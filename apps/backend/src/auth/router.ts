@@ -48,45 +48,56 @@ export function createAuthRouter(deps: AuthDeps): Router {
       return
     }
 
-    const valid = await deps.codeStore.verify(phone, code)
-    if (!valid) {
-      res.status(401).json({ error: 'invalid_code' })
-      return
+    try {
+      const valid = await deps.codeStore.verify(phone, code)
+      if (!valid) {
+        res.status(401).json({ error: 'invalid_code' })
+        return
+      }
+
+      const user = await deps.userStore.findOrCreateByPhone(phone)
+      const token = await deps.jwt.sign({ phone }, user.id)
+
+      res.json({ token, user })
+    } catch (err) {
+      console.error('[auth] verify-otp failed', err)
+      res.status(500).json({ error: 'verification_failed' })
     }
-
-    const user = await deps.userStore.findOrCreateByPhone(phone)
-    const token = await deps.jwt.sign({ phone }, user.id)
-
-    res.json({ token, user })
   })
 
   router.post('/complete-profile', requireAuth(deps.jwt), async (req, res) => {
     const userId = res.locals.userId as string
-    const user = await deps.userStore.findById(userId)
-    if (!user) {
-      res.status(404).json({ error: 'not_found' })
-      return
-    }
 
-    const { name, companyId } = req.body ?? {}
-    const fields: ProfileFields = {}
-    if (name !== undefined) {
-      if (typeof name !== 'string') {
-        res.status(400).json({ error: 'invalid_name' })
+    try {
+      const user = await deps.userStore.findById(userId)
+      if (!user) {
+        res.status(404).json({ error: 'not_found' })
         return
       }
-      fields.name = name
-    }
-    if (companyId !== undefined) {
-      if (typeof companyId !== 'string') {
-        res.status(400).json({ error: 'invalid_company' })
-        return
-      }
-      fields.companyId = companyId
-    }
 
-    const updated = await deps.userStore.update(userId, fields)
-    res.json({ user: updated })
+      const { name, companyId } = req.body ?? {}
+      const fields: ProfileFields = {}
+      if (name !== undefined) {
+        if (typeof name !== 'string') {
+          res.status(400).json({ error: 'invalid_name' })
+          return
+        }
+        fields.name = name
+      }
+      if (companyId !== undefined) {
+        if (typeof companyId !== 'string') {
+          res.status(400).json({ error: 'invalid_company' })
+          return
+        }
+        fields.companyId = companyId
+      }
+
+      const updated = await deps.userStore.update(userId, fields)
+      res.json({ user: updated })
+    } catch (err) {
+      console.error('[auth] complete-profile failed', err)
+      res.status(500).json({ error: 'update_failed' })
+    }
   })
 
   return router

@@ -131,7 +131,7 @@ flowchart LR
 | -- | -- | -- |
 | API Gateway | Higress (Envoy-based) | Single entry point: TLS termination, JWT authentication, distributed rate limiting (via Redis), response caching, canary routing (weighted traffic), request validation, and access logging. |
 | Database | PostgreSQL (Managed RDS or self-hosted) | Shared data store for CMS and Backend. Includes automated backups, read replicas, and encryption at rest. |
-| Cache | Redis (3-node cluster) | Distributed cache for rate-limiting data, session storage, and response caching at the gateway layer. Uses schema separation: `cms.*` for Payload CMS tables, `public.*` for Backend API tables. Migrations are fully isolated; Backend accesses CMS data exclusively via Payload's Local API. |
+| Cache | Redis (3-node cluster) | Distributed cache for rate-limiting data, session storage, and response caching at the gateway layer. Uses schema separation: `cms.*` for Payload CMS tables, `public.*` for Backend API tables. Migrations are fully isolated; Backend accesses CMS data exclusively via Payload's REST API (API-key auth) — never the Local API. |
 | Object Storage | Garage (S3-compatible, distributed) | S3-compatible storage for all file uploads, media assets, and static files managed by Payload CMS. Data is sharded and replicated across three nodes for durability. |
 | Orchestration | Kubernetes (EKS/AKS/GKE or self-managed) | Container orchestration: auto-scaling, self-healing, service discovery, rolling updates, and canary deployments. |
 | Infrastructure as Code | Terraform | Provisions cloud resources: VPC, subnets, Kubernetes cluster, RDS instance, security groups, and IAM roles. Uses remote state and separate workspaces for staging/production. |
@@ -149,7 +149,7 @@ All service codebases are managed in a single monorepo using pnpm workspaces and
 | Network | VPC Isolation | Private subnets for all services |
 | Gateway | TLS 1.3 | cert-manager with Let's Encrypt |
 | Gateway | JWT Auth | Higress JWT plugin (validates, forwards user context as headers) |
-| CMS Auth | Custom | Payload trusts gateway-forwarded user context via custom auth strategy in internal network |
+| CMS Auth | Custom | Payload verifies backend-issued ES256 JWTs via the `backend-jwt` custom strategy (JWKS); editors use Payload's built-in HS256 auth |
 | Gateway | Rate Limiting | Distributed via Redis |
 | Gateway | WAF Protection | Higress WAF plugin |
 | Application | Input Validation | Schema validation, sanitization |
