@@ -1,0 +1,21 @@
+{
+  "name": "@dacho/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend API — framework TBD (Express/NestJS/Fastify). Reads CMS data via Payload Local API.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@dacho/cms-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
