@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto'
+
 import type { ProfileFields, User, UserStore } from './user-store.js'
 
 export type HttpFetcher = (
@@ -27,10 +29,16 @@ export class PayloadUserStore implements UserStore {
     const existing = await this.findByPhone(phone)
     if (existing) return existing
 
+    // Payload's local auth requires an email-or-username and a password on
+    // create; OTP users never log in with either, so supply placeholders they
+    // cannot know. They authenticate via OTP (backend-issued JWT).
+    const email = `${phone}@dacho.local`
+    const password = randomBytes(16).toString('hex')
+
     const res = await this.fetcher(`${this.baseUrl}/api/users`, {
       method: 'POST',
       headers: this.headers(),
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ phone, email, password }),
     })
     const data = await this.ok(res)
     return this.toUser(unwrap(data))
@@ -56,7 +64,12 @@ export class PayloadUserStore implements UserStore {
   }
 
   private async findByPhone(phone: string): Promise<User | undefined> {
-    const url = `${this.baseUrl}/api/users?where[phone][equals]=${encodeURIComponent(phone)}&limit=1&depth=0`
+    const params = new URLSearchParams({
+      'where[phone][equals]': phone,
+      limit: '1',
+      depth: '0',
+    })
+    const url = `${this.baseUrl}/api/users?${params.toString()}`
     const res = await this.fetcher(url, { headers: this.headers() })
     const data = await this.ok(res)
     const docs = (data as { docs?: unknown[] }).docs ?? []

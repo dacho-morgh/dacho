@@ -14,6 +14,10 @@
     "./utilities": {
       "types": "./src/utilities/index.ts",
       "default": "./src/utilities/index.ts"
+    },
+    "./auth": {
+      "types": "./src/auth/backendJwtStrategy.ts",
+      "default": "./src/auth/backendJwtStrategy.ts"
     }
   },
   "scripts": {
@@ -28,6 +32,7 @@
     "@payloadcms/plugin-search": "3.86.0",
     "@payloadcms/plugin-seo": "3.86.0",
     "@payloadcms/richtext-lexical": "3.86.0",
+    "jose": "^5.10.0",
     "next": "^16.3.0",
     "payload": "3.86.0",
     "sharp": "^0.35.3"

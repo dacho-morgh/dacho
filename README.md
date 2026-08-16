@@ -9,7 +9,7 @@ See [`docs/linear/back-end-system-design.md`](docs/linear/back-end-system-design
 | Package | Kind | Stack | Role |
 |---|---|---|---|
 | `apps/frontend` | deployable | Next.js 16 + Payload 3 | Fused CMS + public site — admin panel, REST/GraphQL API, and the public site in one app |
-| `apps/backend` | deployable | Node.js + TypeScript | Workflow engine and business-logic APIs (Express; currently a placeholder scaffold) |
+| `apps/backend` | deployable | Node.js + TypeScript | Application auth (OTP-first, ES256 JWT, `POST /auth/*` + JWKS) and, upcoming, the workflow engine + business-logic APIs (Express) |
 | `packages/cms-core` | library | Payload 3 | **React-free** CMS domain: config, collections, globals, fields, hooks, access control, migrations, and generated `payload-types.ts` |
 
 ## Dependency graph
@@ -28,19 +28,34 @@ apps/backend  ──▶ packages/cms-core
 ```
 apps/
   frontend/         # Fused CMS + site (Next.js + Payload)
-  backend/          # Express API (scaffold)
+  backend/          # Express API — OTP auth (ES256 JWT), future workflow engine
 packages/
   cms-core/         # React-free CMS domain + generated types + migrations
 ```
 
 ## Environment variables
 
+### Frontend (`apps/frontend/.env`)
+
 Required — the config **throws on startup** if these are missing (no silent empty defaults):
 
-- `DATABASE_URL` — Postgres connection string.
+- `DATABASE_URL` — Postgres connection string (`postgres://dacho:dacho@localhost:5432/dacho-cms`).
 - `PAYLOAD_SECRET` — signs Payload auth/JWT tokens.
 
-Optional: `NEXT_PUBLIC_SERVER_URL` (defaults to `http://localhost:3000`), `CRON_SECRET`, `PREVIEW_SECRET`.
+Optional: `NEXT_PUBLIC_SERVER_URL` (defaults to `http://localhost:3000`), `CRON_SECRET`, `PREVIEW_SECRET`, `BACKEND_JWKS_URL` (JWKS URL the `backend-jwt` strategy uses to verify backend-issued ES256 tokens).
+
+### Backend (`apps/backend`)
+
+Required — `loadConfig` throws at startup if these are missing/empty:
+
+- `DATABASE_URL` — Postgres connection string.
+- `JWT_PRIVATE_KEY` — PKCS8 PEM (ES256) signing key.
+- `PAYLOAD_URL` — Payload REST base URL (e.g. `http://localhost:3000`).
+- `PAYLOAD_API_KEY` — service-account API key (from `pnpm --filter @dacho/frontend seed:service-account`).
+
+Optional: `PORT` (default `4000`), `JWT_KID` (default `dacho-backend`), `OTP_DELIVERY` (`console` | `kavenegar`, default `console`). When `OTP_DELIVERY=kavenegar`, `KAVENEGAR_API_KEY` + `KAVENEGAR_TEMPLATE` are required.
+
+Templates: root `.env.example` (backend) and `apps/frontend/.env.example` (frontend).
 
 ## Prerequisites
 

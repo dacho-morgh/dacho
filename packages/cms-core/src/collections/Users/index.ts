@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { authenticated } from '@cms-core/access/authenticated'
+import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -25,6 +26,8 @@ export const Users: CollectionConfig = {
       requireEmail: false,
       requireUsername: false,
     },
+    // Verify backend-issued ES256 JWTs (from the OTP flow) against its JWKS.
+    strategies: [createBackendJwtStrategy(process.env.BACKEND_JWKS_URL)],
   },
   fields: [
     {

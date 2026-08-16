@@ -22,7 +22,7 @@ function mockFetcher(handler: (url: string, init?: { method?: string }) => { sta
 describe('PayloadUserStore', () => {
   it('finds an existing user by phone without creating', async () => {
     const { fetcher, calls } = mockFetcher((url) =>
-      url.includes('where[phone]')
+      url.includes('where%5Bphone%5D')
         ? { status: 200, body: { docs: [{ id: 'u1', phone: '0912', name: 'Ali' }] } }
         : { status: 404, body: {} },
     )
@@ -36,7 +36,7 @@ describe('PayloadUserStore', () => {
 
   it('creates a user when none exists for the phone', async () => {
     const { fetcher, calls } = mockFetcher((url, init) => {
-      if (url.includes('where[phone]')) return { status: 200, body: { docs: [] } }
+      if (url.includes('where%5Bphone%5D')) return { status: 200, body: { docs: [] } }
       if (init?.method === 'POST') return { status: 200, body: { doc: { id: 'u2', phone: '0912' } } }
       return { status: 404, body: {} }
     })
@@ -47,12 +47,15 @@ describe('PayloadUserStore', () => {
     expect(user.id).toBe('u2')
     const post = calls.find((c) => c.method === 'POST')!
     expect(post.url).toBe('http://cms:3000/api/users')
-    expect(JSON.parse(post.body!)).toEqual({ phone: '0912' })
+    const body = JSON.parse(post.body!)
+    expect(body.phone).toBe('0912')
+    expect(body.email).toBe('0912@dacho.local')
+    expect(body.password).toBeTruthy() // placeholders Payload requires
   })
 
   it('authenticates with the users API key', async () => {
     const { fetcher, calls } = mockFetcher((url) =>
-      url.includes('where[phone]')
+      url.includes('where%5Bphone%5D')
         ? { status: 200, body: { docs: [{ id: 'u', phone: '0912' }] } }
         : { status: 404, body: {} },
     )
