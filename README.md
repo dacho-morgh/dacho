@@ -9,30 +9,52 @@ See [`docs/back-end-system-design.md`](docs/back-end-system-design.md) for the f
 | Package | Kind | Stack | Role |
 |---|---|---|---|
 | `apps/frontend` | deployable | Next.js 16 + Payload 3 | Fused CMS + public site — admin panel, REST/GraphQL API, and the public site in one app |
-| `apps/backend` | deployable | Node.js + TypeScript | Business logic and data APIs (framework TBD: Express/NestJS/Fastify) |
-| `packages/cms-core` | library | Payload 3 | **React-free** CMS domain definition: config, collections, globals, fields, hooks, access control, and generated `payload-types.ts`. No Next.js, no React. |
+| `apps/backend` | deployable | Node.js + TypeScript | Workflow engine and business-logic APIs (Express; currently a placeholder scaffold) |
+| `packages/cms-core` | library | Payload 3 | **React-free** CMS domain: config, collections, globals, fields, hooks, access control, migrations, and generated `payload-types.ts` |
+
+## Dependency graph
+
+```
+apps/frontend ──▶ packages/cms-core ──▶ payload, @payloadcms/*, next, sharp
+apps/backend  ──▶ packages/cms-core
+```
+
+- **Direction is one-way:** `frontend → cms-core → frameworks`, and `backend → cms-core`. `cms-core` never imports from `frontend` or `backend`.
+- **Cross-package** imports use the package name: `@dacho/cms-core` (config + types) and `@dacho/cms-core/utilities` (client-safe `getURL`/`canUseDOM` — deliberately excluded from the config barrel so client components don't bundle the server stack).
+- **Internal aliases:** `@cms-core/*` → `packages/cms-core/src/*` (used inside cms-core, avoiding `../` traversal), and `@/*` → `apps/frontend/src/*` (inside the frontend). Both are declared in their package's `tsconfig.json`; the frontend's tsconfig also maps `@cms-core/*` so cms-core files resolve correctly when transpiled from the app.
 
 ## Layout
 
 ```
 apps/
   frontend/         # Fused CMS + site (Next.js + Payload)
-  backend/          # Node.js/TypeScript API
+  backend/          # Express API (scaffold)
 packages/
-  cms-core/         # React-free CMS domain + generated types
+  cms-core/         # React-free CMS domain + generated types + migrations
 ```
+
+## Environment variables
+
+Required — the config **throws on startup** if these are missing (no silent empty defaults):
+
+- `DATABASE_URL` — Postgres connection string.
+- `PAYLOAD_SECRET` — signs Payload auth/JWT tokens.
+
+Optional: `NEXT_PUBLIC_SERVER_URL` (defaults to `http://localhost:3000`), `CRON_SECRET`, `PREVIEW_SECRET`.
 
 ## Prerequisites
 
-- Node.js ≥ 20.9
-- pnpm ≥ 9
-- PostgreSQL (for the Payload admin panel — `DATABASE_URL`)
+- Node.js ≥ 20.19
+- pnpm ≥ 11 (the workspace uses pnpm 11 `allowBuilds`)
+- PostgreSQL
 
 ## Getting started
 
 ```bash
 pnpm install
 cp apps/frontend/.env.example apps/frontend/.env   # set DATABASE_URL + PAYLOAD_SECRET
+docker compose -p dacho -f apps/frontend/docker-compose.yml up -d postgres
+pnpm --filter @dacho/frontend payload migrate       # apply schema from cms-core/src/migrations
 pnpm dev
 ```
 
@@ -44,26 +66,44 @@ pnpm dev
 ## Commands
 
 ```bash
-pnpm dev          # run all workspace dev servers
-pnpm build        # build all packages (turbo)
-pnpm typecheck    # typecheck all packages (turbo)
+pnpm dev            # run all workspace dev servers
+pnpm build          # build all packages (turbo)
+pnpm typecheck      # typecheck all packages (turbo)
+pnpm lint           # lint all packages (turbo)
+
+# Tests (need a running Postgres)
+pnpm --filter @dacho/frontend test:int   # vitest integration tests (Node environment)
+pnpm --filter @dacho/frontend test:e2e   # Playwright (needs seeded content — see below)
 ```
+
+## Migrations
+
+Migrations live in `packages/cms-core/src/migrations` — cms-core owns the schema. The adapter's `migrationDir` is pinned there so the default resolver (which looks relative to `process.cwd()`) can't miss them when building from the frontend:
+
+```bash
+pnpm --filter @dacho/frontend payload migrate
+```
+
+In dev, Payload pushes the schema directly; in production builds it applies the migrations.
 
 ## Code generation
 
-Two generated artifacts are owned by different packages — keep them in sync:
+Both generated artifacts are produced **from the frontend** (it owns `.env` and the custom admin components):
 
 ```bash
-# CMS types — generated in place inside cms-core (typescript.outputFile)
-cd packages/cms-core && pnpm generate:types
-
-# Admin import map — generated in the frontend (importMap.baseDir injected there)
-cd apps/frontend && pnpm generate:importmap
+cd apps/frontend
+pnpm generate:types       # writes packages/cms-core/src/payload-types.ts (config's typescript.outputFile)
+pnpm generate:importmap   # writes apps/frontend/src/app/(payload)/admin/importMap.js
 ```
+
+## Tests & seeding
+
+- `test:int` runs `tests/int/**/*.int.spec.ts` against a real Postgres. The environment is `node` (not `jsdom`) because the spec bootstraps the full Payload config.
+- `test:e2e` runs Playwright against `pnpm dev` (browser: Playwright 1.61, chromium). The homepage spec expects seeded content — seed first via `POST /next/seed` (there's a "Seed" button on the admin dashboard) or directly against `apps/frontend/src/endpoints/seed/`. Seeding downloads placeholder images from a remote URL, so it needs network access.
 
 ## Architecture notes
 
-- **`cms-core` is React-free.** It holds the entire Payload domain (config, collections, globals, fields, hooks, access) and the generated types — nothing else. Custom admin components (custom fields, blocks, login screens) live in `apps/frontend`, keeping the domain package server-only.
+- **`cms-core` is React-free.** It holds the entire Payload domain (config, collections, globals, fields, hooks, access) and the generated types — nothing else. Custom admin components (custom fields, blocks, login screens) live in `apps/frontend`, keeping the domain package server-only. The only `@/` references inside cms-core are *string* component identifiers (`'@/components/BeforeLogin'`, `'@/Header/RowLabel#RowLabel'`) resolved by the frontend's import map at runtime — not TypeScript imports.
 - **The frontend re-exports the CMS config** via a thin `src/payload.config.ts` wrapper. It imports `@dacho/cms-core`, awaits it, and injects its own `admin.importMap.baseDir` so `payload generate:importmap` writes into the frontend, where those components live.
 - **`buildConfig()` is async.** Payload 3's `buildConfig` returns `Promise<SanitizedConfig>`, not a plain object. Any consumer of `@dacho/cms-core`'s default export **must `await` it** before spreading or reading `collections`/`db`/`editor`.
 - **Backend reads CMS data via Payload's API** — no direct table access; it consumes types from `@dacho/cms-core`.

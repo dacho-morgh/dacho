@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: dacho
+      POSTGRES_PASSWORD: dacho
+      POSTGRES_DB: dacho-cms
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'dacho']
+      interval: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: postgres://dacho:dacho@postgres:5432/dacho-cms
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  swagger:
+    image: swaggerapi/swagger-ui:v5.17.14
+    environment:
+      SWAGGER_JSON_URL: http://app:3000/api/openapi.json
+    ports:
+      - '127.0.0.1:8080:8080'
+
+volumes:
+  pgdata:

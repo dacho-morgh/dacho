@@ -17,6 +17,10 @@ dist/
 npm-debug.log*
 pnpm-debug.log*
 
+# playwright
+test-results/
+playwright-report/
+
 # editor/os
 .DS_Store
 .vscode/*

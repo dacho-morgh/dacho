@@ -2,7 +2,7 @@
   "name": "@dacho/cms-core",
   "version": "0.1.0",
   "private": true,
-  "description": "React-free Payload CMS domain: config, collections, globals, fields, hooks, access, and generated types. No Next.js, no React.",
+  "description": "React-free Payload CMS domain: config, collections, globals, fields, hooks, access, and generated types. No React.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -10,6 +10,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./utilities": {
+      "types": "./src/utilities/index.ts",
+      "default": "./src/utilities/index.ts"
     }
   },
   "scripts": {
@@ -18,7 +22,13 @@
   },
   "dependencies": {
     "@payloadcms/db-postgres": "3.86.0",
+    "@payloadcms/plugin-form-builder": "3.86.0",
+    "@payloadcms/plugin-nested-docs": "3.86.0",
+    "@payloadcms/plugin-redirects": "3.86.0",
+    "@payloadcms/plugin-search": "3.86.0",
+    "@payloadcms/plugin-seo": "3.86.0",
     "@payloadcms/richtext-lexical": "3.86.0",
+    "next": "^16.3.0",
     "payload": "3.86.0",
     "sharp": "^0.35.3"
   },
