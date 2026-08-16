@@ -2,7 +2,7 @@
 
 Production-ready, self-hosted architecture for **dacho innovation fun**. Two deployable services plus a shared, React-free CMS domain package, in one pnpm + Turborepo monorepo.
 
-See [`docs/back-end-system-design.md`](docs/back-end-system-design.md) for the full architecture.
+See [`docs/linear/back-end-system-design.md`](docs/linear/back-end-system-design.md) for the full architecture.
 
 ## Packages
 

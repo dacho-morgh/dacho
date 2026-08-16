@@ -62,7 +62,9 @@ _Avoid_: dashboard, console
 - **Backend owns instances** (requests, step history, assignments) in `public.*`; it fetches definitions via Payload's API.
 - **Dynamic form answers are stored as JSONB** on the request, validated against the CMS form schema at submission.
 - **Workflow engine is the backend's core domain** — it interprets the CMS-defined workflow and enforces role-gated transitions.
-- **Backend framework: Express.** Auth: backend issues JWT (company/reviewer/staff); Payload admin uses its own users auth for editors; shared users collection.
+- **Backend framework: Express.**
+- **Authentication** (→ `docs/linear/authentication.md`): one central `users` collection is the identity store; **users are the principals**, belonging to a separate `companies` collection. App auth is backend-owned and OTP-first (request-otp → verify-otp → complete-profile → optional username/password); the backend issues **asymmetric JWTs** (ES256). Payload keeps email+password auth for editors. Credentials are progressive — `phone` required, `email`/`username`/`password` optional.
+- **Authorization** (→ `docs/linear/authorization.md`): **roles are the permission unit (RBAC)** — a dynamic `Role` collection (many-to-many with users) grants general permissions, and workflow steps reference roles for gating. One model, no separate permission mechanism.
 - **Database:** single PostgreSQL, two schemas (`cms.*` + `public.*`), self-hosted.
 - **Domain names:** working subdomains until the client provides real ones.
 - **Email:** deferred — v1 uses in-app notifications only.
