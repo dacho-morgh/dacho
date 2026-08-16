@@ -50,6 +50,19 @@ application auth:
 4. optional `set username+password` → enables password login on later visits.
 5. `login` (username+password) → for returning users who set credentials.
 
+### OTP delivery (decided)
+
+The one-time code reaches the user through a swappable **`OtpDelivery` interface**:
+
+- **`ConsoleOtpDelivery`** — dev/stub default: logs (or returns) the code so the
+  flow is testable with zero external dependencies.
+- **`KavenegarOtpDelivery`** — production SMS adapter using Kavenegar's
+  `verify/lookup.json` (pre-registered `%token` template); selected via env
+  (`OTP_DELIVERY=console|kavenegar`).
+
+The interface is the seam: `request-otp` calls `delivery.send(phone, code)` and
+never knows which backend is configured.
+
 ### Asymmetric authentication (both services)
 
 Both the backend and Payload use **asymmetric JWT** (ES256 recommended): a
@@ -67,7 +80,7 @@ can be verified across services without distributing a secret.
 
 ## Open questions (implementation detail)
 
-- [ ] ES256 vs RS256 (recommend ES256).
+- [x] ES256 vs RS256 — **ES256** (locked).
 - [ ] Key management: JWKS endpoint, key rotation, where private keys live.
 - [ ] Payload asymmetric wiring: custom strategy + custom login vs a dedicated
       auth plugin.
