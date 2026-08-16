@@ -473,3 +473,14 @@ This architecture is production-grade and battle-tested, combining:
 * Full self-hosting with no vendor lock-in
 
 All components are open-source, self-hosted, and ready for production at scale.
+
+---
+
+## Authentication & Authorization
+
+Detailed specifications live in dedicated documents:
+
+- **[Authentication](https://linear.app/dacho/document/authentication-9ef52b3f5c63)** — identity model (central `users` collection, `companies` as orgs), OTP-first application auth, asymmetric JWT (ES256).
+- **[Authorization](https://linear.app/dacho/document/authorization-3698cc7f4c72)** — roles as the RBAC permission unit, workflow-step gating.
+
+Repo counterparts: `docs/linear/authentication.md`, `docs/linear/authorization.md`.
