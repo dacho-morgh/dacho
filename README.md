@@ -53,7 +53,7 @@ Optional: `NEXT_PUBLIC_SERVER_URL` (defaults to `http://localhost:3000`), `CRON_
 ```bash
 pnpm install
 cp apps/frontend/.env.example apps/frontend/.env   # set DATABASE_URL + PAYLOAD_SECRET
-docker compose -p dacho -f apps/frontend/docker-compose.yml up -d postgres
+docker compose up -d postgres
 pnpm --filter @dacho/frontend payload migrate       # apply schema from cms-core/src/migrations
 pnpm dev
 ```
