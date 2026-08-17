@@ -29,6 +29,9 @@ const nextConfig: NextConfig = {
         pathname: '/figma/**',
         search: '',
       },
+      {
+        pathname: '/images/**',
+      },
     ],
     qualities: [100],
     remotePatterns: [

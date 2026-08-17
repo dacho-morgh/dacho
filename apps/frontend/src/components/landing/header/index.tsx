@@ -1,18 +1,21 @@
 'use client'
-
+import { usePathname } from 'next/navigation'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import NavList from './nav'
 
 gsap.registerPlugin(useGSAP, ScrollTrigger)
 
 const Header = () => {
   const headerRef = useRef<HTMLElement>(null)
+  const pathname = usePathname()
 
   useGSAP(() => {
+    if (pathname?.startsWith('/dashboard')) return
     gsap.to(headerRef.current, {
       width: '50rem',
       paddingLeft: 0,
@@ -27,6 +30,10 @@ const Header = () => {
     })
   })
 
+  if (pathname?.startsWith('/dashboard')) {
+    return null
+  }
+
   return (
     <header ref={headerRef} className="sticky top-0 z-20 mx-auto w-7xl max-w-7xl py-5 text-nowrap">
       <div className="flex items-center justify-between rounded-[20px] border border-white bg-white/20 p-2.5 shadow-[0px_2px_16px_0px_#0A0A0A1A] backdrop-blur supports-backdrop-filter:bg-white/60">
@@ -38,9 +45,11 @@ const Header = () => {
         <NavList />
 
         <div className="flex flex-1 justify-end">
-          <Button className="flex h-10 w-20 justify-center bg-[#3B82F6] p-0 text-white">
-            ورود
-          </Button>
+          <Link href="/dashboard">
+            <Button className="flex h-10 w-24 justify-center bg-[#3B82F6] hover:bg-[#2563EB] p-0 text-white cursor-pointer">
+              ورود به پنل
+            </Button>
+          </Link>
         </div>
       </div>
     </header>
