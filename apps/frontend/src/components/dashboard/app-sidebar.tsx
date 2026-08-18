@@ -4,7 +4,6 @@ import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { ChevronDown } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -20,12 +19,15 @@ import {
   LettersIcon,
   EventsIcon,
   MoreOptionsIcon,
+  FundLogoMark,
+  FundLogoType,
+  type SidebarIconProps,
 } from '@/components/dashboard/icons/sidebar-icons'
 
 export interface NavItem {
   title: string
   href: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<SidebarIconProps>
   exact?: boolean
 }
 
@@ -60,7 +62,6 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({
   companyName = 'نام شرکت نمونه',
-  fundName = 'نام صندوق',
   className,
   ...props
 }: AppSidebarProps) {
@@ -71,46 +72,32 @@ export function AppSidebar({
       side="right"
       variant="sidebar"
       collapsible="offcanvas"
-      className={`border-l border-slate-100 bg-white font-sans ${className || ''}`}
+      className={`border-l border-neutral-200 bg-white font-sans ${className || ''}`}
       {...props}
     >
       <div className="flex h-full w-[268px] flex-col justify-between px-4 py-10">
-        {/* Top Section: Header & Menu */}
-        <div className="flex flex-col gap-5">
-          {/* Header / Fund Brand (Frame 38) */}
+        {/* Top Section: Header / Logo & Navigation Menu */}
+        <div className="flex flex-col gap-6">
+          {/* Header / Brand Logo & Logotype */}
           <SidebarHeader className="p-0">
             <Link
               href="/dashboard"
-              className="flex items-center justify-center gap-2.5 transition-opacity hover:opacity-90"
+              className="flex items-center justify-start gap-2.5 px-1 transition-opacity hover:opacity-90"
+              title="صفحه اصلی داشبورد"
             >
-              {/* Fund Logo Badge */}
-              <div className="relative flex h-7 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg">
-                <Image
-                  src="/figma/dashboard/fund-logo.png"
-                  alt={fundName}
-                  width={40}
-                  height={28}
-                  className="h-full w-full object-contain"
-                  onError={(e) => {
-                    // Fallback to vector icon if image fails to render
-                    e.currentTarget.style.display = 'none'
-                  }}
-                />
-              </div>
-
-              {/* Fund Name */}
-              <span className="text-xl font-bold tracking-tight text-[#2563EB]">
-                {fundName}
-              </span>
+              {/* Logomark (46x40) */}
+              <FundLogoMark className="h-10 w-[46px] shrink-0" />
+              {/* Logotype (113x40) */}
+              <FundLogoType className="h-10 w-[113px] shrink-0" />
             </Link>
           </SidebarHeader>
 
           {/* Divider Line (Vector 1) */}
-          <div className="h-px w-full bg-slate-100" />
+          <div className="h-px w-full bg-neutral-200" />
 
           {/* Navigation Menu (Frame 2) */}
           <SidebarContent className="p-0 overflow-visible">
-            <SidebarMenu className="flex flex-col gap-3">
+            <SidebarMenu className="flex flex-col gap-2">
               {defaultNavItems.map((item) => {
                 const isActive = item.exact
                   ? pathname === item.href
@@ -120,41 +107,35 @@ export function AppSidebar({
                 return (
                   <SidebarMenuItem key={item.href} className="relative">
                     <div className="flex w-full items-center gap-2">
-                      {/* Active Indicator Bar (Rectangle 2 - 4x28px rounded) */}
+                      {/* Active Indicator Bar (Rectangle 2 - 4x28px rounded pill) on right side in RTL */}
                       <span
                         className={`h-7 w-1 shrink-0 rounded-full transition-all duration-200 ${
-                          isActive ? 'bg-[#3B82F6] opacity-100' : 'bg-transparent opacity-0'
+                          isActive ? 'bg-[#2563EB] opacity-100' : 'bg-transparent opacity-0'
                         }`}
                         aria-hidden="true"
                       />
 
-                      {/* Menu Button Container */}
+                      {/* Menu Button Container: active selected is #2563EB, active hover bg is #DBEAFE */}
                       <SidebarMenuButton
                         asChild
                         isActive={isActive}
-                        className={`group relative flex h-10 w-full flex-1 items-center justify-between rounded-xl px-3 transition-all duration-150 ${
+                        className={`group relative flex h-10 w-full flex-1 items-center rounded-[12px] px-3 py-2 transition-all duration-150 ${
                           isActive
-                            ? 'bg-[#EEF2FF] text-[#2563EB] font-medium shadow-none'
-                            : 'bg-transparent text-[#525252] font-normal hover:bg-slate-50 hover:text-slate-900'
+                            ? 'bg-[#EEF2FF] text-[#2563EB] font-semibold hover:bg-[#DBEAFE] hover:text-[#2563EB] active:bg-[#BFDBFE]'
+                            : 'bg-transparent text-[#525252] font-normal hover:bg-neutral-100 hover:text-neutral-900'
                         }`}
                       >
-                        <Link href={item.href} className="flex w-full items-center justify-between">
-                          {/* Right: Icon & Label */}
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              className={`h-6 w-6 shrink-0 transition-colors ${
-                                isActive ? 'text-[#2563EB]' : 'text-[#525252] group-hover:text-slate-900'
-                              }`}
-                            />
-                            <span className="text-base leading-7 truncate">{item.title}</span>
-                          </div>
-
-                          {/* Left: Chevron / Accessory for active item */}
-                          {isActive ? (
-                            <ChevronDown className="h-4 w-4 shrink-0 text-[#2563EB]" />
-                          ) : (
-                            <span className="w-4" />
-                          )}
+                        <Link href={item.href} className="flex w-full items-center gap-2.5">
+                          {/* Icon (24x24px): Bulk/Fill when active (#2563EB), Linear when inactive */}
+                          <Icon
+                            variant={isActive ? 'bulk' : 'linear'}
+                            className={`size-6 shrink-0 transition-colors ${
+                              isActive
+                                ? 'text-[#2563EB] group-hover:text-[#2563EB]'
+                                : 'text-[#525252] group-hover:text-neutral-900'
+                            }`}
+                          />
+                          <span className="text-base leading-7 truncate">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </div>
@@ -170,13 +151,16 @@ export function AppSidebar({
           <div className="flex h-10 w-full items-center justify-between">
             {/* Right: Company Avatar & Name (Frame 40) */}
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg shadow-sm border border-slate-100/80">
+              <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-neutral-200/80 shadow-2xs">
                 <Image
                   src="/figma/dashboard/company-avatar.png"
                   alt={companyName}
                   width={40}
                   height={40}
-                  className="h-full w-full object-cover"
+                  className="size-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                  }}
                 />
               </div>
               <span className="truncate text-sm font-semibold text-[#525252] leading-6">
@@ -187,10 +171,10 @@ export function AppSidebar({
             {/* Left: Three Dots Action Button */}
             <button
               type="button"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-              title="تنظیمات و خروج"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition-colors cursor-pointer"
+              title="تنظیمات و گزینه‌ها"
             >
-              <MoreOptionsIcon className="h-6 w-6 text-[#525252]" />
+              <MoreOptionsIcon className="size-6 text-[#525252]" />
               <span className="sr-only">گزینه‌های بیشتر</span>
             </button>
           </div>
