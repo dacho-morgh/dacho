@@ -21,6 +21,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       className={cn(yekanBakh.variable, GeistMono.variable)}
       dir="rtl"
       lang="fa"
+      data-theme="light"
       suppressHydrationWarning
     >
       <head>

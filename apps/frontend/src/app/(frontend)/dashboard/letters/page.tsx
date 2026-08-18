@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import React from 'react'
-import { DashboardLayout } from '@/components/dashboard/dashboard-layout'
 import { InboxListView } from '@/components/dashboard/inbox-list-view'
 
 export const metadata: Metadata = {
@@ -10,10 +9,8 @@ export const metadata: Metadata = {
 
 export default function LettersPage() {
   return (
-    <DashboardLayout>
-      <div className="pb-12">
-        <InboxListView />
-      </div>
-    </DashboardLayout>
+    <div className="p-6 sm:p-8 pb-12">
+      <InboxListView />
+    </div>
   )
 }
