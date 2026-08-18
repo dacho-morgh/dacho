@@ -2,9 +2,11 @@
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { Search as SearchIcon, X, XCircle } from "lucide-react"
+import { XCircle } from "lucide-react"
 
 import { cn } from "@/utilities/ui"
+import { SearchIcon } from "public/images/dashboard/search-icon"
+
 
 /**
  * Sandoq Design System Input Variants (Figma node 26:5317)
@@ -211,7 +213,7 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         defaultValue={defaultValue}
         onChange={handleChange}
         placeholder={placeholder}
-        startIcon={<SearchIcon className="size-5 text-neutral-400" />}
+        startIcon={<SearchIcon className="size-5 text-[#D4D4D4]" />}
         endIcon={
           showClearButton && hasValue ? (
             <button
@@ -233,4 +235,4 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
 )
 SearchInput.displayName = "SearchInput"
 
-export { Input, SearchInput, inputContainerVariants }
+export { Input, SearchInput, SearchIcon, inputContainerVariants }
