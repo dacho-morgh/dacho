@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import React from 'react'
-import { RequestsListView } from '@/components/dashboard/requests-list-view'
+import { RequestsListView } from '@/components/dashboard/requests'
 
 export const metadata: Metadata = {
   title: 'لیست درخواست‌ها | کارخانه نوآوری',
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RequestsPage() {
   return (
-    <div className="p-6 sm:p-8 pb-12">
+    <div className="flex flex-1 flex-col bg-neutral-50 px-4 pt-6 pb-4 sm:pt-10">
       <RequestsListView />
     </div>
   )

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import React from 'react'
 import { StatCards } from '@/components/dashboard/stat-cards'
 import { ServicesQuickAccess } from '@/components/dashboard/services-quick-access'
-import { RequestsTable } from '@/components/dashboard/requests-table'
+import { RequestsTable } from '@/components/dashboard/requests'
 import { RecentActivities } from '@/components/dashboard/recent-activities'
 
 export const metadata: Metadata = {
