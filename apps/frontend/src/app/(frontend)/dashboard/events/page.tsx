@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import React from 'react'
-import { DashboardLayout } from '@/components/dashboard/dashboard-layout'
 import { EventsView } from '@/components/dashboard/events-view'
 
 export const metadata: Metadata = {
@@ -10,10 +9,8 @@ export const metadata: Metadata = {
 
 export default function EventsPage() {
   return (
-    <DashboardLayout>
-      <div className="pb-12">
-        <EventsView />
-      </div>
-    </DashboardLayout>
+    <div className="p-6 sm:p-8 pb-12">
+      <EventsView />
+    </div>
   )
 }

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import React from 'react'
-import { DashboardLayout } from '@/components/dashboard/dashboard-layout'
 import { MailDetailView } from '@/components/dashboard/mail-detail-view'
 
 export const metadata: Metadata = {
@@ -15,13 +14,11 @@ interface PageProps {
 }
 
 export default async function InboxDetailPage({ params }: PageProps) {
-  const { id } = await params
+  const { id: _id } = await params
 
   return (
-    <DashboardLayout>
-      <div className="pb-12">
-        <MailDetailView />
-      </div>
-    </DashboardLayout>
+    <div className="p-6 sm:p-8 pb-12">
+      <MailDetailView />
+    </div>
   )
 }

@@ -1,10 +1,7 @@
 'use client'
 
 import type { Theme } from '@/providers/Theme/types'
-
 import React, { createContext, useCallback, use, useState } from 'react'
-
-import { canUseDOM } from '@dacho/cms-core/utilities'
 
 export interface ContextType {
   headerTheme?: Theme | null
@@ -12,19 +9,17 @@ export interface ContextType {
 }
 
 const initialContext: ContextType = {
-  headerTheme: undefined,
+  headerTheme: 'light',
   setHeaderTheme: () => null,
 }
 
 const HeaderThemeContext = createContext(initialContext)
 
 export const HeaderThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [headerTheme, setThemeState] = useState<Theme | undefined | null>(
-    canUseDOM ? (document.documentElement.getAttribute('data-theme') as Theme) : undefined,
-  )
+  const [headerTheme, setThemeState] = useState<Theme | undefined | null>('light')
 
-  const setHeaderTheme = useCallback((themeToSet: Theme | null) => {
-    setThemeState(themeToSet)
+  const setHeaderTheme = useCallback((_themeToSet: Theme | null) => {
+    setThemeState('light')
   }, [])
 
   return <HeaderThemeContext value={{ headerTheme, setHeaderTheme }}>{children}</HeaderThemeContext>
