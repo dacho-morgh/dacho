@@ -118,6 +118,59 @@ const typographyVariants = cva("font-sans antialiased text-foreground", {
   },
 })
 
+type TypographyVariant = NonNullable<VariantProps<typeof typographyVariants>["variant"]>
+
+const variantAliases: Partial<Record<TypographyVariant, `${number}/${string}`>> = {
+  "display-48": "48/bold",
+  h1: "40/bold",
+  h2: "32/bold",
+  h3: "24/bold",
+  h4: "20/bold",
+  title: "20/semibold",
+  "body-lg": "16/regular",
+  "body-16": "16/regular",
+  body: "14/regular",
+  "body-md": "14/regular",
+  "body-14": "14/regular",
+  caption: "12/regular",
+  "body-sm": "12/regular",
+  "body-12": "12/regular",
+  "caption-xs": "10/light",
+}
+
+const lineHeights: Record<string, string> = {
+  "48": "74px",
+  "40": "60px",
+  "32": "48px",
+  "24": "36px",
+  "20": "32px",
+  "16": "28px",
+  "14": "24px",
+  "12": "20px",
+  "10": "14px",
+}
+
+const fontWeights: Record<string, number> = {
+  light: 300,
+  regular: 400,
+  semibold: 600,
+  bold: 700,
+  extrabold: 800,
+  black: 900,
+}
+
+function responsiveVariantVariables(breakpoint: "sm" | "md" | "lg", variant?: TypographyVariant) {
+  if (!variant) return {}
+
+  const [size, weight] = (variantAliases[variant] || variant).split("/")
+
+  return {
+    [`--typography-${breakpoint}-size`]: `${size}px`,
+    [`--typography-${breakpoint}-leading`]: lineHeights[size],
+    [`--typography-${breakpoint}-weight`]: fontWeights[weight],
+  }
+}
+
 type VariantElementMap = Record<string, React.ElementType>
 
 const defaultElementMap: VariantElementMap = {
@@ -166,6 +219,9 @@ const defaultElementMap: VariantElementMap = {
 export type TypographyProps<T extends React.ElementType = "p"> = {
   as?: T
   asChild?: boolean
+  sm?: TypographyVariant
+  md?: TypographyVariant
+  lg?: TypographyVariant
   className?: string
   children?: React.ReactNode
 } & VariantProps<typeof typographyVariants> &
@@ -175,10 +231,14 @@ function Typography<T extends React.ElementType = "p">({
   as,
   asChild = false,
   variant = "body",
+  sm,
+  md,
+  lg,
   weight,
   color,
   className,
   children,
+  style,
   ...props
 }: TypographyProps<T>) {
   const Component = asChild ? Slot.Root : as || (variant ? defaultElementMap[variant] : "p") || "p"
@@ -187,7 +247,22 @@ function Typography<T extends React.ElementType = "p">({
     <Component
       data-slot="typography"
       data-variant={variant}
-      className={cn(typographyVariants({ variant, weight, color, className }))}
+      className={cn(
+        typographyVariants({ variant, weight, color }),
+        sm &&
+          "sm:text-[length:var(--typography-sm-size)] sm:leading-[var(--typography-sm-leading)] sm:font-[var(--typography-sm-weight)]",
+        md &&
+          "md:text-[length:var(--typography-md-size)] md:leading-[var(--typography-md-leading)] md:font-[var(--typography-md-weight)]",
+        lg &&
+          "lg:text-[length:var(--typography-lg-size)] lg:leading-[var(--typography-lg-leading)] lg:font-[var(--typography-lg-weight)]",
+        className,
+      )}
+      style={{
+        ...responsiveVariantVariables("sm", sm),
+        ...responsiveVariantVariables("md", md),
+        ...responsiveVariantVariables("lg", lg),
+        ...style,
+      }}
       {...props}
     >
       {children}

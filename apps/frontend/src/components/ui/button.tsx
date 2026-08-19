@@ -94,22 +94,81 @@ const buttonVariants = cva(
   }
 )
 
+type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>["size"]>
+
+const buttonSizeAliases: Partial<Record<ButtonSize, ButtonSize>> = {
+  default: "40",
+  xs: "32",
+  sm: "32",
+  md: "36",
+  lg: "40",
+  xl: "48",
+  icon: "icon-40",
+  "icon-xs": "icon-32",
+  "icon-sm": "icon-32",
+  "icon-md": "icon-36",
+  "icon-lg": "icon-40",
+  "icon-xl": "icon-48",
+}
+
+const buttonSizeValues = {
+  "32": ["32px", "6px", "8px", "14px", "24px", 400, "10px", "8px", "20px"],
+  "36": ["36px", "8px", "8px", "16px", "28px", 400, "10px", "8px", "24px"],
+  "40": ["40px", "8px", "8px", "16px", "28px", 600, "10px", "8px", "24px"],
+  "48": ["48px", "12px", "8px", "20px", "32px", 400, "12px", "8px", "26px"],
+  "icon-32": ["32px", "0px", "0px", "14px", "24px", 400, "10px", "0px", "20px"],
+  "icon-36": ["36px", "0px", "0px", "16px", "28px", 400, "10px", "0px", "24px"],
+  "icon-40": ["40px", "0px", "0px", "16px", "28px", 600, "10px", "0px", "24px"],
+  "icon-48": ["48px", "0px", "0px", "20px", "32px", 400, "12px", "0px", "26px"],
+} as const
+
+function responsiveSizeVariables(breakpoint: "sm" | "md" | "lg", size?: ButtonSize) {
+  if (!size || size === "clear") return {}
+
+  const resolvedSize = buttonSizeAliases[size] || size
+  const [height, paddingX, paddingY, fontSize, lineHeight, fontWeight, radius, gap, iconSize] =
+    buttonSizeValues[resolvedSize as keyof typeof buttonSizeValues]
+
+  return {
+    [`--button-${breakpoint}-height`]: height,
+    [`--button-${breakpoint}-px`]: paddingX,
+    [`--button-${breakpoint}-py`]: paddingY,
+    [`--button-${breakpoint}-font-size`]: fontSize,
+    [`--button-${breakpoint}-line-height`]: lineHeight,
+    [`--button-${breakpoint}-font-weight`]: fontWeight,
+    [`--button-${breakpoint}-radius`]: radius,
+    [`--button-${breakpoint}-gap`]: gap,
+    [`--button-${breakpoint}-icon-size`]: iconSize,
+  }
+}
+
+function isIconSize(size?: ButtonSize) {
+  return size ? (buttonSizeAliases[size] || size).startsWith("icon-") : false
+}
+
 export type ButtonProps = React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
     loading?: boolean
     icon?: React.ReactNode
+    sm?: ButtonSize
+    md?: ButtonSize
+    lg?: ButtonSize
   }
 
 function Button({
   className,
   variant = "default",
   size = "default",
+  sm,
+  md,
+  lg,
   asChild = false,
   loading = false,
   disabled,
   children,
   icon,
+  style,
   ...props
 }: ButtonProps) {
   const Comp = asChild ? Slot.Root : "button"
@@ -123,7 +182,31 @@ function Button({
       data-loading={loading ? "true" : undefined}
       disabled={isDisabled}
       aria-disabled={isDisabled ? true : undefined}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(
+        buttonVariants({ variant, size }),
+        sm &&
+          "sm:h-[var(--button-sm-height)] sm:px-[var(--button-sm-px)] sm:py-[var(--button-sm-py)] sm:text-[length:var(--button-sm-font-size)] sm:leading-[var(--button-sm-line-height)] sm:font-[var(--button-sm-font-weight)] sm:rounded-[var(--button-sm-radius)] sm:gap-[var(--button-sm-gap)] sm:[&_svg:not([class*='size-'])]:size-[var(--button-sm-icon-size)]",
+        md &&
+          "md:h-[var(--button-md-height)] md:px-[var(--button-md-px)] md:py-[var(--button-md-py)] md:text-[length:var(--button-md-font-size)] md:leading-[var(--button-md-line-height)] md:font-[var(--button-md-font-weight)] md:rounded-[var(--button-md-radius)] md:gap-[var(--button-md-gap)] md:[&_svg:not([class*='size-'])]:size-[var(--button-md-icon-size)]",
+        lg &&
+          "lg:h-[var(--button-lg-height)] lg:px-[var(--button-lg-px)] lg:py-[var(--button-lg-py)] lg:text-[length:var(--button-lg-font-size)] lg:leading-[var(--button-lg-line-height)] lg:font-[var(--button-lg-font-weight)] lg:rounded-[var(--button-lg-radius)] lg:gap-[var(--button-lg-gap)] lg:[&_svg:not([class*='size-'])]:size-[var(--button-lg-icon-size)]",
+        isIconSize(sm) && "sm:w-[var(--button-sm-height)]",
+        sm && !isIconSize(sm) && "sm:w-auto",
+        isIconSize(md) && "md:w-[var(--button-md-height)]",
+        md && !isIconSize(md) && "md:w-auto",
+        isIconSize(lg) && "lg:w-[var(--button-lg-height)]",
+        lg && !isIconSize(lg) && "lg:w-auto",
+        sm === "clear" && "sm:h-auto sm:p-0 sm:rounded-none sm:border-0",
+        md === "clear" && "md:h-auto md:p-0 md:rounded-none md:border-0",
+        lg === "clear" && "lg:h-auto lg:p-0 lg:rounded-none lg:border-0",
+        className,
+      )}
+      style={{
+        ...responsiveSizeVariables("sm", sm),
+        ...responsiveSizeVariables("md", md),
+        ...responsiveSizeVariables("lg", lg),
+        ...style,
+      }}
       {...props}
     >
       {loading ? (

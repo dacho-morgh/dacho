@@ -1,10 +1,12 @@
-import { Button } from '@/components/ui/button'
 import ShapeGrid from '@/components/landing/ShapeGrid'
+import HeroVisual from '@/components/landing/home/hero-visual'
+import { Button } from '@/components/ui/button'
+import { Typography } from '@/components/ui/typography'
 
 const HeroSection = () => {
   return (
-    <div className="relative mx-auto flex w-full max-w-7xl flex-col items-center justify-center gap-10 pb-15">
-      <div className="pointer-events-none absolute inset-0 z-0 h-full w-full">
+    <section className="relative mx-auto  w-full max-w-7xl overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 z-0">
         <ShapeGrid
           speed={0.1}
           squareSize={50}
@@ -12,33 +14,37 @@ const HeroSection = () => {
           direction="up"
           shape="square"
         />
-        <div className="fromleft absolute top-0 left-0 h-full w-[2%] bg-linear-to-r from-white to-white/15" />
-        <div className="fromleft absolute top-0 right-0 h-full w-[2%] bg-linear-to-l from-white to-white/15" />
-        <div />
+        <div className="absolute inset-y-0 left-0 w-[2%] bg-linear-to-r from-white to-white/15" />
+        <div className="absolute inset-y-0 right-0 w-[2%] bg-linear-to-l from-white to-white/15" />
       </div>
-      <div className="relative z-10 flex flex-col gap-9 px-20 py-30">
-        <div className="flex flex-col gap-4">
-          <h1 className="text-center text-[40px] leading-16 font-bold text-[#262626]">
-            پل ارتباطی میان صنایع بزرگ و کسب‌وکارهای نوآور
-          </h1>
-          <p className="text-xl text-[#262626]">
-            شرکت‌های صنعتی نیازهای فناورانه خود را ثبت می‌کنند و شرکت‌های متخصص برای اجرای پروژه‌ها
-            درخواست همکاری ارسال می‌کنند.
-          </p>
-        </div>
-        <div className="flex justify-center gap-2">
-          <Button className="flex h-10 w-40 items-center justify-center rounded-[10px] bg-[#3B82F6] p-0 text-white">
-            ثبت‌نام شرکت
-          </Button>
-          <Button
-            variant="outline"
-            className="flex h-10 w-40 items-center justify-center rounded-[10px] border-[#3B82F6] bg-transparent p-0 text-[#3B82F6]"
-          >
-            مشاهده فرصت‌ها
-          </Button>
+
+      <div className="relative lg:ms-8 z-10 grid items-center gap-10 px-5 lg:grid-cols-[600px_640px] lg:px-0 lg:py-0">
+        <HeroVisual />
+        <div className="flex w-full flex-col items-end lg:gap-20 gap-8 text-right lg:order-1">
+          <div className="flex w-full flex-col items-end gap-4">
+            <Typography variant="24/extrabold" lg='48/black' color="neutral-700" className="w-full">
+              مسیر رشد کسب‌وکارها،
+              <br className='hidden lg:block'/>
+              از <span className="text-brand-500">فرصت</span> تا{' '}
+              <span className="text-[#ECA204]">موفقیت</span>
+            </Typography>
+            <Typography variant="16/light" lg="20/regular" color="neutral-500" className="w-full">
+              فرصت‌های سرمایه‌گذاری، همکاری و حضور در رویدادهای تخصصی را کشف کنید و مسیر رشد
+              کسب‌وکارتان را هموارتر کنید.
+            </Typography>
+          </div>
+
+          <div className="flex flex-wrap self-start justify-center w-full px-10 lg:pb-0 pb-20 gap-4 lg:gap-2 lg:px-0 lg:justify-start">
+            <Button variant="primary" size="40" lg='48' className="lg:w-45 w-40 lg:font-bold font-normal">
+              ثبت‌نام شرکت
+            </Button>
+            <Button variant="outline-primary" size="40" lg='48' className="lg:w-45 w-40 bg-transparent lg:font-bold font-normal">
+              مشاهده فرصت‌ها
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 
