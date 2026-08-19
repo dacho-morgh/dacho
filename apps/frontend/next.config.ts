@@ -12,7 +12,9 @@ const NEXT_PUBLIC_SERVER_URL = process.env.VERCEL_PROJECT_PRODUCTION_URL
   : process.env.__NEXT_PRIVATE_ORIGIN || 'http://localhost:3000'
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  // Note: `output: 'standalone'` is intentionally NOT set — the Docker runner
+  // serves via `next start` against a complete prod node_modules (the standalone
+  // tracer only partially copies symlinked pnpm deps, e.g. @swc/helpers/esm).
   // Temporarily required on Windows until Next.js fixes Turbopack Sass resolution.
   // See: https://github.com/vercel/next.js/issues/86431
   sassOptions: {

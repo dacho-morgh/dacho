@@ -56,14 +56,18 @@ COPY --from=build /repo/packages/cms-core ./packages/cms-core
 # `payload migrate` can resolve the config's own deps (sharp, payload, plugins).
 RUN pnpm install --prod --filter @dacho/frontend --filter @dacho/cms-core --frozen-lockfile --fetch-retries=5 --fetch-timeout=600000
 
-# standalone server (self-contained) + static + public.
-# Next 16 traces the monorepo, so server.js lives at apps/frontend/server.js.
-COPY --from=build /repo/apps/frontend/.next/standalone ./standalone/
-COPY --from=build /repo/apps/frontend/.next/static ./standalone/apps/frontend/.next/static
-COPY --from=build /repo/apps/frontend/public ./standalone/apps/frontend/public
-RUN mkdir -p /repo/standalone/apps/frontend/public/media
+# Build output + public. `next start` runs against the complete prod
+# node_modules above (not the standalone tracer output, which only partially
+# traces symlinked deps like @swc/helpers — missing esm/).
+COPY --from=build /repo/apps/frontend/.next ./apps/frontend/.next
+COPY --from=build /repo/apps/frontend/public ./apps/frontend/public
+COPY --from=build /repo/apps/frontend/next.config.ts ./apps/frontend/next.config.ts
+COPY --from=build /repo/apps/frontend/redirects.ts ./apps/frontend/redirects.ts
+RUN mkdir -p /repo/apps/frontend/public/media
 
-COPY --from=build /repo/apps/frontend/docker-entrypoint.sh ./docker-entrypoint.sh
+# Copy entrypoint from context (not the build stage) so edits to it don't
+# invalidate the cached `next build` layer.
+COPY apps/frontend/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x /repo/docker-entrypoint.sh
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
