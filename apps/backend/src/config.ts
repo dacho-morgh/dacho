@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 export class MissingEnvError extends Error {
   constructor(name: string) {
     super(`Missing required environment variable: ${name}`)
@@ -31,9 +33,17 @@ function require(env: NodeJS.ProcessEnv, name: string): string {
   return value
 }
 
+/** JWT key comes from a mounted file when JWT_PRIVATE_KEY_FILE is set, else from JWT_PRIVATE_KEY. */
+function resolveJwtPrivateKey(env: NodeJS.ProcessEnv): string {
+  if (env.JWT_PRIVATE_KEY_FILE) {
+    return readFileSync(env.JWT_PRIVATE_KEY_FILE, 'utf8')
+  }
+  return require(env, 'JWT_PRIVATE_KEY')
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const databaseUrl = require(env, 'DATABASE_URL')
-  const jwtPrivateKey = require(env, 'JWT_PRIVATE_KEY')
+  const jwtPrivateKey = resolveJwtPrivateKey(env)
   const payloadUrl = require(env, 'PAYLOAD_URL')
   const payloadApiKey = require(env, 'PAYLOAD_API_KEY')
 

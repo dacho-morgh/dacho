@@ -15,26 +15,47 @@ services:
       retries: 5
 
   frontend:
-    build: ./apps/frontend
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      # next build queries Payload (SSG), so it needs the Postgres on the host.
+      network: host
+      args:
+        PAYLOAD_SECRET: ${PAYLOAD_SECRET:-dacho-build-secret}
+        DATABASE_URL: postgres://dacho:dacho@localhost:5432/dacho-cms
     ports:
       - '3000:3000'
     environment:
       DATABASE_URL: postgres://dacho:dacho@postgres:5432/dacho-cms
       PAYLOAD_SECRET: ${PAYLOAD_SECRET}
       NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
+      BACKEND_JWKS_URL: http://backend:4000/.well-known/jwks.json
     depends_on:
       postgres:
         condition: service_healthy
 
-  # backend:
-  #   build: ./apps/backend
-  #   ports:
-  #     - '4000:4000'
-  #   environment:
-  #     DATABASE_URL: postgres://dacho:dacho@postgres:5432/dacho-cms
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    ports:
+      - '4000:4000'
+    secrets:
+      - jwt_private_key
+    environment:
+      PORT: '4000'
+      DATABASE_URL: postgres://dacho:dacho@postgres:5432/dacho-cms
+      JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private_key
+      PAYLOAD_URL: http://frontend:3000
+      PAYLOAD_API_KEY: ${PAYLOAD_API_KEY:-dev-backend-service-account}
+      OTP_DELIVERY: ${OTP_DELIVERY:-console}
+      KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
+      KAVENEGAR_TEMPLATE: ${KAVENEGAR_TEMPLATE:-testtemplate}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      frontend:
+        condition: service_started
 
   swagger:
     image: swaggerapi/swagger-ui:v5.17.14
@@ -45,3 +66,7 @@ services:
 
 volumes:
   pgdata:
+
+secrets:
+  jwt_private_key:
+    file: ./secrets/jwt-private.pem

@@ -1,0 +1,15 @@
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+**/playwright-report
+**/test-results
+**/.env
+**/.env.*
+**/*.log
+secrets/
+.git
+.gitignore
+Dockerfile*
+docker-compose*.yml
