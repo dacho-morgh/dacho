@@ -126,5 +126,5 @@ pnpm generate:importmap   # writes apps/frontend/src/app/(payload)/admin/importM
 
 ## Deployment strategy
 
-- **Phase 1 (current):** Docker Compose on a single VPS (Postgres, Redis, fused Front-end + CMS, Backend API behind Nginx/Caddy).
+- **Phase 1 (current):** Docker Compose on a single VPS (Postgres, fused Front-end + CMS, Backend API behind Nginx/Caddy). Step-by-step: [docs/deployment.md](docs/deployment.md).
 - **Aspirational:** full Kubernetes orchestration (Argo CD, canary, Higress gateway, observability) — see the design doc.
