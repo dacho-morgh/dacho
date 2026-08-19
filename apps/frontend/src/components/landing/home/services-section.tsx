@@ -1,6 +1,7 @@
 import configPromise from '@payload-config'
 import Image from 'next/image'
 import { getPayload } from 'payload'
+import ArrowLeftIcon from 'public/figma/events/arrow-left-icon'
 import {
   Carousel,
   CarouselContent,
@@ -24,21 +25,21 @@ const ServicesSection = async () => {
   if (services.length === 0) return null
 
   return (
-    <section
-      dir="rtl"
-      className="flex w-full flex-col items-center gap-6 overflow-x-hidden py-24 sm:py-32 lg:py-40"
-    >
+    <section className="flex w-full flex-col items-center gap-6 overflow-x-hidden py-24 sm:py-32 lg:py-40">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
-        <h2 className="text-[32px] leading-12 font-bold text-[#525252] sm:text-[40px] sm:leading-16">
-          ارئه خدمات
-        </h2>
-        <p className="max-w-5xl text-base leading-7 text-[#737373] sm:text-xl sm:leading-8">
+        <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">
+          <div className="my-2 w-1 rounded-full bg-[#FAB622] lg:my-3 lg:w-2" />
+          <h2 className="text-[32px] leading-12 font-normal text-[#525252] sm:text-[40px] sm:leading-16">
+            ارئه خدمات
+          </h2>
+        </div>
+        <p className="max-w-5xl text-base leading-7 font-light text-[#737373] sm:text-xl sm:leading-8 lg:ms-30 xl:ms-40 8xl:ms-0">
           از انتشار فرصت‌های صنعتی تا داوری تخصصی و تخصیص بودجه، تمام مسیر همکاری در یک فضای یکپارچه
           مدیریت می‌شود.
         </p>
       </div>
       <Carousel opts={{ align: 'start', direction: 'rtl' }} className="mx-auto w-full">
-        <CarouselContent className="mx-8 py-4 md:mx-0 md:ms-20 lg:ms-30 xl:ms-40">
+        <CarouselContent className="mx-8 py-4 md:mx-0 md:ms-20 lg:ms-30 lg:me-4 xl:ms-40">
           {services.map((service, index) => {
             const featuredImage =
               typeof service.featuredImage === 'object' ? service.featuredImage : null
@@ -66,29 +67,17 @@ const ServicesSection = async () => {
             variant="ghost"
             size="icon"
             aria-label="خدمت قبلی"
-            className="static h-12 w-12 translate-0 rounded-xl bg-[#F5F5F5] p-0 hover:bg-[#E5E5E5]"
+            className="static h-12 w-12 translate-0 rounded-xl bg-[#3B82F6] p-0 text-white hover:bg-[#2563EB] hover:text-white disabled:bg-[#E5E5E5] disabled:text-[#D4D4D4]"
           >
-            <Image
-              src="/figma/services/arrow-left.svg"
-              alt=""
-              width={26}
-              height={26}
-              className="pointer-events-none h-6.5 w-6.5 rotate-180"
-            />
+            <ArrowLeftIcon className="h-6.5 w-6.5 rotate-180" />
           </CarouselPrevious>
           <CarouselNext
             variant="ghost"
             size="icon"
             aria-label="خدمت بعدی"
-            className="static h-12 w-12 translate-0 rounded-xl bg-[#F5F5F5] p-0 hover:bg-[#E5E5E5]"
+            className="static h-12 w-12 translate-0 rounded-xl bg-[#3B82F6] p-0 text-white hover:bg-[#2563EB] hover:text-white disabled:bg-[#E5E5E5] disabled:text-[#D4D4D4]"
           >
-            <Image
-              src="/figma/services/arrow-left.svg"
-              alt=""
-              width={26}
-              height={26}
-              className="pointer-events-none h-6.5 w-6.5"
-            />
+            <ArrowLeftIcon className="h-6.5 w-6.5" />
           </CarouselNext>
         </div>
       </Carousel>

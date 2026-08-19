@@ -43,6 +43,7 @@
   --breakpoint-lg: 64rem;
   --breakpoint-xl: 80rem;
   --breakpoint-2xl: 86rem;
+  --breakpoint-8xl: 96rem;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-yekan-bakh);
   --font-sans: var(--font-yekan-bakh);
