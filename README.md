@@ -40,7 +40,7 @@ packages/
 Required — the config **throws on startup** if these are missing (no silent empty defaults):
 
 - `DATABASE_URL` — Postgres connection string (`postgres://dacho:dacho@localhost:5432/dacho-cms`).
-- `PAYLOAD_SECRET` — signs Payload auth/JWT tokens.
+- `PAYLOAD_SECRET` — signs Payload auth/JWT tokens. Under Docker, set `PAYLOAD_SECRET_FILE` instead (mounted from `secrets/payload-secret`).
 
 Optional: `NEXT_PUBLIC_SERVER_URL` (defaults to `http://localhost:3000`), `CRON_SECRET`, `PREVIEW_SECRET`, `BACKEND_JWKS_URL` (JWKS URL the `backend-jwt` strategy uses to verify backend-issued ES256 tokens).
 

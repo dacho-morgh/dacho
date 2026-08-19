@@ -27,9 +27,11 @@ services:
       - '3000:3000'
     environment:
       DATABASE_URL: postgres://dacho:dacho@postgres:5432/dacho-cms
-      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      PAYLOAD_SECRET_FILE: /run/secrets/payload_secret
       NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
       BACKEND_JWKS_URL: http://backend:4000/.well-known/jwks.json
+    secrets:
+      - payload_secret
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,3 +72,5 @@ volumes:
 secrets:
   jwt_private_key:
     file: ./secrets/jwt-private.pem
+  payload_secret:
+    file: ./secrets/payload-secret
