@@ -1,4 +1,5 @@
 import path from 'path'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'url'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, PayloadRequest } from 'payload'
@@ -37,7 +38,16 @@ const requireEnv = (name: string): string => {
   return value
 }
 
-const payloadSecret = requireEnv('PAYLOAD_SECRET')
+// PAYLOAD_SECRET comes from a mounted file (Docker secret) when
+// PAYLOAD_SECRET_FILE is set, else from the PAYLOAD_SECRET env var.
+const resolveSecret = (): string => {
+  if (process.env.PAYLOAD_SECRET_FILE) {
+    return readFileSync(process.env.PAYLOAD_SECRET_FILE, 'utf8').trim()
+  }
+  return requireEnv('PAYLOAD_SECRET')
+}
+
+const payloadSecret = resolveSecret()
 const databaseURL = requireEnv('DATABASE_URL')
 
 export default buildConfig({
