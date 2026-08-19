@@ -35,10 +35,10 @@ const HeroSection = () => {
           </div>
 
           <div className="flex flex-wrap self-start justify-center w-full px-10 lg:pb-0 pb-20 gap-4 lg:gap-2 lg:px-0 lg:justify-start">
-            <Button variant="primary" size="40" lg='48' className="lg:w-45 w-40 lg:font-bold font-normal">
+            <Button variant="primary" size="40" lg='48' className="lg:w-45 w-40 font-light!">
               ثبت‌نام شرکت
             </Button>
-            <Button variant="outline-primary" size="40" lg='48' className="lg:w-45 w-40 bg-transparent lg:font-bold font-normal">
+            <Button variant="outline-primary" size="40" lg='48' className="lg:w-45 w-40 bg-transparent font-light!">
               مشاهده فرصت‌ها
             </Button>
           </div>
