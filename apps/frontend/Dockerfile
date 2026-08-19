@@ -52,14 +52,16 @@ COPY --from=build /repo/apps/frontend/src ./apps/frontend/src
 COPY --from=build /repo/apps/frontend/tsconfig.json ./apps/frontend/tsconfig.json
 COPY --from=build /repo/packages/cms-core ./packages/cms-core
 
-# fresh prod install — correct symlinks, no per-package node_modules COPY
-RUN pnpm install --prod --filter @dacho/frontend --frozen-lockfile --fetch-retries=5 --fetch-timeout=600000
+# fresh prod install — install the frontend AND its workspace dep cms-core so
+# `payload migrate` can resolve the config's own deps (sharp, payload, plugins).
+RUN pnpm install --prod --filter @dacho/frontend --filter @dacho/cms-core --frozen-lockfile --fetch-retries=5 --fetch-timeout=600000
 
-# standalone server (self-contained) + static + public
+# standalone server (self-contained) + static + public.
+# Next 16 traces the monorepo, so server.js lives at apps/frontend/server.js.
 COPY --from=build /repo/apps/frontend/.next/standalone ./standalone/
-COPY --from=build /repo/apps/frontend/.next/static ./standalone/.next/static
-COPY --from=build /repo/apps/frontend/public ./standalone/public
-RUN mkdir -p /repo/standalone/public/media
+COPY --from=build /repo/apps/frontend/.next/static ./standalone/apps/frontend/.next/static
+COPY --from=build /repo/apps/frontend/public ./standalone/apps/frontend/public
+RUN mkdir -p /repo/standalone/apps/frontend/public/media
 
 COPY --from=build /repo/apps/frontend/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x /repo/docker-entrypoint.sh
