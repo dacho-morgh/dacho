@@ -30,3 +30,5 @@ playwright-report/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+#cms media
+packages/cms-core/public/media
