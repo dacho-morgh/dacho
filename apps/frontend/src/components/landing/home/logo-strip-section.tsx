@@ -134,7 +134,7 @@ const LogoStripSection = () => {
   }, [])
 
   return (
-    <section className="relative z-10 w-full py-8">
+    <section className="relative z-10 w-full py-0 lg:py-8">
       <div dir="ltr" className="logos-marquee-viewport w-full overflow-hidden">
         <div
           ref={trackRef}

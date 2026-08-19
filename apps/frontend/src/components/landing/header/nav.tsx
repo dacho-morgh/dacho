@@ -12,13 +12,13 @@ const navItems = [
 const NavList = () => {
   const [active, setActive] = useState('/')
   return (
-    <nav className="nav-pill flex flex-1 items-center gap-1 text-black">
+    <nav className="nav-pill flex flex-col md:flex-row flex-1 md:items-center gap-1 text-black">
       {navItems.map(({ label, href }) => (
         <button
           key={href}
           data-active={active === href ? 'true' : 'false'}
           onClick={() => setActive(href)}
-          className="px-0.5"
+          className="px-0.5 cursor-pointer md:self-auto self-start"
         >
           <span className="pointer-events-none relative z-20 block rounded-[10px] px-2 py-1.5">
             {label}
