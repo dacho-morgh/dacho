@@ -14,9 +14,6 @@ importers:
 
   apps/backend:
     dependencies:
-      '@dacho/cms-core':
-        specifier: workspace:*
-        version: link:../../packages/cms-core
       express:
         specifier: ^4.21.2
         version: 4.22.2(supports-color@7.2.0)
@@ -27,6 +24,9 @@ importers:
         specifier: ^8.13.1
         version: 8.20.0
     devDependencies:
+      '@dacho/cms-core':
+        specifier: workspace:*
+        version: link:../../packages/cms-core
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.25

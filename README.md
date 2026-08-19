@@ -49,7 +49,7 @@ Optional: `NEXT_PUBLIC_SERVER_URL` (defaults to `http://localhost:3000`), `CRON_
 Required — `loadConfig` throws at startup if these are missing/empty:
 
 - `DATABASE_URL` — Postgres connection string.
-- `JWT_PRIVATE_KEY` — PKCS8 PEM (ES256) signing key.
+- `JWT_PRIVATE_KEY` — PKCS8 PEM (ES256) signing key. Under Docker, set `JWT_PRIVATE_KEY_FILE` instead (the key is mounted from `secrets/jwt-private.pem`).
 - `PAYLOAD_URL` — Payload REST base URL (e.g. `http://localhost:3000`).
 - `PAYLOAD_API_KEY` — service-account API key (from `pnpm --filter @dacho/frontend seed:service-account`).
 

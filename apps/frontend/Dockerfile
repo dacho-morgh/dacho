@@ -1,82 +1,71 @@
-# To use this Dockerfile, you have to set `output: 'standalone'` in your next.config.js file.
-# From https://github.com/vercel/next.js/blob/canary/examples/with-docker/Dockerfile
+# syntax=docker/dockerfile:1
 
+# Fused CMS + site image. Build context is the monorepo ROOT (see docker-compose.yml).
 FROM node:24-alpine AS base
+# Install pnpm globally (no corepack version resolution, available to any user at runtime).
+RUN npm install -g pnpm@11.21.0
+WORKDIR /repo
 
-# Install dependencies only when needed
+# ---- deps: full install for the build ----
 FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
-WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/backend/package.json ./apps/backend/package.json
+COPY apps/frontend/package.json ./apps/frontend/package.json
+COPY packages/cms-core/package.json ./packages/cms-core/package.json
+RUN pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=600000
 
-# Install dependencies based on the preferred package manager
-COPY package.json yarn.lock* package-lock.json* pnpm-*.yaml* ./
-RUN \
-  if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && PNPM_IGNORED_BUILDS= pnpm i --frozen-lockfile; \
-  elif [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
-
-
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# ---- build: next build (standalone output) ----
+FROM base AS build
+# Payload SSG (generateStaticParams) queries the DB during `next build`, so the
+# config's required env must be present here. DATABASE_URL points at the compose
+# Postgres via the host network (see docker-compose build.network).
+ARG PAYLOAD_SECRET
+ARG DATABASE_URL
+ENV PAYLOAD_SECRET=$PAYLOAD_SECRET
+ENV DATABASE_URL=$DATABASE_URL
+RUN apk add --no-cache libc6-compat
+COPY --from=deps /repo/node_modules ./node_modules
+COPY --from=deps /repo/apps ./apps
+COPY --from=deps /repo/packages ./packages
+COPY --from=deps /repo/package.json ./package.json
+COPY --from=deps /repo/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY . .
+RUN pnpm --filter @dacho/frontend build
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-# ENV NEXT_TELEMETRY_DISABLED 1
-
-RUN \
-  if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
-  elif [ -f yarn.lock ]; then yarn run build; \
-  elif [ -f package-lock.json ]; then npm run build; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
-
-# Production image, copy all the files and run next
+# ---- runner ----
 FROM base AS runner
-WORKDIR /app
+RUN apk add --no-cache libc6-compat
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+WORKDIR /repo
 
-RUN corepack enable pnpm
+# manifests for a fresh prod install (payload pulls tsx, so the .ts config loads)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/backend/package.json ./apps/backend/package.json
+COPY apps/frontend/package.json ./apps/frontend/package.json
+COPY packages/cms-core/package.json ./packages/cms-core/package.json
 
-ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED 1
+# config source + cms-core (payload migrate resolves these via @payload-config)
+COPY --from=build /repo/apps/frontend/src ./apps/frontend/src
+COPY --from=build /repo/apps/frontend/tsconfig.json ./apps/frontend/tsconfig.json
+COPY --from=build /repo/packages/cms-core ./packages/cms-core
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# fresh prod install — correct symlinks, no per-package node_modules COPY
+RUN pnpm install --prod --filter @dacho/frontend --frozen-lockfile --fetch-retries=5 --fetch-timeout=600000
 
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+# standalone server (self-contained) + static + public
+COPY --from=build /repo/apps/frontend/.next/standalone ./standalone/
+COPY --from=build /repo/apps/frontend/.next/static ./standalone/.next/static
+COPY --from=build /repo/apps/frontend/public ./standalone/public
+RUN mkdir -p /repo/standalone/public/media
 
-# Remove this line if you do not have this folder
-COPY --from=builder /app/public ./public
+COPY --from=build /repo/apps/frontend/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x /repo/docker-entrypoint.sh
 
-# Ensure media upload directory is writable
-RUN mkdir -p /app/public/media && chown -R nextjs:nodejs /app/public
-COPY --from=deps /app/pnpm-*.yaml* /app/
-
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh && chown nextjs:nodejs /app
-
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+RUN chown -R nextjs:nodejs /repo
 USER nextjs
-
 EXPOSE 3000
-
-ENV PORT 3000
-
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["node", "server.js"]
+ENTRYPOINT ["/repo/docker-entrypoint.sh"]

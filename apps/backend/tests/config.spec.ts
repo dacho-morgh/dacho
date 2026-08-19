@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { loadConfig, MissingEnvError } from '../src/config.js'
@@ -53,5 +56,23 @@ describe('loadConfig', () => {
       KAVENEGAR_TEMPLATE: 't',
     })
     expect(cfg.kavenegar).toEqual({ apiKey: 'k', template: 't' })
+  })
+
+  it('reads the JWT key from JWT_PRIVATE_KEY_FILE when set', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dacho-jwt-'))
+    const file = join(dir, 'private.pem')
+    writeFileSync(file, '-----BEGIN PRIVATE KEY-----\nFILE_BODY\n-----END PRIVATE KEY-----\n')
+
+    const cfg = loadConfig({ ...base, JWT_PRIVATE_KEY: undefined, JWT_PRIVATE_KEY_FILE: file })
+    expect(cfg.jwtPrivateKey).toContain('FILE_BODY')
+  })
+
+  it('prefers JWT_PRIVATE_KEY_FILE over JWT_PRIVATE_KEY', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dacho-jwt-'))
+    const file = join(dir, 'private.pem')
+    writeFileSync(file, 'FILE_KEY')
+
+    const cfg = loadConfig({ ...base, JWT_PRIVATE_KEY: 'ENV_KEY', JWT_PRIVATE_KEY_FILE: file })
+    expect(cfg.jwtPrivateKey).toBe('FILE_KEY')
   })
 })

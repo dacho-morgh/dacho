@@ -4,6 +4,9 @@
   "private": true,
   "description": "Backend API — Express service owning application auth (OTP-first), workflow instances, and request processing.",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",
@@ -13,12 +16,12 @@
     "test:int": "vitest run --config ./vitest.int.config.mts"
   },
   "dependencies": {
-    "@dacho/cms-core": "workspace:*",
     "express": "^4.21.2",
     "jose": "^5.10.0",
     "pg": "^8.13.1"
   },
   "devDependencies": {
+    "@dacho/cms-core": "workspace:*",
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.0",
     "@types/pg": "^8.11.10",
