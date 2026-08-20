@@ -7,6 +7,12 @@ import NewsSection from '@/components/landing/home/news-section'
 import ServicesSection from '@/components/landing/home/services-section'
 import ScrollProvider from '@/components/landing/scroll-provider'
 
+// The landing page reads collections (services/events/news/reviews/faq) at
+// request time via Payload's local API. Without a dynamic marker Next.js
+// statically bakes it at build (SSG), so CMS edits never appear. Force dynamic
+// rendering so content changes are reflected immediately.
+export const dynamic = 'force-dynamic'
+
 export default function HomePage() {
   return (
     <main className="relative flex min-h-screen w-full flex-col gap-10 overflow-x-hidden bg-white">
