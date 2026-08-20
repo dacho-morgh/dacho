@@ -40,6 +40,8 @@ Create `.env` (gitignored). `PAYLOAD_SECRET` is **not** set here — it comes fr
 
 ```env
 # backend → Payload REST. Seed this key first (§5), then paste it here.
+PORT=4000
+DATABASE_URL=postgres://dacho:dacho@localhost:5432/dacho-cms
 PAYLOAD_API_KEY=<seed:service-account output>
 
 # OTP delivery
