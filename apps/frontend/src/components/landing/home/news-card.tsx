@@ -1,8 +1,9 @@
+import type { News } from '@dacho/cms-core'
 import Image from 'next/image'
 import ArrowUpIcon from '@/components/icons/arrow-up-icon'
 import { Media } from '@/components/Media'
 import { Button } from '@/components/ui/button'
-import type { News } from '@dacho/cms-core'
+import { Typography } from '@/components/ui/typography'
 
 export type NewsCardData = Pick<News, 'featuredImage' | 'title'>
 
@@ -12,9 +13,9 @@ const NewsCard = ({ news }: { news: NewsCardData }) => {
   return (
     <article
       dir="rtl"
-      className="group flex w-full flex-col items-end overflow-hidden rounded-4xl bg-white transition-all md:max-w-104"
+      className="group flex w-full flex-col items-end overflow-hidden rounded-4xl bg-white drop-shadow-xl transition-all lg:drop-shadow-lg"
     >
-      <div className="relative h-50 w-full shrink-0 overflow-hidden rounded-t-3xl">
+      <div className="relative h-50 w-full shrink-0 overflow-hidden rounded-t-3xl 8xl:h-65">
         {hasFeaturedImage ? (
           <Media
             fill
@@ -35,18 +36,23 @@ const NewsCard = ({ news }: { news: NewsCardData }) => {
       </div>
 
       <div className="flex w-full flex-col items-end gap-4 p-5">
-        <h3
+        <Typography
+          as="h3"
+          variant="16/regular"
+          color="neutral-900"
           title={news.title}
-          className="w-full truncate text-right text-base leading-7 font-semibold text-[#262626]"
+          className="w-full truncate text-right"
         >
           {news.title}
-        </h3>
+        </Typography>
         <Button
           variant="ghost"
-          className="group h-8 self-start rounded-[10px] px-1.5 py-2 text-sm leading-6 font-normal text-[#525252] transition-colors hover:bg-[#E5E5E5]"
+          className="group h-8 self-start rounded-[10px] px-1.5 py-2 transition-colors hover:bg-[#E5E5E5]"
         >
-          مطالعه خبر
-          <ArrowUpIcon className="-rotate-90" />
+          <Typography as="span" variant="14/regular" color="neutral-600">
+            مطالعه خبر
+          </Typography>
+          <ArrowUpIcon className="-rotate-90 text-[#525252]" />
         </Button>
       </div>
     </article>

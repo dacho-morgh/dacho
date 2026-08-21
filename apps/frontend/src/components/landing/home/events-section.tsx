@@ -1,9 +1,10 @@
+import type { Event, Exhibition } from '@dacho/cms-core'
 import configPromise from '@payload-config'
 import { convertLexicalToPlaintext } from '@payloadcms/richtext-lexical/plaintext'
 import { getPayload } from 'payload'
-import type { Event, Exhibition } from '@dacho/cms-core'
 import type { EventCardData } from './event-card'
 import EventsCarousel from './events-carousel'
+import RecruitmentSection from './recruitment-section'
 
 const persianDateFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
   day: 'numeric',
@@ -80,6 +81,7 @@ const EventsSection = async () => {
         نمایشگاه و رویداد ها
       </h2>
       <EventsCarousel items={items} />
+      <RecruitmentSection />
     </section>
   )
 }
