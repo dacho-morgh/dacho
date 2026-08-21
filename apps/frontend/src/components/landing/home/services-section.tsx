@@ -1,5 +1,4 @@
 import configPromise from '@payload-config'
-import Image from 'next/image'
 import { getPayload } from 'payload'
 import ArrowLeftIcon from 'public/figma/events/arrow-left-icon'
 import {
@@ -9,6 +8,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel'
+import { Typography } from '@/components/ui/typography'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
 import ServiceCard from './service-card'
 
@@ -25,18 +25,23 @@ const ServicesSection = async () => {
   if (services.length === 0) return null
 
   return (
-    <section className="flex w-full flex-col items-center gap-6 overflow-x-hidden py-24 sm:py-32 lg:py-40">
+    <section className="flex w-full flex-col items-center gap-6 overflow-x-hidden py-16 md:py-24 lg:py-28 2xl:py-32">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
         <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">
           <div className="my-2 w-1 rounded-full bg-[#FAB622] lg:my-3 lg:w-2" />
-          <h2 className="text-[32px] leading-12 font-normal text-[#525252] sm:text-[40px] sm:leading-16">
-            ارئه خدمات
-          </h2>
+          <Typography as="h2" variant="32/regular" sm="40/regular" color="neutral-600">
+            ارائه خدمات
+          </Typography>
         </div>
-        <p className="max-w-5xl text-base leading-7 font-light text-[#737373] sm:text-xl sm:leading-8 lg:ms-30 xl:ms-40 8xl:ms-0">
+        <Typography
+          variant="16/light"
+          sm="20/regular"
+          color="neutral-500"
+          className="max-w-5xl lg:ms-30 xl:ms-40 8xl:ms-0"
+        >
           از انتشار فرصت‌های صنعتی تا داوری تخصصی و تخصیص بودجه، تمام مسیر همکاری در یک فضای یکپارچه
           مدیریت می‌شود.
-        </p>
+        </Typography>
       </div>
       <Carousel opts={{ align: 'start', direction: 'rtl' }} className="mx-auto w-full">
         <CarouselContent className="mx-8 py-4 md:mx-0 md:ms-20 lg:ms-30 lg:me-4 xl:ms-40">
