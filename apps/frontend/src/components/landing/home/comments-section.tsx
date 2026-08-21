@@ -1,5 +1,6 @@
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
+import { Typography } from '@/components/ui/typography'
 import CommentCard from './comment-card'
 import CommentsSlideshow from './comments-slideshow'
 
@@ -20,18 +21,25 @@ const CommentsSection = async () => {
   return (
     <section
       dir="rtl"
-      className="flex w-full flex-col items-center gap-10 overflow-x-hidden px-4 py-24 sm:px-6 sm:py-32 lg:items-start lg:px-0 lg:py-40"
+      className="flex w-full flex-col items-center gap-10 overflow-x-hidden py-8 pb-30 sm:px-6 lg:items-start lg:px-0 lg:py-20 lg:pb-30"
     >
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 text-right">
-        <h2 className="text-[32px] leading-12 font-semibold text-[#525252] sm:text-[40px] sm:leading-16">
-          نظرات
-        </h2>
-        <p className="text-base leading-7 text-[#737373] sm:text-xl sm:leading-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
+        <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">
+          <div className="my-2 w-1 rounded-full bg-[#FAB622] lg:my-3 lg:w-2" />
+          <Typography as="h2" variant="32/regular" sm="40/regular" color="neutral-600">
+            نظرات
+          </Typography>
+        </div>
+        <Typography
+          variant="16/light"
+          sm="20/regular"
+          color="neutral-500"
+          className="max-w-5xl lg:ms-30 xl:ms-40 8xl:ms-0"
+        >
           از انتشار فرصت‌های صنعتی تا داوری تخصصی و تخصیص بودجه، تمام مسیر همکاری در یک فضای یکپارچه
           مدیریت می‌شود.
-        </p>
+        </Typography>
       </div>
-
       {shouldLoop ? (
         <CommentsSlideshow reviews={reviews} />
       ) : (
