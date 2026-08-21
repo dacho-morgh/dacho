@@ -1,6 +1,7 @@
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import { Button } from '@/components/ui/button'
+import { Typography } from '@/components/ui/typography'
 import NewsCard from './news-card'
 
 const NewsSection = async () => {
@@ -25,27 +26,33 @@ const NewsSection = async () => {
       dir="rtl"
       className="relative z-10 flex w-full flex-col items-center gap-10 bg-[#FAFAFA] px-4 py-24 sm:px-6 sm:py-32 lg:px-0 lg:py-40"
     >
-      <div className="flex w-full max-w-7xl flex-col items-center gap-2 text-center">
-        <h2 className="text-[32px] leading-12 font-bold text-[#525252] sm:text-[40px] sm:leading-16">
-          اخبار
-        </h2>
-        <p className="max-w-7xl text-base leading-7 text-[#737373] sm:text-xl sm:leading-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
+        <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">
+          <div className="my-2 w-1 rounded-full bg-[#FAB622] lg:my-3 lg:w-2" />
+          <Typography as="h2" variant="32/regular" sm="40/regular" color="neutral-600">
+            اخبار
+          </Typography>
+        </div>
+        <Typography
+          variant="16/light"
+          sm="20/regular"
+          color="neutral-500"
+          className="max-w-5xl lg:ms-30 xl:ms-40 8xl:ms-0"
+        >
           از انتشار فرصت‌های صنعتی تا داوری تخصصی و تخصیص بودجه، تمام مسیر همکاری در یک فضای یکپارچه
           مدیریت می‌شود.
-        </p>
+        </Typography>
       </div>
-
-      <div className="grid w-full max-w-7xl grid-cols-1 justify-items-center gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid w-full max-w-[1600px] grid-cols-1 justify-items-center gap-6 px-6 md:grid-cols-2 lg:px-30 xl:grid-cols-3 xl:px-40 8xl:px-0">
         {newsItems.map((news) => (
           <NewsCard key={news.id} news={news} />
         ))}
       </div>
 
-      <Button
-        variant="ghost"
-        className="h-12 rounded-xl px-3 py-2 text-xl leading-8 font-normal text-[#525252] hover:bg-[#F5F5F5]"
-      >
-        مشاهده همه
+      <Button variant="ghost" className="h-12 rounded-xl px-3 py-2 hover:bg-[#F5F5F5]">
+        <Typography as="span" variant="20/regular" color="neutral-600">
+          مشاهده همه
+        </Typography>
       </Button>
     </section>
   )
