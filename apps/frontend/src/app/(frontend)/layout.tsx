@@ -2,6 +2,7 @@ import { GeistMono } from 'geist/font/mono'
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import React from 'react'
+import { Footer } from '@/Footer/Component'
 import LandingHeader from '@/components/landing/header'
 import { Providers } from '@/providers'
 import { InitTheme } from '@/providers/Theme/InitTheme'
@@ -33,7 +34,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Providers>
           <div id="smooth-wrapper">
             <LandingHeader />
-            <div id="smooth-content">{children}</div>
+            <div id="smooth-content">
+              {children}
+              <Footer />
+            </div>
           </div>
         </Providers>
       </body>
