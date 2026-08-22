@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic'
 
 export default function HomePage() {
   return (
-    <main className="relative flex w-full flex-col gap-10 overflow-x-hidden bg-white">
+    <main className="relative flex w-full flex-col gap-10 overflow-x-clip bg-white">
       <ScrollProvider />
       <HeroSection />
       <LogoStripSection />

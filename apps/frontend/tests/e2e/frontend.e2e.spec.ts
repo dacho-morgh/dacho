@@ -31,4 +31,21 @@ test.describe('Frontend', () => {
     await expect(navigation).toHaveAttribute('aria-hidden', 'true')
     await expect(navigation).not.toBeInViewport()
   })
+
+  test('does not create a nested scrollbar while sections are waiting to reveal', async ({
+    page,
+  }) => {
+    await page.goto('http://localhost:3000')
+
+    const lastReveal = page.locator('main > div').last()
+    await expect(lastReveal).toHaveCSS('transform', /48/)
+
+    const hasNestedVerticalScrollbar = await page.locator('main').evaluate((main) => {
+      const { overflowY } = getComputedStyle(main)
+
+      return ['auto', 'scroll'].includes(overflowY) && main.scrollHeight > main.clientHeight
+    })
+
+    expect(hasNestedVerticalScrollbar).toBe(false)
+  })
 })
