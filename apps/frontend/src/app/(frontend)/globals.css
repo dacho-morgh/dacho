@@ -254,7 +254,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply flex min-h-screen flex-col overflow-x-hidden text-foreground bg-background;
+    @apply flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground;
   }
 }
 
@@ -263,7 +263,7 @@
   clip-path: inset(0 round 10px);
 }
 
-.nav-pill button[data-active='true'] span {
+.nav-pill [data-active='true'] span {
   anchor-name: --nav-active;
 }
 
