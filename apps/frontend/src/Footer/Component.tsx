@@ -17,10 +17,10 @@ const SERVICES_FALLBACK: FooterLink[] = [
 
 const PAGES_FALLBACK: FooterLink[] = [
   { label: 'خانه', href: '/' },
-  { label: 'رویداد ها و همایش ها', href: '#' },
-  { label: 'اخبار', href: '#' },
-  { label: 'درباره ما', href: '#' },
-  { label: 'تماس با ما', href: '#' },
+  { label: 'رویداد ها و همایش ها', href: '/events' },
+  { label: 'اخبار', href: '/news' },
+  { label: 'درباره ما', href: '/about' },
+  { label: 'تماس با ما', href: '/connect' },
 ]
 
 const DESCRIPTION_FALLBACK =
@@ -131,7 +131,11 @@ export async function Footer() {
 
         {/* Band C — bottom bar. RTL: social icons render right, copyright left. */}
         <div className="flex items-center justify-between gap-4 max-lg:flex-col-reverse max-lg:items-start">
-          <Typography className="whitespace-nowrap" color="neutral-400" variant="14/light">
+          <Typography
+            className="text-center lg:whitespace-nowrap"
+            color="neutral-400"
+            variant="14/light"
+          >
             {COPYRIGHT_FALLBACK}
           </Typography>
           <div className="flex items-center gap-4">

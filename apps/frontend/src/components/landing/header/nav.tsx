@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 const navItems = [
   { label: 'خانه', href: '/' },
@@ -10,20 +11,33 @@ const navItems = [
 ]
 
 const NavList = () => {
-  const [active, setActive] = useState('/')
+  const pathname = usePathname()
+
   return (
-    <nav className="nav-pill flex flex-col md:flex-row flex-1 md:items-center gap-1 text-black">
+    <nav
+      aria-label="ناوبری اصلی"
+      className="nav-pill flex flex-1 flex-col gap-1 text-black md:flex-row md:items-center"
+    >
       {navItems.map(({ label, href }) => (
-        <button
+        <Link
           key={href}
-          data-active={active === href ? 'true' : 'false'}
-          onClick={() => setActive(href)}
-          className="px-0.5 cursor-pointer md:self-auto self-start"
+          href={href}
+          aria-current={
+            pathname === href || (href !== '/' && pathname.startsWith(`${href}/`))
+              ? 'page'
+              : undefined
+          }
+          data-active={
+            pathname === href || (href !== '/' && pathname.startsWith(`${href}/`))
+              ? 'true'
+              : 'false'
+          }
+          className="cursor-pointer self-start px-0.5 md:self-auto"
         >
           <span className="pointer-events-none relative z-20 block rounded-[10px] px-2 py-1.5">
             {label}
           </span>
-        </button>
+        </Link>
       ))}
     </nav>
   )

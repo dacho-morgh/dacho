@@ -69,7 +69,7 @@ const MobileNavigationContent = () => {
         aria-hidden={!menuOpen}
         aria-modal={menuOpen ? 'true' : undefined}
         className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,22rem)] flex-col bg-white p-5 shadow-2xl transition-transform duration-[450ms] ease-out motion-reduce:transition-none ${
-          menuOpen ? 'translate-x-0' : '-translate-x-full'
+          menuOpen ? 'visible translate-x-0' : 'invisible -translate-x-full'
         }`}
         id="mobile-navigation"
         inert={!menuOpen}
