@@ -2,6 +2,7 @@
 
 import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useRef, useState, useSyncExternalStore } from 'react'
 import Brand from './brand'
 import NavList from './nav'
@@ -108,13 +109,14 @@ const MobileNavigationContent = () => {
 }
 
 const MobileNavigation = () => {
+  const pathname = usePathname()
   const isMobile = useSyncExternalStore(
     subscribeToMobileBreakpoint,
     getMobileBreakpointSnapshot,
     getServerBreakpointSnapshot,
   )
 
-  return <MobileNavigationContent key={isMobile ? 'mobile' : 'desktop'} />
+  return <MobileNavigationContent key={`${isMobile ? 'mobile' : 'desktop'}:${pathname}`} />
 }
 
 export default MobileNavigation

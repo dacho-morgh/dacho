@@ -32,6 +32,59 @@ test.describe('Frontend', () => {
     await expect(navigation).not.toBeInViewport()
   })
 
+  test('restores the full desktop header after client-side navigation', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 800 })
+    await page.goto('http://localhost:3000')
+    await page.waitForTimeout(1_000)
+
+    const header = page.locator('header').first()
+    const initialWidth = await header.evaluate((element) => element.getBoundingClientRect().width)
+
+    await page.evaluate(() => window.scrollTo(0, 700))
+    await expect
+      .poll(() => header.evaluate((element) => element.getBoundingClientRect().width))
+      .toBeLessThan(initialWidth - 100)
+
+    await header.locator(':scope > div:first-child nav a[href="/news"]').click()
+    await page.waitForURL('**/news')
+
+    await expect
+      .poll(() => header.evaluate((element) => element.getBoundingClientRect().width))
+      .toBeCloseTo(initialWidth, 0)
+  })
+
+  test('fits the viewport and closes mobile navigation after routing', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 800 })
+    await page.goto('http://localhost:3000')
+    await page.waitForTimeout(1_000)
+
+    await page
+      .locator('header')
+      .first()
+      .locator(':scope > div:first-child nav a[href="/news"]')
+      .click()
+    await page.waitForURL('**/news')
+
+    await page.setViewportSize({ width: 1024, height: 800 })
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(1024)
+
+    await page.setViewportSize({ width: 390, height: 800 })
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(390)
+
+    const navigation = page.locator('#mobile-navigation')
+    await page.getByRole('button', { name: 'باز کردن منو' }).click()
+    await expect(navigation).toHaveAttribute('aria-hidden', 'false')
+
+    await navigation.locator('nav a[href="/"]').click()
+    await page.waitForURL((url) => url.pathname === '/')
+    await expect(navigation).toHaveAttribute('aria-hidden', 'true')
+    await expect(navigation).not.toBeInViewport()
+  })
+
   test('does not create a nested scrollbar while sections are waiting to reveal', async ({
     page,
   }) => {

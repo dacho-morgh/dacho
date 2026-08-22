@@ -24,7 +24,7 @@ const Header = () => {
       const media = gsap.matchMedia()
       media.add('(min-width: 768px)', () => {
         gsap.to(headerRef.current, {
-          width: '50rem',
+          maxWidth: '50rem',
           paddingLeft: 0,
           paddingRight: 0,
           ease: 'none',
@@ -34,7 +34,7 @@ const Header = () => {
 
       return () => media.revert()
     },
-    { scope: headerRef, dependencies: [pathname] },
+    { scope: headerRef, dependencies: [pathname], revertOnUpdate: true },
   )
 
   if (pathname?.startsWith('/dashboard')) return null
@@ -42,7 +42,7 @@ const Header = () => {
   return (
     <header
       ref={headerRef}
-      className="sticky top-0 z-20 mx-auto w-full max-w-7xl px-4 py-4 text-nowrap md:w-7xl md:px-0 md:py-5"
+      className="sticky top-0 z-20 mx-auto w-full max-w-7xl px-4 py-4 text-nowrap md:px-0 md:py-5"
     >
       <div
         className="flex h-14 items-center justify-between rounded-[20px] border border-white bg-white/20 p-2 shadow-[0px_2px_16px_0px_#0A0A0A1A] backdrop-blur supports-backdrop-filter:bg-white/60 md:h-auto md:p-2.5"
