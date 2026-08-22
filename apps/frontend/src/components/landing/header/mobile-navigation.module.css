@@ -1,0 +1,5 @@
+@media (width < 48rem) {
+  :global(body):has(.root[data-open='true']) {
+    overflow: hidden;
+  }
+}
