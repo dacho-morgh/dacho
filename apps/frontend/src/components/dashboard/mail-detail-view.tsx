@@ -17,9 +17,6 @@ import {
   Download,
   Send,
   X,
-  Share2,
-  Printer,
-  CheckCircle2,
 } from 'lucide-react'
 
 export interface MailData {

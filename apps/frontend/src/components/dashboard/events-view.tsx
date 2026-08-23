@@ -67,7 +67,7 @@ const initialEvents: EventItem[] = [
 ]
 
 export function EventsView() {
-  const [events, setEvents] = useState<EventItem[]>(initialEvents)
+  const [events] = useState<EventItem[]>(initialEvents)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
   const [viewState, setViewState] = useState<'default' | 'loading' | 'empty'>('default')

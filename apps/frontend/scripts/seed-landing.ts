@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   // 2. Categories
   payload.logger.info('— Seeding categories…')
   const catNews = await payload.create({ collection: 'categories', data: { title: 'اخبار', slug: 'news' } })
-  const catEvents = await payload.create({ collection: 'categories', data: { title: 'رویدادها', slug: 'events' } })
+  await payload.create({ collection: 'categories', data: { title: 'رویدادها', slug: 'events' } })
 
   // 3. Services
   payload.logger.info('— Seeding services…')
