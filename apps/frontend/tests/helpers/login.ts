@@ -20,7 +20,10 @@ export async function login({
 }: LoginOptions): Promise<void> {
   await page.goto(`${serverURL}/admin/login`)
 
-  await page.fill('#field-email', user.email)
+  // The Users collection enables `loginWithUsername` (with allowEmailLogin), so
+  // Payload renders a single "Email or Username" field with id `field-username`
+  // — not `field-email`. The email address is still accepted here.
+  await page.fill('#field-username', user.email)
   await page.fill('#field-password', user.password)
   await page.click('button[type="submit"]')
 
