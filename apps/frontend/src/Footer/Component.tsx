@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import React from 'react'
 import { Typography } from '@/components/ui/typography'
+import { buildSafe } from '@/utilities/buildSafe'
 import { getCachedGlobal } from '@/utilities/getGlobals'
 import { cn } from '@/utilities/ui'
 
@@ -71,7 +72,7 @@ function ContactRow({ icon, text }: { icon: string; text: string }) {
 }
 
 export async function Footer() {
-  const footerData = await getCachedGlobal('footer', 1)()
+  const footerData = await buildSafe('footer global', () => getCachedGlobal('footer', 1)())
 
   // Map CMS navItems to the «صفحات» column with static Figma fallbacks.
   const cmsItems: FooterLink[] = Array.isArray(footerData?.navItems)

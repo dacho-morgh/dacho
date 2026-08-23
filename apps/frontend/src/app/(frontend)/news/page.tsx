@@ -6,7 +6,11 @@ import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import { NewsEmptyState } from '@/components/landing/news/news-empty-state'
 import { NewsBreadcrumb, NewsPageHeading } from '@/components/landing/news/news-page-header'
 
-export const revalidate = 600
+// Server-rendered rather than prerendered: this page has no dynamic params, so
+// a static build would query Payload at build time and require a live database.
+// Rendering on request keeps the database out of the build path (and avoids
+// serving an empty news archive after a database-less build).
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'اخبار',
