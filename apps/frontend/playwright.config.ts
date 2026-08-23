@@ -34,7 +34,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
+    // CI runs the e2e suite against a production build (`pnpm start`); locally
+    // `pnpm dev` stays the default for fast iteration.
+    command: process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? 'pnpm dev',
     reuseExistingServer: true,
     url: 'http://localhost:3000',
     // First `next dev` compile of the Payload app + workspace packages can
