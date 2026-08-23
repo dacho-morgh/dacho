@@ -22,7 +22,13 @@ const HeroSection = () => {
         <HeroVisual />
         <div className="flex w-full flex-col items-end lg:gap-20 gap-8 text-right lg:order-1">
           <div className="flex w-full flex-col items-end gap-4">
-            <Typography variant="24/extrabold" lg='48/black' color="neutral-700" className="w-full">
+            <Typography
+              as="h1"
+              variant="24/extrabold"
+              lg="48/black"
+              color="neutral-700"
+              className="w-full"
+            >
               مسیر رشد کسب‌وکارها،
               <br className='hidden lg:block'/>
               از <span className="text-brand-500">فرصت</span> تا{' '}
