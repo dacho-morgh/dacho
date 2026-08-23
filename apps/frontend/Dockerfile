@@ -17,11 +17,12 @@ RUN pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=600000
 
 # ---- build: next build (standalone output) ----
 FROM base AS build
-# Payload SSG (generateStaticParams) queries the DB during `next build`, so the
-# config's required env must be present here. DATABASE_URL points at the compose
-# Postgres via the host network (see docker-compose build.network).
-ARG PAYLOAD_SECRET
-ARG DATABASE_URL
+# Payload's config requires these at import time (fail-fast, no silent
+# defaults), so the build stage must have them set — but thanks to buildSafe()
+# the build no longer needs a REACHABLE database. Placeholders are enough; real
+# values are injected at runtime via compose env / mounted secrets.
+ARG PAYLOAD_SECRET=build-time-placeholder
+ARG DATABASE_URL=postgres://build:build@127.0.0.1:5432/build
 ENV PAYLOAD_SECRET=$PAYLOAD_SECRET
 ENV DATABASE_URL=$DATABASE_URL
 RUN apk add --no-cache libc6-compat

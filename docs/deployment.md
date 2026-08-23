@@ -59,15 +59,18 @@ Production hardening before the first build:
 - Drop or keep `swagger` loopback-only (it already binds `127.0.0.1:8080`).
 - Change the backend port mapping `4000:4000` → `127.0.0.1:4000:4000` (only the frontend should be public).
 
-## 4. Build order (important)
+## 4. Build order
 
-`next build` generates static pages by querying Payload at build time (SSG), so the database must exist **and be migrated before** the image is built.
+The image build is self-contained — it does **not** need a reachable database
+(build-time Payload queries are guarded by `buildSafe`, and the config's
+required env vars fall back to build-time placeholders). Migrate before the
+first `up` so the schema exists when the app starts serving.
 
 ```bash
+docker compose build                              # no database needed
 docker compose up -d postgres
 pnpm install --frozen-lockfile                    # payload CLI on the host (one-time)
 pnpm --filter @dacho/frontend payload migrate     # create the schema
-docker compose build                              # SSG needs the migrated DB
 docker compose up -d
 ```
 
@@ -101,8 +104,7 @@ curl -s http://localhost:4000/health              # backend
 
 - **Backups:** `secrets/jwt-private.pem`, `secrets/payload-secret`, and the `pgdata` volume. Restoring the JWT key is critical.
 - **Updates:** `git pull` → `docker compose build` → `docker compose up -d`.
-- **Fresh DB:** `docker compose down -v`, then repeat §4 (migrate → build → up).
-- **`network: host` build** is Linux-specific — fine on a VPS; a macOS/CI build needs a different way to reach Postgres.
+- **Fresh DB:** `docker compose down -v`, then repeat §4 (build → up postgres → migrate → up).
 
 ## Notes
 

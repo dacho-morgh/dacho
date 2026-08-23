@@ -8,6 +8,7 @@ import { getPayload } from 'payload'
 import React from 'react'
 import PageClient from './page.client'
 import { notFound } from 'next/navigation'
+import { buildSafe } from '@/utilities/buildSafe'
 
 export const revalidate = 600
 
@@ -17,6 +18,9 @@ type Args = {
   }>
 }
 
+// The body is only prerendered for params returned by generateStaticParams,
+// which is empty when no database is reachable — so this query is never run at
+// build time without a database and needs no guard.
 export default async function Page({ params: paramsPromise }: Args) {
   const { pageNumber } = await paramsPromise
   const payload = await getPayload({ config: configPromise })
@@ -70,13 +74,17 @@ export async function generateMetadata({ params: paramsPromise }: Args): Promise
 }
 
 export async function generateStaticParams() {
-  const payload = await getPayload({ config: configPromise })
-  const { totalDocs } = await payload.count({
-    collection: 'posts',
-    overrideAccess: false,
+  const result = await buildSafe('posts page count', async () => {
+    const payload = await getPayload({ config: configPromise })
+    return payload.count({
+      collection: 'posts',
+      overrideAccess: false,
+    })
   })
 
-  const totalPages = Math.ceil(totalDocs / 10)
+  if (!result) return []
+
+  const totalPages = Math.ceil(result.totalDocs / 10)
 
   const pages: { pageNumber: string }[] = []
 

@@ -8,8 +8,11 @@ import { getPayload } from 'payload'
 import React from 'react'
 import PageClient from './page.client'
 
-export const dynamic = 'force-static'
-export const revalidate = 600
+// Server-rendered rather than prerendered: this page has no dynamic params, so
+// a static build would query Payload at build time and require a live database.
+// Rendering on request keeps the database out of the build path (and avoids
+// serving an empty archive on the first hit after a database-less build).
+export const dynamic = 'force-dynamic'
 
 export default async function Page() {
   const payload = await getPayload({ config: configPromise })
