@@ -133,14 +133,44 @@ exists only inside Actions — the VPS needs its own credential. Create a
 **classic PAT with only the `read:packages` scope** (ideally on a dedicated
 machine account, so revoking it doesn't disturb anyone's personal access):
 
+<https://github.com/settings/tokens/new?scopes=read:packages>
+
 ```bash
 # on the VPS
-echo "<PAT>" | docker login ghcr.io -u <github-username> --password-stdin
+read -rsp 'PAT: ' PAT && echo
+echo "$PAT" | docker login ghcr.io -u <github-username> --password-stdin
 ```
 
-Credentials land in `~/.docker/config.json`. If pulls 403 after this, check
-Package settings → *Manage Actions access* — the repository must be linked to
-the package with at least Read.
+Credentials land in `~/.docker/config.json`.
+
+> **A fine-grained token will not work here.** GHCR's documented auth path is a
+> classic PAT; fine-grained tokens (`/settings/personal-access-tokens`) fail with
+> a bare `denied` on `docker pull`, even though they authenticate fine against
+> `api.github.com`. Check which kind you have:
+>
+> ```bash
+> curl -sI -H "Authorization: token $PAT" https://api.github.com/user \
+>   | grep -iE 'x-oauth-scopes|x-accepted-github-permissions'
+> ```
+>
+> `x-oauth-scopes: read:packages` → classic, correct.
+> `x-accepted-github-permissions: …` with **no** `x-oauth-scopes` → fine-grained,
+> replace it with a classic token.
+
+To isolate a registry refusal from a Docker-config problem, query GHCR directly:
+
+```bash
+T=$(curl -s -u "<github-username>:$PAT" \
+  "https://ghcr.io/token?service=ghcr.io&scope=repository:dacho-morgh/dacho/frontend:pull" \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+curl -so /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" \
+  https://ghcr.io/v2/dacho-morgh/dacho/frontend/manifests/<tag>
+# 200 = token and tag are both good; 403 = token scope / package access
+```
+
+If pulls 403 with a correct classic token, check Package settings →
+*Manage Actions access* — the repository must be linked to the package with at
+least Read.
 
 ### Deploy
 
