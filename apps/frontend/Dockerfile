@@ -53,6 +53,11 @@ COPY --from=build /repo/apps/frontend/src ./apps/frontend/src
 COPY --from=build /repo/apps/frontend/tsconfig.json ./apps/frontend/tsconfig.json
 COPY --from=build /repo/packages/cms-core ./packages/cms-core
 
+# Operational scripts (admin bootstrap, service account, content seed). Run them
+# with Payload's own TS loader — `payload run scripts/<name>.ts` — because tsx is
+# a devDependency and is absent from this production install.
+COPY --from=build /repo/apps/frontend/scripts ./apps/frontend/scripts
+
 # fresh prod install — install the frontend AND its workspace dep cms-core so
 # `payload migrate` can resolve the config's own deps (sharp, payload, plugins).
 RUN pnpm install --prod --filter @dacho/frontend --filter @dacho/cms-core --frozen-lockfile --fetch-retries=5 --fetch-timeout=600000

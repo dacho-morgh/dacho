@@ -76,10 +76,30 @@ docker compose up -d
 
 ## 5. Seed (first deploy)
 
+The operational scripts ship inside the frontend image under
+`apps/frontend/scripts/` and run with Payload's TypeScript loader — **not** the
+`pnpm <script>` shorthand, because `tsx` and `pnpm` are dev tooling that isn't in
+the runtime image. `payload run` can't execute them either: it imports the
+script but doesn't await its floating promise, so the seed exits before writing
+anything.
+
 ```bash
-pnpm --filter @dacho/frontend seed:service-account   # prints PAYLOAD_API_KEY
-# then seed content: POST /next/seed (or the "Seed" button on the admin dashboard)
+# inside the running frontend container
+docker compose -f docker-compose.prod.yml exec frontend sh -lc '
+  cd apps/frontend
+  NODE_OPTIONS=--no-deprecation ./node_modules/.bin/tsx scripts/seed-service-account.ts
+  NODE_OPTIONS=--no-deprecation ./node_modules/.bin/tsx scripts/seed-landing.ts
+  NODE_OPTIONS=--no-deprecation ./node_modules/.bin/tsx scripts/create-admin.ts
+'
 ```
+
+- `seed-service-account.ts` prints the `PAYLOAD_API_KEY` — put it in `.env`.
+- `seed-landing.ts` populates the Persian landing-page content from the Figma
+  design (home page, globals, services/news/FAQ).
+- `create-admin.ts` bootstraps (or resets) an admin login; it reads
+  `ADMIN_EMAIL` / `ADMIN_PASSWORD` from the environment, defaulting to
+  `admin@dacho.local`.
+
 
 ## 6. Reverse proxy + TLS (Caddy)
 
