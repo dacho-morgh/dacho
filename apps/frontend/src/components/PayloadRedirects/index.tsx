@@ -1,5 +1,5 @@
 import type React from 'react'
-import type { Page, Post } from '@dacho/cms-core'
+import type { News, Page, Post } from '@dacho/cms-core'
 
 import { getCachedDocument } from '@/utilities/getDocument'
 import { getCachedRedirects } from '@/utilities/getRedirects'
@@ -27,7 +27,7 @@ export const PayloadRedirects: React.FC<Props> = async ({ disableNotFound, url }
       const collection = redirectItem.to?.reference?.relationTo
       const id = redirectItem.to?.reference?.value
 
-      const document = (await getCachedDocument(collection, id)()) as Page | Post
+      const document = (await getCachedDocument(collection, id)()) as News | Page | Post
       redirectUrl = `${redirectItem.to?.reference?.relationTo !== 'pages' ? `/${redirectItem.to?.reference?.relationTo}` : ''}/${
         document?.slug
       }`

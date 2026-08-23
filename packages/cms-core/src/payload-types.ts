@@ -1062,16 +1062,11 @@ export interface Exhibition {
 export interface News {
   id: number;
   title: string;
-  slug?: string | null;
-  status: 'draft' | 'published';
-  pinned?: boolean | null;
-  publishDate?: string | null;
-  category?: (number | null) | Category;
+  heroImage?: (number | null) | Media;
   /**
    * Short summary for listings and previews
    */
   excerpt?: string | null;
-  featuredImage?: (number | null) | Media;
   content: {
     root: {
       type: string;
@@ -1087,14 +1082,42 @@ export interface News {
     };
     [k: string]: unknown;
   };
+  relatedNews?: (number | News)[] | null;
+  categories?: (number | Category)[] | null;
   tags?:
     | {
         tag: string;
         id?: string | null;
       }[]
     | null;
+  meta?: {
+    title?: string | null;
+    /**
+     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
+     */
+    image?: (number | null) | Media;
+    description?: string | null;
+  };
+  publishedAt?: string | null;
+  /**
+   * Pinned items are listed before the rest of the archive
+   */
+  pinned?: boolean | null;
+  authors?: (number | User)[] | null;
+  populatedAuthors?:
+    | {
+        id?: string | null;
+        name?: string | null;
+      }[]
+    | null;
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1116,6 +1139,10 @@ export interface Redirect {
       | ({
           relationTo: 'posts';
           value: number | Post;
+        } | null)
+      | ({
+          relationTo: 'news';
+          value: number | News;
         } | null);
     url?: string | null;
   };
@@ -1149,10 +1176,15 @@ export interface Search {
   id: number;
   title?: string | null;
   priority?: number | null;
-  doc: {
-    relationTo: 'posts';
-    value: number | Post;
-  };
+  doc:
+    | {
+        relationTo: 'posts';
+        value: number | Post;
+      }
+    | {
+        relationTo: 'news';
+        value: number | News;
+      };
   slug?: string | null;
   meta?: {
     title?: string | null;
@@ -1799,22 +1831,38 @@ export interface ReviewsSelect<T extends boolean = true> {
  */
 export interface NewsSelect<T extends boolean = true> {
   title?: T;
-  slug?: T;
-  status?: T;
-  pinned?: T;
-  publishDate?: T;
-  category?: T;
+  heroImage?: T;
   excerpt?: T;
-  featuredImage?: T;
   content?: T;
+  relatedNews?: T;
+  categories?: T;
   tags?:
     | T
     | {
         tag?: T;
         id?: T;
       };
+  meta?:
+    | T
+    | {
+        title?: T;
+        image?: T;
+        description?: T;
+      };
+  publishedAt?: T;
+  pinned?: T;
+  authors?: T;
+  populatedAuthors?:
+    | T
+    | {
+        id?: T;
+        name?: T;
+      };
+  generateSlug?: T;
+  slug?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2398,6 +2446,10 @@ export interface TaskSchedulePublish {
       | ({
           relationTo: 'posts';
           value: number | Post;
+        } | null)
+      | ({
+          relationTo: 'news';
+          value: number | News;
         } | null);
     global?: string | null;
     user?: (number | null) | User;

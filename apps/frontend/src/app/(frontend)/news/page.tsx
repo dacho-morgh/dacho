@@ -24,12 +24,7 @@ export default async function NewsPage() {
     depth: 1,
     limit: 12,
     overrideAccess: false,
-    sort: ['-pinned', '-publishDate', '-createdAt'],
-    where: {
-      status: {
-        equals: 'published',
-      },
-    },
+    sort: ['-pinned', '-publishedAt', '-createdAt'],
   })
 
   return (

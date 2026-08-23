@@ -11,12 +11,7 @@ const NewsSection = async () => {
     depth: 1,
     limit: 6,
     overrideAccess: false,
-    sort: ['-pinned', '-publishDate', '-createdAt'],
-    where: {
-      status: {
-        equals: 'published',
-      },
-    },
+    sort: ['-pinned', '-publishedAt', '-createdAt'],
   })
 
   if (newsItems.length === 0) return null

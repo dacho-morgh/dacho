@@ -1,17 +1,18 @@
 import configPromise from '@payload-config'
 import type { Metadata } from 'next'
+import { draftMode } from 'next/headers'
 import Image from 'next/image'
-import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import { cache } from 'react'
 import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import { NewsBreadcrumb } from '@/components/landing/news/news-page-header'
+import { LivePreviewListener } from '@/components/LivePreviewListener'
 import { Media } from '@/components/Media'
+import { PayloadRedirects } from '@/components/PayloadRedirects'
 import RichText from '@/components/RichText'
 import { Typography } from '@/components/ui/typography'
 import { buildSafe } from '@/utilities/buildSafe'
-
-export const revalidate = 600
+import { generateMeta } from '@/utilities/generateMeta'
 
 type Args = {
   params: Promise<{ slug: string }>
@@ -35,16 +36,22 @@ function countTextWords(value: unknown): number {
   }, 0)
 }
 
-const queryNewsBySlug = cache(async (slug: string) => {
+const queryNewsBySlug = cache(async ({ slug }: { slug: string }) => {
+  const { isEnabled: draft } = await draftMode()
+
   const payload = await getPayload({ config: configPromise })
+
   const result = await payload.find({
     collection: 'news',
     depth: 2,
+    draft,
     limit: 1,
-    overrideAccess: false,
+    overrideAccess: draft,
     pagination: false,
     where: {
-      and: [{ slug: { equals: slug } }, { status: { equals: 'published' } }],
+      slug: {
+        equals: slug,
+      },
     },
   })
 
@@ -56,11 +63,11 @@ export async function generateStaticParams() {
     const payload = await getPayload({ config: configPromise })
     return payload.find({
       collection: 'news',
+      draft: false,
       limit: 1000,
       overrideAccess: false,
       pagination: false,
       select: { slug: true },
-      where: { status: { equals: 'published' } },
     })
   })
 
@@ -68,27 +75,35 @@ export async function generateStaticParams() {
 }
 
 export default async function NewsArticlePage({ params }: Args) {
+  const { isEnabled: draft } = await draftMode()
   const { slug } = await params
-  const news = await queryNewsBySlug(decodeURIComponent(slug))
+  const decodedSlug = decodeURIComponent(slug)
+  const url = `/news/${decodedSlug}`
+  const news = await queryNewsBySlug({ slug: decodedSlug })
 
-  if (!news) notFound()
+  if (!news) return <PayloadRedirects url={url} />
 
-  const publishedAt = news.publishDate || news.createdAt
+  const publishedAt = news.publishedAt || news.createdAt
   const readingMinutes = Math.max(1, Math.ceil(countTextWords(news.content) / 200))
-  const hasFeaturedImage = typeof news.featuredImage === 'object' && news.featuredImage !== null
+  const hasHeroImage = typeof news.heroImage === 'object' && news.heroImage !== null
 
   return (
     <main className="overflow-x-clip bg-white">
+      {/* Allows redirects for valid news articles too */}
+      <PayloadRedirects disableNotFound url={url} />
+
+      {draft && <LivePreviewListener />}
+
       <article className="mx-auto flex w-full max-w-7xl flex-col gap-16 px-4 pt-10 pb-20 sm:px-6 lg:pt-14">
         <NewsBreadcrumb title={news.title} />
 
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div className="relative aspect-[31/20] w-full overflow-hidden rounded-4xl bg-neutral-100">
-            {hasFeaturedImage ? (
+            {hasHeroImage ? (
               <Media
                 fill
                 priority
-                resource={news.featuredImage}
+                resource={news.heroImage}
                 size="(min-width: 1024px) 620px, 100vw"
                 pictureClassName="absolute inset-0 block"
                 imgClassName="object-cover"
@@ -144,15 +159,17 @@ export default async function NewsArticlePage({ params }: Args) {
 
 export async function generateMetadata({ params }: Args): Promise<Metadata> {
   const { slug } = await params
-  const news = await queryNewsBySlug(decodeURIComponent(slug))
+  const news = await queryNewsBySlug({ slug: decodeURIComponent(slug) })
 
   if (!news) return { title: 'خبر پیدا نشد' }
 
-  const image = typeof news.featuredImage === 'object' ? news.featuredImage?.url : undefined
+  const meta = await generateMeta({ doc: news })
 
   return {
-    title: news.title,
-    description: news.excerpt || undefined,
-    openGraph: image ? { images: [{ url: image }] } : undefined,
+    ...meta,
+    // `excerpt` is the editor-facing summary; fall back to it when no SEO
+    // description was written for the article.
+    description: news.meta?.description || news.excerpt || meta.description,
+    title: news.meta?.title || news.title,
   }
 }
