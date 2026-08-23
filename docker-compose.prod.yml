@@ -1,0 +1,87 @@
+# Production stack running PREBUILT images from GHCR — no source checkout, no
+# build step. This file is standalone (do NOT combine it with
+# docker-compose.yml, which builds from source); on the VPS you only need:
+#
+#   docker-compose.prod.yml
+#   .env                     (see below)
+#   secrets/payload-secret
+#   secrets/jwt-private.pem
+#
+# Usage:
+#   docker login ghcr.io -u <github-user> --password-stdin < token.txt
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Required in .env (compose refuses to start if any are missing — critical
+# values must never silently fall back to a default):
+#   IMAGE_TAG              e.g. sha-a805857  (prefer an immutable sha tag)
+#   POSTGRES_PASSWORD
+#   NEXT_PUBLIC_SERVER_URL e.g. https://dacho.example.com
+#   PAYLOAD_API_KEY        from `pnpm --filter @dacho/frontend seed:service-account`
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dacho
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: dacho-cms
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'dacho']
+      interval: 5s
+      retries: 5
+
+  frontend:
+    image: ghcr.io/dacho-morgh/dacho/frontend:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    # Bound to loopback: TLS and the public port are Caddy's job (docs/deployment.md).
+    ports:
+      - '127.0.0.1:3000:3000'
+    environment:
+      DATABASE_URL: postgres://dacho:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/dacho-cms
+      PAYLOAD_SECRET_FILE: /run/secrets/payload_secret
+      NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:?NEXT_PUBLIC_SERVER_URL is required}
+      BACKEND_JWKS_URL: http://backend:4000/.well-known/jwks.json
+    secrets:
+      - payload_secret
+    volumes:
+      # Uploaded media lives outside the container so image updates don't drop it.
+      - media:/repo/apps/frontend/public/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    image: ghcr.io/dacho-morgh/dacho/backend:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:4000:4000'
+    secrets:
+      - jwt_private_key
+    environment:
+      PORT: '4000'
+      DATABASE_URL: postgres://dacho:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/dacho-cms
+      JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private_key
+      PAYLOAD_URL: http://frontend:3000
+      PAYLOAD_API_KEY: ${PAYLOAD_API_KEY:?PAYLOAD_API_KEY is required}
+      OTP_DELIVERY: ${OTP_DELIVERY:-console}
+      KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
+      KAVENEGAR_TEMPLATE: ${KAVENEGAR_TEMPLATE:-testtemplate}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+volumes:
+  pgdata:
+  media:
+
+secrets:
+  jwt_private_key:
+    file: ./secrets/jwt-private.pem
+  payload_secret:
+    file: ./secrets/payload-secret

@@ -106,6 +106,89 @@ curl -s http://localhost:4000/health              # backend
 - **Updates:** `git pull` → `docker compose build` → `docker compose up -d`.
 - **Fresh DB:** `docker compose down -v`, then repeat §4 (build → up postgres → migrate → up).
 
+## 9. Alternative: run prebuilt GHCR images (no build on the VPS)
+
+CI publishes both services to GHCR on every push, so the VPS can pull instead of
+build — no source checkout, no toolchain, no 5-minute build on a small box. Use
+`docker-compose.prod.yml`, which is **standalone** (do not combine it with
+`docker-compose.yml`; that one builds from source).
+
+Images:
+
+```
+ghcr.io/dacho-morgh/dacho/frontend:<tag>
+ghcr.io/dacho-morgh/dacho/backend:<tag>
+```
+
+Tags come from `docker/metadata-action`: `sha-<short>` for every build,
+`pr-<n>` on pull requests, the branch name on branch pushes, and `latest` only
+on pushes to `main`. **Pin `sha-<short>` in production** — it is immutable, so a
+redeploy can never silently pick up different code, and rolling back is just
+changing one line.
+
+### One-time: authenticate to GHCR
+
+The repository is private, so its packages are private too. `GITHUB_TOKEN`
+exists only inside Actions — the VPS needs its own credential. Create a
+**classic PAT with only the `read:packages` scope** (ideally on a dedicated
+machine account, so revoking it doesn't disturb anyone's personal access):
+
+```bash
+# on the VPS
+echo "<PAT>" | docker login ghcr.io -u <github-username> --password-stdin
+```
+
+Credentials land in `~/.docker/config.json`. If pulls 403 after this, check
+Package settings → *Manage Actions access* — the repository must be linked to
+the package with at least Read.
+
+### Deploy
+
+The VPS needs only three things in a directory: `docker-compose.prod.yml`,
+`.env`, and `secrets/`.
+
+```bash
+mkdir -p /srv/dacho/secrets && cd /srv/dacho
+# copy docker-compose.prod.yml here, plus secrets/payload-secret and
+# secrets/jwt-private.pem (generated per §2)
+
+cat > .env <<'EOF'
+IMAGE_TAG=sha-a805857
+POSTGRES_PASSWORD=<strong-password>
+NEXT_PUBLIC_SERVER_URL=https://your-domain.com
+PAYLOAD_API_KEY=<from seed:service-account>
+EOF
+
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Every one of those four variables is mandatory — compose aborts with
+`required variable ... is missing a value` rather than starting with a default.
+Migrations run automatically: the frontend entrypoint executes
+`payload migrate` before `next start`, so no host-side `pnpm` is needed.
+
+### Update / roll back
+
+```bash
+sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=sha-<new>/' .env
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d      # migrations run on boot
+```
+
+Rolling back is the same command with the previous sha. Uploaded media lives in
+the `media` volume rather than the image, so it survives both directions.
+
+### Caveats
+
+- Images are **linux/amd64 only** — the publish workflow sets no `platforms`. An
+  arm64 VPS (Ampere, Graviton, Apple-silicon-like hosts) cannot run them; add
+  `platforms: linux/amd64,linux/arm64` to `docker/build-push-action` first.
+- `latest` exists only after a push to `main`. Before the first merge, pin
+  `sha-<short>` or `pr-<n>`.
+- The frontend binds to `127.0.0.1:3000` here, so Caddy (§6) is required to serve
+  it publicly.
+
 ## Notes
 
 - The frontend runs via `next start` against a complete prod `node_modules` — **not** Next's `output: standalone` tracer, which only partially copies symlinked pnpm deps (e.g. `@swc/helpers/esm`) and crashed on boot.
