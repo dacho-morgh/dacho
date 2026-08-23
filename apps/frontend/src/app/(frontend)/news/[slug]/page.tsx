@@ -9,6 +9,7 @@ import { NewsBreadcrumb } from '@/components/landing/news/news-page-header'
 import { Media } from '@/components/Media'
 import RichText from '@/components/RichText'
 import { Typography } from '@/components/ui/typography'
+import { buildSafe } from '@/utilities/buildSafe'
 
 export const revalidate = 600
 
@@ -51,17 +52,19 @@ const queryNewsBySlug = cache(async (slug: string) => {
 })
 
 export async function generateStaticParams() {
-  const payload = await getPayload({ config: configPromise })
-  const result = await payload.find({
-    collection: 'news',
-    limit: 1000,
-    overrideAccess: false,
-    pagination: false,
-    select: { slug: true },
-    where: { status: { equals: 'published' } },
+  const result = await buildSafe('news slug params', async () => {
+    const payload = await getPayload({ config: configPromise })
+    return payload.find({
+      collection: 'news',
+      limit: 1000,
+      overrideAccess: false,
+      pagination: false,
+      select: { slug: true },
+      where: { status: { equals: 'published' } },
+    })
   })
 
-  return result.docs.flatMap((news) => (news.slug ? [{ slug: news.slug }] : []))
+  return result?.docs.flatMap((news) => (news.slug ? [{ slug: news.slug }] : [])) ?? []
 }
 
 export default async function NewsArticlePage({ params }: Args) {
