@@ -136,16 +136,22 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm --filter @dacho/frontend build
-        env:
-          DATABASE_URL: postgres://dacho:dacho@127.0.0.1:5432/dacho-cms
-          PAYLOAD_SECRET: ci-placeholder
-
+      # Migrate + seed BEFORE building. The Postgres service is reachable here,
+      # so buildSafe() does NOT skip the prerender queries — it only tolerates
+      # connection-init failures. An unmigrated database therefore fails the
+      # build with `relation "pages" does not exist`, which is correct
+      # behaviour: a reachable database with a broken schema is a real error.
+      # The DB-free path is covered by the build-without-database job above.
       - name: Migrate + seed landing
         run: |
           echo "n" | pnpm --filter @dacho/frontend payload migrate
           pnpm --filter @dacho/frontend seed:landing
+        env:
+          DATABASE_URL: postgres://dacho:dacho@127.0.0.1:5432/dacho-cms
+          PAYLOAD_SECRET: ci-placeholder
+
+      - name: Build
+        run: pnpm --filter @dacho/frontend build
         env:
           DATABASE_URL: postgres://dacho:dacho@127.0.0.1:5432/dacho-cms
           PAYLOAD_SECRET: ci-placeholder
