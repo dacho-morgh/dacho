@@ -4,17 +4,19 @@ import useClickableCard from '@/utilities/useClickableCard'
 import Link from 'next/link'
 import React, { Fragment } from 'react'
 
-import type { Post } from '@dacho/cms-core'
+import type { News, Post } from '@dacho/cms-core'
 
 import { Media } from '@/components/Media'
 
-export type CardPostData = Pick<Post, 'slug' | 'categories' | 'meta' | 'title'>
+export type CardRelationTo = 'news' | 'posts'
+
+export type CardPostData = Pick<News | Post, 'slug' | 'categories' | 'meta' | 'title'>
 
 export const Card: React.FC<{
   alignItems?: 'center'
   className?: string
   doc?: CardPostData
-  relationTo?: 'posts'
+  relationTo?: CardRelationTo
   showCategories?: boolean
   title?: string
 }> = (props) => {

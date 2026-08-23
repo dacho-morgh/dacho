@@ -16,7 +16,8 @@ import { Banner } from '@cms-core/blocks/Banner/config'
 import { Code } from '@cms-core/blocks/Code/config'
 import { MediaBlock } from '@cms-core/blocks/MediaBlock/config'
 import { generatePreviewPath } from '@cms-core/utilities/generatePreviewPath'
-import { populateAuthors } from './hooks/populateAuthors'
+import { slugify } from '@cms-core/utilities/slugify'
+import { populateAuthors } from '@cms-core/hooks/populateAuthors'
 import { revalidateDelete, revalidatePost } from './hooks/revalidatePost'
 
 import {
@@ -216,7 +217,7 @@ export const Posts: CollectionConfig<'posts'> = {
         },
       ],
     },
-    slugField(),
+    slugField({ slugify }),
   ],
   hooks: {
     afterChange: [revalidatePost],

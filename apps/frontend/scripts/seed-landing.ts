@@ -79,7 +79,10 @@ async function main(): Promise<void> {
     'reviews',
     'faq',
   ] as const) {
-    await payload.delete({ collection, where: {} })
+    // `disableRevalidate` keeps collection hooks from calling Next's
+    // revalidatePath(): this script runs outside a request scope, where that
+    // throws instead of busting a cache.
+    await payload.delete({ collection, where: {}, context: { disableRevalidate: true } })
     payload.logger.info(`— Cleared ${collection}`)
   }
 
@@ -138,12 +141,14 @@ async function main(): Promise<void> {
   payload.logger.info('— Seeding news…')
   await payload.create({
     collection: 'news',
+    context: { disableRevalidate: true },
     data: {
       title: 'انتقال واحد اعتبارات صندوق پژوهش و فناوری استان بوشهر به محل جدید',
-      status: 'published',
+      slug: 'انتقال-واحد-اعتبارات-صندوق-پژوهش-و-فناوری-استان-بوشهر-به-محل-جدید',
+      _status: 'published',
       pinned: true,
-      publishDate: new Date().toISOString(),
-      category: catNews.id,
+      publishedAt: new Date().toISOString(),
+      categories: [catNews.id],
       excerpt: 'انتقال واحد اعتبارات صندوق با هدف بهبود فرآیندهای مالی و اعتباری و ارتقای کیفیت خدمات‌رسانی انجام شد.',
       content: rt([
         {
@@ -169,12 +174,14 @@ async function main(): Promise<void> {
 
   await payload.create({
     collection: 'news',
+    context: { disableRevalidate: true },
     data: {
       title: 'حمایت از شرکت‌های دانش‌بنیان در مسیر تجاری‌سازی',
-      status: 'published',
+      slug: 'حمایت-از-شرکتهای-دانشبنیان-در-مسیر-تجاریسازی',
+      _status: 'published',
       pinned: false,
-      publishDate: new Date().toISOString(),
-      category: catNews.id,
+      publishedAt: new Date().toISOString(),
+      categories: [catNews.id],
       excerpt: 'از اعتبارسنجی ایده تا توسعه بازار و جذب شرکای صنعتی.',
       content: rt([
         {

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
 
-export type NewsCardData = Pick<News, 'featuredImage' | 'slug' | 'title'>
+export type NewsCardData = Pick<News, 'heroImage' | 'slug' | 'title'>
 
 const NewsCard = ({
   news,
@@ -16,7 +16,7 @@ const NewsCard = ({
   news: NewsCardData
   variant?: 'home' | 'listing'
 }) => {
-  const hasFeaturedImage = typeof news.featuredImage === 'object' && news.featuredImage !== null
+  const hasHeroImage = typeof news.heroImage === 'object' && news.heroImage !== null
   const href = news.slug ? `/news/${news.slug}` : '/news'
 
   return (
@@ -32,10 +32,10 @@ const NewsCard = ({
         aria-label={news.title}
         className="relative h-50 w-full shrink-0 overflow-hidden rounded-t-3xl 8xl:h-65"
       >
-        {hasFeaturedImage ? (
+        {hasHeroImage ? (
           <Media
             fill
-            resource={news.featuredImage}
+            resource={news.heroImage}
             size="(min-width: 1280px) 416px, (min-width: 768px) 50vw, 100vw"
             pictureClassName="absolute inset-0 block"
             imgClassName="pointer-events-none object-cover group-hover:scale-105 transition-transform duration-300"

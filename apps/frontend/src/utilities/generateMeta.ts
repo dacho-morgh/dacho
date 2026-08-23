@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 
-import type { Media, Page, Post, Config } from '@dacho/cms-core'
+import type { Media, News, Page, Post, Config } from '@dacho/cms-core'
 
 import { mergeOpenGraph } from './mergeOpenGraph'
 import { getServerSideURL } from '@dacho/cms-core/utilities'
@@ -20,7 +20,7 @@ const getImageURL = (image?: Media | Config['db']['defaultIDType'] | null) => {
 }
 
 export const generateMeta = async (args: {
-  doc: Partial<Page> | Partial<Post> | null
+  doc: Partial<News> | Partial<Page> | Partial<Post> | null
 }): Promise<Metadata> => {
   const { doc } = args
 
