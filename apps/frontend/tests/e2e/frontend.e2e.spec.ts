@@ -1,17 +1,14 @@
-import { test, expect, Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 
 test.describe('Frontend', () => {
-  let page: Page
-
-  test.beforeAll(async ({ browser }, testInfo) => {
-    const context = await browser.newContext()
-    page = await context.newPage()
-  })
-
   test('can load homepage', async ({ page }) => {
-    await page.goto('http://localhost:3000')
-    await expect(page).toHaveTitle(/Payload Website Template/)
-    const heading = page.locator('h1').first()
-    await expect(heading).toHaveText('Payload Website Template')
+    const response = await page.goto('http://localhost:3000')
+
+    expect(response?.status()).toBe(200)
+
+    // `/` is the custom landing page (not the CMS `home` page and not the stock
+    // Payload template), so assert its hero renders rather than the template's
+    // "Payload Website Template" copy.
+    await expect(page.locator('h1').first()).toBeVisible()
   })
 })
