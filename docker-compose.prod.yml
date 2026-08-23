@@ -15,9 +15,20 @@
 # Required in .env (compose refuses to start if any are missing — critical
 # values must never silently fall back to a default):
 #   IMAGE_TAG              e.g. sha-a805857  (prefer an immutable sha tag)
-#   POSTGRES_PASSWORD
+#   POSTGRES_PASSWORD      URL-SAFE ONLY — see warning below
 #   NEXT_PUBLIC_SERVER_URL e.g. https://dacho.example.com
 #   PAYLOAD_API_KEY        from `pnpm --filter @dacho/frontend seed:service-account`
+#
+# WARNING — POSTGRES_PASSWORD is interpolated into a connection URL below, so
+# `@ : / ? # % &` in it corrupt the URL and surface as the very misleading
+# `password authentication failed for user "dacho"` (SQLSTATE 28P01). Generate a
+# hex password, which is always URL-safe:  openssl rand -hex 32
+#
+# WARNING — Postgres applies POSTGRES_PASSWORD only when it INITIALISES the data
+# directory. Changing it later has no effect while the `pgdata` volume already
+# exists; the original password stays in force. Either recreate the volume
+# (`down -v`, destroys data) or run
+# `ALTER USER dacho WITH PASSWORD '<new>'` inside the container.
 
 services:
   postgres:
