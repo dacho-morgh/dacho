@@ -338,8 +338,8 @@ export function EventsIcon({
  * Three Dots / More Options Icon - Figma Vuesax
  */
 export function MoreOptionsIcon({
-  variant = 'linear',
-  active = false,
+  variant: _variant = 'linear',
+  active: _active = false,
   className = 'w-6 h-6',
   ...props
 }: SidebarIconProps) {
