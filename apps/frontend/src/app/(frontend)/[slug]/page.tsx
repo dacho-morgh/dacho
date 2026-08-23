@@ -10,23 +10,26 @@ import { homeStatic } from '@/endpoints/seed/home-static'
 import { RenderBlocks } from '@/blocks/RenderBlocks'
 import { RenderHero } from '@/heros/RenderHero'
 import { generateMeta } from '@/utilities/generateMeta'
+import { buildSafe } from '@/utilities/buildSafe'
 import PageClient from './page.client'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
 
 export async function generateStaticParams() {
-  const payload = await getPayload({ config: configPromise })
-  const pages = await payload.find({
-    collection: 'pages',
-    draft: false,
-    limit: 1000,
-    overrideAccess: false,
-    pagination: false,
-    select: {
-      slug: true,
-    },
+  const pages = await buildSafe('pages slug params', async () => {
+    const payload = await getPayload({ config: configPromise })
+    return payload.find({
+      collection: 'pages',
+      draft: false,
+      limit: 1000,
+      overrideAccess: false,
+      pagination: false,
+      select: {
+        slug: true,
+      },
+    })
   })
 
-  const params = pages.docs
+  const params = pages?.docs
     ?.filter((doc) => {
       return doc.slug !== 'home'
     })
@@ -34,7 +37,7 @@ export async function generateStaticParams() {
       return { slug }
     })
 
-  return params
+  return params ?? []
 }
 
 type Args = {

@@ -18,11 +18,6 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
-      # next build queries Payload (SSG), so it needs the Postgres on the host.
-      network: host
-      args:
-        PAYLOAD_SECRET: ${PAYLOAD_SECRET:-dacho-build-secret}
-        DATABASE_URL: postgres://dacho:dacho@localhost:5432/dacho-cms
     ports:
       - '3000:3000'
     environment:
