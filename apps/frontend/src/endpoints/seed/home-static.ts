@@ -80,8 +80,9 @@ export const homeStatic: RequiredDataFromCollectionSlug<'pages'> = {
     },
   },
   meta: {
-    description: 'An open-source website built with Payload and Next.js.',
-    title: 'Payload Website Template',
+    description:
+      'خدمات تأمین مالی، صدور ضمانت‌نامه، سرمایه‌گذاری و تجاری‌سازی برای شرکت‌های دانش‌بنیان و فناور.',
+    title: 'کارخانه نوآوری صنایع انرژی بوشهر',
   },
   title: 'Home',
   layout: [],

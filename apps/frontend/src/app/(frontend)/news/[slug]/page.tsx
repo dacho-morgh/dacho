@@ -161,15 +161,11 @@ export async function generateMetadata({ params }: Args): Promise<Metadata> {
   const { slug } = await params
   const news = await queryNewsBySlug({ slug: decodeURIComponent(slug) })
 
-  if (!news) return { title: 'خبر پیدا نشد' }
-
-  const meta = await generateMeta({ doc: news })
-
-  return {
-    ...meta,
+  return generateMeta({
+    doc: news,
+    path: `/news/${decodeURIComponent(slug)}`,
     // `excerpt` is the editor-facing summary; fall back to it when no SEO
     // description was written for the article.
-    description: news.meta?.description || news.excerpt || meta.description,
-    title: news.meta?.title || news.title,
-  }
+    description: news?.meta?.description || news?.excerpt,
+  })
 }

@@ -1,5 +1,5 @@
-import type { RequiredDataFromCollectionSlug } from 'payload'
 import type { Media } from '@dacho/cms-core'
+import type { RequiredDataFromCollectionSlug } from 'payload'
 
 type HomeArgs = {
   heroImage: Media
@@ -666,9 +666,10 @@ export const home: (args: HomeArgs) => RequiredDataFromCollectionSlug<'pages'> =
       },
     ],
     meta: {
-      description: 'An open-source website built with Payload and Next.js.',
+      description:
+        'خدمات تأمین مالی، صدور ضمانت‌نامه، سرمایه‌گذاری و تجاری‌سازی برای شرکت‌های دانش‌بنیان و فناور.',
       image: heroImage.id,
-      title: 'Payload Website Template',
+      title: 'کارخانه نوآوری صنایع انرژی بوشهر',
     },
     title: 'Home',
   }

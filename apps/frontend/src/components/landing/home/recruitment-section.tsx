@@ -116,7 +116,7 @@ const RecruitmentSection = () => {
             مشتاق همکاری با شما هستیم
           </Typography>
           <Typography variant="16/regular" sm="20/regular" color="white" className="max-w-175.5">
-            در صورت تمایل به همکاری با صندوق کارآفرینی بوشهر رزومه خود را برای ما بفرستید.
+            در صورت تمایل به همکاری با کارخانه نوآوری صنایع انرژی بوشهر رزومه خود را برای ما بفرستید.
           </Typography>
         </div>
       </div>

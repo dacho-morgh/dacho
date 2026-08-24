@@ -1,20 +1,17 @@
-import type { Metadata } from 'next'
-
-import { RelatedPosts } from '@/blocks/RelatedPosts/Component'
-import { PayloadRedirects } from '@/components/PayloadRedirects'
-import configPromise from '@payload-config'
-import { getPayload } from 'payload'
-import { draftMode } from 'next/headers'
-import React, { cache } from 'react'
-import RichText from '@/components/RichText'
-
 import type { Post } from '@dacho/cms-core'
-
-import { PostHero } from '@/heros/PostHero'
-import { generateMeta } from '@/utilities/generateMeta'
-import { buildSafe } from '@/utilities/buildSafe'
-import PageClient from './page.client'
+import configPromise from '@payload-config'
+import type { Metadata } from 'next'
+import { draftMode } from 'next/headers'
+import { getPayload } from 'payload'
+import React, { cache } from 'react'
+import { RelatedPosts } from '@/blocks/RelatedPosts/Component'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
+import { PayloadRedirects } from '@/components/PayloadRedirects'
+import RichText from '@/components/RichText'
+import { PostHero } from '@/heros/PostHero'
+import { buildSafe } from '@/utilities/buildSafe'
+import { generateMeta } from '@/utilities/generateMeta'
+import PageClient from './page.client'
 
 export async function generateStaticParams() {
   const posts = await buildSafe('post slug params', async () => {
@@ -67,10 +64,10 @@ export default async function Post({ params: paramsPromise }: Args) {
 
       <div className="flex flex-col items-center gap-4 pt-8">
         <div className="container">
-          <RichText className="max-w-[48rem] mx-auto" data={post.content} enableGutter={false} />
+          <RichText className="mx-auto max-w-[48rem]" data={post.content} enableGutter={false} />
           {post.relatedPosts && post.relatedPosts.length > 0 && (
             <RelatedPosts
-              className="mt-12 max-w-[52rem] lg:grid lg:grid-cols-subgrid col-start-1 col-span-3 grid-rows-[2fr]"
+              className="col-span-3 col-start-1 mt-12 max-w-[52rem] grid-rows-[2fr] lg:grid lg:grid-cols-subgrid"
               docs={post.relatedPosts.filter((post) => typeof post === 'object')}
             />
           )}
@@ -86,7 +83,7 @@ export async function generateMetadata({ params: paramsPromise }: Args): Promise
   const decodedSlug = decodeURIComponent(slug)
   const post = await queryPostBySlug({ slug: decodedSlug })
 
-  return generateMeta({ doc: post })
+  return generateMeta({ doc: post, path: `/posts/${decodedSlug}` })
 }
 
 const queryPostBySlug = cache(async ({ slug }: { slug: string }) => {

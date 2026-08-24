@@ -3,7 +3,7 @@ import React from 'react'
 import { RequestsListView } from '@/components/dashboard/requests'
 
 export const metadata: Metadata = {
-  title: 'لیست درخواست‌ها | کارخانه نوآوری',
+  title: 'لیست درخواست‌ها',
   description: 'مشاهده، جستجو و پیگیری وضعیت درخواست‌های ثبت شده در سامانه کارخانه نوآوری',
 }
 

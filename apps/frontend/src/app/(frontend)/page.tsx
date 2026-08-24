@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import CommentsSection from '@/components/landing/home/comments-section'
 import EventsSection from '@/components/landing/home/events-section'
 import FaqSection from '@/components/landing/home/faq-section'
@@ -7,6 +8,9 @@ import NewsSection from '@/components/landing/home/news-section'
 import ServicesSection from '@/components/landing/home/services-section'
 import Reveal from '@/components/landing/reveal'
 import ScrollProvider from '@/components/landing/scroll-provider'
+import { createPageMetadata } from '@/utilities/siteMetadata'
+
+export const metadata: Metadata = createPageMetadata({ path: '/' })
 
 // The landing page reads collections (services/events/news/reviews/faq) at
 // request time via Payload's local API. Without a dynamic marker Next.js
