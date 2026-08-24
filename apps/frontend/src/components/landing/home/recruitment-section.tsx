@@ -3,6 +3,7 @@
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import Link from 'next/link'
 import ShapeIcon from 'public/figma/recruitment/shape-icon'
 import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
@@ -99,8 +100,8 @@ const RecruitmentSection = () => {
         className="relative z-10 grid w-full items-center gap-8 md:grid-cols-[160px_minmax(0,1fr)] md:gap-12 xl:grid-cols-[160px_minmax(0,702px)] xl:gap-24.5"
       >
         <div className="order-2 flex justify-center md:order-1 md:justify-start">
-          <Button type="button" variant="white" size="48" className="w-40 font-light">
-            ارسال رزومه
+          <Button asChild variant="white" size="48" className="w-40 font-light">
+            <Link href="/cooperation">ارسال رزومه</Link>
           </Button>
         </div>
 
@@ -116,7 +117,8 @@ const RecruitmentSection = () => {
             مشتاق همکاری با شما هستیم
           </Typography>
           <Typography variant="16/regular" sm="20/regular" color="white" className="max-w-175.5">
-            در صورت تمایل به همکاری با کارخانه نوآوری صنایع انرژی بوشهر رزومه خود را برای ما بفرستید.
+            در صورت تمایل به همکاری با کارخانه نوآوری صنایع انرژی بوشهر رزومه خود را برای ما
+            بفرستید.
           </Typography>
         </div>
       </div>
