@@ -82,7 +82,10 @@ export async function Footer() {
       }))
     : []
 
-  const pages = cmsItems.length > 0 ? cmsItems : PAGES_FALLBACK
+  const configuredPages = cmsItems.length > 0 ? cmsItems : PAGES_FALLBACK
+  const pages = configuredPages.some((item) => item.href === '/connect')
+    ? configuredPages
+    : [...configuredPages, { label: 'تماس با ما', href: '/connect' }]
 
   return (
     <footer className="bg-neutral-800 py-12 lg:py-30">
