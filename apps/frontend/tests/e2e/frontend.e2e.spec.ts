@@ -1,6 +1,32 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Frontend', () => {
+  test('opens the dashboard mobile sidebar as a right-side drawer', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    await page.goto('http://localhost:3000/dashboard')
+
+    const trigger = page.locator('[data-sidebar="trigger"]')
+    await expect(trigger).toBeVisible()
+    await expect(trigger).toHaveCSS('position', 'absolute')
+
+    const triggerBox = await trigger.boundingBox()
+    expect(triggerBox).not.toBeNull()
+    expect(triggerBox!.x).toBeLessThanOrEqual(24)
+    expect(triggerBox!.y).toBeLessThanOrEqual(24)
+    expect(triggerBox!.width).toBeLessThanOrEqual(44)
+    await expect(trigger.locator('svg')).toBeVisible()
+
+    await trigger.click()
+
+    const sidebar = page.locator('[data-sidebar="sidebar"][data-mobile="true"]')
+    await expect(sidebar).toBeVisible()
+
+    const box = await sidebar.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x + box!.width).toBeCloseTo(390, 0)
+    expect(box!.x).toBeGreaterThan(0)
+  })
+
   test('can load homepage', async ({ page }) => {
     const response = await page.goto('http://localhost:3000')
 

@@ -54,7 +54,6 @@ const siteName = 'کارخانه نوآوری صنایع انرژی بوشهر'
 export default buildConfig({
   admin: {
     meta: {
-      metadataBase: new URL(getServerSideURL()),
       applicationName: siteName,
       titleSuffix: ` | ${siteName}`,
       manifest: '/favicon/site.webmanifest',
@@ -149,6 +148,7 @@ export default buildConfig({
     Exhibitions,
   ],
   cors: [getServerSideURL(), 'http://localhost:8080', 'http://127.0.0.1:8080'].filter(Boolean),
+  serverURL: getServerSideURL(),
   globals: [Header, Footer, ContactUs, SiteSettings],
   endpoints: [openApiEndpoint],
   plugins,
