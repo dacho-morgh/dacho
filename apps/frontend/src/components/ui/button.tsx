@@ -209,17 +209,8 @@ function Button({
       }}
       {...props}
     >
-      {loading ? (
-        <>
-          <Loader2 className="animate-spin" />
-          {children}
-        </>
-      ) : (
-        <>
-          {icon}
-          {children}
-        </>
-      )}
+      {loading ? <Loader2 className="animate-spin" /> : icon}
+      <Slot.Slottable>{children}</Slot.Slottable>
     </Comp>
   )
 }
