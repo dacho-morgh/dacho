@@ -1,49 +1,46 @@
-"use client"
+'use client'
 
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { XCircle } from "lucide-react"
-
-import { cn } from "@/utilities/ui"
-import { SearchIcon } from "public/images/dashboard/search-icon"
-
+import { cva, type VariantProps } from 'class-variance-authority'
+import { XCircle } from 'lucide-react'
+import { SearchIcon } from 'public/images/dashboard/search-icon'
+import * as React from 'react'
+import { Typography, typographyVariants } from '@/components/ui/typography'
+import { cn } from '@/utilities/ui'
 
 /**
- * Sandoq Design System Input Variants (Figma node 26:5317)
+ * Sandoq Design System Input Variants (Figma node 263:3294)
  *
  * Direction: RTL (Persian)
- * Heights: 40px (default / md), 36px (sm), 48px (lg)
+ * Height: 40px (default / md)
  * Radius: 8px
- * States: Default, Hover, Focus/Active (Blue #3B82F6), Error (#EF4444 / #FF4E64), Disabled
+ * States: Default, Hover, Focus/Active, Error, Disabled
  */
 const inputContainerVariants = cva(
-  "group relative flex w-full items-center gap-2 rounded-[8px] border bg-white px-3 py-2 text-foreground transition-all duration-150 dir-rtl",
+  'group relative flex w-full items-center gap-2 rounded-lg border bg-background p-2 transition-colors duration-150 dir-rtl',
   {
     variants: {
       variant: {
-        default:
-          "border-neutral-200 hover:border-neutral-300 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20",
-        error:
-          "border-error-500 hover:border-error-500 focus-within:border-error-500 focus-within:ring-2 focus-within:ring-error-500/20",
+        default: 'border-neutral-100 hover:border-brand-500 focus-within:border-brand-500',
+        error: 'border-error-100 hover:border-error-200 focus-within:border-error-500',
       },
       inputSize: {
-        sm: "h-9 text-sm leading-6",
-        default: "h-10 text-base leading-7",
-        md: "h-10 text-base leading-7",
-        lg: "h-12 text-lg leading-8",
+        sm: 'h-9',
+        default: 'h-10',
+        md: 'h-10',
+        lg: 'h-12',
       },
       disabled: {
-        true: "cursor-not-allowed bg-neutral-100 border-neutral-200 opacity-70",
+        true: 'cursor-not-allowed border-neutral-100 bg-neutral-50',
       },
     },
     defaultVariants: {
-      variant: "default",
-      inputSize: "default",
+      variant: 'default',
+      inputSize: 'default',
     },
-  }
+  },
 )
 
-export type InputProps = Omit<React.ComponentProps<"input">, "size"> &
+export type InputProps = Omit<React.ComponentProps<'input'>, 'size'> &
   VariantProps<typeof inputContainerVariants> & {
     label?: string
     hint?: string
@@ -60,9 +57,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       className,
       containerClassName,
       wrapperClassName,
-      type = "text",
+      type = 'text',
       variant,
-      inputSize = "default",
+      inputSize = 'default',
       label,
       hint,
       error,
@@ -70,15 +67,19 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       endIcon,
       disabled,
       id,
-      dir = "rtl",
+      dir = 'rtl',
+      'aria-describedby': ariaDescribedBy,
+      'aria-invalid': ariaInvalid,
       ...props
     },
-    ref
+    ref,
   ) => {
     const generatedId = React.useId()
-    const inputId = id || (label ? generatedId : undefined)
-    const isError = Boolean(error)
-    const computedVariant = isError ? "error" : variant || "default"
+    const hasSupportingContent = Boolean(label || hint || error)
+    const inputId = id || (hasSupportingContent ? generatedId : undefined)
+    const helperId = inputId && (error || hint) ? `${inputId}-description` : undefined
+    const isError = Boolean(error) || variant === 'error'
+    const computedVariant = isError ? 'error' : variant || 'default'
 
     const inputElement = (
       <div
@@ -89,12 +90,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             inputSize,
             disabled,
           }),
-          containerClassName
+          containerClassName,
         )}
       >
         {/* Right Icon in RTL / Leading Icon */}
         {startIcon && (
-          <div className="flex shrink-0 items-center justify-center text-neutral-400 group-focus-within:text-brand-500 transition-colors [&>svg]:size-5">
+          <div className="flex size-6 shrink-0 items-center justify-center text-neutral-300 transition-colors group-focus-within:text-brand-500 [&>svg]:size-6">
             {startIcon}
           </div>
         )}
@@ -106,24 +107,26 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           dir={dir}
           disabled={disabled}
           data-slot="input"
+          aria-describedby={ariaDescribedBy || helperId}
+          aria-invalid={ariaInvalid ?? (isError || undefined)}
           className={cn(
-            "w-full flex-1 bg-transparent font-sans text-neutral-800 outline-none placeholder:text-neutral-400 disabled:cursor-not-allowed disabled:text-neutral-400",
-            className
+            typographyVariants({ variant: '16/regular', color: 'neutral-600' }),
+            'min-w-0 flex-1 bg-transparent text-right outline-none placeholder:font-light placeholder:text-neutral-400 disabled:cursor-not-allowed disabled:text-neutral-400',
+            className,
           )}
           {...props}
         />
 
         {/* Left Icon in RTL / Trailing Icon */}
         {endIcon && (
-          <div className="flex shrink-0 items-center justify-center text-neutral-400 transition-colors [&>svg]:size-5">
+          <div className="flex size-6 shrink-0 items-center justify-center text-neutral-300 transition-colors [&>svg]:size-6">
             {endIcon}
           </div>
         )}
       </div>
     )
 
-    // If no label, hint, or error, return the container directly
-    if (!label && !hint && !error) {
+    if (!hasSupportingContent) {
       return inputElement
     }
 
@@ -131,36 +134,42 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <div
         data-slot="input-wrapper"
         dir={dir}
-        className={cn("flex w-full flex-col gap-2 font-sans text-right", wrapperClassName)}
+        className={cn('flex w-full flex-col gap-2 text-right', wrapperClassName)}
       >
         {label && (
-          <label
+          <Typography
+            as="label"
             htmlFor={inputId}
-            className="text-base font-semibold leading-7 text-neutral-600 select-none cursor-pointer"
+            variant="16/regular"
+            color="neutral-600"
+            className="cursor-pointer select-none"
           >
             {label}
-          </label>
+          </Typography>
         )}
 
-        {inputElement}
+        <div className="flex w-full flex-col gap-1">
+          {inputElement}
 
-        {(error || hint) && (
-          <p
-            className={cn(
-              "px-1 text-xs leading-4 font-normal transition-colors",
-              isError ? "text-error-500 font-medium" : "text-neutral-500"
-            )}
-          >
-            {error || hint}
-          </p>
-        )}
+          {(error || hint) && (
+            <Typography
+              as="p"
+              id={helperId}
+              variant="12/light"
+              color={isError ? 'error' : 'neutral-500'}
+              className="w-full transition-colors"
+            >
+              {error || hint}
+            </Typography>
+          )}
+        </div>
       </div>
     )
-  }
+  },
 )
-Input.displayName = "Input"
+Input.displayName = 'Input'
 
-export type SearchInputProps = Omit<InputProps, "startIcon" | "endIcon"> & {
+export type SearchInputProps = Omit<InputProps, 'startIcon' | 'endIcon'> & {
   onClear?: () => void
   showClearButton?: boolean
 }
@@ -178,13 +187,13 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       onChange,
       onClear,
       showClearButton = true,
-      placeholder = "جستجو...",
+      placeholder = 'جستجو...',
       className,
       ...props
     },
-    ref
+    ref,
   ) => {
-    const [internalValue, setInternalValue] = React.useState(defaultValue || "")
+    const [internalValue, setInternalValue] = React.useState(defaultValue || '')
     const isControlled = value !== undefined
     const currentValue = isControlled ? value : internalValue
 
@@ -199,7 +208,7 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
 
     const handleClear = () => {
       if (!isControlled) {
-        setInternalValue("")
+        setInternalValue('')
       }
       onClear?.()
     }
@@ -221,7 +230,7 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
               onClick={handleClear}
               tabIndex={-1}
               aria-label="پاک کردن متن"
-              className="flex items-center justify-center text-neutral-400 hover:text-neutral-600 transition-colors cursor-pointer"
+              className="flex cursor-pointer items-center justify-center text-neutral-400 transition-colors hover:text-neutral-600"
             >
               <XCircle className="size-5" />
             </button>
@@ -231,8 +240,8 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         {...props}
       />
     )
-  }
+  },
 )
-SearchInput.displayName = "SearchInput"
+SearchInput.displayName = 'SearchInput'
 
 export { Input, SearchInput, SearchIcon, inputContainerVariants }
