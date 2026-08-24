@@ -98,7 +98,7 @@ export async function Footer() {
                 <img
                   alt=""
                   aria-hidden="true"
-                  className="h-8 w-auto"
+                  className="h-8 w-auto brightness-0 invert"
                   height={32}
                   src="/logo/sandoq-logomark.svg"
                   width={37}
@@ -106,7 +106,7 @@ export async function Footer() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt="صندوق"
-                  className="h-8 w-auto"
+                  className="h-8 w-auto brightness-0 invert"
                   height={32}
                   src="/logo/sandoq-logotype.svg"
                   width={90}
