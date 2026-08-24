@@ -5,6 +5,7 @@ import NewsCard from '@/components/landing/home/news-card'
 import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import { NewsEmptyState } from '@/components/landing/news/news-empty-state'
 import { NewsBreadcrumb, NewsPageHeading } from '@/components/landing/news/news-page-header'
+import { createPageMetadata } from '@/utilities/siteMetadata'
 
 // Server-rendered rather than prerendered: this page has no dynamic params, so
 // a static build would query Payload at build time and require a live database.
@@ -12,10 +13,11 @@ import { NewsBreadcrumb, NewsPageHeading } from '@/components/landing/news/news-
 // serving an empty news archive after a database-less build).
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: 'اخبار',
-  description: 'آخرین اخبار، فرصت‌های صنعتی، داوری‌های تخصصی و رویدادهای صندوق کارآفرینی بوشهر.',
-}
+  description: 'آخرین اخبار، فرصت‌های صنعتی، داوری‌های تخصصی و رویدادهای کارخانه نوآوری صنایع انرژی بوشهر.',
+  path: '/news',
+})
 
 export default async function NewsPage() {
   const payload = await getPayload({ config: configPromise })

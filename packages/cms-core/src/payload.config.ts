@@ -49,9 +49,44 @@ const resolveSecret = (): string => {
 
 const payloadSecret = resolveSecret()
 const databaseURL = requireEnv('DATABASE_URL')
+const siteName = 'کارخانه نوآوری صنایع انرژی بوشهر'
 
 export default buildConfig({
   admin: {
+    meta: {
+      metadataBase: new URL(getServerSideURL()),
+      applicationName: siteName,
+      titleSuffix: ` | ${siteName}`,
+      manifest: '/favicon/site.webmanifest',
+      icons: {
+        icon: [
+          { url: '/favicon/favicon.ico', sizes: 'any' },
+          { url: '/favicon/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+          { url: '/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+        ],
+        apple: [{ url: '/favicon/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+        shortcut: ['/favicon/favicon.ico'],
+      },
+      robots: {
+        index: false,
+        follow: false,
+      },
+      openGraph: {
+        images: [
+          {
+            url: '/og-image.png',
+            width: 1688,
+            height: 932,
+            alt: 'مسیر رشد کسب‌وکارها، از فرصت تا موفقیت',
+          },
+        ],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        images: ['/og-image.png'],
+      },
+      defaultOGImageType: 'off',
+    },
     components: {
       // The `BeforeLogin` component renders a message that you see while logging into your admin panel.
       // Feel free to delete this at any time. Simply remove the line below.

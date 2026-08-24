@@ -1,49 +1,28 @@
+import type { News, Page, Post } from '@dacho/cms-core'
 import type { Metadata } from 'next'
-
-import type { Media, News, Page, Post, Config } from '@dacho/cms-core'
-
-import { mergeOpenGraph } from './mergeOpenGraph'
-import { getServerSideURL } from '@dacho/cms-core/utilities'
-
-const getImageURL = (image?: Media | Config['db']['defaultIDType'] | null) => {
-  const serverUrl = getServerSideURL()
-
-  let url = serverUrl + '/website-template-OG.webp'
-
-  if (image && typeof image === 'object' && 'url' in image) {
-    const ogUrl = image.sizes?.og?.url
-
-    url = ogUrl ? serverUrl + ogUrl : serverUrl + image.url
-  }
-
-  return url
-}
+import { createPageMetadata } from './siteMetadata'
 
 export const generateMeta = async (args: {
   doc: Partial<News> | Partial<Page> | Partial<Post> | null
+  path?: string
+  description?: string | null
 }): Promise<Metadata> => {
-  const { doc } = args
+  const { doc, path, description } = args
 
-  const ogImage = getImageURL(doc?.meta?.image)
-
-  const title = doc?.meta?.title
-    ? doc?.meta?.title + ' | Payload Website Template'
-    : 'Payload Website Template'
-
-  return {
-    description: doc?.meta?.description,
-    openGraph: mergeOpenGraph({
-      description: doc?.meta?.description || '',
-      images: ogImage
-        ? [
-            {
-              url: ogImage,
-            },
-          ]
-        : undefined,
-      title,
-      url: Array.isArray(doc?.slug) ? doc?.slug.join('/') : '/',
-    }),
-    title,
+  if (!doc) {
+    return createPageMetadata({
+      title: 'صفحه پیدا نشد',
+      description: 'صفحه درخواست‌شده پیدا نشد.',
+      path,
+      noIndex: true,
+    })
   }
+
+  const resolvedPath = path || (doc.slug ? `/${doc.slug}` : '/')
+
+  return createPageMetadata({
+    title: doc.meta?.title || doc.title,
+    description: description || doc.meta?.description,
+    path: resolvedPath,
+  })
 }

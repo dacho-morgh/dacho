@@ -13,14 +13,17 @@ import { beforeSyncWithSearch } from '@cms-core/search/beforeSync'
 import { News, Page, Post } from '@cms-core/payload-types'
 import { getServerSideURL } from '@cms-core/utilities/getURL'
 
+const SITE_NAME = 'کارخانه نوآوری صنایع انرژی بوشهر'
+
 const generateTitle: GenerateTitle<News | Post | Page> = ({ doc }) => {
-  return doc?.title ? `${doc.title} | Payload Website Template` : 'Payload Website Template'
+  return doc?.title ? `${doc.title} | ${SITE_NAME}` : SITE_NAME
 }
 
-const generateURL: GenerateURL<News | Post | Page> = ({ doc }) => {
+const generateURL: GenerateURL<News | Post | Page> = ({ collectionSlug, doc }) => {
   const url = getServerSideURL()
+  const collectionPath = collectionSlug === 'pages' ? '' : `/${collectionSlug}`
 
-  return doc?.slug ? `${url}/${doc.slug}` : url
+  return doc?.slug ? `${url}${collectionPath}/${doc.slug}` : url
 }
 
 export const plugins: Plugin[] = [

@@ -1,9 +1,10 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import localFont from 'next/font/local'
 import Image from 'next/image'
 import React from 'react'
 import { Typography } from '@/components/ui/typography'
+import { siteMetadata, siteViewport } from '@/utilities/siteMetadata'
 import '../(frontend)/globals.css'
 
 const yekanBakh = localFont({
@@ -12,9 +13,14 @@ const yekanBakh = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'ورود | صندوق نوآوری بوشهر',
-  description: 'ورود به سامانه صندوق پژوهش و فناوری استان بوشهر',
+  ...siteMetadata,
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
 }
+export const viewport: Viewport = siteViewport
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

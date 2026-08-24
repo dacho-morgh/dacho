@@ -268,7 +268,7 @@ async function main(): Promise<void> {
       blockType: 'cta',
       richText: rt([
         { t: 'h2', x: 'مشتاق همکاری با شما هستیم' },
-        { t: 'p', x: 'در صورت تمایل به همکاری با صندوق کارآفرینی بوشهر، رزومه خود را برای ما بفرستید.' },
+        { t: 'p', x: 'در صورت تمایل به همکاری با کارخانه نوآوری صنایع انرژی بوشهر، رزومه خود را برای ما بفرستید.' },
       ]),
       links: [customLink('ارسال رزومه', '/contact', 'default')],
     },
@@ -328,7 +328,7 @@ async function main(): Promise<void> {
 
   // 9. Globals
   payload.logger.info('— Seeding globals…')
-  await payload.updateGlobal({ slug: 'site-settings', data: { siteName: 'صندوق پژوهش و فناوری استان بوشهر' } })
+  await payload.updateGlobal({ slug: 'site-settings', data: { siteName: 'کارخانه نوآوری صنایع انرژی بوشهر' } })
 
   const navItems: any[] = [
     customLink('خانه', '/'),
@@ -349,7 +349,7 @@ async function main(): Promise<void> {
     slug: 'contact-us',
     data: {
       heading: 'تماس با ما',
-      subtext: 'در صورت تمایل به همکاری با صندوق کارآفرینی بوشهر با ما در ارتباط باشید.',
+      subtext: 'در صورت تمایل به همکاری با کارخانه نوآوری صنایع انرژی بوشهر با ما در ارتباط باشید.',
       phone: '077 - 1234 56 78',
       email: 'info@sandoq.ir',
       address: rt([{ t: 'p', x: 'بوشهر، بهمنی، خیابان ماهینی، سه راه دانشجو' }]),

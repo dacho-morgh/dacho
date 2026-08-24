@@ -1,13 +1,12 @@
 import { GeistMono } from 'geist/font/mono'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import localFont from 'next/font/local'
 import React from 'react'
-import { Footer } from '@/Footer/Component'
 import LandingHeader from '@/components/landing/header'
+import { Footer } from '@/Footer/Component'
 import { Providers } from '@/providers'
 import { InitTheme } from '@/providers/Theme/InitTheme'
-import { getServerSideURL } from '@dacho/cms-core/utilities'
-import { mergeOpenGraph } from '@/utilities/mergeOpenGraph'
+import { siteMetadata, siteViewport } from '@/utilities/siteMetadata'
 import './globals.css'
 import { cn } from '@/utilities/ui'
 
@@ -27,8 +26,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <head>
         <InitTheme />
-        <link href="/favicon.ico" rel="icon" sizes="32x32" />
-        <link href="/favicon.svg" rel="icon" type="image/svg+xml" />
       </head>
       <body>
         <Providers>
@@ -45,11 +42,5 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   )
 }
 
-export const metadata: Metadata = {
-  metadataBase: new URL(getServerSideURL()),
-  openGraph: mergeOpenGraph(),
-  twitter: {
-    card: 'summary_large_image',
-    creator: '@payloadcms',
-  },
-}
+export const metadata: Metadata = siteMetadata
+export const viewport: Viewport = siteViewport

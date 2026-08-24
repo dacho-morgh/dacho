@@ -1,14 +1,14 @@
+import configPromise from '@payload-config'
+import { notFound } from 'next/navigation'
 import type { Metadata } from 'next/types'
-
+import { getPayload } from 'payload'
+import React from 'react'
 import { CollectionArchive } from '@/components/CollectionArchive'
 import { PageRange } from '@/components/PageRange'
 import { Pagination } from '@/components/Pagination'
-import configPromise from '@payload-config'
-import { getPayload } from 'payload'
-import React from 'react'
-import PageClient from './page.client'
-import { notFound } from 'next/navigation'
 import { buildSafe } from '@/utilities/buildSafe'
+import { createPageMetadata } from '@/utilities/siteMetadata'
+import PageClient from './page.client'
 
 export const revalidate = 600
 
@@ -68,9 +68,13 @@ export default async function Page({ params: paramsPromise }: Args) {
 
 export async function generateMetadata({ params: paramsPromise }: Args): Promise<Metadata> {
   const { pageNumber } = await paramsPromise
-  return {
-    title: `Payload Website Template Posts Page ${pageNumber || ''}`,
-  }
+  const pageLabel = Number(pageNumber).toLocaleString('fa-IR')
+
+  return createPageMetadata({
+    title: `مقالات - صفحه ${pageLabel}`,
+    description: `مقالات و محتوای تخصصی کارخانه نوآوری صنایع انرژی بوشهر، صفحه ${pageLabel}.`,
+    path: `/posts/page/${pageNumber}`,
+  })
 }
 
 export async function generateStaticParams() {

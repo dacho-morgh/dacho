@@ -1,11 +1,11 @@
+import configPromise from '@payload-config'
 import type { Metadata } from 'next/types'
-
+import { getPayload } from 'payload'
+import React from 'react'
 import { CollectionArchive } from '@/components/CollectionArchive'
 import { PageRange } from '@/components/PageRange'
 import { Pagination } from '@/components/Pagination'
-import configPromise from '@payload-config'
-import { getPayload } from 'payload'
-import React from 'react'
+import { createPageMetadata } from '@/utilities/siteMetadata'
 import PageClient from './page.client'
 
 // Server-rendered rather than prerendered: this page has no dynamic params, so
@@ -60,7 +60,9 @@ export default async function Page() {
 }
 
 export function generateMetadata(): Metadata {
-  return {
-    title: `Payload Website Template Posts`,
-  }
+  return createPageMetadata({
+    title: 'مقالات',
+    description: 'مقالات و محتوای تخصصی کارخانه نوآوری صنایع انرژی بوشهر.',
+    path: '/posts',
+  })
 }
