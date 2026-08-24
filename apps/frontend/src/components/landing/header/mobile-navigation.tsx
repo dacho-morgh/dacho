@@ -98,7 +98,7 @@ const MobileNavigationContent = () => {
         </div>
         <Link
           className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#3B82F6] px-4 text-white"
-          href="/dashboard"
+          href="/login"
           onClick={closeMenu}
         >
           ورود

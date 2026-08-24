@@ -57,7 +57,7 @@ const Header = () => {
           <NavList />
         </div>
         <div className="hidden flex-1 justify-end md:flex">
-          <Link href="/dashboard">
+          <Link href="/login">
             <Button className="flex h-10 w-24 cursor-pointer justify-center bg-[#3B82F6] p-0 font-light text-white hover:bg-[#2563EB]">
               ورود
             </Button>
