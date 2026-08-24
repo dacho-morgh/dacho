@@ -4,6 +4,7 @@ import localFont from 'next/font/local'
 import React from 'react'
 import LandingHeader from '@/components/landing/header'
 import { Footer } from '@/Footer/Component'
+import { FooterVisibility } from '@/Footer/FooterVisibility'
 import { Providers } from '@/providers'
 import { InitTheme } from '@/providers/Theme/InitTheme'
 import { siteMetadata, siteViewport } from '@/utilities/siteMetadata'
@@ -33,7 +34,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <LandingHeader />
             <div id="smooth-content">
               {children}
-              <Footer />
+              <FooterVisibility>
+                <Footer />
+              </FooterVisibility>
             </div>
           </div>
         </Providers>
