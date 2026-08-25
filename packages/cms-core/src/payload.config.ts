@@ -147,8 +147,13 @@ export default buildConfig({
     Events,
     Exhibitions,
   ],
-  cors: [getServerSideURL(), 'http://localhost:8080', 'http://127.0.0.1:8080'].filter(Boolean),
+  // Explicit serverURL: without this Payload derives it from the inbound
+  // request, which is plain HTTP behind Caddy (TLS terminated). That makes
+  // `serverURL` (and the CSRF allowlist) `http://…` while the browser sends
+  // `Origin: https://…`, so cookie auth is rejected on every write (403).
+  // Pin it to the public HTTPS origin instead.
   serverURL: getServerSideURL(),
+  cors: [getServerSideURL(), 'http://localhost:8080', 'http://127.0.0.1:8080'].filter(Boolean),
   globals: [Header, Footer, ContactUs, SiteSettings],
   endpoints: [openApiEndpoint],
   plugins,
