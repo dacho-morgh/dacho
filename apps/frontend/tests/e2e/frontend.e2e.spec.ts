@@ -5,6 +5,15 @@ test.describe('Frontend', () => {
     await page.setViewportSize({ width: 390, height: 800 })
     await page.goto('http://localhost:3000/dashboard')
 
+    // `useIsMobile()` is false on first paint (its state starts `undefined` for
+    // SSR safety) and flips to true once the matchMedia effect runs, which
+    // unmounts the desktop sidebar. Wait for that before clicking — otherwise
+    // `toggleSidebar()` toggles the hidden desktop sidebar and the mobile sheet
+    // never opens.
+    await expect(
+      page.locator('[data-sidebar="sidebar"]:not([data-mobile])'),
+    ).toHaveCount(0)
+
     const trigger = page.locator('[data-sidebar="trigger"]')
     await expect(trigger).toBeVisible()
     await expect(trigger).toHaveCSS('position', 'absolute')
@@ -21,9 +30,18 @@ test.describe('Frontend', () => {
     const sidebar = page.locator('[data-sidebar="sidebar"][data-mobile="true"]')
     await expect(sidebar).toBeVisible()
 
+    // The Sheet slides in from the right over 200ms. `toBeVisible` passes as
+    // soon as the drawer mounts, so wait for the right edge to settle on the
+    // viewport edge before measuring — otherwise we sample a mid-animation box.
+    await expect
+      .poll(async () => {
+        const box = await sidebar.boundingBox()
+        return box!.x + box!.width
+      })
+      .toBeCloseTo(390, 0)
+
     const box = await sidebar.boundingBox()
     expect(box).not.toBeNull()
-    expect(box!.x + box!.width).toBeCloseTo(390, 0)
     expect(box!.x).toBeGreaterThan(0)
   })
 
