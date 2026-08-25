@@ -23,10 +23,12 @@ export async function seedTestUser(): Promise<void> {
     },
   })
 
-  // Create fresh test user
+  // Create fresh test user (an admin, so the /admin e2e panel is reachable;
+  // the beforeChange escalation guard is bypassed for this trusted seed).
   await payload.create({
     collection: 'users',
-    data: testUser,
+    data: { ...testUser, role: 'staff', cmsRole: 'admin' },
+    context: { allowRoleAssignment: true },
   })
 }
 

@@ -25,9 +25,11 @@ export const Users: CollectionConfig = {
   hooks: {
     // Defense-in-depth: even if field-level access were bypassed (e.g. a Local
     // API call with `overrideAccess`), a non-admin can never assign a role.
+    // Trusted internal writes (seed scripts, service-account bootstrap) opt out
+    // via `context.allowRoleAssignment`.
     beforeChange: [
-      ({ data, req }) => {
-        if (req.user?.cmsRole !== 'admin') {
+      ({ data, req, context }) => {
+        if (req.user?.cmsRole !== 'admin' && context.allowRoleAssignment !== true) {
           data.role = 'applicant'
           data.cmsRole = null
         }
