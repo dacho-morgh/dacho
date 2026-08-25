@@ -1,20 +1,15 @@
+import { BrandSandoqLogomark, BrandSandoqLogotype } from '@/components/icons'
+
 const Brand = () => (
   <span className="flex h-8 w-[151px] flex-1 items-center gap-4 pr-2" dir="ltr">
-    {/* eslint-disable @next/next/no-img-element */}
-    <img
-      alt="کارخانه نوآوری صنایع انرژی بوشهر"
-      className="h-8 w-[90px] shrink-0"
-      height={32}
-      src="/logo/sandoq-logotype.svg"
-      width={90}
+    <BrandSandoqLogotype
+      aria-label="کارخانه نوآوری صنایع انرژی بوشهر"
+      className="h-8 w-[90px] shrink-0 text-neutral-800"
+      role="img"
     />
-    <img
-      alt=""
+    <BrandSandoqLogomark
       aria-hidden="true"
-      className="h-8 w-[37px] shrink-0"
-      height={32}
-      src="/logo/sandoq-logomark.svg"
-      width={37}
+      className="h-8 w-[37px] shrink-0 text-neutral-800"
     />
   </span>
 )

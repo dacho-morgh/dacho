@@ -65,9 +65,46 @@ const customLink = (label: string, url: string, appearance?: 'default' | 'outlin
 const EXHIBITION_START = '2027-02-01T00:00:00.000Z'
 const EXHIBITION_END = '2027-02-04T00:00:00.000Z'
 
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'sajjaddg@gmail.com'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'sajjaddg'
+const ADMIN_NAME = process.env.ADMIN_NAME ?? 'Sajjad'
+const ADMIN_PHONE = process.env.ADMIN_PHONE ?? '09120000000'
+
 async function main(): Promise<void> {
   const payload = await getPayload({ config })
   payload.logger.info('Seeding Sandoq landing page…')
+
+  // Keep the seed repeatable: create the requested admin on the first run and
+  // refresh its credentials on subsequent runs without touching other users.
+  payload.logger.info('— Seeding admin user…')
+  const existingAdmin = await payload.find({
+    collection: 'users',
+    where: { email: { equals: ADMIN_EMAIL } },
+    limit: 1,
+  })
+
+  if (existingAdmin.docs[0]) {
+    await payload.update({
+      collection: 'users',
+      id: existingAdmin.docs[0].id,
+      data: {
+        email: ADMIN_EMAIL,
+        name: ADMIN_NAME,
+        password: ADMIN_PASSWORD,
+        phone: ADMIN_PHONE,
+      },
+    })
+  } else {
+    await payload.create({
+      collection: 'users',
+      data: {
+        email: ADMIN_EMAIL,
+        name: ADMIN_NAME,
+        password: ADMIN_PASSWORD,
+        phone: ADMIN_PHONE,
+      },
+    })
+  }
 
   // 1. Clear landing content (keep users/media untouched).
   for (const collection of [
@@ -117,8 +154,68 @@ async function main(): Promise<void> {
       tags: [{ tag: 'تجاری‌سازی' }, { tag: 'بازار' }],
     },
   })
+  const svcGuarantee = await payload.create({
+    collection: 'services',
+    data: {
+      title: 'صدور ضمانت‌نامه',
+      excerpt: 'صدور انواع ضمانت‌نامه برای حضور مطمئن شرکت‌های فناور در قراردادها و مناقصه‌ها.',
+      tags: [{ tag: 'ضمانت‌نامه' }, { tag: 'اعتبار' }],
+    },
+  })
+  const svcInvestment = await payload.create({
+    collection: 'services',
+    data: {
+      title: 'سرمایه‌گذاری خطرپذیر',
+      excerpt: 'مشارکت در طرح‌های نوآورانه و همراهی با تیم‌ها از مرحله نمونه اولیه تا توسعه بازار.',
+      tags: [{ tag: 'سرمایه‌گذاری' }, { tag: 'نوآوری' }],
+    },
+  })
+  await payload.create({
+    collection: 'services',
+    data: {
+      title: 'مشاوره توسعه کسب‌وکار',
+      excerpt: 'ارائه مشاوره تخصصی در زمینه مدل کسب‌وکار، فروش، بازاریابی و جذب سرمایه.',
+      tags: [{ tag: 'مشاوره' }, { tag: 'رشد' }],
+    },
+  })
 
-  // 4. Exhibitions
+  // 4. Events
+  payload.logger.info('— Seeding events…')
+  const eventInnovation = await payload.create({
+    collection: 'events',
+    data: {
+      title: 'رویداد نوآوری در صنعت انرژی',
+      description: rt([{ t: 'p', x: 'گردهمایی شرکت‌های فناور، سرمایه‌گذاران و مدیران صنعت انرژی برای معرفی راهکارهای نوآورانه.' }]),
+      location: 'بوشهر، کارخانه نوآوری صنایع انرژی',
+      startDate: '2026-10-14T05:30:00.000Z',
+      endDate: '2026-10-15T13:30:00.000Z',
+      status: 'upcoming',
+    },
+  })
+  const eventPitch = await payload.create({
+    collection: 'events',
+    data: {
+      title: 'نشست ارائه استارتاپ‌های حوزه نفت و گاز',
+      description: rt([{ t: 'p', x: 'فرصتی برای ارائه استارتاپ‌ها، دریافت بازخورد تخصصی و ارتباط مستقیم با سرمایه‌گذاران.' }]),
+      location: 'عسلویه، مرکز همایش‌های پارس',
+      startDate: '2026-11-18T06:30:00.000Z',
+      endDate: '2026-11-18T14:30:00.000Z',
+      status: 'upcoming',
+    },
+  })
+  const eventWorkshop = await payload.create({
+    collection: 'events',
+    data: {
+      title: 'کارگاه تامین مالی شرکت‌های دانش‌بنیان',
+      description: rt([{ t: 'p', x: 'آشنایی عملی با تسهیلات، ضمانت‌نامه‌ها و مسیر آماده‌سازی مدارک برای دریافت حمایت مالی.' }]),
+      location: 'بوشهر، سالن آموزش صندوق پژوهش و فناوری',
+      startDate: '2026-12-09T05:30:00.000Z',
+      endDate: '2026-12-09T11:30:00.000Z',
+      status: 'upcoming',
+    },
+  })
+
+  // 5. Exhibitions
   payload.logger.info('— Seeding exhibitions…')
   const exhibition = await payload.create({
     collection: 'exhibitions',
@@ -133,6 +230,17 @@ async function main(): Promise<void> {
       location: 'عسلویه، بلوار سیراف، محل دائمی برگزاری همایش‌ها و نمایش‌های بین‌المللی',
       startDate: EXHIBITION_START,
       endDate: EXHIBITION_END,
+      status: 'upcoming',
+    },
+  })
+  const exhibitionTechnology = await payload.create({
+    collection: 'exhibitions',
+    data: {
+      title: 'نمایشگاه دستاوردهای پژوهش، فناوری و فن‌بازار بوشهر',
+      description: rt([{ t: 'p', x: 'نمایش تازه‌ترین محصولات و توانمندی‌های شرکت‌های دانش‌بنیان، فناوران و مراکز پژوهشی استان بوشهر.' }]),
+      location: 'بوشهر، محل دائمی نمایشگاه‌های بین‌المللی',
+      startDate: '2027-03-02T05:30:00.000Z',
+      endDate: '2027-03-05T14:30:00.000Z',
       status: 'upcoming',
     },
   })
@@ -193,7 +301,107 @@ async function main(): Promise<void> {
     },
   })
 
-  // 6. Reviews
+  await payload.create({
+    collection: 'news',
+    context: { disableRevalidate: true },
+    data: {
+      title: 'آغاز ثبت‌نام رویداد نوآوری در صنعت انرژی',
+      slug: 'آغاز-ثبتنام-رویداد-نوآوری-در-صنعت-انرژی',
+      _status: 'published',
+      pinned: false,
+      publishedAt: new Date(Date.now() - 86_400_000).toISOString(),
+      categories: [catNews.id],
+      excerpt: 'ثبت‌نام شرکت‌های فناور، استارتاپ‌ها و صاحبان ایده برای حضور در رویداد نوآوری صنعت انرژی آغاز شد.',
+      content: rt([
+        {
+          t: 'p',
+          x: 'رویداد نوآوری در صنعت انرژی با هدف شناسایی راهکارهای فناورانه و ایجاد ارتباط میان شرکت‌های نوپا، سرمایه‌گذاران و صنایع بزرگ برگزار می‌شود.',
+        },
+        {
+          t: 'p',
+          x: 'متقاضیان می‌توانند طرح‌ها و محصولات خود را برای ارزیابی اولیه ارسال کنند و تیم‌های منتخب فرصت ارائه مستقیم به مدیران صنعت را خواهند داشت.',
+        },
+      ]),
+      tags: [{ tag: 'رویداد' }, { tag: 'انرژی' }],
+    },
+  })
+
+  await payload.create({
+    collection: 'news',
+    context: { disableRevalidate: true },
+    data: {
+      title: 'فراخوان پذیرش طرح‌های سرمایه‌گذاری فناورانه',
+      slug: 'فراخوان-پذیرش-طرحهای-سرمایهگذاری-فناورانه',
+      _status: 'published',
+      pinned: false,
+      publishedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+      categories: [catNews.id],
+      excerpt: 'صندوق پژوهش و فناوری استان بوشهر از شرکت‌ها و تیم‌های فناور برای ارائه طرح‌های سرمایه‌گذاری دعوت کرد.',
+      content: rt([
+        {
+          t: 'p',
+          x: 'این فراخوان با تمرکز بر فناوری‌های صنعت انرژی، اقتصاد دریا، هوشمندسازی و توسعه پایدار منتشر شده است.',
+        },
+        {
+          t: 'p',
+          x: 'طرح‌های منتخب پس از ارزیابی فنی و اقتصادی، از خدمات سرمایه‌گذاری، مشاوره کسب‌وکار و شبکه‌سازی صنعتی بهره‌مند خواهند شد.',
+        },
+      ]),
+      tags: [{ tag: 'سرمایه‌گذاری' }, { tag: 'فراخوان' }],
+    },
+  })
+
+  await payload.create({
+    collection: 'news',
+    context: { disableRevalidate: true },
+    data: {
+      title: 'امضای تفاهم‌نامه حمایت از زیست‌بوم فناوری بوشهر',
+      slug: 'امضای-تفاهمنامه-حمایت-از-زیستبوم-فناوری-بوشهر',
+      _status: 'published',
+      pinned: false,
+      publishedAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+      categories: [catNews.id],
+      excerpt: 'تفاهم‌نامه‌ای برای توسعه همکاری‌های مالی و صنعتی و حمایت از شرکت‌های فناور استان بوشهر امضا شد.',
+      content: rt([
+        {
+          t: 'p',
+          x: 'این تفاهم‌نامه زمینه استفاده مشترک از ظرفیت‌های مالی، آموزشی و شبکه ارتباطی طرفین را برای حمایت مؤثرتر از کسب‌وکارهای فناور فراهم می‌کند.',
+        },
+        {
+          t: 'p',
+          x: 'تسهیل ورود محصولات دانش‌بنیان به بازار و تعریف پروژه‌های مشترک با صنایع استان از مهم‌ترین محورهای این همکاری است.',
+        },
+      ]),
+      tags: [{ tag: 'تفاهم‌نامه' }, { tag: 'فناوری' }],
+    },
+  })
+
+  await payload.create({
+    collection: 'news',
+    context: { disableRevalidate: true },
+    data: {
+      title: 'برگزاری کارگاه تخصصی صدور ضمانت‌نامه برای شرکت‌ها',
+      slug: 'برگزاری-کارگاه-تخصصی-صدور-ضمانتنامه-برای-شرکتها',
+      _status: 'published',
+      pinned: false,
+      publishedAt: new Date(Date.now() - 4 * 86_400_000).toISOString(),
+      categories: [catNews.id],
+      excerpt: 'مدیران شرکت‌های فناور در کارگاهی تخصصی با انواع ضمانت‌نامه و مراحل دریافت آن آشنا شدند.',
+      content: rt([
+        {
+          t: 'p',
+          x: 'در این کارگاه، شرایط دریافت ضمانت‌نامه‌های شرکت در مناقصه، حسن انجام تعهدات و پیش‌پرداخت به‌صورت کاربردی تشریح شد.',
+        },
+        {
+          t: 'p',
+          x: 'کارشناسان صندوق همچنین به پرسش‌های شرکت‌کنندگان درباره مدارک مورد نیاز، فرآیند اعتبارسنجی و زمان‌بندی صدور پاسخ دادند.',
+        },
+      ]),
+      tags: [{ tag: 'ضمانت‌نامه' }, { tag: 'آموزش' }],
+    },
+  })
+
+  // 7. Reviews
   payload.logger.info('— Seeding reviews…')
   const review = await payload.create({
     collection: 'reviews',
@@ -203,6 +411,38 @@ async function main(): Promise<void> {
         { t: 'p', x: 'صندوق پژوهش و فناوری انواع خدمات مرتبط با صدور ضمانت‌نامه‌های بانکی را ارائه می‌دهد.' },
       ]),
       priority: 0,
+    },
+  })
+  const review2 = await payload.create({
+    collection: 'reviews',
+    data: {
+      userName: 'علی رضایی',
+      review: rt([{ t: 'p', x: 'فرآیند بررسی درخواست ما شفاف بود و تیم صندوق در تمام مراحل پاسخ‌گویی دقیقی داشت.' }]),
+      priority: 1,
+    },
+  })
+  const review3 = await payload.create({
+    collection: 'reviews',
+    data: {
+      companyName: 'شرکت دانش‌بنیان خلیج فارس',
+      review: rt([{ t: 'p', x: 'با حمایت صندوق توانستیم نمونه صنعتی محصول را تکمیل کنیم و وارد مذاکره با مشتریان بزرگ شویم.' }]),
+      priority: 2,
+    },
+  })
+  const review4 = await payload.create({
+    collection: 'reviews',
+    data: {
+      userName: 'مریم احمدی',
+      review: rt([{ t: 'p', x: 'کارگاه‌های آموزشی صندوق کاربردی و متناسب با چالش‌های واقعی شرکت‌های نوپا برگزار می‌شوند.' }]),
+      priority: 3,
+    },
+  })
+  const review5 = await payload.create({
+    collection: 'reviews',
+    data: {
+      companyName: 'پژوهشگران انرژی ساحل',
+      review: rt([{ t: 'p', x: 'صدور ضمانت‌نامه باعث شد با اطمینان بیشتری در مناقصه صنعتی شرکت کنیم.' }]),
+      priority: 4,
     },
   })
 
@@ -256,13 +496,13 @@ async function main(): Promise<void> {
     {
       blockType: 'services',
       heading: 'ارائه خدمات',
-      services: [svcFinancing.id, svcKnowledge.id, svcCommercial.id],
+      services: [svcFinancing.id, svcKnowledge.id, svcCommercial.id, svcGuarantee.id, svcInvestment.id],
     },
     {
       blockType: 'events',
       heading: 'نمایشگاه و رویدادها',
-      events: [],
-      exhibitions: [exhibition.id],
+      events: [eventInnovation.id, eventPitch.id, eventWorkshop.id],
+      exhibitions: [exhibition.id, exhibitionTechnology.id],
     },
     {
       blockType: 'cta',
@@ -292,7 +532,7 @@ async function main(): Promise<void> {
     {
       blockType: 'reviews',
       heading: 'نظرات',
-      reviews: [review.id],
+      reviews: [review.id, review2.id, review3.id, review4.id, review5.id],
     },
     {
       blockType: 'faq',
@@ -357,7 +597,10 @@ async function main(): Promise<void> {
   })
 
   payload.logger.info('Seeded Sandoq landing page successfully!')
-  console.log(`\nDone. Created: 2 categories, 3 services, 1 exhibition, 2 news, 1 review, 4 FAQs + home page & globals.`)
+  console.log(`\nDone. Created: admin, 2 categories, 6 services, 3 events, 2 exhibitions, 6 news, 5 reviews, 4 FAQs + home page & globals.`)
+  console.log(`Admin: http://localhost:3000/admin`)
+  console.log(`Email: ${ADMIN_EMAIL}`)
+  console.log(`Password: ${ADMIN_PASSWORD}`)
 }
 
 main()

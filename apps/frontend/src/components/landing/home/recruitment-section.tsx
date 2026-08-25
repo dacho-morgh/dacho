@@ -4,14 +4,23 @@ import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Link from 'next/link'
-import ShapeIcon from 'public/figma/recruitment/shape-icon'
 import { useRef } from 'react'
+import { ShapeIcon, ShapeIconDark } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 
 gsap.registerPlugin(useGSAP, ScrollTrigger)
 
-const RecruitmentSection = () => {
+type RecruitmentSectionProps = {
+  variant?: 'blue' | 'gold'
+}
+
+const gradientClasses = {
+  blue: 'bg-[linear-gradient(104.071deg,var(--brand-600)_21.93%,var(--brand-900)_98.384%)]',
+  gold: 'bg-neutral-800 bg-[radial-gradient(circle_at_4%_39%,rgba(193,132,4,0.52)_0%,rgba(193,132,4,0.28)_24%,transparent_56%),radial-gradient(circle_at_29%_-6%,rgba(250,182,34,0.34)_0%,transparent_44%)]',
+} as const
+
+const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
   const sectionRef = useRef<HTMLElement>(null)
   const shapeRef = useRef<HTMLDivElement>(null)
 
@@ -85,14 +94,18 @@ const RecruitmentSection = () => {
       ref={sectionRef}
       dir="rtl"
       aria-labelledby="recruitment-title"
-      className="relative z-10 mx-auto mt-20 flex min-h-64 w-[calc(100%-2rem)] max-w-280 items-center overflow-hidden rounded-[40px] bg-[linear-gradient(104.071deg,var(--brand-600)_21.93%,var(--brand-900)_98.384%)] px-6 py-10 sm:px-10 md:px-12 xl:px-20 xl:py-0"
+      className={`relative z-10 mx-auto mt-20 flex min-h-64 w-[calc(100%-2rem)] max-w-280 items-center overflow-hidden rounded-[40px] px-6 py-10 sm:px-10 md:px-12 xl:px-20 xl:py-0 ${gradientClasses[variant]}`}
     >
       <div
         ref={shapeRef}
         aria-hidden="true"
         className="pointer-events-none absolute inset-y-0 left-1/2 h-full w-235.25 -translate-x-1/2 select-none md:left-0 md:translate-x-0"
       >
-        <ShapeIcon className="size-full max-w-none" />
+        {variant === 'gold' ? (
+          <ShapeIconDark className="size-full max-w-none text-[#FFFDF7]" />
+        ) : (
+          <ShapeIcon className="size-full max-w-none text-[#EEF2FF]" />
+        )}
       </div>
 
       <div

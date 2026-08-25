@@ -1,5 +1,12 @@
 import Link from 'next/link'
 import React from 'react'
+import {
+  BrandSandoqLogomark,
+  BrandSandoqLogotype,
+  FooterCallIcon,
+  FooterHouseIcon,
+  FooterLocationIcon,
+} from '@/components/icons'
 import { Typography } from '@/components/ui/typography'
 import { buildSafe } from '@/utilities/buildSafe'
 import { getCachedGlobal } from '@/utilities/getGlobals'
@@ -59,11 +66,10 @@ function NavColumn({
   )
 }
 
-function ContactRow({ icon, text }: { icon: string; text: string }) {
+function ContactRow({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex items-center gap-2">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img alt="" height={24} src={icon} width={24} />
+      {icon}
       <Typography className="min-w-0 flex-1" color="neutral-400" variant="16/regular">
         {text}
       </Typography>
@@ -97,22 +103,14 @@ export async function Footer() {
             {/* Brand block */}
             <div className="flex flex-col gap-6">
               <div className="flex items-center gap-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt=""
+                <BrandSandoqLogomark
                   aria-hidden="true"
-                  className="h-8 w-auto brightness-0 invert"
-                  height={32}
-                  src="/logo/sandoq-logomark.svg"
-                  width={37}
+                  className="h-8 w-auto text-white"
                 />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt="صندوق"
-                  className="h-8 w-auto brightness-0 invert"
-                  height={32}
-                  src="/logo/sandoq-logotype.svg"
-                  width={90}
+                <BrandSandoqLogotype
+                  aria-label="صندوق"
+                  className="h-8 w-auto text-white"
+                  role="img"
                 />
               </div>
               <Typography color="neutral-400" variant="16/regular">
@@ -122,8 +120,24 @@ export async function Footer() {
 
             {/* Contact block */}
             <div className="flex flex-col gap-6">
-              <ContactRow icon="/icons/footer/icon-location.svg" text={ADDRESS_FALLBACK} />
-              <ContactRow icon="/icons/footer/icon-call.svg" text={PHONE_FALLBACK} />
+              <ContactRow
+                icon={
+                  <FooterLocationIcon
+                    aria-hidden="true"
+                    className="size-6 shrink-0 text-neutral-400"
+                  />
+                }
+                text={ADDRESS_FALLBACK}
+              />
+              <ContactRow
+                icon={
+                  <FooterCallIcon
+                    aria-hidden="true"
+                    className="size-6 shrink-0 text-neutral-400"
+                  />
+                }
+                text={PHONE_FALLBACK}
+              />
             </div>
           </div>
           <NavColumn className="order-2 lg:order-0" heading="صفحات" links={pages} />
@@ -145,14 +159,7 @@ export async function Footer() {
           <div className="flex items-center gap-4">
             {[0, 1, 2].map((i) => (
               <a href="#" key={i} aria-label="شبکه اجتماعی (نماد موقت)">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt=""
-                  aria-hidden="true"
-                  height={32}
-                  src="/icons/footer/icon-house2.svg"
-                  width={32}
-                />
+                <FooterHouseIcon aria-hidden="true" className="size-8 text-neutral-400" />
               </a>
             ))}
           </div>

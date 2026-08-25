@@ -1,7 +1,22 @@
 'use client'
 
-import Image from 'next/image'
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import {
+  Partner1Logomark,
+  Partner1Logotype,
+  Partner2Logo,
+  Partner3Logomark,
+  Partner3Logotype,
+  Partner4Logo,
+  Partner5Logo,
+} from '@/components/icons'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type CSSProperties,
+  type SVGProps,
+} from 'react'
 
 const PIXELS_PER_SECOND = 60
 
@@ -9,9 +24,8 @@ type LogoAsset = {
   id: string
   parts: {
     className: string
-    height: number
-    src: string
-    width: number
+    Icon: ComponentType<SVGProps<SVGSVGElement>>
+    id: string
   }[]
   width: string
 }
@@ -22,15 +36,13 @@ const logos: LogoAsset[] = [
     width: 'w-[220px]',
     parts: [
       {
-        src: '/figma/logos/logo-1-logotype.svg',
-        width: 167,
-        height: 33,
+        id: 'partner-1-logotype',
+        Icon: Partner1Logotype,
         className: 'absolute inset-[10%_0_7.5%_24.09%]',
       },
       {
-        src: '/figma/logos/logo-1-logomark.svg',
-        width: 46,
-        height: 40,
+        id: 'partner-1-logomark',
+        Icon: Partner1Logomark,
         className: 'absolute inset-[0_78.88%_0_0]',
       },
     ],
@@ -40,9 +52,8 @@ const logos: LogoAsset[] = [
     width: 'w-44',
     parts: [
       {
-        src: '/figma/logos/logo-2.svg',
-        width: 176,
-        height: 40,
+        id: 'partner-2-logo',
+        Icon: Partner2Logo,
         className: 'absolute inset-0',
       },
     ],
@@ -52,15 +63,13 @@ const logos: LogoAsset[] = [
     width: 'w-[202px]',
     parts: [
       {
-        src: '/figma/logos/logo-3-logomark.svg',
-        width: 40,
-        height: 40,
+        id: 'partner-3-logomark',
+        Icon: Partner3Logomark,
         className: 'absolute inset-[0_80.2%_0_0]',
       },
       {
-        src: '/figma/logos/logo-3-logotype.svg',
-        width: 151,
-        height: 30,
+        id: 'partner-3-logotype',
+        Icon: Partner3Logotype,
         className: 'absolute inset-[17.5%_0.22%_8.05%_25.32%]',
       },
     ],
@@ -70,9 +79,8 @@ const logos: LogoAsset[] = [
     width: 'w-[98px]',
     parts: [
       {
-        src: '/figma/logos/logo-4.svg',
-        width: 97,
-        height: 40,
+        id: 'partner-4-logo',
+        Icon: Partner4Logo,
         className: 'absolute inset-[0_0.64%]',
       },
     ],
@@ -82,9 +90,8 @@ const logos: LogoAsset[] = [
     width: 'w-[159px]',
     parts: [
       {
-        src: '/figma/logos/logo-5.svg',
-        width: 152,
-        height: 34,
+        id: 'partner-5-logo',
+        Icon: Partner5Logo,
         className: 'absolute inset-[7.25%_1.82%_7.25%_2.47%]',
       },
     ],
@@ -94,14 +101,11 @@ const logos: LogoAsset[] = [
 const LogoBox = ({ logo }: { logo: LogoAsset }) => {
   return (
     <div className={`logo-strip-item relative h-10 shrink-0 overflow-hidden ${logo.width}`}>
-      {logo.parts.map((part) => (
-        <Image
-          key={part.src}
-          src={part.src}
-          alt=""
-          width={part.width}
-          height={part.height}
-          className={`${part.className} pointer-events-none max-w-none`}
+      {logo.parts.map(({ Icon, ...part }) => (
+        <Icon
+          key={part.id}
+          aria-hidden="true"
+          className={`${part.className} pointer-events-none max-w-none text-neutral-500`}
         />
       ))}
     </div>

@@ -81,7 +81,7 @@ const EventsSection = async () => {
         نمایشگاه و رویداد ها
       </h2>
       <EventsCarousel items={items} />
-      <RecruitmentSection />
+      <RecruitmentSection variant="gold" />
     </section>
   )
 }

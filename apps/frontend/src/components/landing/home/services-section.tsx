@@ -1,6 +1,6 @@
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
-import ArrowLeftIcon from 'public/figma/events/arrow-left-icon'
+import { ArrowLeftIcon } from '@/components/icons'
 import {
   Carousel,
   CarouselContent,

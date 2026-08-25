@@ -10,7 +10,7 @@ import {
   TrashIcon,
   CalendarBulkIcon,
   ClockBulkIcon,
-} from '@/components/dashboard/icons/request-icons'
+} from '@/components/icons'
 import {
   ChevronLeft,
   FileText,

@@ -12,8 +12,8 @@ import {
   EyeIcon,
   EditIcon,
   TrashIcon,
-  MoreOptionsIcon,
-} from '@/components/dashboard/icons/request-icons'
+  RequestMoreOptionsIcon,
+} from '@/components/icons'
 
 export interface RequestRowActionsProps {
   requestId?: string
@@ -43,7 +43,7 @@ export function RequestRowActions({
           className={`flex size-8 items-center justify-center mx-auto rounded-[10px] text-[#525252] hover:bg-[#E5E5E5]/60 transition-colors focus:outline-none ${className}`}
           title="عملیات بیشتر"
         >
-          <MoreOptionsIcon className="size-5 text-[#525252]" />
+          <RequestMoreOptionsIcon className="size-5 text-[#525252]" />
           <span className="sr-only">منوی عملیات</span>
         </button>
       </DropdownMenuTrigger>

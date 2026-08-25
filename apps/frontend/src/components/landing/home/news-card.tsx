@@ -1,7 +1,7 @@
 import type { News } from '@dacho/cms-core'
 import Image from 'next/image'
 import Link from 'next/link'
-import ArrowUpIcon from '@/components/icons/arrow-up-icon'
+import { ArrowUpIcon } from '@/components/icons'
 import { Media } from '@/components/Media'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'

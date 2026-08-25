@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { FilterIcon } from '@/components/dashboard/icons/request-icons'
+import { FilterIcon } from '@/components/icons'
 import { RequestsSearchInput } from './requests-search-input'
 
 export interface RequestsToolbarProps {

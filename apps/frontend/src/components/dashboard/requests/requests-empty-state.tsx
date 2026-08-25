@@ -1,6 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
-import { EmptyInboxIllustration } from '@/components/dashboard/icons/request-icons'
+import { EmptyInboxIllustration } from '@/components/icons'
 import { Typography } from '@/components/ui/typography'
 
 export interface RequestsEmptyStateProps {

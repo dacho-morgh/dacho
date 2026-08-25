@@ -17,7 +17,7 @@ import {
   LocationBulkIcon,
   CheckSquareIcon,
   EmptyInboxIllustration,
-} from '@/components/dashboard/icons/request-icons'
+} from '@/components/icons'
 import { Check, X, Send } from 'lucide-react'
 
 export interface EventItem {

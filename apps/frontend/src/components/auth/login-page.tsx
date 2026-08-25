@@ -1,10 +1,10 @@
 'use client'
 
 import { Eye, EyeOff } from 'lucide-react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FormEvent, useState } from 'react'
+import { BrandSandoqLogomark, BrandSandoqLogotype } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Typography } from '@/components/ui/typography'
@@ -68,22 +68,14 @@ export default function LoginPage({ registered = false }: { registered?: boolean
           className="flex h-[132px] flex-col items-center justify-center gap-[18px] min-[480px]:h-[164px] min-[480px]:gap-6"
           aria-label="کارخانه نوآوری صنایع انرژی بوشهر"
         >
-          <Image
-            alt=""
+          <BrandSandoqLogomark
             aria-hidden="true"
-            className="h-auto w-[62px] min-[480px]:h-16 min-[480px]:w-[74px]"
-            height={64}
-            priority
-            src="/logo/sandoq-logomark.svg"
-            width={74}
+            className="h-auto w-[62px] text-brand-500 min-[480px]:h-16 min-[480px]:w-[74px]"
           />
-          <Image
-            alt="کارخانه نوآوری صنایع انرژی بوشهر"
-            className="h-auto w-[140px] min-[480px]:h-[60px] min-[480px]:w-[168px]"
-            height={60}
-            priority
-            src="/logo/sandoq-logotype.svg"
-            width={168}
+          <BrandSandoqLogotype
+            aria-label="کارخانه نوآوری صنایع انرژی بوشهر"
+            className="h-auto w-[140px] text-brand-500 min-[480px]:h-[60px] min-[480px]:w-[168px]"
+            role="img"
           />
         </div>
 

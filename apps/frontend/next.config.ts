@@ -30,6 +30,10 @@ const nextConfig: NextConfig = {
         search: '',
       },
       {
+        pathname: '/icons/**',
+        search: '',
+      },
+      {
         pathname: '/images/**',
       },
     ],

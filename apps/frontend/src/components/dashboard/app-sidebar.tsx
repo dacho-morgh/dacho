@@ -22,7 +22,7 @@ import {
   FundLogoMark,
   FundLogoType,
   type SidebarIconProps,
-} from '@/components/dashboard/icons/sidebar-icons'
+} from '@/components/icons'
 
 export interface NavItem {
   title: string

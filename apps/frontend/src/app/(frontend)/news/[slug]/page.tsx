@@ -4,6 +4,7 @@ import { draftMode } from 'next/headers'
 import Image from 'next/image'
 import { getPayload } from 'payload'
 import { cache } from 'react'
+import { NewsCalendarIcon, NewsTimeIcon } from '@/components/icons'
 import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import { NewsBreadcrumb } from '@/components/landing/news/news-page-header'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
@@ -126,14 +127,20 @@ export default async function NewsArticlePage({ params }: Args) {
             </Typography>
             <dl className="flex flex-col gap-4 text-neutral-500">
               <div className="flex items-center gap-2">
-                <Image src="/figma/newspage/calender.svg" alt="" width={28} height={28} />
+                <NewsCalendarIcon
+                  aria-hidden="true"
+                  className="size-7 shrink-0 text-neutral-400"
+                />
                 <dt className="sr-only">تاریخ انتشار</dt>
                 <Typography as="dd" variant="16/regular" color="neutral-500">
                   {persianDateFormatter.format(new Date(publishedAt))}
                 </Typography>
               </div>
               <div className="flex items-center gap-2">
-                <Image src="/figma/newspage/time.svg" alt="" width={28} height={28} />
+                <NewsTimeIcon
+                  aria-hidden="true"
+                  className="size-7 shrink-0 text-neutral-400"
+                />
                 <dt className="sr-only">زمان مطالعه</dt>
                 <Typography as="dd" variant="16/regular" color="neutral-500">
                   زمان مطالعه {readingMinutes.toLocaleString('fa-IR')} دقیقه

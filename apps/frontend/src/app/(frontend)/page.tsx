@@ -12,10 +12,7 @@ import { createPageMetadata } from '@/utilities/siteMetadata'
 
 export const metadata: Metadata = createPageMetadata({ path: '/' })
 
-// The landing page reads collections (services/events/news/reviews/faq) at
-// request time via Payload's local API. Without a dynamic marker Next.js
-// statically bakes it at build (SSG), so CMS edits never appear. Force dynamic
-// rendering so content changes are reflected immediately.
+
 export const dynamic = 'force-dynamic'
 
 export default function HomePage() {

@@ -1,7 +1,13 @@
 import type { Media } from '@dacho/cms-core'
 import Image from 'next/image'
 import type React from 'react'
-import ArrowUpIcon from '@/components/icons/arrow-up-icon'
+import {
+  ArrowLeftIcon,
+  ArrowUpIcon,
+  EventsCalendarIcon,
+  EventsLocationIcon,
+  EventsTimerIcon,
+} from '@/components/icons'
 import { Media as MediaComponent } from '@/components/Media'
 import { Button } from '@/components/ui/button'
 
@@ -25,18 +31,12 @@ type EventCardProps = {
   onPrevious: () => void
 }
 
-const EventMeta = ({ icon, children }: { icon: string; children: React.ReactNode }) => (
+const EventMeta = ({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) => (
   <div dir="ltr" className="flex w-full items-center justify-end gap-2">
     <p className="min-w-0 flex-1 text-right text-base leading-7 font-normal text-[#525252]">
       {children}
     </p>
-    <Image
-      src={icon}
-      alt=""
-      width={28}
-      height={28}
-      className="pointer-events-none size-7 shrink-0"
-    />
+    {icon}
   </div>
 )
 
@@ -66,12 +66,9 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
 
         <div className="absolute bottom-4 z-10 flex h-full items-end justify-start lg:bottom-6">
           <div className="flex items-center gap-1 rounded-[20px] border border-white bg-white/20 p-4 text-right text-white shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-[15px] lg:p-5">
-            <Image
-              src="/figma/events/timer.svg"
-              alt=""
-              width={36}
-              height={36}
-              className="pointer-events-none size-6 shrink-0 lg:size-9"
+            <EventsTimerIcon
+              aria-hidden="true"
+              className="pointer-events-none size-6 shrink-0 text-white lg:size-9"
             />
             <div className="flex items-center justify-end gap-2 whitespace-nowrap">
               {event.countdown ? (
@@ -99,8 +96,26 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
           </div>
 
           <div className="flex w-full flex-col items-end gap-4">
-            <EventMeta icon="/figma/events/calendar.svg">{event.date}</EventMeta>
-            <EventMeta icon="/figma/events/location.svg">{event.location}</EventMeta>
+            <EventMeta
+              icon={
+                <EventsCalendarIcon
+                  aria-hidden="true"
+                  className="pointer-events-none size-7 shrink-0 text-neutral-400"
+                />
+              }
+            >
+              {event.date}
+            </EventMeta>
+            <EventMeta
+              icon={
+                <EventsLocationIcon
+                  aria-hidden="true"
+                  className="pointer-events-none size-7 shrink-0 text-neutral-400"
+                />
+              }
+            >
+              {event.location}
+            </EventMeta>
           </div>
         </div>
 
@@ -115,11 +130,8 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
                 onClick={onNext}
                 className="size-12 rounded-xl bg-[#F5F5F5] p-0 hover:bg-[#E5E5E5]"
               >
-                <Image
-                  src="/figma/events/arrow-left.svg"
-                  alt=""
-                  width={26}
-                  height={26}
+                <ArrowLeftIcon
+                  aria-hidden="true"
                   className="pointer-events-none size-6.5 shrink-0 rotate-180"
                 />
               </Button>
@@ -131,11 +143,8 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
                 onClick={onPrevious}
                 className="size-12 rounded-xl bg-[#F5F5F5] p-0 hover:bg-[#E5E5E5]"
               >
-                <Image
-                  src="/figma/events/arrow-left.svg"
-                  alt=""
-                  width={26}
-                  height={26}
+                <ArrowLeftIcon
+                  aria-hidden="true"
                   className="pointer-events-none size-6.5 shrink-0"
                 />
               </Button>

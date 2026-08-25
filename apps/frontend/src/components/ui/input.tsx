@@ -2,8 +2,8 @@
 
 import { cva, type VariantProps } from 'class-variance-authority'
 import { XCircle } from 'lucide-react'
-import { SearchIcon } from 'public/images/dashboard/search-icon'
 import * as React from 'react'
+import { SearchIcon } from '@/components/icons'
 import { Typography, typographyVariants } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
 

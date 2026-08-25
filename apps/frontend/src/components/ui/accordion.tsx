@@ -2,7 +2,7 @@
 
 import { Accordion as AccordionPrimitive } from 'radix-ui'
 import * as React from 'react'
-import ArrowUpDownIcon from '@/components/icons/arrow-up-icon'
+import { ArrowUpIcon as ArrowUpDownIcon } from '@/components/icons'
 import { cn } from '@/utilities/ui'
 
 function Accordion({ className, ...props }: React.ComponentProps<typeof AccordionPrimitive.Root>) {

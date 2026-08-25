@@ -17,8 +17,8 @@ import {
   SearchNormalIcon,
   Message2Icon,
   EmptyInboxIllustration,
-} from '@/components/dashboard/icons/request-icons'
-import { MoreOptionsIcon } from '@/components/dashboard/icons/sidebar-icons'
+  MoreOptionsIcon,
+} from '@/components/icons'
 import { Check, X, Send, RefreshCw } from 'lucide-react'
 
 export type LetterStatus =

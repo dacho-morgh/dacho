@@ -1,0 +1,26 @@
+import * as React from 'react'
+import type { SVGProps } from 'react'
+const SvgPartner2Logo = (props: SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={176}
+    height={40}
+    fill="none"
+    overflow="visible"
+    preserveAspectRatio="none"
+    style={{
+      display: 'block',
+    }}
+    {...props}
+  >
+    <g fill="currentColor">
+      <path
+        fillRule="evenodd"
+        d="M15 28a5 5 0 0 1-5-5V0H0v23c0 8.284 6.716 15 15 15h11V28zm30-18a9 9 0 1 0 0 18 9 9 0 0 0 0-18m-19 9C26 8.507 34.507 0 45 0s19 8.507 19 19-8.507 19-19 19-19-8.507-19-19m127-9a9 9 0 1 0 0 18 9 9 0 0 0 0-18m-19 9c0-10.493 8.507-19 19-19s19 8.507 19 19-8.507 19-19 19-19-8.507-19-19M85 0C74.507 0 66 8.507 66 19s8.507 19 19 19h28c1.969 0 3.868-.3 5.654-.856L124 40l5.768-10.804A19 19 0 0 0 132 20.261V19c0-10.493-8.507-19-19-19zm37 19a9 9 0 0 0-9-9H85a9 9 0 0 0 0 18h28a8.997 8.997 0 0 0 9-8.93z"
+        clipRule="evenodd"
+      />
+      <path d="M176 2.5a2.5 2.5 0 1 1-4.998.001A2.5 2.5 0 0 1 176 2.5" />
+    </g>
+  </svg>
+)
+export default SvgPartner2Logo
