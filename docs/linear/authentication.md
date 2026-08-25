@@ -85,6 +85,24 @@ backend-issued ES256 tokens against `BACKEND_JWKS_URL` (`jose`
 `Users.auth.strategies`, so OTP users can call Payload-protected endpoints with
 their backend token.
 
+### Applicant self-registration (public signup)
+
+Applicants register themselves through the public signup form
+(`apps/frontend/src/components/auth/register-page.tsx`), a 3-step wizard
+(company → representative → account security) that `POST`s to `/api/users`:
+
+- Collects company fields (`companyName`, `companyNationalId`,
+  `companyRegistrationNumber`, `companyType`, `companyProvince`, `companyCity`),
+  representative fields (`name`, `position`, `phone`, `email`), and a password.
+- `Users.access.create` is public; field-level access + a `beforeChange` hook
+  force `role: 'applicant'` and `cmsRole: null`, so a self-registering visitor
+  cannot escalate (see [authorization.md](./authorization.md)).
+- On success the user is redirected to `/login?registered=1`.
+
+This is the **password-based** path (email/phone + password via
+`/api/users/login`). The backend OTP flow below remains the application-auth
+path for phone-first users and is unchanged.
+
 ## Planned (not implemented)
 
 ### Optional username/password login
