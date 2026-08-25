@@ -7,8 +7,8 @@ import config from '@/payload.config'
 // Public signup must produce an `applicant` (role) with no CMS role (cmsRole),
 // and must be impossible to self-elevate: any `role`/`cmsRole` supplied by an
 // anonymous visitor is ignored and forced to the safe defaults.
-const TEST_PHONES = ['09910000001', '09910000002']
-const TEST_EMAILS = ['int-applicant@example.com', 'int-escalation@example.com']
+const TEST_PHONES = ['09910000001', '09910000002', '09910000003']
+const TEST_EMAILS = ['int-applicant@example.com', 'int-escalation@example.com', 'int-admin@example.com']
 
 let payload: Payload
 
@@ -61,6 +61,24 @@ describe('users roles & access control', () => {
 
     expect(user.role).toBe('applicant')
     expect(user.cmsRole).toBeNull()
+  })
+
+  it('allows trusted internal writes to assign roles via context', async () => {
+    const user = await payload.create({
+      collection: 'users',
+      data: {
+        email: TEST_EMAILS[2],
+        password: 'int-test-password',
+        phone: TEST_PHONES[2],
+        name: 'ادمین تست',
+        role: 'staff',
+        cmsRole: 'admin',
+      },
+      context: { allowRoleAssignment: true },
+    })
+
+    expect(user.role).toBe('staff')
+    expect(user.cmsRole).toBe('admin')
   })
 
   it('hasCmsRole only admits editor/admin', () => {
