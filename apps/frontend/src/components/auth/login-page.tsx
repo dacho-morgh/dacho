@@ -11,13 +11,15 @@ import { Typography } from '@/components/ui/typography'
 
 type Notice = { kind: 'error' | 'info'; message: string } | null
 
-export default function LoginPage() {
+export default function LoginPage({ registered = false }: { registered?: boolean }) {
   const router = useRouter()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [notice, setNotice] = useState<Notice>(null)
+  const [notice, setNotice] = useState<Notice>(
+    registered ? { kind: 'info', message: 'ثبت‌نام با موفقیت انجام شد. اکنون می‌توانید وارد شوید.' } : null,
+  )
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

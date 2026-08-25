@@ -9,6 +9,11 @@ export const metadata: Metadata = createPageMetadata({
   noIndex: true,
 })
 
-export default function Page() {
-  return <LoginPage />
+type Args = {
+  searchParams: Promise<{ registered?: string }>
+}
+
+export default async function Page({ searchParams }: Args) {
+  const { registered } = await searchParams
+  return <LoginPage registered={registered === '1'} />
 }

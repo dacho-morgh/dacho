@@ -520,6 +520,15 @@ export interface User {
   id: number;
   name?: string | null;
   phone: string;
+  role?: ('applicant' | 'staff') | null;
+  cmsRole?: ('admin' | 'editor') | null;
+  position?: string | null;
+  companyName?: string | null;
+  companyNationalId?: string | null;
+  companyRegistrationNumber?: string | null;
+  companyType?: ('سهامی خاص' | 'سهامی عام' | 'مسئولیت محدود' | 'دانش‌بنیان' | 'استارتاپ' | 'سایر') | null;
+  companyProvince?: string | null;
+  companyCity?: string | null;
   updatedAt: string;
   createdAt: string;
   enableAPIKey?: boolean | null;
@@ -1779,6 +1788,15 @@ export interface CategoriesSelect<T extends boolean = true> {
 export interface UsersSelect<T extends boolean = true> {
   name?: T;
   phone?: T;
+  role?: T;
+  cmsRole?: T;
+  position?: T;
+  companyName?: T;
+  companyNationalId?: T;
+  companyRegistrationNumber?: T;
+  companyType?: T;
+  companyProvince?: T;
+  companyCity?: T;
   updatedAt?: T;
   createdAt?: T;
   enableAPIKey?: T;

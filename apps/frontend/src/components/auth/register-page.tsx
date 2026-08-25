@@ -2,33 +2,58 @@
 
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Typography } from '@/components/ui/typography'
 
 const steps = ['اطلاعات شرکت', 'اطلاعات نماینده', 'امنیت حساب'] as const
 
-const companyFields = [
-  { label: 'نام شرکت', name: 'companyName', placeholder: 'نام رسمی شرکت را وارد کنید' },
-  { label: 'شناسه ملی', name: 'nationalId', placeholder: 'شناسه ملی ۱۱ رقمی شرکت' },
-  { label: 'شماره ثبت', name: 'registrationNumber', placeholder: 'شماره ثبت شرکت را وارد کنید' },
-  { label: 'نوع شرکت', name: 'companyType', placeholder: 'نوع شرکت را انتخاب کنید' },
-  { label: 'استان', name: 'province', placeholder: 'استان محل ثبت را انتخاب کنید' },
-  { label: 'شهر', name: 'city', placeholder: 'شهر محل ثبت را انتخاب کنید' },
-] as const
+const COMPANY_TYPES = ['سهامی خاص', 'سهامی عام', 'مسئولیت محدود', 'دانش‌بنیان', 'استارتاپ', 'سایر'] as const
 
-const representativeFields = [
-  {
-    label: 'نام و نام خانوادگی',
-    name: 'fullName',
-    placeholder: 'نام و نام خانوادگی را وارد کنید',
-    inputMode: 'text',
-  },
-  { label: 'سمت', name: 'role', placeholder: 'سمت خود را در شرکت انتخاب کنید', inputMode: 'text' },
-  { label: 'شماره موبایل', name: 'mobile', placeholder: 'مثلاً ۰۹۱۲۱۲۳۴۵۶۷', inputMode: 'tel' },
-  { label: 'ایمیل', name: 'email', placeholder: 'مثلاً example@company.ir', inputMode: 'email' },
-] as const
+// Form field names mirror the Users collection: the representative's
+// fullName/mobile/email map to name/phone/email, and company fields carry a
+// `company` prefix. `role`/`cmsRole` are deliberately omitted — the server
+// forces every self-signup to `applicant` / `cmsRole: null`.
+type FormState = {
+  companyName: string
+  companyNationalId: string
+  companyRegistrationNumber: string
+  companyType: string
+  companyProvince: string
+  companyCity: string
+  name: string
+  position: string
+  phone: string
+  email: string
+  password: string
+  passwordConfirmation: string
+}
+
+const EMPTY_FORM: FormState = {
+  companyName: '',
+  companyNationalId: '',
+  companyRegistrationNumber: '',
+  companyType: '',
+  companyProvince: '',
+  companyCity: '',
+  name: '',
+  position: '',
+  phone: '',
+  email: '',
+  password: '',
+  passwordConfirmation: '',
+}
+
+type FormErrors = Partial<Record<keyof FormState, string>>
 
 const registerInputClasses = {
   className: 'text-sm leading-6 text-neutral-800 placeholder:text-neutral-300',
@@ -37,13 +62,116 @@ const registerInputClasses = {
     'gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700',
 } as const
 
+const required = (value: string, label: string): string | undefined =>
+  value.trim() ? undefined : `${label} را وارد کنید.`
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export default function RegisterPage() {
+  const router = useRouter()
   const [step, setStep] = useState(1)
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [errors, setErrors] = useState<FormErrors>({})
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [confirmationVisible, setConfirmationVisible] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
 
-  const goBack = () => setStep((currentStep) => Math.max(1, currentStep - 1))
-  const goForward = () => setStep((currentStep) => Math.min(3, currentStep + 1))
+  // Marks the form hydrated so e2e tests wait until React has attached its
+  // handlers before filling the controlled inputs (a fill before hydration is
+  // discarded when React re-renders the initial empty state).
+  useEffect(() => {
+    formRef.current?.setAttribute('data-hydrated', 'true')
+  }, [])
+
+  const setField = (name: keyof FormState) => (value: string) => {
+    setForm((current) => ({ ...current, [name]: value }))
+    setErrors((current) => ({ ...current, [name]: undefined }))
+  }
+
+  const validateStep = (stepNumber: number): boolean => {
+    const next: FormErrors = {}
+
+    if (stepNumber === 1) {
+      next.companyName = required(form.companyName, 'نام شرکت')
+      next.companyNationalId = required(form.companyNationalId, 'شناسه ملی')
+      next.companyRegistrationNumber = required(form.companyRegistrationNumber, 'شماره ثبت')
+      next.companyType = required(form.companyType, 'نوع شرکت')
+      next.companyProvince = required(form.companyProvince, 'استان')
+      next.companyCity = required(form.companyCity, 'شهر')
+    }
+
+    if (stepNumber === 2) {
+      next.name = required(form.name, 'نام و نام خانوادگی')
+      next.position = required(form.position, 'سمت')
+      next.phone = required(form.phone, 'شماره موبایل')
+      next.email = required(form.email, 'ایمیل')
+      if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) {
+        next.email = 'ایمیل معتبر نیست.'
+      }
+    }
+
+    if (stepNumber === 3) {
+      next.password = required(form.password, 'رمز عبور')
+      if (form.password && form.password.length < 8) {
+        next.password = 'رمز عبور باید حداقل ۸ کاراکتر باشد.'
+      }
+      next.passwordConfirmation = required(form.passwordConfirmation, 'تکرار رمز عبور')
+      if (form.password && form.passwordConfirmation && form.password !== form.passwordConfirmation) {
+        next.passwordConfirmation = 'رمز عبور و تکرار آن یکسان نیستند.'
+      }
+    }
+
+    setErrors(next)
+    return Object.values(next).every((error) => !error)
+  }
+
+  const goBack = () => setStep((current) => Math.max(1, current - 1))
+  const goForward = () => {
+    if (validateStep(step)) {
+      setStep((current) => Math.min(3, current + 1))
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!validateStep(3)) return
+    setSubmitting(true)
+    setNotice(null)
+
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email.trim(),
+          password: form.password,
+          phone: form.phone.trim(),
+          name: form.name.trim(),
+          position: form.position.trim(),
+          companyName: form.companyName.trim(),
+          companyNationalId: form.companyNationalId.trim(),
+          companyRegistrationNumber: form.companyRegistrationNumber.trim(),
+          companyType: form.companyType,
+          companyProvince: form.companyProvince.trim(),
+          companyCity: form.companyCity.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        // Payload returns validation errors keyed by field when a unique
+        // phone/email already exists; surface a single friendly message.
+        setNotice('ثبت‌نام انجام نشد. ممکن است این شماره موبایل یا ایمیل قبلاً ثبت شده باشد.')
+        return
+      }
+
+      router.replace('/login?registered=1')
+    } catch {
+      setNotice('در حال حاضر ارتباط با سامانه برقرار نیست. کمی بعد دوباره تلاش کنید.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="mx-auto flex min-h-svh w-full max-w-[520px] flex-col px-6 pt-8 pb-6 lg:h-svh lg:min-h-0 lg:px-5 lg:pt-10 lg:pb-8">
@@ -117,37 +245,157 @@ export default function RegisterPage() {
         </ol>
       </header>
 
-      <form className="flex min-h-0 flex-1 flex-col pt-11" aria-label="فرم ثبت شرکت">
+      <form
+        className="flex min-h-0 flex-1 flex-col pt-11"
+        aria-label="فرم ثبت شرکت"
+        ref={formRef}
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (step < 3) goForward()
+          else void handleSubmit()
+        }}
+      >
         <div
           className="flex flex-col gap-7 ps-0.5 pe-3.5 lg:min-h-0 lg:flex-1 lg:[scrollbar-width:thin] lg:[scrollbar-color:var(--neutral-300)_transparent] lg:overflow-y-auto"
           key={step}
         >
-          {step === 1 &&
-            companyFields.map((field) => (
+          {step === 1 && (
+            <>
               <Input
                 {...registerInputClasses}
-                id={`register-${field.name}`}
+                error={errors.companyName}
+                id="register-companyName"
                 inputSize="lg"
-                key={field.name}
-                label={field.label}
-                name={field.name}
-                placeholder={field.placeholder}
+                label="نام شرکت"
+                name="companyName"
+                onChange={(event) => setField('companyName')(event.target.value)}
+                placeholder="نام رسمی شرکت را وارد کنید"
+                value={form.companyName}
               />
-            ))}
+              <Input
+                {...registerInputClasses}
+                error={errors.companyNationalId}
+                id="register-companyNationalId"
+                inputSize="lg"
+                label="شناسه ملی"
+                name="companyNationalId"
+                onChange={(event) => setField('companyNationalId')(event.target.value)}
+                placeholder="شناسه ملی ۱۱ رقمی شرکت"
+                value={form.companyNationalId}
+              />
+              <Input
+                {...registerInputClasses}
+                error={errors.companyRegistrationNumber}
+                id="register-companyRegistrationNumber"
+                inputSize="lg"
+                label="شماره ثبت"
+                name="companyRegistrationNumber"
+                onChange={(event) => setField('companyRegistrationNumber')(event.target.value)}
+                placeholder="شماره ثبت شرکت را وارد کنید"
+                value={form.companyRegistrationNumber}
+              />
+              <div className="flex flex-col gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700">
+                <Typography as="label" color="neutral-700" variant="14/regular">
+                  نوع شرکت
+                </Typography>
+                <Select
+                  onValueChange={(value) => setField('companyType')(value)}
+                  value={form.companyType || undefined}
+                >
+                  <SelectTrigger className="h-12 rounded-lg border-neutral-200 px-3 py-2 shadow-none">
+                    <SelectValue placeholder="نوع شرکت را انتخاب کنید" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMPANY_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.companyType && (
+                  <Typography as="p" color="error" variant="12/light">
+                    {errors.companyType}
+                  </Typography>
+                )}
+              </div>
+              <Input
+                {...registerInputClasses}
+                error={errors.companyProvince}
+                id="register-companyProvince"
+                inputSize="lg"
+                label="استان"
+                name="companyProvince"
+                onChange={(event) => setField('companyProvince')(event.target.value)}
+                placeholder="استان محل ثبت را وارد کنید"
+                value={form.companyProvince}
+              />
+              <Input
+                {...registerInputClasses}
+                error={errors.companyCity}
+                id="register-companyCity"
+                inputSize="lg"
+                label="شهر"
+                name="companyCity"
+                onChange={(event) => setField('companyCity')(event.target.value)}
+                placeholder="شهر محل ثبت را وارد کنید"
+                value={form.companyCity}
+              />
+            </>
+          )}
 
-          {step === 2 &&
-            representativeFields.map((field) => (
+          {step === 2 && (
+            <>
               <Input
                 {...registerInputClasses}
-                id={`register-${field.name}`}
-                inputMode={field.inputMode}
+                error={errors.name}
+                id="register-name"
+                inputMode="text"
                 inputSize="lg"
-                key={field.name}
-                label={field.label}
-                name={field.name}
-                placeholder={field.placeholder}
+                label="نام و نام خانوادگی"
+                name="name"
+                onChange={(event) => setField('name')(event.target.value)}
+                placeholder="نام و نام خانوادگی را وارد کنید"
+                value={form.name}
               />
-            ))}
+              <Input
+                {...registerInputClasses}
+                error={errors.position}
+                id="register-position"
+                inputMode="text"
+                inputSize="lg"
+                label="سمت"
+                name="position"
+                onChange={(event) => setField('position')(event.target.value)}
+                placeholder="سمت خود را در شرکت انتخاب کنید"
+                value={form.position}
+              />
+              <Input
+                {...registerInputClasses}
+                error={errors.phone}
+                id="register-phone"
+                inputMode="tel"
+                inputSize="lg"
+                label="شماره موبایل"
+                name="phone"
+                onChange={(event) => setField('phone')(event.target.value)}
+                placeholder="مثلاً ۰۹۱۲۱۲۳۴۵۶۷"
+                value={form.phone}
+              />
+              <Input
+                {...registerInputClasses}
+                error={errors.email}
+                id="register-email"
+                inputMode="email"
+                inputSize="lg"
+                label="ایمیل"
+                name="email"
+                onChange={(event) => setField('email')(event.target.value)}
+                placeholder="مثلاً example@company.ir"
+                value={form.email}
+              />
+            </>
+          )}
 
           {step === 3 && (
             <>
@@ -168,12 +416,15 @@ export default function RegisterPage() {
                     )}
                   </button>
                 }
+                error={errors.password}
                 id="register-password"
                 inputSize="lg"
                 label="رمز عبور"
                 name="password"
+                onChange={(event) => setField('password')(event.target.value)}
                 placeholder="رمز عبور خود را وارد کنید"
                 type={passwordVisible ? 'text' : 'password'}
+                value={form.password}
               />
 
               <Input
@@ -195,16 +446,32 @@ export default function RegisterPage() {
                     )}
                   </button>
                 }
+                error={errors.passwordConfirmation}
                 id="register-password-confirmation"
                 inputSize="lg"
                 label="تکرار رمز عبور"
                 name="passwordConfirmation"
+                onChange={(event) => setField('passwordConfirmation')(event.target.value)}
                 placeholder="رمز عبور خود را دوباره وارد کنید"
                 type={confirmationVisible ? 'text' : 'password'}
+                value={form.passwordConfirmation}
               />
             </>
           )}
         </div>
+
+        {notice && (
+          <Typography
+            aria-live="polite"
+            as="p"
+            className="mt-4 text-center"
+            color="error"
+            role="alert"
+            variant="12/regular"
+          >
+            {notice}
+          </Typography>
+        )}
 
         <footer
           className={`flex shrink-0 items-center pt-8 ${step === 1 ? 'justify-end' : 'justify-between'}`}
@@ -227,7 +494,7 @@ export default function RegisterPage() {
               <ArrowLeft />
             </Button>
           ) : (
-            <Button size="40" type="button">
+            <Button loading={submitting} size="40" type="submit">
               ثبت شرکت
             </Button>
           )}
