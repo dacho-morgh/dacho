@@ -98,7 +98,12 @@ docker compose -f docker-compose.prod.yml exec frontend sh -lc '
   design (home page, globals, services/news/FAQ).
 - `create-admin.ts` bootstraps (or resets) an admin login; it reads
   `ADMIN_EMAIL` / `ADMIN_PASSWORD` from the environment, defaulting to
-  `admin@dacho.local`.
+  `admin@dacho.local`. It also grants the admin `role=staff` + `cmsRole=admin`
+  (the roles from the roles/signup change). **Re-run it after deploying that
+  change** to backfill an existing admin that predates the roles migration
+  (such an admin has `role=applicant` + `cmsRole=null` and is locked out of
+  `/admin`). Leave `ADMIN_PASSWORD` unset on re-run so the existing password is
+  preserved.
 
 
 ## 6. Reverse proxy + TLS (Caddy)
