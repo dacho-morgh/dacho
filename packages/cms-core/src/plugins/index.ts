@@ -11,6 +11,7 @@ import { searchFields } from '@cms-core/search/fieldOverrides'
 import { beforeSyncWithSearch } from '@cms-core/search/beforeSync'
 
 import { News, Page, Post } from '@cms-core/payload-types'
+import { hasCmsRole } from '@cms-core/access/hasCmsRole'
 import { getServerSideURL } from '@cms-core/utilities/getURL'
 
 const SITE_NAME = 'کارخانه نوآوری صنایع انرژی بوشهر'
@@ -60,6 +61,14 @@ export const plugins: Plugin[] = [
   formBuilderPlugin({
     fields: {
       payment: false,
+    },
+    formSubmissionOverrides: {
+      // Submissions stay public to write (the contact forms) but readable only
+      // by CMS staff — matches the roles model; "any logged-in user" (the plugin
+      // default) would let an applicant read every submission via REST.
+      access: {
+        read: hasCmsRole,
+      },
     },
     formOverrides: {
       fields: ({ defaultFields }) => {
