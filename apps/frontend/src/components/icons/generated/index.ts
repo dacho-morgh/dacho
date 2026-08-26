@@ -70,3 +70,4 @@ export {
 } from './sidebar-icons'
 export { default as ShapeIconDark } from './shape-icon-dark'
 export { default as ShapeIcon } from './shape-icon'
+export { TickCircleIcon } from './tick-circle-icon'
