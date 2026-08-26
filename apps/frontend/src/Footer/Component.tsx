@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import React from 'react'
 import {
-  BrandSandoqLogomark,
-  BrandSandoqLogotype,
+  BrandFooterSandoqLogotype,
+  BrandFooterSandoqLogomark,
   FooterCallIcon,
   FooterHouseIcon,
   FooterLocationIcon,
@@ -103,14 +103,13 @@ export async function Footer() {
             {/* Brand block */}
             <div className="flex flex-col gap-6">
               <div className="flex items-center gap-4">
-                <BrandSandoqLogomark
+                <BrandFooterSandoqLogomark
                   aria-hidden="true"
                   className="h-8 w-auto text-white"
                 />
-                <BrandSandoqLogotype
+                <BrandFooterSandoqLogotype
                   aria-label="صندوق"
                   className="h-8 w-auto text-white"
-                  role="img"
                 />
               </div>
               <Typography color="neutral-400" variant="16/regular">

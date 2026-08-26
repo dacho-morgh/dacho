@@ -1,4 +1,6 @@
 export { default as BrandHeroLogo } from './brand-hero-logo'
+export { default as BrandFooterSandoqLogomark } from './brand-footer-sandoq-logomark'
+export { default as BrandFooterSandoqLogotype } from './brand-footer-sandoq-logotype'
 export { default as BrandSandoqLogomark } from './brand-sandoq-logomark'
 export { default as BrandSandoqLogotype } from './brand-sandoq-logotype'
 export { default as CarouselArrowRightIcon } from './carousel-arrow-right-icon'
