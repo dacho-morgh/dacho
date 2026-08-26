@@ -1,7 +1,14 @@
 import type { Metadata } from 'next'
 import { MessageForm } from '@/components/landing/contact/message-form'
 import { Typography } from '@/components/ui/typography'
+import { getFormIdByTitle } from '@/utilities/getFormId'
 import { createPageMetadata } from '@/utilities/siteMetadata'
+
+// Server-rendered per request: the form id comes from the database (seeded via
+// `scripts/seed-forms.ts`), so the page must not be prerendered at build time.
+export const dynamic = 'force-dynamic'
+
+const COOPERATION_FORM_TITLE = 'درخواست همکاری'
 
 export const metadata: Metadata = createPageMetadata({
   title: 'درخواست همکاری',
@@ -9,7 +16,9 @@ export const metadata: Metadata = createPageMetadata({
   path: '/cooperation',
 })
 
-export default function CooperationPage() {
+export default async function CooperationPage() {
+  const cooperationFormId = await getFormIdByTitle(COOPERATION_FORM_TITLE)
+
   return (
     <main className="overflow-x-clip bg-white">
       <section className="container flex flex-col gap-10 pt-14 pb-24 sm:gap-12 md:pt-20 lg:pt-24 lg:pb-32">
@@ -20,7 +29,7 @@ export default function CooperationPage() {
           </Typography>
         </div>
 
-        <MessageForm className="min-h-132 lg:p-10" />
+        <MessageForm className="min-h-132 lg:p-10" formId={cooperationFormId} />
       </section>
     </main>
   )

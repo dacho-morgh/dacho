@@ -3,7 +3,14 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { MessageForm } from '@/components/landing/contact/message-form'
 import { Typography } from '@/components/ui/typography'
+import { getFormIdByTitle } from '@/utilities/getFormId'
 import { createPageMetadata } from '@/utilities/siteMetadata'
+
+// Server-rendered per request: the form id comes from the database (seeded via
+// `scripts/seed-forms.ts`), so the page must not be prerendered at build time.
+export const dynamic = 'force-dynamic'
+
+const MESSAGE_FORM_TITLE = 'فرم تماس با ما'
 
 export const metadata: Metadata = createPageMetadata({
   title: 'تماس با ما',
@@ -161,7 +168,9 @@ function MapPlaceholder() {
   )
 }
 
-export default function ConnectPage() {
+export default async function ConnectPage() {
+  const messageFormId = await getFormIdByTitle(MESSAGE_FORM_TITLE)
+
   return (
     <main className="overflow-x-clip bg-white">
       <section className="container flex flex-col gap-12 pt-10 pb-20 sm:gap-16 lg:pt-16 lg:pb-28">
@@ -206,7 +215,7 @@ export default function ConnectPage() {
       <section className="container flex flex-col gap-8 pb-20 lg:gap-10 lg:pb-28">
         <SectionTitle>ارسال پیام‌ها، درخواست‌ها و گزارش‌ها</SectionTitle>
 
-        <MessageForm />
+        <MessageForm formId={messageFormId} />
       </section>
 
       <section className="bg-neutral-100 py-16 lg:py-24">
