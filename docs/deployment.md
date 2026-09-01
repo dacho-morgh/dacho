@@ -30,6 +30,13 @@ openssl ecparam -genkey -name prime256v1 -noout | openssl pkcs8 -topk8 -nocrypt 
 
 # Payload secret (≥ 32 bytes recommended)
 openssl rand -hex 32 > secrets/payload-secret
+
+# The containers run as a non-root user (nodejs/nextjs, UID 1001). Compose
+# bind-mounts these files preserving host ownership, so they must be readable
+# by UID 1001 — otherwise startup fails with EACCES on /run/secrets/jwt_private_key.
+# (As root, prefer chown 1001:1001 + chmod 600 for tighter perms; chmod 644
+# works for any user on a single-user box.)
+chmod 644 secrets/jwt-private.pem secrets/payload-secret
 ```
 
 Both files are gitignored. Compose mounts them as Docker secrets and the apps read them via `JWT_PRIVATE_KEY_FILE` / `PAYLOAD_SECRET_FILE` — they are **not** passed as plain env vars.
