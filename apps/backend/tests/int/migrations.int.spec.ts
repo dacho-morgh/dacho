@@ -4,13 +4,13 @@ import { Pool } from 'pg'
 import { runMigrations } from '../../src/db/migrate.js'
 
 // Slice 2 — backend migrations: node-pg-migrate creates the dashboard tables
-// (requests, letters, activities) in the `public` schema.
+// (requests, letters, activities) in the `dashboard` schema.
 const connectionString = process.env.DATABASE_URL ?? 'postgres://dacho:dacho@localhost:5432/dacho-cms'
 const pool = new Pool({ connectionString })
 
 const tableColumns = async (table: string): Promise<string[]> => {
   const { rows } = await pool.query(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+    `SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'dashboard'`,
     [table],
   )
   return rows.map((r) => r.column_name as string)
@@ -74,7 +74,7 @@ describe('dashboard migrations', () => {
 
   it('types requests.status with the request_status enum', async () => {
     const { rows } = await pool.query(
-      `SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'requests' AND column_name = 'status'`,
+      `SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'requests' AND table_schema = 'dashboard' AND column_name = 'status'`,
     )
     expect(rows[0]?.data_type).toBe('USER-DEFINED')
     expect(rows[0]?.udt_name).toBe('request_status')

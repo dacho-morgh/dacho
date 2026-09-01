@@ -78,9 +78,9 @@ describe('workflow transition API', () => {
   })
 
   beforeEach(async () => {
-    await pool.query('DELETE FROM public.activities')
-    await pool.query('DELETE FROM public.letters')
-    await pool.query('DELETE FROM public.requests')
+    await pool.query('DELETE FROM dashboard.activities')
+    await pool.query('DELETE FROM dashboard.letters')
+    await pool.query('DELETE FROM dashboard.requests')
   })
 
   afterAll(async () => {

@@ -6,6 +6,8 @@ import { MailDetailView } from '@/components/dashboard/mail-detail-view'
 import { mapMailData, type LetterDto } from '@/utilities/dashboard-api'
 import { serverDashboardFetch } from '@/utilities/dashboard-server'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'مشاهده نامه',
   description: 'مشاهده جزئیات نامه و مکاتبات اداری',

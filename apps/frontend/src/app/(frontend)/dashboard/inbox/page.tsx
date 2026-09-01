@@ -5,6 +5,8 @@ import { InboxListView, type LetterItem } from '@/components/dashboard/inbox-lis
 import { mapLetterItem, type LetterDto, type Paginated } from '@/utilities/dashboard-api'
 import { serverDashboardFetch } from '@/utilities/dashboard-server'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'کارتابل نامه',
   description: 'مشاهده نامه‌ها، پیام‌ها و مکاتبات اداری در سامانه کارخانه نوآوری',

@@ -49,14 +49,14 @@ export class ActivityRepository {
 
   async list(ownerId: string, page: number, limit: number): Promise<ActivityList> {
     const { rows: countRows } = await this.pool.query<{ total: string }>(
-      'SELECT COUNT(*) AS total FROM activities WHERE owner_id = $1',
+      'SELECT COUNT(*) AS total FROM dashboard.activities WHERE owner_id = $1',
       [ownerId],
     )
     const total = Number(countRows[0]?.total ?? 0)
 
     const offset = (page - 1) * limit
     const { rows } = await this.pool.query<ActivityRow>(
-      `SELECT ${ACTIVITY_COLUMNS} FROM activities
+      `SELECT ${ACTIVITY_COLUMNS} FROM dashboard.activities
        WHERE owner_id = $1
        ORDER BY at DESC
        LIMIT $2 OFFSET $3`,
@@ -74,7 +74,7 @@ export class ActivityRepository {
   /** Chronological event log for a single request (the detail timeline). */
   async listForRequest(requestId: string): Promise<ActivityDto[]> {
     const { rows } = await this.pool.query<ActivityRow>(
-      `SELECT ${ACTIVITY_COLUMNS} FROM activities WHERE request_id = $1 ORDER BY at ASC`,
+      `SELECT ${ACTIVITY_COLUMNS} FROM dashboard.activities WHERE request_id = $1 ORDER BY at ASC`,
       [requestId],
     )
     return rows.map(mapActivity)

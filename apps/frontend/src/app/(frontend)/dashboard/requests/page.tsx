@@ -5,6 +5,8 @@ import { RequestsListView, type RequestItem } from '@/components/dashboard/reque
 import { mapRequestItem, type Paginated, type RequestDto } from '@/utilities/dashboard-api'
 import { serverDashboardFetch } from '@/utilities/dashboard-server'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'لیست درخواست‌ها',
   description: 'مشاهده، جستجو و پیگیری وضعیت درخواست‌های ثبت شده در سامانه کارخانه نوآوری',

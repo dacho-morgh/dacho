@@ -4,12 +4,11 @@ import type { MigrationBuilder } from 'node-pg-migrate'
 // without re-fetching the service definition: `service_name` (service title) and
 // `current_step` (the workflow step title at the current index).
 export async function up(pgm: MigrationBuilder): Promise<void> {
-  pgm.addColumns('requests', {
-    service_name: { type: 'text', notNull: true, default: '' },
-    current_step: { type: 'text' },
-  })
+  pgm.sql("ALTER TABLE dashboard.requests ADD COLUMN service_name text NOT NULL DEFAULT ''")
+  pgm.sql('ALTER TABLE dashboard.requests ADD COLUMN current_step text')
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropColumns('requests', ['current_step', 'service_name'])
+  pgm.sql('ALTER TABLE dashboard.requests DROP COLUMN current_step')
+  pgm.sql('ALTER TABLE dashboard.requests DROP COLUMN service_name')
 }
