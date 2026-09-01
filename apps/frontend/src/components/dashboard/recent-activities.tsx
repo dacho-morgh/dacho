@@ -1,14 +1,24 @@
 import React from 'react'
-import {
-  Bell,
-  CheckCircle,
-  FileEdit,
-  MessageSquare,
-  UploadCloud,
-} from 'lucide-react'
+import { Bell, CheckCircle, FileEdit, MessageSquare, UploadCloud } from 'lucide-react'
 
-export function RecentActivities() {
-  const activities = [
+import { formatDate, type ActivityDto } from '@/utilities/dashboard-api'
+
+export interface RecentActivitiesProps {
+  /** Recent activity log from GET /activities; the Figma sample shows when absent. */
+  activityItems?: ActivityDto[]
+}
+
+export function RecentActivities({ activityItems }: RecentActivitiesProps) {
+  const activities =
+    activityItems?.map((a) => ({
+      id: a.id,
+      title: a.title,
+      description: a.description ?? '',
+      time: formatDate(a.at),
+      icon: Bell,
+      iconColor: 'text-blue-500',
+      bgColor: 'bg-blue-50',
+    })) ?? [
     {
       id: 1,
       title: 'امتیازدهی داور تخصصی ثبت شد',

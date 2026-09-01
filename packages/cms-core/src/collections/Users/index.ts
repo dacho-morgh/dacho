@@ -32,6 +32,7 @@ export const Users: CollectionConfig = {
         if (req.user?.cmsRole !== 'admin' && context.allowRoleAssignment !== true) {
           data.role = 'applicant'
           data.cmsRole = null
+          data.roles = []
         }
         return data
       },
@@ -105,6 +106,23 @@ export const Users: CollectionConfig = {
       name: 'position',
       type: 'text',
       label: 'سمت',
+    },
+    // Workflow roles (داور، دبیرخانه، واحد حسابداری، …) — many-to-many with the
+    // `roles` collection. Same escalation guard as `role`/`cmsRole`: only an
+    // admin may assign them.
+    {
+      name: 'roles',
+      type: 'relationship',
+      relationTo: 'roles',
+      hasMany: true,
+      label: 'Roles',
+      admin: {
+        position: 'sidebar',
+      },
+      access: {
+        create: adminOnly,
+        update: adminOnly,
+      },
     },
     // Company (applicant) data — flattened onto the user for v1. Non-required
     // at the schema level (staff/editor/admin have no company); the signup form

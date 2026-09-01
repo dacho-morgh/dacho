@@ -19,7 +19,7 @@ export function RecentRequestServiceBadge({
           تأمین مالی
         </span>
       )
-    case 'exhibition':
+    case 'exhibitions':
       return (
         <span
           className={`text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-medium ${className}`}
@@ -27,7 +27,7 @@ export function RecentRequestServiceBadge({
           نمایشگاه
         </span>
       )
-    case 'event':
+    case 'events':
       return (
         <span
           className={`text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md font-medium ${className}`}
@@ -41,6 +41,14 @@ export function RecentRequestServiceBadge({
           className={`text-xs text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md font-medium ${className}`}
         >
           دانش‌بنیان
+        </span>
+      )
+    case 'commercialization':
+      return (
+        <span
+          className={`text-xs text-orange-700 bg-orange-50 px-2 py-0.5 rounded-md font-medium ${className}`}
+        >
+          تجاری‌سازی
         </span>
       )
     default:

@@ -72,6 +72,7 @@ export interface Config {
     media: Media;
     categories: Category;
     users: User;
+    roles: Role;
     faq: Faq;
     reviews: Review;
     news: News;
@@ -101,6 +102,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
+    roles: RolesSelect<false> | RolesSelect<true>;
     faq: FaqSelect<false> | FaqSelect<true>;
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
     news: NewsSelect<false> | NewsSelect<true>;
@@ -523,6 +525,7 @@ export interface User {
   role?: ('applicant' | 'staff') | null;
   cmsRole?: ('admin' | 'editor') | null;
   position?: string | null;
+  roles?: (number | Role)[] | null;
   companyName?: string | null;
   companyNationalId?: string | null;
   companyRegistrationNumber?: string | null;
@@ -551,6 +554,17 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roles".
+ */
+export interface Role {
+  id: number;
+  name: string;
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -893,6 +907,22 @@ export interface Service {
   id: number;
   title: string;
   /**
+   * Stable machine key mapping the service to the dashboard quick-access cards
+   */
+  key?: ('financing' | 'events' | 'exhibitions' | 'knowledge' | 'commercialization') | null;
+  /**
+   * Icon key the frontend resolves to a lucide icon
+   */
+  icon?: ('coins' | 'calendar' | 'store' | 'graduation-cap' | 'trending-up' | 'sparkles') | null;
+  /**
+   * Short label shown on the quick-access card (e.g. «سرمایه‌گذاری»)
+   */
+  tag?: string | null;
+  /**
+   * Gradient key the frontend resolves to a Tailwind gradient
+   */
+  gradient?: ('blue-cyan' | 'indigo-purple' | 'fuchsia-rose' | 'emerald-teal' | 'amber-orange') | null;
+  /**
    * Short summary for listings and previews
    */
   excerpt?: string | null;
@@ -922,6 +952,21 @@ export interface Service {
   tags?:
     | {
         tag: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * The form-builder form applicants fill to request this service
+   */
+  form?: (number | null) | Form;
+  /**
+   * Ordered role-gated steps a request traverses
+   */
+  workflow?:
+    | {
+        title: string;
+        role: number | Role;
+        order: number;
         id?: string | null;
       }[]
     | null;
@@ -1346,6 +1391,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'users';
         value: number | User;
+      } | null)
+    | ({
+        relationTo: 'roles';
+        value: number | Role;
       } | null)
     | ({
         relationTo: 'faq';
@@ -1791,6 +1840,7 @@ export interface UsersSelect<T extends boolean = true> {
   role?: T;
   cmsRole?: T;
   position?: T;
+  roles?: T;
   companyName?: T;
   companyNationalId?: T;
   companyRegistrationNumber?: T;
@@ -1817,6 +1867,16 @@ export interface UsersSelect<T extends boolean = true> {
         createdAt?: T;
         expiresAt?: T;
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roles_select".
+ */
+export interface RolesSelect<T extends boolean = true> {
+  name?: T;
+  description?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1899,6 +1959,10 @@ export interface SponsorsSelect<T extends boolean = true> {
  */
 export interface ServicesSelect<T extends boolean = true> {
   title?: T;
+  key?: T;
+  icon?: T;
+  tag?: T;
+  gradient?: T;
   excerpt?: T;
   featuredImage?: T;
   heroImage?: T;
@@ -1907,6 +1971,15 @@ export interface ServicesSelect<T extends boolean = true> {
     | T
     | {
         tag?: T;
+        id?: T;
+      };
+  form?: T;
+  workflow?:
+    | T
+    | {
+        title?: T;
+        role?: T;
+        order?: T;
         id?: T;
       };
   updatedAt?: T;

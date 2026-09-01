@@ -1,7 +1,9 @@
 import { PayloadUserStore } from './auth/payload-user-store.js'
 import { createApp } from './app.js'
+import { PayloadServiceCatalog } from './catalog/payload-service-catalog.js'
 import { loadConfig } from './config.js'
 import { createPool } from './db.js'
+import { runMigrations } from './db/migrate.js'
 import { JwtSigner } from './jwt.js'
 import { ConsoleOtpDelivery } from './otp/console-delivery.js'
 import { KavenegarOtpDelivery } from './otp/kavenegar-delivery.js'
@@ -10,6 +12,7 @@ import { ensureOtpCodesTable, PostgresCodeStore } from './otp/postgres-code-stor
 const config = loadConfig()
 
 const pool = createPool(config.databaseUrl)
+await runMigrations(config.databaseUrl)
 await ensureOtpCodesTable(pool)
 
 const delivery = config.kavenegar
@@ -23,6 +26,9 @@ const app = createApp({
   delivery,
   jwt,
   userStore: new PayloadUserStore({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
+  pool,
+  serviceCatalog: new PayloadServiceCatalog({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
+  proxySecret: config.internalProxySecret,
 })
 
 app.listen(config.port, () => {

@@ -14,6 +14,7 @@ import { News } from './collections/News'
 import { Pages } from './collections/Pages'
 import { Posts } from './collections/Posts'
 import { Reviews } from './collections/Reviews'
+import { Roles } from './collections/Roles'
 import { Services } from './collections/Services'
 import { Sponsors } from './collections/Sponsors'
 import { Users } from './collections/Users'
@@ -139,6 +140,7 @@ export default buildConfig({
     Media,
     Categories,
     Users,
+    Roles,
     FAQ,
     Reviews,
     News,

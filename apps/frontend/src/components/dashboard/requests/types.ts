@@ -1,4 +1,4 @@
-export type RequestStatus = 'in_review' | 'rejected' | 'draft' | 'approved'
+export type RequestStatus = 'in_review' | 'action_needed' | 'rejected' | 'draft' | 'approved'
 
 export interface RequestItem {
   id: string
@@ -13,10 +13,10 @@ export type RecentRequestStatus = 'in_review' | 'action_needed' | 'approved' | '
 
 export type RecentRequestServiceType =
   | 'financing'
-  | 'event'
-  | 'exhibition'
+  | 'events'
+  | 'exhibitions'
   | 'knowledge'
-  | 'commercial'
+  | 'commercialization'
 
 export interface RecentRequestItem {
   id: string

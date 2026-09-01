@@ -10,6 +10,7 @@ const base = {
   JWT_PRIVATE_KEY: 'k',
   PAYLOAD_URL: 'http://localhost:3000',
   PAYLOAD_API_KEY: 'key',
+  INTERNAL_PROXY_SECRET: 'secret',
 }
 
 describe('loadConfig', () => {
@@ -19,6 +20,7 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...base, JWT_PRIVATE_KEY: undefined })).toThrow('JWT_PRIVATE_KEY')
     expect(() => loadConfig({ ...base, PAYLOAD_URL: undefined })).toThrow('PAYLOAD_URL')
     expect(() => loadConfig({ ...base, PAYLOAD_API_KEY: undefined })).toThrow('PAYLOAD_API_KEY')
+    expect(() => loadConfig({ ...base, INTERNAL_PROXY_SECRET: undefined })).toThrow('INTERNAL_PROXY_SECRET')
   })
 
   it('defaults port to 4000, kid to dacho-backend, otpDelivery to console', () => {

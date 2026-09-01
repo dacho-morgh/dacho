@@ -1,9 +1,18 @@
 import express from 'express'
 import type { Express } from 'express'
+import type { Pool } from 'pg'
 
 import { createAuthRouter, type AuthDeps } from './auth/router.js'
+import type { ServiceCatalog } from './catalog/service-catalog.js'
+import { createDashboardRouter } from './dashboard/router.js'
 
-export function createApp(deps: AuthDeps): Express {
+export interface AppDeps extends AuthDeps {
+  pool: Pool
+  serviceCatalog: ServiceCatalog
+  proxySecret: string
+}
+
+export function createApp(deps: AppDeps): Express {
   const app = express()
   app.use(express.json())
 
@@ -16,6 +25,7 @@ export function createApp(deps: AuthDeps): Express {
   })
 
   app.use('/auth', createAuthRouter(deps))
+  app.use('/', createDashboardRouter(deps))
 
   return app
 }
