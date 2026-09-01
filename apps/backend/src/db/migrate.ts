@@ -15,6 +15,9 @@ export async function runMigrations(databaseUrl: string): Promise<void> {
     // Backend tables + the migration bookkeeping live in `dashboard`, away from
     // Payload's `public` schema (which Payload would otherwise try to drop).
     schema: 'dashboard',
+    // The schema must exist before node-pg-migrate ensures the `pgmigrations`
+    // table inside it; `createSchema` runs `CREATE SCHEMA IF NOT EXISTS` first.
+    createSchema: true,
     count: Infinity,
     // Multiple app instances (or test files) may run migrations concurrently;
     // block on the advisory lock instead of failing, then no-op once applied.

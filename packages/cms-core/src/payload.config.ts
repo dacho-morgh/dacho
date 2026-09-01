@@ -133,6 +133,13 @@ export default buildConfig({
     // during `next build` — so pin it here or production builds skip migrations
     // and hit "relation does not exist" on a fresh database.
     migrationDir: path.resolve(dirname, 'migrations'),
+    // Disable Payload's destructive dev schema push. The CMS (`public`) and the
+    // backend domain (`dashboard` schema) share one Postgres database; the push
+    // introspects the *whole* database and tries to drop the backend's foreign
+    // tables/enums, erroring with "type public.letter_type does not exist".
+    // Rely on explicit `payload migrate` everywhere instead — the prod
+    // entrypoint (docker-entrypoint.sh) already runs it on startup.
+    push: false,
   }),
   collections: [
     Pages,
