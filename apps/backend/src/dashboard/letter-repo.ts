@@ -89,14 +89,14 @@ export class LetterRepository {
     const whereSql = where.join(' AND ')
 
     const { rows: countRows } = await this.pool.query<{ total: string }>(
-      `SELECT COUNT(*) AS total FROM letters WHERE ${whereSql}`,
+      `SELECT COUNT(*) AS total FROM dashboard.letters WHERE ${whereSql}`,
       params,
     )
     const total = Number(countRows[0]?.total ?? 0)
 
     const offset = (options.page - 1) * options.limit
     const { rows } = await this.pool.query<LetterRow>(
-      `SELECT ${LETTER_COLUMNS} FROM letters
+      `SELECT ${LETTER_COLUMNS} FROM dashboard.letters
        WHERE ${whereSql}
        ORDER BY sent_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
@@ -114,7 +114,7 @@ export class LetterRepository {
   /** Owner-scoped detail that also marks the letter read (idempotent). */
   async findByIdAndMarkRead(id: string, ownerId: string): Promise<LetterDto | undefined> {
     const { rows } = await this.pool.query<LetterRow>(
-      `UPDATE letters SET read = true, updated_at = now()
+      `UPDATE dashboard.letters SET read = true, updated_at = now()
        WHERE id = $1 AND recipient_id = $2
        RETURNING ${LETTER_COLUMNS}`,
       [id, ownerId],

@@ -26,7 +26,7 @@ export class StatsRepository {
               COUNT(*) FILTER (WHERE status = 'approved')::int AS approved,
               COUNT(*) FILTER (WHERE status = 'action_needed')::int AS action_needed,
               COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected
-       FROM requests
+       FROM dashboard.requests
        WHERE owner_id = $1`,
       [ownerId],
     )

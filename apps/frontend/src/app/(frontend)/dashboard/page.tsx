@@ -18,6 +18,8 @@ import {
   type RequestStats,
 } from '@/utilities/dashboard-api'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'پیشخوان متقاضی',
   description: 'سامانه مدیریت درخواست‌ها، طرح‌ها و پیگیری فرآیندهای خدمات کارخانه نوآوری بوشهر',

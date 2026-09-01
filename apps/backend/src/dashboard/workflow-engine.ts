@@ -106,7 +106,7 @@ export class WorkflowEngine {
       await client.query('BEGIN')
 
       const updated = await client.query<RequestRow>(
-        `UPDATE requests
+        `UPDATE dashboard.requests
          SET status = $1, current_step_index = $2, assigned_role = $3, current_step = $4, updated_at = now()
          WHERE id = $5
          RETURNING ${REQUEST_COLUMNS}`,
@@ -116,7 +116,7 @@ export class WorkflowEngine {
       let letterId: string | null = null
       if (letterType) {
         const letter = await client.query<{ id: string }>(
-          `INSERT INTO letters (type, title, body, recipient_id, request_id, read)
+          `INSERT INTO dashboard.letters (type, title, body, recipient_id, request_id, read)
            VALUES ($1, $2, $3, $4, $5, false)
            RETURNING id`,
           [letterType, LETTER_TITLES[letterType], input.note ?? '', request.ownerId, request.id],
@@ -125,7 +125,7 @@ export class WorkflowEngine {
       }
 
       await client.query(
-        `INSERT INTO activities (owner_id, request_id, letter_id, type, title, description)
+        `INSERT INTO dashboard.activities (owner_id, request_id, letter_id, type, title, description)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [
           request.ownerId,
@@ -140,7 +140,7 @@ export class WorkflowEngine {
       await client.query('COMMIT')
 
       const row = updated.rows[0]
-      if (!row) throw new Error('UPDATE requests returned no row')
+      if (!row) throw new Error('UPDATE dashboard.requests returned no row')
       return { request: mapRequestRow(row) }
     } catch (err) {
       await client.query('ROLLBACK')
@@ -152,7 +152,7 @@ export class WorkflowEngine {
 
   private async findRequest(id: string): Promise<RequestDto | undefined> {
     const { rows } = await this.pool.query<RequestRow>(
-      `SELECT ${REQUEST_COLUMNS} FROM requests WHERE id = $1`,
+      `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1`,
       [id],
     )
     const row = rows[0]

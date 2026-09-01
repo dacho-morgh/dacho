@@ -73,7 +73,7 @@ function trackingCodeForYear(year: number, seq: number): string {
 
 async function nextTrackingCode(client: PoolClient, year: number): Promise<string> {
   const { rows } = await client.query<{ c: number }>(
-    `SELECT COUNT(*)::int AS c FROM requests WHERE tracking_code LIKE $1`,
+    `SELECT COUNT(*)::int AS c FROM dashboard.requests WHERE tracking_code LIKE $1`,
     [`DCH-${year}-%`],
   )
   const count = rows[0]?.c ?? 0
@@ -113,7 +113,7 @@ export class RequestRepository {
       const year = new Date().getFullYear()
       const trackingCode = await nextTrackingCode(client, year)
       const { rows } = await client.query<RequestRow>(
-        `INSERT INTO requests (tracking_code, title, service_id, service_key, service_name, owner_id, answers)
+        `INSERT INTO dashboard.requests (tracking_code, title, service_id, service_key, service_name, owner_id, answers)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING ${REQUEST_COLUMNS}`,
         [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, JSON.stringify(input.answers)],
@@ -142,14 +142,14 @@ export class RequestRepository {
     const whereSql = where.join(' AND ')
 
     const { rows: countRows } = await this.pool.query<{ total: string }>(
-      `SELECT COUNT(*) AS total FROM requests WHERE ${whereSql}`,
+      `SELECT COUNT(*) AS total FROM dashboard.requests WHERE ${whereSql}`,
       params,
     )
     const total = Number(countRows[0]?.total ?? 0)
 
     const offset = (options.page - 1) * options.limit
     const { rows } = await this.pool.query<RequestRow>(
-      `SELECT ${REQUEST_COLUMNS} FROM requests
+      `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests
        WHERE ${whereSql}
        ORDER BY created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
@@ -166,7 +166,7 @@ export class RequestRepository {
 
   async findById(id: string, ownerId: string): Promise<RequestDto | undefined> {
     const { rows } = await this.pool.query<RequestRow>(
-      `SELECT ${REQUEST_COLUMNS} FROM requests WHERE id = $1 AND owner_id = $2`,
+      `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1 AND owner_id = $2`,
       [id, ownerId],
     )
     return rows[0] ? mapRequestRow(rows[0]) : undefined
@@ -183,7 +183,7 @@ export class RequestRepository {
     if (existing.status !== 'draft') return 'already_submitted'
 
     const { rows } = await this.pool.query<RequestRow>(
-      `UPDATE requests
+      `UPDATE dashboard.requests
        SET status = 'in_review', submission_date = now(), updated_at = now(),
            assigned_role = $3, current_step = $4
        WHERE id = $1 AND owner_id = $2
@@ -191,7 +191,7 @@ export class RequestRepository {
       [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null],
     )
     const updated = rows[0]
-    if (!updated) throw new Error('UPDATE requests returned no row')
+    if (!updated) throw new Error('UPDATE dashboard.requests returned no row')
     return mapRequestRow(updated)
   }
 }

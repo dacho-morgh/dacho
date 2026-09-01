@@ -7,10 +7,11 @@ export interface PostgresCodeStoreOptions {
   maxAttempts?: number
 }
 
-/** Creates the backend-owned OTP code table (idempotent). */
+/** Creates the backend-owned OTP code table (idempotent, in `dashboard` schema). */
 export async function ensureOtpCodesTable(pool: Pool): Promise<void> {
+  await pool.query('CREATE SCHEMA IF NOT EXISTS dashboard')
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS public.otp_codes (
+    CREATE TABLE IF NOT EXISTS dashboard.otp_codes (
       phone TEXT PRIMARY KEY,
       code TEXT NOT NULL,
       expires_at BIGINT NOT NULL,
@@ -35,7 +36,7 @@ export class PostgresCodeStore implements CodeStore {
   async save(phone: string, code: string, ttlSeconds: number): Promise<void> {
     const expiresAt = this.now() + ttlSeconds * 1000
     await this.pool.query(
-      `INSERT INTO public.otp_codes (phone, code, expires_at, attempts)
+      `INSERT INTO dashboard.otp_codes (phone, code, expires_at, attempts)
        VALUES ($1, $2, $3, 0)
        ON CONFLICT (phone) DO UPDATE SET code = $2, expires_at = $3, attempts = 0`,
       [phone, code, expiresAt],
@@ -47,7 +48,7 @@ export class PostgresCodeStore implements CodeStore {
     try {
       await client.query('BEGIN')
       const result = await client.query(
-        'SELECT code, expires_at, attempts FROM public.otp_codes WHERE phone = $1 FOR UPDATE',
+        'SELECT code, expires_at, attempts FROM dashboard.otp_codes WHERE phone = $1 FOR UPDATE',
         [phone],
       )
       const row = result.rows[0]
@@ -62,15 +63,15 @@ export class PostgresCodeStore implements CodeStore {
 
       if (expired || tooMany || row.code !== code) {
         if (expired || tooMany) {
-          await client.query('DELETE FROM public.otp_codes WHERE phone = $1', [phone])
+          await client.query('DELETE FROM dashboard.otp_codes WHERE phone = $1', [phone])
         } else {
-          await client.query('UPDATE public.otp_codes SET attempts = $1 WHERE phone = $2', [attempts, phone])
+          await client.query('UPDATE dashboard.otp_codes SET attempts = $1 WHERE phone = $2', [attempts, phone])
         }
         await client.query('COMMIT')
         return false
       }
 
-      await client.query('DELETE FROM public.otp_codes WHERE phone = $1', [phone])
+      await client.query('DELETE FROM dashboard.otp_codes WHERE phone = $1', [phone])
       await client.query('COMMIT')
       return true
     } catch (err) {

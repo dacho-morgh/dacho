@@ -60,7 +60,7 @@ describe('requests API', () => {
   })
 
   beforeEach(async () => {
-    await pool.query('DELETE FROM public.requests')
+    await pool.query('DELETE FROM dashboard.requests')
   })
 
   afterAll(async () => {

@@ -33,7 +33,7 @@ interface LetterFixture {
 
 async function insertLetter(fixture: LetterFixture = {}): Promise<string> {
   const { rows } = await pool.query<{ id: string }>(
-    `INSERT INTO letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, read)
+    `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, read)
      VALUES ($1, $2, $3, NULL, $4, $5, $6, $7)
      RETURNING id`,
     [
@@ -72,7 +72,7 @@ describe('letters API', () => {
   })
 
   beforeEach(async () => {
-    await pool.query('DELETE FROM public.letters')
+    await pool.query('DELETE FROM dashboard.letters')
   })
 
   afterAll(async () => {

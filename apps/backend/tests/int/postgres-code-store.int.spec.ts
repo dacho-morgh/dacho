@@ -16,5 +16,5 @@ afterAll(async () => {
 })
 
 describeCodeStore('PostgresCodeStore', (opts) => new PostgresCodeStore(pool, opts), async () => {
-  await pool.query('DELETE FROM public.otp_codes')
+  await pool.query('DELETE FROM dashboard.otp_codes')
 })

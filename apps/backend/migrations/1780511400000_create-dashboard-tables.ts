@@ -1,67 +1,65 @@
 import type { MigrationBuilder } from 'node-pg-migrate'
 
-// Backend-owned dashboard tables (public schema): requests, letters, activities.
+// Backend-owned dashboard tables live in a dedicated `dashboard` schema so
+// Payload's `public` schema push never sees them as foreign tables to drop.
 export async function up(pgm: MigrationBuilder): Promise<void> {
-  pgm.createType('request_status', ['draft', 'in_review', 'action_needed', 'approved', 'rejected'])
-  pgm.createType('letter_type', ['rejected', 'approved', 'needs_fix', 'official', 'notification'])
+  pgm.sql('CREATE SCHEMA IF NOT EXISTS dashboard')
+  pgm.sql(`CREATE TYPE dashboard.request_status AS ENUM ('draft', 'in_review', 'action_needed', 'approved', 'rejected')`)
+  pgm.sql(`CREATE TYPE dashboard.letter_type AS ENUM ('rejected', 'approved', 'needs_fix', 'official', 'notification')`)
 
-  pgm.createTable('requests', {
-    id: { type: 'uuid', primaryKey: true, notNull: true, default: pgm.func('gen_random_uuid()') },
-    tracking_code: { type: 'text', notNull: true, unique: true },
-    title: { type: 'text', notNull: true },
-    service_id: { type: 'text', notNull: true },
-    service_key: { type: 'text', notNull: true },
-    owner_id: { type: 'text', notNull: true },
-    status: { type: 'request_status', notNull: true, default: 'draft' },
-    current_step_index: { type: 'integer', notNull: true, default: 0 },
-    assigned_role: { type: 'text' },
-    answers: { type: 'jsonb', notNull: true, default: pgm.func("'{}'::jsonb") },
-    submission_date: { type: 'timestamptz' },
-    due_date: { type: 'timestamptz' },
-    created_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
-    updated_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
-  })
+  pgm.sql(`CREATE TABLE dashboard.requests (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    tracking_code text NOT NULL UNIQUE,
+    title text NOT NULL,
+    service_id text NOT NULL,
+    service_key text NOT NULL,
+    owner_id text NOT NULL,
+    status dashboard.request_status NOT NULL DEFAULT 'draft',
+    current_step_index integer NOT NULL DEFAULT 0,
+    assigned_role text,
+    answers jsonb NOT NULL DEFAULT '{}'::jsonb,
+    submission_date timestamptz,
+    due_date timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`)
 
-  pgm.createTable('letters', {
-    id: { type: 'uuid', primaryKey: true, notNull: true, default: pgm.func('gen_random_uuid()') },
-    type: { type: 'letter_type', notNull: true },
-    title: { type: 'text', notNull: true },
-    body: { type: 'text', notNull: true },
-    sender_id: { type: 'text' },
-    sender_name: { type: 'text' },
-    sender_role: { type: 'text' },
-    recipient_id: { type: 'text', notNull: true },
-    request_id: { type: 'uuid', references: 'requests', onDelete: 'SET NULL' },
-    read: { type: 'boolean', notNull: true, default: false },
-    sent_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
-    attachments: { type: 'jsonb', notNull: true, default: pgm.func("'[]'::jsonb") },
-    created_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
-    updated_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
-  })
+  pgm.sql(`CREATE TABLE dashboard.letters (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    type dashboard.letter_type NOT NULL,
+    title text NOT NULL,
+    body text NOT NULL,
+    sender_id text,
+    sender_name text,
+    sender_role text,
+    recipient_id text NOT NULL,
+    request_id uuid REFERENCES dashboard.requests(id) ON DELETE SET NULL,
+    read boolean NOT NULL DEFAULT false,
+    sent_at timestamptz NOT NULL DEFAULT now(),
+    attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`)
 
-  pgm.createTable('activities', {
-    id: { type: 'uuid', primaryKey: true, notNull: true, default: pgm.func('gen_random_uuid()') },
-    owner_id: { type: 'text', notNull: true },
-    request_id: { type: 'uuid', references: 'requests', onDelete: 'SET NULL' },
-    letter_id: { type: 'uuid', references: 'letters', onDelete: 'SET NULL' },
-    type: { type: 'text', notNull: true },
-    title: { type: 'text', notNull: true },
-    description: { type: 'text' },
-    at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
-  })
+  pgm.sql(`CREATE TABLE dashboard.activities (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id text NOT NULL,
+    request_id uuid REFERENCES dashboard.requests(id) ON DELETE SET NULL,
+    letter_id uuid REFERENCES dashboard.letters(id) ON DELETE SET NULL,
+    type text NOT NULL,
+    title text NOT NULL,
+    description text,
+    at timestamptz NOT NULL DEFAULT now()
+  )`)
 
-  pgm.createIndex('requests', 'owner_id')
-  pgm.createIndex('requests', 'status')
-  pgm.createIndex('letters', 'recipient_id')
-  pgm.createIndex('letters', 'request_id')
-  pgm.createIndex('activities', 'owner_id')
-  pgm.createIndex('activities', 'at')
+  pgm.sql('CREATE INDEX requests_owner_id_idx ON dashboard.requests (owner_id)')
+  pgm.sql('CREATE INDEX requests_status_idx ON dashboard.requests (status)')
+  pgm.sql('CREATE INDEX letters_recipient_id_idx ON dashboard.letters (recipient_id)')
+  pgm.sql('CREATE INDEX letters_request_id_idx ON dashboard.letters (request_id)')
+  pgm.sql('CREATE INDEX activities_owner_id_idx ON dashboard.activities (owner_id)')
+  pgm.sql('CREATE INDEX activities_at_idx ON dashboard.activities (at)')
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropTable('activities')
-  pgm.dropTable('letters')
-  pgm.dropTable('requests')
-  pgm.dropType('letter_type')
-  pgm.dropType('request_status')
+  pgm.sql('DROP SCHEMA IF EXISTS dashboard CASCADE')
 }
