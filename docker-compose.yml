@@ -25,6 +25,8 @@ services:
       PAYLOAD_SECRET_FILE: /run/secrets/payload_secret
       NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
       BACKEND_JWKS_URL: http://backend:4000/.well-known/jwks.json
+      BACKEND_URL: http://backend:4000
+      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET:-dev-internal-proxy-secret}
     secrets:
       - payload_secret
     depends_on:
@@ -45,6 +47,7 @@ services:
       JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private_key
       PAYLOAD_URL: http://frontend:3000
       PAYLOAD_API_KEY: ${PAYLOAD_API_KEY:-dev-backend-service-account}
+      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET:-dev-internal-proxy-secret}
       OTP_DELIVERY: ${OTP_DELIVERY:-console}
       KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
       KAVENEGAR_TEMPLATE: ${KAVENEGAR_TEMPLATE:-testtemplate}

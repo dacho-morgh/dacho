@@ -24,7 +24,7 @@ import { Check, X, Send, RefreshCw } from 'lucide-react'
 export type LetterStatus =
   | 'rejected'
   | 'approved'
-  | 'needs_info'
+  | 'needs_fix'
   | 'official'
   | 'notification'
 
@@ -41,7 +41,7 @@ export interface LetterItem {
   trackingCode?: string
 }
 
-const initialLetters: LetterItem[] = [
+const mockLetters: LetterItem[] = [
   {
     id: 'LTR-501',
     title: 'همایش نفت و گاز عسلویه',
@@ -67,8 +67,8 @@ const initialLetters: LetterItem[] = [
   {
     id: 'LTR-503',
     title: 'همایش نفت و گاز عسلویه',
-    status: 'needs_info',
-    statusLabel: 'نیاز به اطلاع درخواست',
+    status: 'needs_fix',
+    statusLabel: 'نیاز به اصلاح درخواست',
     senderName: 'نام و نام خانوادگی',
     senderRole: 'عنوان و سمت',
     sentDate: '۱۴۰۵/۰۱/۰۶',
@@ -99,7 +99,12 @@ const initialLetters: LetterItem[] = [
   },
 ]
 
-export function InboxListView() {
+export interface InboxListViewProps {
+  /** Letters read from GET /letters; the Figma sample shows when absent. */
+  initialLetters?: LetterItem[]
+}
+
+export function InboxListView({ initialLetters = mockLetters }: InboxListViewProps) {
   const [letters, setLetters] = useState<LetterItem[]>(initialLetters)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -153,7 +158,7 @@ export function InboxListView() {
             {label}
           </Badge>
         )
-      case 'needs_info':
+      case 'needs_fix':
         return (
           <Badge
             variant="outline"
@@ -287,11 +292,11 @@ export function InboxListView() {
                 {statusFilter === 'rejected' && <Check className="h-4 w-4 text-[#2563EB]" />}
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => setStatusFilter('needs_info')}
+                onClick={() => setStatusFilter('needs_fix')}
                 className="flex items-center justify-between rounded-lg px-2.5 py-2 text-sm text-[#404040] hover:bg-slate-50 cursor-pointer"
               >
-                <span>نیاز به اطلاع درخواست</span>
-                {statusFilter === 'needs_info' && <Check className="h-4 w-4 text-[#2563EB]" />}
+                <span>نیاز به اصلاح درخواست</span>
+                {statusFilter === 'needs_fix' && <Check className="h-4 w-4 text-[#2563EB]" />}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setStatusFilter('official')}

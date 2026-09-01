@@ -1,16 +1,74 @@
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
+import { getPayload } from 'payload'
 import React from 'react'
+
+import configPromise from '@payload-config'
+import { getServerSideURL } from '@dacho/cms-core/utilities'
+
 import { RecentActivities } from '@/components/dashboard/recent-activities'
-import { RequestsTable } from '@/components/dashboard/requests'
-import { ServicesQuickAccess } from '@/components/dashboard/services-quick-access'
+import { RequestsTable, type RecentRequestItem, type RecentRequestServiceType } from '@/components/dashboard/requests'
+import { ServicesQuickAccess, type ServiceCard } from '@/components/dashboard/services-quick-access'
 import { StatCards } from '@/components/dashboard/stat-cards'
+import {
+  formatDate,
+  type ActivityDto,
+  type Paginated,
+  type RequestDto,
+  type RequestStats,
+} from '@/utilities/dashboard-api'
 
 export const metadata: Metadata = {
   title: 'پیشخوان متقاضی',
   description: 'سامانه مدیریت درخواست‌ها، طرح‌ها و پیگیری فرآیندهای خدمات کارخانه نوآوری بوشهر',
 }
 
-export default function DashboardPage() {
+async function proxyFetch<T>(path: string, cookie: string): Promise<T | undefined> {
+  try {
+    const res = await fetch(`${getServerSideURL()}/api/dashboard${path}`, {
+      headers: { cookie },
+      cache: 'no-store',
+    })
+    if (!res.ok) return undefined
+    return (await res.json()) as T
+  } catch {
+    return undefined
+  }
+}
+
+export default async function DashboardPage() {
+  const payload = await getPayload({ config: configPromise })
+
+  // CMS-owned definitions read server-side via Payload's local API.
+  const { docs: services } = await payload.find({ collection: 'services', limit: 100 })
+  const serviceCards: ServiceCard[] = services.map((s) => ({
+    key: s.key ?? '',
+    title: s.title,
+    description: s.excerpt ?? null,
+    tag: s.tag ?? null,
+  })).filter((s) => s.key)
+
+  // Application-owned instances read through the same-origin proxy.
+  const cookie = (await cookies()).toString()
+  const [stats, requests, activities] = await Promise.all([
+    proxyFetch<RequestStats>('/stats', cookie),
+    proxyFetch<Paginated<RequestDto>>('/requests?limit=10', cookie),
+    proxyFetch<Paginated<ActivityDto>>('/activities?limit=10', cookie),
+  ])
+
+  const recentRequests: RecentRequestItem[] = (requests?.items ?? []).map((r) => ({
+    id: r.id,
+    trackingCode: r.trackingCode,
+    title: r.title,
+    serviceName: r.serviceName,
+    serviceType: r.serviceKey as RecentRequestServiceType,
+    currentStep: r.currentStep ?? '',
+    assignedRole: r.assignedRole ?? '',
+    status: r.status as RecentRequestItem['status'],
+    submissionDate: formatDate(r.submissionDate),
+    updatedAt: formatDate(r.updatedAt),
+  }))
+
   return (
     <div className="space-y-8 p-6 pb-12 sm:p-8">
       {/* Welcome Banner */}
@@ -21,13 +79,10 @@ export default function DashboardPage() {
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
               سامانه فعال و متصل به دبیرخانه مرکزی
             </div>
-            <h1 className="text-xl font-black tracking-tight sm:text-2xl">
-              سلام، مهندس سجادی عزیز 👋
-            </h1>
+            <h1 className="text-xl font-black tracking-tight sm:text-2xl">سلام، مهندس سجادی عزیز 👋</h1>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-blue-100/90 sm:text-sm">
-              به پیشخوان مدیریت خدمات کارخانه نوآوری خوش آمدید. می‌توانید آخرین وضعیت پرونده‌ها،
-              امتیازات داوری و درخواست‌های فعال شرکت «پترو داده‌آوران پارس» را از این بخش مدیریت و
-              پیگیری نمایید.
+              به پیشخوان مدیریت خدمات کارخانه نوآوری خوش آمدید. می‌توانید آخرین وضعیت پرونده‌ها، امتیازات
+              داوری و درخواست‌های فعال شرکت «پترو داده‌آوران پارس» را از این بخش مدیریت و پیگیری نمایید.
             </p>
           </div>
 
@@ -39,22 +94,21 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Decorative subtle background shapes */}
         <div className="pointer-events-none absolute -top-12 -left-12 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
         <div className="pointer-events-none absolute right-1/4 -bottom-16 h-48 w-48 rounded-full bg-indigo-500/20 blur-2xl" />
       </div>
 
       {/* 1. Quick Stats */}
-      <StatCards />
+      <StatCards data={stats} />
 
       {/* 2. Factory Services Quick Access */}
-      <ServicesQuickAccess />
+      <ServicesQuickAccess services={serviceCards} />
 
       {/* 3. Requests Tracking Table */}
-      <RequestsTable />
+      <RequestsTable items={recentRequests} />
 
       {/* 4. Recent Activities & Upcoming Deadlines */}
-      <RecentActivities />
+      <RecentActivities activityItems={activities?.items} />
     </div>
   )
 }

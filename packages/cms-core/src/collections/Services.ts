@@ -27,6 +27,60 @@ export const Services: CollectionConfig = {
       label: 'Title',
     },
     {
+      name: 'key',
+      type: 'select',
+      label: 'Key',
+      admin: {
+        description: 'Stable machine key mapping the service to the dashboard quick-access cards',
+      },
+      options: [
+        { label: 'Financing', value: 'financing' },
+        { label: 'Events', value: 'events' },
+        { label: 'Exhibitions', value: 'exhibitions' },
+        { label: 'Knowledge-based', value: 'knowledge' },
+        { label: 'Commercialization', value: 'commercialization' },
+      ],
+    },
+    {
+      name: 'icon',
+      type: 'select',
+      label: 'Icon',
+      admin: {
+        description: 'Icon key the frontend resolves to a lucide icon',
+      },
+      options: [
+        { label: 'Coins', value: 'coins' },
+        { label: 'Calendar', value: 'calendar' },
+        { label: 'Store', value: 'store' },
+        { label: 'Graduation cap', value: 'graduation-cap' },
+        { label: 'Trending up', value: 'trending-up' },
+        { label: 'Sparkles', value: 'sparkles' },
+      ],
+    },
+    {
+      name: 'tag',
+      type: 'text',
+      label: 'Tag',
+      admin: {
+        description: 'Short label shown on the quick-access card (e.g. «سرمایه‌گذاری»)',
+      },
+    },
+    {
+      name: 'gradient',
+      type: 'select',
+      label: 'Gradient',
+      admin: {
+        description: 'Gradient key the frontend resolves to a Tailwind gradient',
+      },
+      options: [
+        { label: 'Blue → Cyan', value: 'blue-cyan' },
+        { label: 'Indigo → Purple', value: 'indigo-purple' },
+        { label: 'Fuchsia → Rose', value: 'fuchsia-rose' },
+        { label: 'Emerald → Teal', value: 'emerald-teal' },
+        { label: 'Amber → Orange', value: 'amber-orange' },
+      ],
+    },
+    {
       name: 'excerpt',
       type: 'textarea',
       label: 'Excerpt',
@@ -66,6 +120,44 @@ export const Services: CollectionConfig = {
           name: 'tag',
           type: 'text',
           required: true,
+        },
+      ],
+    },
+    {
+      name: 'form',
+      type: 'relationship',
+      relationTo: 'forms',
+      label: 'Request Form',
+      admin: {
+        description: 'The form-builder form applicants fill to request this service',
+      },
+    },
+    {
+      name: 'workflow',
+      type: 'array',
+      label: 'Workflow',
+      admin: {
+        description: 'Ordered role-gated steps a request traverses',
+      },
+      fields: [
+        {
+          name: 'title',
+          type: 'text',
+          required: true,
+          label: 'Step title',
+        },
+        {
+          name: 'role',
+          type: 'relationship',
+          relationTo: 'roles',
+          required: true,
+          label: 'Assigned role',
+        },
+        {
+          name: 'order',
+          type: 'number',
+          required: true,
+          label: 'Order',
         },
       ],
     },

@@ -21,6 +21,7 @@ export interface Config {
   jwtKid: string
   payloadUrl: string
   payloadApiKey: string
+  internalProxySecret: string
   otpDelivery: OtpDeliveryKind
   kavenegar?: KavenegarConfig
 }
@@ -46,6 +47,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const jwtPrivateKey = resolveJwtPrivateKey(env)
   const payloadUrl = require(env, 'PAYLOAD_URL')
   const payloadApiKey = require(env, 'PAYLOAD_API_KEY')
+  const internalProxySecret = require(env, 'INTERNAL_PROXY_SECRET')
 
   const otpDelivery = env.OTP_DELIVERY ?? 'console'
   if (otpDelivery !== 'console' && otpDelivery !== 'kavenegar') {
@@ -59,6 +61,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jwtKid: env.JWT_KID ?? 'dacho-backend',
     payloadUrl,
     payloadApiKey,
+    internalProxySecret,
     otpDelivery,
   }
 

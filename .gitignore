@@ -32,3 +32,6 @@ playwright-report/
 .idea/
 #cms media
 packages/cms-core/public/media
+
+# local wayfinder / ticket tracker
+.scratch/
