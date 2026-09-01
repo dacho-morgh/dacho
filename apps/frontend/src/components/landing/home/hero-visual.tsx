@@ -118,7 +118,7 @@ const HeroVisual = () => {
   return (
     <div
       ref={panelRef}
-      className="relative mx-auto lg:order-2 flex h-[clamp(420px,47vw,600px)] w-full max-w-160 items-center justify-center overflow-hidden rounded-[48px] lg:rounded-[80px]"
+      className="relative mx-auto flex-1 lg:order-2 flex h-[clamp(420px,47vw,600px)] w-full max-w-160 items-center justify-center overflow-hidden rounded-[48px] lg:rounded-[80px]"
     >
       <div
         ref={proofFieldRef}
@@ -126,13 +126,13 @@ const HeroVisual = () => {
       >
         <div
           data-gravity-card
-          className="absolute lg:top-10 top-1 right-3 h-15 w-63 max-w-[calc(100%_-_32px)] will-change-transform sm:h-17 sm:w-75 lg:h-19.5 lg:w-87.75"
+          className="absolute lg:top-10 top-1 right-3 h-15 w-63 max-w-[calc(100%-32px)] will-change-transform sm:h-17 sm:w-75 lg:h-19.5 lg:w-87.75"
         >
           <HeroProofCard metric="۱۰+" message="از همکاری با ما راضی بودند" />
         </div>
         <div
           data-gravity-card
-          className="absolute bottom-1 left-7 lg:left-10 h-15 w-62 max-w-[calc(100%_-_32px)] will-change-transform lg:bottom-10 lg:h-19.5 lg:w-87.75"
+          className="absolute bottom-1 left-7 lg:left-10 h-15 w-62 max-w-[calc(100%-32px)] will-change-transform lg:bottom-10 lg:h-19.5 lg:w-87.75"
         >
           <HeroProofCard metric="۵۰+" message="فرصت تازه برای پیشرفت" />
         </div>

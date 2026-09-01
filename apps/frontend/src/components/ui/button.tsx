@@ -59,10 +59,10 @@ const buttonVariants = cva(
       },
       size: {
         // Figma standard sizes
-        "32": "h-8 px-1.5 py-2 text-sm leading-6 font-normal rounded-[10px] gap-2 [&_svg:not([class*='size-'])]:size-5",
-        "36": "h-9 px-2 py-2 text-base leading-7 font-normal rounded-[10px] gap-2 [&_svg:not([class*='size-'])]:size-6",
-        "40": "h-10 px-2 py-2 text-base leading-7 font-semibold rounded-[10px] gap-2 [&_svg:not([class*='size-'])]:size-6",
-        "48": "h-12 px-3 py-2 text-xl leading-8 font-normal rounded-[12px] gap-2 [&_svg:not([class*='size-'])]:size-[26px]",
+        "32": "h-8 px-1.5 py-2 text-sm leading-6 font-[325] rounded-[10px] gap-2 [&_svg:not([class*='size-'])]:size-5",
+        "36": "h-9 px-2 py-2 text-base leading-7 font-[325] rounded-[10px] gap-2 [&_svg:not([class*='size-'])]:size-6",
+        "40": "h-10 px-2 py-2 text-base leading-7 font-[450] rounded-[10px] gap-2 [&_svg:not([class*='size-'])]:size-6",
+        "48": "h-12 px-3 py-2 text-xl leading-8 font-[325] rounded-[12px] gap-2 [&_svg:not([class*='size-'])]:size-[26px]",
 
         // Aliases for compatibility
         default:
@@ -112,10 +112,10 @@ const buttonSizeAliases: Partial<Record<ButtonSize, ButtonSize>> = {
 }
 
 const buttonSizeValues = {
-  "32": ["32px", "6px", "8px", "14px", "24px", 400, "10px", "8px", "20px"],
-  "36": ["36px", "8px", "8px", "16px", "28px", 400, "10px", "8px", "24px"],
-  "40": ["40px", "8px", "8px", "16px", "28px", 600, "10px", "8px", "24px"],
-  "48": ["48px", "12px", "8px", "20px", "32px", 400, "12px", "8px", "26px"],
+  "32": ["32px", "6px", "8px", "14px", "24px", 325, "10px", "8px", "20px"],
+  "36": ["36px", "8px", "8px", "16px", "28px", 325, "10px", "8px", "24px"],
+  "40": ["40px", "8px", "8px", "16px", "28px", 450, "10px", "8px", "24px"],
+  "48": ["48px", "12px", "8px", "20px", "32px", 325, "12px", "8px", "26px"],
   "icon-32": ["32px", "0px", "0px", "14px", "24px", 400, "10px", "0px", "20px"],
   "icon-36": ["36px", "0px", "0px", "16px", "28px", 400, "10px", "0px", "24px"],
   "icon-40": ["40px", "0px", "0px", "16px", "28px", 600, "10px", "0px", "24px"],

@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/carousel'
 import { Typography } from '@/components/ui/typography'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
+import SectionHeading from './section-heading'
 import ServiceCard from './service-card'
 
 const ServicesSection = async () => {
@@ -29,7 +30,7 @@ const ServicesSection = async () => {
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
         <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">
           <div className="my-2 w-1 rounded-full bg-[#FAB622] lg:my-3 lg:w-2" />
-          <Typography as="h2" variant="32/regular" sm="40/regular" color="neutral-600">
+           <Typography as="h2" variant="32/extrabold" sm="40/extrabold" color="neutral-600">
             ارائه خدمات
           </Typography>
         </div>
@@ -51,7 +52,7 @@ const ServicesSection = async () => {
             const isFigmaCrop = featuredImage?.filename?.startsWith('service-2')
 
             return (
-              <CarouselItem key={service.id} className="pl-5 md:basis-1/2 xl:basis-[30%]">
+              <CarouselItem key={service.id} className="pl-5 md:basis-1/2 lg:basis-lg">
                 <ServiceCard
                   service={{
                     image:
@@ -72,7 +73,7 @@ const ServicesSection = async () => {
             variant="ghost"
             size="icon"
             aria-label="خدمت قبلی"
-            className="static h-12 w-12 translate-0 rounded-xl bg-[#3B82F6] p-0 text-white hover:bg-[#2563EB] hover:text-white disabled:bg-[#E5E5E5] disabled:text-[#D4D4D4]"
+            className="static h-12 w-12 translate-0 rounded-xl bg-brand-500 p-0 text-white hover:bg-brand-600 hover:text-white disabled:bg-neutral-200 disabled:text-neutral-300"
           >
             <ArrowLeftIcon className="h-6.5 w-6.5 rotate-180" />
           </CarouselPrevious>
@@ -80,7 +81,7 @@ const ServicesSection = async () => {
             variant="ghost"
             size="icon"
             aria-label="خدمت بعدی"
-            className="static h-12 w-12 translate-0 rounded-xl bg-[#3B82F6] p-0 text-white hover:bg-[#2563EB] hover:text-white disabled:bg-[#E5E5E5] disabled:text-[#D4D4D4]"
+            className="static h-12 w-12 translate-0 rounded-xl bg-brand-500 p-0 text-white hover:bg-brand-600 hover:text-white disabled:bg-neutral-200 disabled:text-neutral-300"
           >
             <ArrowLeftIcon className="h-6.5 w-6.5" />
           </CarouselNext>

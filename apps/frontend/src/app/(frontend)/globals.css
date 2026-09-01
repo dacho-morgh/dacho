@@ -127,15 +127,27 @@
   --error: oklch(75% 0.15 25deg);
 
   /* Sandoq Design System - Brand Colors */
-  --brand-50: #f9f5ff;
-  --brand-100: #f4ebff;
+  --brand-50: #eef2ff;
+  --brand-100: #dbeafe;
+  --brand-200: #dbeafe;
+  --brand-300: #93c5fd;
+  --brand-400: #60a5fa;
   --brand-500: #3b82f6;
   --brand-600: #2563eb;
   --brand-700: #1d4ed8;
-  --brand-900: #172b85;
+  --brand-900: #172554;
+
+  /* Sandoq Design System - Secondary Palette */
+  --secondary-50: #fffdf7;
+  --secondary-100: #fef0cd;
+  --secondary-200: #fde2a2;
+  --secondary-300: #fdd476;
+  --secondary-400: #fcc54c;
+  --secondary-500: #fab622;
+  --secondary-600: #eca204;
+  --secondary-700: #c18404;
 
   /* About page */
-  --secondary-500: #fab622;
   --about-cta-start: #2258dc;
   --about-cta-end: #172554;
 
@@ -217,11 +229,21 @@
   /* Sandoq Design System Themes */
   --color-brand-50: var(--brand-50);
   --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
   --color-brand-500: var(--brand-500);
   --color-brand-600: var(--brand-600);
   --color-brand-700: var(--brand-700);
   --color-brand-900: var(--brand-900);
+  --color-secondary-50: var(--secondary-50);
+  --color-secondary-100: var(--secondary-100);
+  --color-secondary-200: var(--secondary-200);
+  --color-secondary-300: var(--secondary-300);
+  --color-secondary-400: var(--secondary-400);
   --color-secondary-500: var(--secondary-500);
+  --color-secondary-600: var(--secondary-600);
+  --color-secondary-700: var(--secondary-700);
   --color-about-cta-start: var(--about-cta-start);
   --color-about-cta-end: var(--about-cta-end);
 

@@ -26,7 +26,7 @@ const CommentsSection = async () => {
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
         <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">
           <div className="my-2 w-1 rounded-full bg-[#FAB622] lg:my-3 lg:w-2" />
-          <Typography as="h2" variant="32/regular" sm="40/regular" color="neutral-600">
+         <Typography as="h2" variant="32/extrabold" sm="40/extrabold" color="neutral-600">
             نظرات
           </Typography>
         </div>

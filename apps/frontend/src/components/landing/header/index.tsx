@@ -42,10 +42,10 @@ const Header = () => {
   return (
     <header
       ref={headerRef}
-      className="sticky top-0 z-20 mx-auto w-full max-w-7xl px-4 py-4 text-nowrap md:px-0 md:py-5"
+      className="fixed inset-x-0 top-0 z-20 mx-auto w-full max-w-7xl px-4 py-4 text-nowrap md:px-0 md:py-5"
     >
       <div
-        className="flex h-14 items-center justify-between rounded-[20px] border border-white bg-white/20 p-2 shadow-[0px_2px_16px_0px_#0A0A0A1A] backdrop-blur supports-backdrop-filter:bg-white/60 md:h-auto md:p-2.5"
+        className="flex h-14 items-center justify-between rounded-[20px] border border-white bg-white/20 p-2 shadow-[0_2px_16px_rgb(10_10_10/0.1)] backdrop-blur supports-backdrop-filter:bg-white/60 md:h-auto md:p-2.5"
         dir="rtl"
       >
         <div className="flex-1">
@@ -58,7 +58,7 @@ const Header = () => {
         </div>
         <div className="hidden flex-1 justify-end md:flex">
           <Link href="/login">
-            <Button className="flex h-10 w-24 cursor-pointer justify-center bg-[#3B82F6] p-0 font-light text-white hover:bg-[#2563EB]">
+            <Button size="40" className="w-20 font-[325]!">
               ورود
             </Button>
           </Link>

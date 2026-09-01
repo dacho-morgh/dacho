@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Typography } from '@/components/ui/typography'
 
 const navItems = [
   { label: 'خانه', href: '/' },
@@ -34,9 +35,14 @@ const NavList = () => {
           }
           className="cursor-pointer self-start px-0.5 md:self-auto"
         >
-          <span className="pointer-events-none relative z-20 block rounded-[10px] px-2 py-1.5">
+          <Typography
+            as="span"
+            variant="14/regular"
+            color="neutral-700"
+            className="pointer-events-none relative z-20 block rounded-[10px] px-2 py-1.5"
+          >
             {label}
-          </span>
+          </Typography>
         </Link>
       ))}
     </nav>

@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import { Typography } from '@/components/ui/typography'
 
 export type ServiceCardData = {
   image: string
@@ -9,7 +10,7 @@ export type ServiceCardData = {
 
 const ServiceCard = ({ service }: { service: ServiceCardData }) => {
   return (
-    <article className="flex min-w-0 flex-col items-end gap-4 rounded-4xl bg-white px-4 pt-4 pb-8 drop-shadow-xl lg:rounded-[40px]">
+    <article className="flex min-w-0 flex-col items-end gap-4 rounded-[40px] bg-white px-4 pt-4 pb-8  drop-shadow-xl">
       <div className="relative h-60 w-full shrink-0 overflow-hidden rounded-3xl lg:h-80 lg:rounded-4xl">
         {service.crop === 'figma' ? (
           <Image
@@ -31,8 +32,12 @@ const ServiceCard = ({ service }: { service: ServiceCardData }) => {
       </div>
 
       <div className="flex w-full flex-col items-start gap-2 px-2 text-right">
-        <h3 className="w-full text-xl leading-8 font-bold text-[#262626]">{service.title}</h3>
-        <p className="w-full text-base leading-7 text-[#737373]">{service.description}</p>
+        <Typography as="h3" variant="20/bold" color="neutral-800" className="w-full">
+          {service.title}
+        </Typography>
+        <Typography variant="16/regular" color="neutral-500" className="w-full">
+          {service.description}
+        </Typography>
       </div>
     </article>
   )

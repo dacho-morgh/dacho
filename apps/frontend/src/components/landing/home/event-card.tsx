@@ -10,6 +10,7 @@ import {
 } from '@/components/icons'
 import { Media as MediaComponent } from '@/components/Media'
 import { Button } from '@/components/ui/button'
+import { Typography } from '@/components/ui/typography'
 
 export type EventCardData = {
   id: string
@@ -33,9 +34,9 @@ type EventCardProps = {
 
 const EventMeta = ({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) => (
   <div dir="ltr" className="flex w-full items-center justify-end gap-2">
-    <p className="min-w-0 flex-1 text-right text-base leading-7 font-normal text-[#525252]">
+    <Typography variant="16/semibold" color="neutral-600" className="min-w-0 flex-1 text-right">
       {children}
-    </p>
+    </Typography>
     {icon}
   </div>
 )
@@ -72,9 +73,13 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
             />
             <div className="flex items-center justify-end gap-2 whitespace-nowrap">
               {event.countdown ? (
-                <p className="text-lg leading-9 font-extrabold lg:text-2xl">{event.countdown}</p>
+                <Typography as="span" variant="24/extrabold" color="white">
+                  {event.countdown}
+                </Typography>
               ) : null}
-              <p className="text-sm leading-7 lg:text-base">{event.countdownLabel}</p>
+              <Typography as="span" variant="16/regular" color="white">
+                {event.countdownLabel}
+              </Typography>
             </div>
           </div>
         </div>
@@ -82,16 +87,21 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
       <div className="flex min-w-0 flex-1 flex-col items-end justify-between gap-5 py-0 lg:gap-10 lg:py-10">
         <div className="flex w-full flex-col items-end gap-5 lg:gap-10">
           <div className="flex w-full flex-col gap-4 text-right">
-            <span className="self-start rounded-full bg-[#FEF0CD] px-4 py-1 text-base leading-7 text-[#C18404]">
+            <Typography
+              as="span"
+              variant="16/regular"
+              color="warning"
+              className="self-start rounded-full bg-secondary-100 px-4 py-0.5 text-secondary-700"
+            >
               {event.tag}
-            </span>
-            <h3 className="w-full text-xl leading-8 font-bold text-[#262626] sm:text-2xl sm:leading-9">
+            </Typography>
+            <Typography as="h3" variant="20/bold" sm="24/bold" color="neutral-800" className="w-full">
               {event.title}
-            </h3>
+            </Typography>
             {event.description ? (
-              <p className="line-clamp-4 w-full text-sm leading-7 text-[#737373] sm:text-base">
+              <Typography variant="14/regular" sm="16/regular" color="neutral-500" className="line-clamp-4 w-full">
                 {event.description}
-              </p>
+              </Typography>
             ) : null}
           </div>
 
@@ -128,7 +138,7 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
                 size="icon"
                 aria-label="مورد قبلی"
                 onClick={onNext}
-                className="size-12 rounded-xl bg-[#F5F5F5] p-0 hover:bg-[#E5E5E5]"
+                className="size-12 rounded-xl bg-neutral-100 p-0 hover:bg-neutral-200 text-[#525252] hover:text-[#525252]"
               >
                 <ArrowLeftIcon
                   aria-hidden="true"
@@ -141,7 +151,7 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
                 size="icon"
                 aria-label="مورد قبلی"
                 onClick={onPrevious}
-                className="size-12 rounded-xl bg-[#F5F5F5] p-0 hover:bg-[#E5E5E5]"
+                className="size-12 rounded-xl bg-neutral-100 p-0 hover:bg-neutral-200 text-[#525252] hover:text-[#525252]"
               >
                 <ArrowLeftIcon
                   aria-hidden="true"
@@ -150,7 +160,7 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
               </Button>
             </div>
           ) : null}
-          <Button className="h-12 rounded-xl bg-[#3B82F6] px-3 py-2 text-xl leading-8 font-light! text-white transition-colors hover:bg-[#2563EB]">
+          <Button size="48" className="w-auto font-[325]!">
             مطالعه بیشتر
             <ArrowUpIcon className="size-6.5 -rotate-90" />
           </Button>

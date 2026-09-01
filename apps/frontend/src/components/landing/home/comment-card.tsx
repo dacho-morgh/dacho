@@ -9,10 +9,10 @@ const CommentCard = ({ comment }: { comment: CommentCardData }) => {
   return (
     <article
       dir="rtl"
-      className="flex h-full w-full flex-col gap-3 rounded-4xl bg-white p-4 drop-shadow-lg lg:gap-4 lg:p-5"
+      className="flex h-full w-full flex-col gap-3 rounded-4xl bg-white p-4 drop-shadow-lg lg:h-41 lg:gap-4 lg:p-5"
     >
       <div className="flex items-center gap-3 lg:gap-4">
-        <div className="relative size-11 shrink-0 overflow-hidden rounded-full bg-[#F5F5F5] lg:size-13">
+        <div className="relative size-11 shrink-0 overflow-hidden rounded-full bg-neutral-100 lg:size-13">
           {typeof comment.avatar === 'object' && comment.avatar ? (
             <Media
               resource={comment.avatar}

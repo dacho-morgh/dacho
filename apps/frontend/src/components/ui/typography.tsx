@@ -23,50 +23,50 @@ const typographyVariants = cva("font-sans antialiased text-foreground", {
   variants: {
     variant: {
       // 48px scale
-      "48/black": "text-[48px] leading-[74px] font-black",
-      "48/bold": "text-[48px] leading-[74px] font-bold",
-      "48/regular": "text-[48px] leading-[74px] font-normal",
-      "display-48": "text-[48px] leading-[74px] font-bold",
+      "48/black": "text-[48px] leading-[74px] font-[875]",
+      "48/bold": "text-[48px] leading-[74px] font-[600]",
+      "48/regular": "text-[48px] leading-[74px] font-[325]",
+      "display-48": "text-[48px] leading-[74px] font-[600]",
 
       // 40px scale (H1)
-      "40/extrabold": "text-[40px] leading-[60px] font-extrabold",
-      "40/bold": "text-[40px] leading-[60px] font-bold",
-      "40/regular": "text-[40px] leading-[60px] font-normal",
-      h1: "text-[40px] leading-[60px] font-bold",
+      "40/extrabold": "text-[40px] leading-[64px] font-[725]",
+      "40/bold": "text-[40px] leading-[64px] font-[600]",
+      "40/regular": "text-[40px] leading-[64px] font-[325]",
+      h1: "text-[40px] leading-[64px] font-[600]",
 
       // 32px scale (H2)
-      "32/extrabold": "text-[32px] leading-[48px] font-extrabold",
-      "32/bold": "text-[32px] leading-[48px] font-bold",
-      "32/regular": "text-[32px] leading-[48px] font-normal",
-      h2: "text-[32px] leading-[48px] font-bold",
+      "32/extrabold": "text-[32px] leading-[50px] font-[725]",
+      "32/bold": "text-[32px] leading-[50px] font-[600]",
+      "32/regular": "text-[32px] leading-[50px] font-[325]",
+      h2: "text-[32px] leading-[50px] font-[600]",
 
       // 24px scale (H3)
-      "24/extrabold": "text-[24px] leading-[36px] font-extrabold",
-      "24/bold": "text-[24px] leading-[36px] font-bold",
-      "24/regular": "text-[24px] leading-[36px] font-normal",
-      h3: "text-[24px] leading-[36px] font-bold",
+      "24/extrabold": "text-[24px] leading-[36px] font-[725]",
+      "24/bold": "text-[24px] leading-[36px] font-[600]",
+      "24/regular": "text-[24px] leading-[36px] font-[325]",
+      h3: "text-[24px] leading-[36px] font-[600]",
 
       // 20px scale (H4 / Title)
-      "20/extrabold": "text-[20px] leading-[32px] font-extrabold",
-      "20/bold": "text-[20px] leading-[32px] font-bold",
-      "20/regular": "text-[20px] leading-[32px] font-normal",
-      h4: "text-[20px] leading-[32px] font-bold",
-      title: "text-[20px] leading-[32px] font-semibold",
+      "20/extrabold": "text-[20px] leading-[32px] font-[725]",
+      "20/bold": "text-[20px] leading-[32px] font-[600]",
+      "20/regular": "text-[20px] leading-[32px] font-[325]",
+      h4: "text-[20px] leading-[32px] font-[600]",
+      title: "text-[20px] leading-[32px] font-[450]",
 
       // 16px scale (Body Large)
-      "16/semibold": "text-[16px] leading-[28px] font-semibold",
-      "16/regular": "text-[16px] leading-[28px] font-normal",
-      "16/light": "text-[16px] leading-[28px] font-light",
-      "body-lg": "text-[16px] leading-[28px] font-normal",
-      "body-16": "text-[16px] leading-[28px] font-normal",
+      "16/semibold": "text-[16px] leading-[28px] font-[450]",
+      "16/regular": "text-[16px] leading-[28px] font-[325]",
+      "16/light": "text-[16px] leading-[28px] font-[150]",
+      "body-lg": "text-[16px] leading-[28px] font-[325]",
+      "body-16": "text-[16px] leading-[28px] font-[325]",
 
       // 14px scale (Body Medium / Default Body)
-      "14/semibold": "text-[14px] leading-[24px] font-semibold",
-      "14/regular": "text-[14px] leading-[24px] font-normal",
-      "14/light": "text-[14px] leading-[24px] font-light",
-      body: "text-[14px] leading-[24px] font-normal",
-      "body-md": "text-[14px] leading-[24px] font-normal",
-      "body-14": "text-[14px] leading-[24px] font-normal",
+      "14/semibold": "text-[14px] leading-[24px] font-[450]",
+      "14/regular": "text-[14px] leading-[24px] font-[325]",
+      "14/light": "text-[14px] leading-[24px] font-[150]",
+      body: "text-[14px] leading-[24px] font-[325]",
+      "body-md": "text-[14px] leading-[24px] font-[325]",
+      "body-14": "text-[14px] leading-[24px] font-[325]",
 
       // 12px scale (Body Small / Caption)
       "12/semibold": "text-[12px] leading-[20px] font-semibold",
@@ -81,14 +81,14 @@ const typographyVariants = cva("font-sans antialiased text-foreground", {
       "caption-xs": "text-[10px] leading-[14px] font-light",
     },
     weight: {
-      light: "font-light",
-      normal: "font-normal",
-      regular: "font-normal",
+      light: "font-[150]",
+      normal: "font-[325]",
+      regular: "font-[325]",
       medium: "font-medium",
-      semibold: "font-semibold",
-      bold: "font-bold",
-      extrabold: "font-extrabold",
-      black: "font-black",
+      semibold: "font-[450]",
+      bold: "font-[600]",
+      extrabold: "font-[725]",
+      black: "font-[875]",
     },
     color: {
       default: "text-foreground",
@@ -140,8 +140,8 @@ const variantAliases: Partial<Record<TypographyVariant, `${number}/${string}`>> 
 
 const lineHeights: Record<string, string> = {
   "48": "74px",
-  "40": "60px",
-  "32": "48px",
+  "40": "64px",
+  "32": "50px",
   "24": "36px",
   "20": "32px",
   "16": "28px",
@@ -151,12 +151,12 @@ const lineHeights: Record<string, string> = {
 }
 
 const fontWeights: Record<string, number> = {
-  light: 300,
-  regular: 400,
-  semibold: 600,
-  bold: 700,
-  extrabold: 800,
-  black: 900,
+  light: 150,
+  regular: 325,
+  semibold: 450,
+  bold: 600,
+  extrabold: 725,
+  black: 875,
 }
 
 function responsiveVariantVariables(breakpoint: "sm" | "md" | "lg", variant?: TypographyVariant) {

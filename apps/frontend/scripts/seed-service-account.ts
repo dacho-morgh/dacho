@@ -6,6 +6,7 @@ import { getPayload } from 'payload'
 import config from '../src/payload.config.js'
 
 const SERVICE_EMAIL = 'backend@dacho.local'
+const SERVICE_PHONE = process.env.SERVICE_ACCOUNT_PHONE ?? '09120000002'
 
 async function main(): Promise<void> {
   const apiKey = process.env.SERVICE_ACCOUNT_API_KEY ?? 'dev-backend-service-account'
@@ -32,7 +33,7 @@ async function main(): Promise<void> {
       data: {
         email: SERVICE_EMAIL,
         name: 'Backend Service',
-        phone: '09120000000',
+        phone: SERVICE_PHONE,
         enableAPIKey: true,
         apiKey,
         password,

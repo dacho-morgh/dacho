@@ -23,9 +23,7 @@ const NewsCard = ({
     <article
       dir="rtl"
       className={cn(
-        'group flex w-full flex-col items-end overflow-hidden rounded-4xl bg-white transition-all',
-        variant === 'home' && 'drop-shadow-xl lg:drop-shadow-lg',
-      )}
+        'group flex w-full flex-col rounded-[32px] drop-shadow-xl lg:drop-shadow-lg items-end overflow-hidden rounded-4xl bg-white transition-all'      )}
     >
       <Link
         href={href}
@@ -63,13 +61,13 @@ const NewsCard = ({
         </Typography>
         <Button
           variant="ghost"
-          className="group h-8 self-start rounded-[10px] px-1.5 py-2 transition-colors hover:bg-[#E5E5E5]"
+          className="group h-8 self-start rounded-[10px] px-1.5 py-2 transition-colors hover:bg-neutral-200"
         >
           <Link href={href} className="flex items-center gap-1">
             <Typography as="span" variant="14/regular" color="neutral-600">
               مطالعه خبر
             </Typography>
-            <ArrowUpIcon className="size-5 -rotate-90 text-[#525252]" />
+            <ArrowUpIcon className="size-5 -rotate-90 text-neutral-600" />
           </Link>
         </Button>
       </div>

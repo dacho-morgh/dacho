@@ -45,7 +45,7 @@ function AccordionTrigger({
       >
         <ArrowUpDownIcon
           data-slot="accordion-trigger-icon"
-          className="pointer-events-none w-8 shrink-0 transition-all group-aria-expanded/accordion-trigger:rotate-180"
+          className="pointer-events-none w-8 shrink-0 transition-all rotate-180 group-aria-expanded/accordion-trigger:rotate-0"
         />
         {children}
       </AccordionPrimitive.Trigger>

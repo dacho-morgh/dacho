@@ -4,6 +4,7 @@ import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useRef, type ReactNode } from 'react'
+import { cn } from '@/utilities/ui'
 
 gsap.registerPlugin(useGSAP, ScrollTrigger)
 
@@ -13,10 +14,17 @@ const STACK_OFFSET = 16
 
 type ServicesScrollStackProps = {
   children: ReactNode
+  equalCardHeights?: boolean
   heading: ReactNode
+  headingClassName?: string
 }
 
-export default function ServicesScrollStack({ children, heading }: ServicesScrollStackProps) {
+export default function ServicesScrollStack({
+  children,
+  equalCardHeights = false,
+  heading,
+  headingClassName,
+}: ServicesScrollStackProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const headingRef = useRef<HTMLDivElement>(null)
   const stackRef = useRef<HTMLDivElement>(null)
@@ -30,6 +38,22 @@ export default function ServicesScrollStack({ children, heading }: ServicesScrol
 
       const cards = gsap.utils.toArray<HTMLElement>('[data-service-card]', stack)
       if (cards.length < 2) return
+
+      const syncCardHeights = () => {
+        if (!equalCardHeights) return
+
+        gsap.set(cards, { height: 'auto' })
+        const tallestCardHeight = Math.max(...cards.map((card) => card.offsetHeight))
+        gsap.set(cards, { height: tallestCardHeight })
+      }
+
+      syncCardHeights()
+      ScrollTrigger.addEventListener('refreshInit', syncCardHeights)
+
+      let isActive = true
+      void document.fonts.ready.then(() => {
+        if (isActive) ScrollTrigger.refresh()
+      })
 
       const media = gsap.matchMedia()
 
@@ -80,14 +104,22 @@ export default function ServicesScrollStack({ children, heading }: ServicesScrol
         }
       })
 
-      return () => media.revert()
+      return () => {
+        isActive = false
+        ScrollTrigger.removeEventListener('refreshInit', syncCardHeights)
+        media.revert()
+        if (equalCardHeights) gsap.set(cards, { clearProps: 'height' })
+      }
     },
-    { scope: containerRef },
+    { dependencies: [equalCardHeights], scope: containerRef },
   )
 
   return (
     <div ref={containerRef} className="flex flex-col gap-10">
-      <div ref={headingRef} className="relative z-50 flex justify-start bg-neutral-50">
+      <div
+        ref={headingRef}
+        className={cn('relative z-50 flex justify-start bg-neutral-50', headingClassName)}
+      >
         {heading}
       </div>
       <div ref={stackRef} className="relative flex flex-col items-center gap-12 pb-[40vh]">

@@ -97,7 +97,7 @@ const MobileNavigationContent = () => {
           <NavList />
         </div>
         <Link
-          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#3B82F6] px-4 text-white"
+          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-brand-500 px-4 text-white"
           href="/login"
           onClick={closeMenu}
         >

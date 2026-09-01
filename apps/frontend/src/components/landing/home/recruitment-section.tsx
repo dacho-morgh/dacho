@@ -94,7 +94,7 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
       ref={sectionRef}
       dir="rtl"
       aria-labelledby="recruitment-title"
-      className={`relative z-10 mx-auto mt-20 flex min-h-64 w-[calc(100%-2rem)] max-w-280 items-center overflow-hidden rounded-[40px] px-6 py-10 sm:px-10 md:px-12 xl:px-20 xl:py-0 ${gradientClasses[variant]}`}
+      className={`relative z-10 mx-auto flex min-h-64 w-[calc(100%-2rem)] max-w-280 items-center overflow-hidden rounded-[40px] px-6 py-10 sm:px-10 md:px-12 xl:h-64 xl:px-20 xl:py-0 ${gradientClasses[variant]}`}
     >
       <div
         ref={shapeRef}
@@ -102,9 +102,9 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
         className="pointer-events-none absolute inset-y-0 left-1/2 h-full w-235.25 -translate-x-1/2 select-none md:left-0 md:translate-x-0"
       >
         {variant === 'gold' ? (
-          <ShapeIconDark className="size-full max-w-none text-[#FFFDF7]" />
+          <ShapeIconDark className="size-full max-w-none text-secondary-50" />
         ) : (
-          <ShapeIcon className="size-full max-w-none text-[#EEF2FF]" />
+          <ShapeIcon className="size-full max-w-none text-brand-50" />
         )}
       </div>
 

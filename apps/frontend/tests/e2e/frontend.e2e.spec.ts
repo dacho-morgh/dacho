@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
 
+test.use({ channel: 'chrome' })
+
 test.describe('Frontend', () => {
   test('opens the dashboard mobile sidebar as a right-side drawer', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 })
@@ -144,5 +146,42 @@ test.describe('Frontend', () => {
     })
 
     expect(hasNestedVerticalScrollbar).toBe(false)
+  })
+
+  test('does not make the mobile services section a vertical scroller', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    await page.goto('http://localhost:3000')
+
+    const servicesSection = page
+      .getByRole('heading', { name: 'ارائه خدمات', exact: true })
+      .locator('xpath=ancestor::section[1]')
+
+    await expect(servicesSection).toBeAttached()
+
+    const overflowY = await servicesSection.evaluate(
+      (section) => getComputedStyle(section).overflowY,
+    )
+
+    expect(overflowY).toBe('visible')
+  })
+
+  test('keeps reveal sections in their layout position on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    await page.goto('http://localhost:3000')
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(1_000)
+
+    const servicesReveal = page.locator('main > div').last()
+
+    await expect(servicesReveal).toBeAttached()
+
+    await expect
+      .poll(() =>
+        servicesReveal.evaluate((element) => ({
+          opacity: getComputedStyle(element).opacity,
+          transform: getComputedStyle(element).transform,
+        })),
+      )
+      .toEqual({ opacity: '1', transform: 'none' })
   })
 })
