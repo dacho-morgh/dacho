@@ -89,6 +89,8 @@ docker compose -f docker-compose.prod.yml exec frontend sh -lc '
   cd apps/frontend
   NODE_OPTIONS=--no-deprecation ./node_modules/.bin/tsx scripts/seed-service-account.ts
   NODE_OPTIONS=--no-deprecation ./node_modules/.bin/tsx scripts/seed-landing.ts
+  NODE_OPTIONS=--no-deprecation ./node_modules/.bin/tsx scripts/seed-dashboard.ts
+  NODE_OPTIONS=--no-deprecation ./node_modules/.bin/tsx scripts/seed-forms.ts
   NODE_OPTIONS=--no-deprecation ./node_modules/.bin/tsx scripts/create-admin.ts
 '
 ```
@@ -96,6 +98,12 @@ docker compose -f docker-compose.prod.yml exec frontend sh -lc '
 - `seed-service-account.ts` prints the `PAYLOAD_API_KEY` — put it in `.env`.
 - `seed-landing.ts` populates the Persian landing-page content from the Figma
   design (home page, globals, services/news/FAQ).
+- `seed-dashboard.ts` creates the dashboard's workflow `roles` and the five
+  `services` with `key`/`icon`/`workflow`. The landing seed's services are
+  marketing-only (no `key`, no `workflow`), so this is required for the
+  dashboard quick-access grid and the backend workflow engine.
+- `seed-forms.ts` creates the form-builder forms backing `/connect` and
+  `/cooperation`.
 - `create-admin.ts` bootstraps (or resets) an admin login; it reads
   `ADMIN_EMAIL` / `ADMIN_PASSWORD` from the environment, defaulting to
   `admin@dacho.local`. It also grants the admin `role=staff` + `cmsRole=admin`
