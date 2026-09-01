@@ -5,7 +5,8 @@
   "description": "Backend API — Express service owning application auth (OTP-first), workflow instances, and request processing.",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "migrations"
   ],
   "scripts": {
     "dev": "tsx watch src/index.ts",

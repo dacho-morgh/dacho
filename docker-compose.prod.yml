@@ -18,6 +18,7 @@
 #   POSTGRES_PASSWORD      URL-SAFE ONLY — see warning below
 #   NEXT_PUBLIC_SERVER_URL e.g. https://dacho.example.com
 #   PAYLOAD_API_KEY        from `pnpm --filter @dacho/frontend seed:service-account`
+#   INTERNAL_PROXY_SECRET  shared frontend↔backend proxy-auth secret
 #
 # WARNING — POSTGRES_PASSWORD is interpolated into a connection URL below, so
 # `@ : / ? # % &` in it corrupt the URL and surface as the very misleading
@@ -56,6 +57,8 @@ services:
       PAYLOAD_SECRET_FILE: /run/secrets/payload_secret
       NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:?NEXT_PUBLIC_SERVER_URL is required}
       BACKEND_JWKS_URL: http://backend:4000/.well-known/jwks.json
+      BACKEND_URL: http://backend:4000
+      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET:?INTERNAL_PROXY_SECRET is required}
     secrets:
       - payload_secret
     volumes:
@@ -78,6 +81,7 @@ services:
       JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private_key
       PAYLOAD_URL: http://frontend:3000
       PAYLOAD_API_KEY: ${PAYLOAD_API_KEY:?PAYLOAD_API_KEY is required}
+      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET:?INTERNAL_PROXY_SECRET is required}
       OTP_DELIVERY: ${OTP_DELIVERY:-console}
       KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
       KAVENEGAR_TEMPLATE: ${KAVENEGAR_TEMPLATE:-testtemplate}

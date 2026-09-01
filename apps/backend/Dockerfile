@@ -35,6 +35,9 @@ ENV NODE_ENV=production
 WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nodejs
 COPY --from=build --chown=nodejs:nodejs /out/backend ./
+# node-pg-migrate .ts migrations (runMigrations resolves ../../migrations from
+# dist/db/); they are NOT compiled into dist/, so ship them from the source tree.
+COPY --chown=nodejs:nodejs apps/backend/migrations ./migrations
 USER nodejs
 EXPOSE 4000
 ENV PORT=4000

@@ -212,13 +212,14 @@ IMAGE_TAG=sha-a805857
 POSTGRES_PASSWORD=<strong-password>
 NEXT_PUBLIC_SERVER_URL=https://your-domain.com
 PAYLOAD_API_KEY=<from seed:service-account>
+INTERNAL_PROXY_SECRET=<shared-secret>
 EOF
 
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Every one of those four variables is mandatory — compose aborts with
+Every one of those five variables is mandatory — compose aborts with
 `required variable ... is missing a value` rather than starting with a default.
 Migrations run automatically: the frontend entrypoint executes
 `payload migrate` before `next start`, so no host-side `pnpm` is needed.
