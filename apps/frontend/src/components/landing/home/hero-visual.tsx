@@ -2,16 +2,16 @@
 
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
+import Image from 'next/image'
 import { useRef } from 'react'
 
-import { BrandHeroLogo } from '@/components/icons'
 import HeroProofCard from '@/components/landing/home/hero-proof-card'
 
 gsap.registerPlugin(useGSAP)
 
 const HeroVisual = () => {
   const panelRef = useRef<HTMLDivElement>(null)
-  const logoRef = useRef<SVGSVGElement>(null)
+  const logoRef = useRef<HTMLImageElement>(null)
   const proofFieldRef = useRef<HTMLDivElement>(null)
 
   useGSAP(
@@ -138,11 +138,15 @@ const HeroVisual = () => {
         </div>
       </div>
 
-      <BrandHeroLogo
+      <Image
         ref={logoRef}
-        aria-label="نشان صندوق"
-        className="h-auto w-[min(78%,443px)] transform-3d text-brand-500 will-change-transform"
-        role="img"
+        src="/images/dashboard/hero-logo.webp"
+        alt="نشان صندوق"
+        width={500}
+        height={520}
+        priority
+        sizes="(max-width: 1024px) 90vw, 520px"
+        className="h-auto w-[min(90%,520px)] transform-3d text-brand-500 will-change-transform"
       />
     </div>
   )
