@@ -10,7 +10,7 @@ export type ServiceCardData = {
 
 const ServiceCard = ({ service }: { service: ServiceCardData }) => {
   return (
-    <article className="flex min-w-0 flex-col items-end gap-4 rounded-[40px] bg-white px-4 pt-4 pb-8  drop-shadow-xl">
+    <article className="flex h-[420px] min-w-0 flex-col items-end gap-4 rounded-[40px] bg-white px-4 pt-4 pb-8 drop-shadow-xl lg:h-auto">
       <div className="relative h-60 w-full shrink-0 overflow-hidden rounded-3xl lg:h-80 lg:rounded-4xl">
         {service.crop === 'figma' ? (
           <Image
@@ -35,7 +35,11 @@ const ServiceCard = ({ service }: { service: ServiceCardData }) => {
         <Typography as="h3" variant="20/bold" color="neutral-800" className="w-full">
           {service.title}
         </Typography>
-        <Typography variant="16/regular" color="neutral-500" className="w-full">
+        <Typography
+          variant="16/regular"
+          color="neutral-500"
+          className="line-clamp-2 w-full lg:line-clamp-none"
+        >
           {service.description}
         </Typography>
       </div>

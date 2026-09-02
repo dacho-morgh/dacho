@@ -12,6 +12,7 @@ const seedScripts = [
   'seed-dashboard.ts',
   'seed-forms.ts',
   'seed-service-account.ts',
+  'create-admin.ts',
 ] as const
 
 function run(command: string, args: string[]): void {

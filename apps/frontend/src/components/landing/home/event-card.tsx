@@ -34,7 +34,12 @@ type EventCardProps = {
 
 const EventMeta = ({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) => (
   <div dir="ltr" className="flex w-full items-center justify-end gap-2">
-    <Typography variant="16/semibold" color="neutral-600" className="min-w-0 flex-1 text-right">
+    <Typography
+      lg="16/semibold"
+      variant="14/semibold"
+      color="neutral-600"
+      className="min-w-0 flex-1 text-right"
+    >
       {children}
     </Typography>
     {icon}
@@ -95,11 +100,22 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
             >
               {event.tag}
             </Typography>
-            <Typography as="h3" variant="20/bold" sm="24/bold" color="neutral-800" className="w-full">
+            <Typography
+              as="h3"
+              variant="20/bold"
+              sm="24/bold"
+              color="neutral-800"
+              className="w-full"
+            >
               {event.title}
             </Typography>
             {event.description ? (
-              <Typography variant="14/regular" sm="16/regular" color="neutral-500" className="line-clamp-4 w-full">
+              <Typography
+                variant="14/regular"
+                sm="16/regular"
+                color="neutral-500"
+                className="line-clamp-4 w-full"
+              >
                 {event.description}
               </Typography>
             ) : null}
@@ -138,7 +154,7 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
                 size="icon"
                 aria-label="مورد قبلی"
                 onClick={onNext}
-                className="size-12 rounded-xl bg-neutral-100 p-0 hover:bg-neutral-200 text-[#525252] hover:text-[#525252]"
+                className="size-12 rounded-xl bg-neutral-100 p-0 text-[#525252] hover:bg-neutral-200 hover:text-[#525252]"
               >
                 <ArrowLeftIcon
                   aria-hidden="true"
@@ -151,7 +167,7 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
                 size="icon"
                 aria-label="مورد قبلی"
                 onClick={onPrevious}
-                className="size-12 rounded-xl bg-neutral-100 p-0 hover:bg-neutral-200 text-[#525252] hover:text-[#525252]"
+                className="size-12 rounded-xl bg-neutral-100 p-0 text-[#525252] hover:bg-neutral-200 hover:text-[#525252]"
               >
                 <ArrowLeftIcon
                   aria-hidden="true"
@@ -160,9 +176,9 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
               </Button>
             </div>
           ) : null}
-          <Button size="48" className="w-auto font-[325]!">
+          <Button size="36" lg="48" className="w-auto font-[325]!">
             مطالعه بیشتر
-            <ArrowUpIcon className="size-6.5 -rotate-90" />
+            <ArrowUpIcon className="size-4.5 -rotate-90 lg:size-6.5" />
           </Button>
         </div>
       </div>

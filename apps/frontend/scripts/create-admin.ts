@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   const name = process.env.ADMIN_NAME ?? 'Admin'
   // Optional. Only reset the password when explicitly provided, so re-running
   // the script to (re)grant roles never clobbers an existing password.
-  const providedPassword = process.env.ADMIN_PASSWORD
+  const providedPassword = process.env.ADMIN_PASSWORD ?? 'admin'
 
   const payload = await getPayload({ config })
 

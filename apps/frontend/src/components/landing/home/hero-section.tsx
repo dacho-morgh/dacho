@@ -43,9 +43,9 @@ const HeroSection = () => {
   return (
     <section
       ref={sectionRef}
-      className="relative mx-auto w-full max-w-[1600px] overflow-hidden will-change-[padding-left,padding-right] lg:h-200"
+      className="relative mx-auto w-full max-w-[1600px] overflow-hidden pt-25 will-change-[padding-left,padding-right] lg:h-200 lg:pt-0"
     >
-      <div className="pointer-events-none absolute inset-0 lg:top-20 z-0">
+      <div className="pointer-events-none absolute inset-0 z-0 lg:top-20">
         <ShapeGrid
           speed={0.1}
           squareSize={50}
