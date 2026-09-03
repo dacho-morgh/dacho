@@ -14,10 +14,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Typography } from '@/components/ui/typography'
+import { getLoginUrl, getSafeReturnUrl } from '@/utilities/auth-return-url'
 
 const steps = ['اطلاعات شرکت', 'اطلاعات نماینده', 'امنیت حساب'] as const
 
-const COMPANY_TYPES = ['سهامی خاص', 'سهامی عام', 'مسئولیت محدود', 'دانش‌بنیان', 'استارتاپ', 'سایر'] as const
+const COMPANY_TYPES = [
+  'سهامی خاص',
+  'سهامی عام',
+  'مسئولیت محدود',
+  'دانش‌بنیان',
+  'استارتاپ',
+  'سایر',
+] as const
 
 // Form field names mirror the Users collection: the representative's
 // fullName/mobile/email map to name/phone/email, and company fields carry a
@@ -67,8 +75,9 @@ const required = (value: string, label: string): string | undefined =>
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export default function RegisterPage() {
+export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?: string }) {
   const router = useRouter()
+  const safeReturnUrl = getSafeReturnUrl(returnUrl)
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -118,7 +127,11 @@ export default function RegisterPage() {
         next.password = 'رمز عبور باید حداقل ۸ کاراکتر باشد.'
       }
       next.passwordConfirmation = required(form.passwordConfirmation, 'تکرار رمز عبور')
-      if (form.password && form.passwordConfirmation && form.password !== form.passwordConfirmation) {
+      if (
+        form.password &&
+        form.passwordConfirmation &&
+        form.password !== form.passwordConfirmation
+      ) {
         next.passwordConfirmation = 'رمز عبور و تکرار آن یکسان نیستند.'
       }
     }
@@ -145,6 +158,7 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: form.email.trim(),
+          username: form.phone.trim(),
           password: form.password,
           phone: form.phone.trim(),
           name: form.name.trim(),
@@ -165,7 +179,7 @@ export default function RegisterPage() {
         return
       }
 
-      router.replace('/login?registered=1')
+      router.replace(getLoginUrl(safeReturnUrl, { registered: true }))
     } catch {
       setNotice('در حال حاضر ارتباط با سامانه برقرار نیست. کمی بعد دوباره تلاش کنید.')
     } finally {
@@ -182,7 +196,7 @@ export default function RegisterPage() {
           color="neutral-600"
           variant="16/regular"
         >
-          <Link href="/login">
+          <Link href={getLoginUrl(safeReturnUrl)}>
             <ArrowRight aria-hidden="true" className="size-5 stroke-[1.5]" />
             بازگشت
           </Link>

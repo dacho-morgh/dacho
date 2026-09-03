@@ -4,6 +4,25 @@ test.use({ channel: 'chrome' })
 
 test.describe('Frontend', () => {
   test('opens the dashboard mobile sidebar as a right-side drawer', async ({ page }) => {
+    const suffix = `${Date.now()}`.slice(-9)
+    const phone = `09${suffix}`
+    const password = 'password123'
+    const registration = await page.request.post('http://localhost:3000/api/users', {
+      data: {
+        email: `sidebar-${suffix}@example.com`,
+        username: phone,
+        password,
+        phone,
+        name: 'متقاضی تست سایدبار',
+      },
+    })
+    expect(registration.ok()).toBe(true)
+
+    const login = await page.request.post('http://localhost:3000/api/users/login', {
+      data: { username: phone, password },
+    })
+    expect(login.ok()).toBe(true)
+
     await page.setViewportSize({ width: 390, height: 800 })
     await page.goto('http://localhost:3000/dashboard')
 
@@ -12,9 +31,7 @@ test.describe('Frontend', () => {
     // unmounts the desktop sidebar. Wait for that before clicking — otherwise
     // `toggleSidebar()` toggles the hidden desktop sidebar and the mobile sheet
     // never opens.
-    await expect(
-      page.locator('[data-sidebar="sidebar"]:not([data-mobile])'),
-    ).toHaveCount(0)
+    await expect(page.locator('[data-sidebar="sidebar"]:not([data-mobile])')).toHaveCount(0)
 
     const trigger = page.locator('[data-sidebar="trigger"]')
     await expect(trigger).toBeVisible()

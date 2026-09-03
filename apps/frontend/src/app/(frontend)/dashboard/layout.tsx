@@ -1,8 +1,17 @@
+import configPromise from '@payload-config'
 import { Menu } from 'lucide-react'
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { getPayload } from 'payload'
 import React from 'react'
 import { AppSidebar } from '@/components/dashboard/app-sidebar'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
+import {
+  DASHBOARD_RETURN_URL_HEADER,
+  getLoginUrl,
+  getSafeReturnUrl,
+} from '@/utilities/auth-return-url'
 
 export const metadata: Metadata = {
   robots: {
@@ -12,7 +21,20 @@ export const metadata: Metadata = {
   },
 }
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const requestHeaders = await headers()
+  const returnUrl = getSafeReturnUrl(requestHeaders.get(DASHBOARD_RETURN_URL_HEADER))
+  const payload = await getPayload({ config: configPromise })
+
+  let user = null
+  try {
+    user = (await payload.auth({ headers: requestHeaders })).user
+  } catch {
+    // Invalid, expired, or otherwise unreadable sessions are unauthenticated.
+  }
+
+  if (!user) redirect(getLoginUrl(returnUrl))
+
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full bg-[#F8FAFC] text-slate-800 antialiased" dir="rtl">

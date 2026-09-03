@@ -1,14 +1,17 @@
+import { hasCmsRole } from '@cms-core/access/hasCmsRole'
 import { getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-
-import { hasCmsRole } from '@cms-core/access/hasCmsRole'
 import config from '@/payload.config'
 
 // Public signup must produce an `applicant` (role) with no CMS role (cmsRole),
 // and must be impossible to self-elevate: any `role`/`cmsRole` supplied by an
 // anonymous visitor is ignored and forced to the safe defaults.
 const TEST_PHONES = ['09910000001', '09910000002', '09910000003']
-const TEST_EMAILS = ['int-applicant@example.com', 'int-escalation@example.com', 'int-admin@example.com']
+const TEST_EMAILS = [
+  'int-applicant@example.com',
+  'int-escalation@example.com',
+  'int-admin@example.com',
+]
 
 let payload: Payload
 
@@ -43,6 +46,7 @@ describe('users roles & access control', () => {
 
     expect(user.role).toBe('applicant')
     expect(user.cmsRole).toBeNull()
+    expect(user.username).toBe(TEST_PHONES[0])
   })
 
   it('ignores role/cmsRole supplied during self-signup', async () => {

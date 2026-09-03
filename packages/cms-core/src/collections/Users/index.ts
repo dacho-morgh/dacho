@@ -30,6 +30,10 @@ export const Users: CollectionConfig = {
     beforeChange: [
       ({ data, req, context }) => {
         if (req.user?.cmsRole !== 'admin' && context.allowRoleAssignment !== true) {
+          // Payload authenticates `loginWithUsername` against username/email.
+          // Applicants use their unique phone as the username so the public
+          // login form can truthfully accept either phone or email.
+          if (typeof data.phone === 'string') data.username = data.phone.trim()
           data.role = 'applicant'
           data.cmsRole = null
           data.roles = []

@@ -94,10 +94,13 @@ Applicants register themselves through the public signup form
 - Collects company fields (`companyName`, `companyNationalId`,
   `companyRegistrationNumber`, `companyType`, `companyProvince`, `companyCity`),
   representative fields (`name`, `position`, `phone`, `email`), and a password.
+- Stores the applicant's unique phone as their Payload username so the public
+  login form accepts either phone or email as advertised.
 - `Users.access.create` is public; field-level access + a `beforeChange` hook
   force `role: 'applicant'` and `cmsRole: null`, so a self-registering visitor
   cannot escalate (see [authorization.md](./authorization.md)).
-- On success the user is redirected to `/login?registered=1`.
+- On success the user is redirected to `/login?registered=1&returnUrl=…`; the
+  return path is limited to the dashboard route tree.
 
 This is the **password-based** path (email/phone + password via
 `/api/users/login`). The backend OTP flow below remains the application-auth

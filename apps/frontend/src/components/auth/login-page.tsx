@@ -8,17 +8,27 @@ import { BrandSandoqLogomark, BrandSandoqLogotype } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Typography } from '@/components/ui/typography'
+import { getSafeReturnUrl } from '@/utilities/auth-return-url'
 
 type Notice = { kind: 'error' | 'info'; message: string } | null
 
-export default function LoginPage({ registered = false }: { registered?: boolean }) {
+export default function LoginPage({
+  registered = false,
+  returnUrl = '/dashboard',
+}: {
+  registered?: boolean
+  returnUrl?: string
+}) {
   const router = useRouter()
+  const safeReturnUrl = getSafeReturnUrl(returnUrl)
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState<Notice>(
-    registered ? { kind: 'info', message: 'ثبت‌نام با موفقیت انجام شد. اکنون می‌توانید وارد شوید.' } : null,
+    registered
+      ? { kind: 'info', message: 'ثبت‌نام با موفقیت انجام شد. اکنون می‌توانید وارد شوید.' }
+      : null,
   )
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -38,7 +48,7 @@ export default function LoginPage({ registered = false }: { registered?: boolean
         return
       }
 
-      router.replace('/dashboard')
+      router.replace(safeReturnUrl)
       router.refresh()
     } catch {
       setNotice({
@@ -156,7 +166,10 @@ export default function LoginPage({ registered = false }: { registered?: boolean
             variant="14/regular"
           >
             <span>آیا حساب کاربری ندارید؟</span>
-            <Link className="text-brand-500" href="/register">
+            <Link
+              className="text-brand-500"
+              href={`/register?returnUrl=${encodeURIComponent(safeReturnUrl)}`}
+            >
               ثبت‌نام کنید
             </Link>
           </Typography>
