@@ -21,7 +21,7 @@ type ServicesScrollStackProps = {
 
 export default function ServicesScrollStack({
   children,
-  equalCardHeights = false,
+  equalCardHeights = true,
   heading,
   headingClassName,
 }: ServicesScrollStackProps) {

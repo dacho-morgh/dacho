@@ -37,6 +37,7 @@ const getCountdown = (startDate: string, endDate: string) => {
 
 const toCardData = (item: Event | Exhibition, kind: 'event' | 'exhibition'): EventCardData => ({
   id: `${kind}-${item.id}`,
+  href: `/${kind === 'event' ? 'events' : 'exhibitions'}/${item.id}`,
   featuredImage: item.featuredImage,
   fallbackImage: kind === 'event' ? '/figma/events/event-2.jpeg' : '/figma/events/event-1.jpeg',
   tag: kind === 'event' ? 'رویداد' : 'نمایشگاه',

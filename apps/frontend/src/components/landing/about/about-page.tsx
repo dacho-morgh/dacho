@@ -76,25 +76,25 @@ function TickItem({ children }: { children: ReactNode }) {
 
 function IntroductionSection() {
   return (
-    <section className="mx-auto flex min-h-[800px] w-full max-w-[1280px] flex-col justify-center gap-10 px-4 py-16 md:px-8 lg:flex-row lg:items-center lg:py-20 2xl:px-0">
-      <div className="flex flex-1 flex-col gap-8 lg:max-w-[600px]">
+    <section className="mx-auto flex min-h-200 w-full max-w-7xl flex-col justify-center gap-10 px-4 py-16 pt-25 md:px-8 lg:flex-row lg:items-center lg:py-20 lg:pt-40 2xl:px-0">
+      <div className="flex flex-1 flex-col gap-8 lg:max-w-150">
         <div className="flex flex-col gap-4">
-          <Typography as="h1" color="neutral-700" md="48/black" variant="32/extrabold">
+          <Typography as="h1" color="neutral-700" lg="48/black" variant="24/extrabold">
             پیوند هوشمندانه صنعت و فناوری در قلب انرژی کشور
           </Typography>
-          <Typography as="p" color="neutral-500" variant="20/regular">
+          <Typography as="p" color="neutral-500" lg="20/regular" variant="16/regular">
             کارخانه نوآوری نفت، گاز و پتروشیمی بوشهر، با هدف راه‌اندازی نخستین هاب تخصصی نوآوری در
             حوزه انرژی‌های فسیلی و تجدیدپذیر در منطقه راهبردی عسلویه شکل گرفته است.
           </Typography>
         </div>
         <div className="flex items-stretch gap-4">
           <span aria-hidden="true" className="w-2 shrink-0 rounded-lg bg-secondary-500" />
-          <Typography as="p" color="neutral-600" variant="20/bold">
+          <Typography as="p" color="neutral-600" lg="20/bold" variant="16/semibold">
             رسالت ما، تبدیل چالش‌های واقعی صنعت به راهکارهای فناورانه و اقتصادی است
           </Typography>
         </div>
       </div>
-      <div className="relative aspect-square w-full overflow-hidden rounded-[40px] lg:w-1/2 lg:max-w-[640px]">
+      <div className="relative aspect-square w-full overflow-hidden rounded-[40px] lg:w-1/2 lg:max-w-160">
         <Image
           fill
           priority
@@ -110,9 +110,9 @@ function IntroductionSection() {
 
 function VisionSection() {
   return (
-    <section className="mx-auto w-full max-w-[1280px] px-4 py-20 md:px-8 lg:py-40 2xl:px-0">
+    <section className="mx-auto w-full max-w-7xl px-4 py-20 md:px-8 lg:py-40 2xl:px-0">
       <article className="flex flex-col gap-10 rounded-[40px] bg-white p-5 shadow-[0_0_20px_rgb(10_10_10/0.1)] sm:p-8 lg:flex-row lg:items-stretch lg:rounded-[80px] lg:p-10">
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-4 lg:py-10">
+        <div className="order-2 flex min-w-0 flex-1 flex-col justify-center gap-4 lg:py-10">
           <Typography as="h3" color="neutral-800" variant="24/bold">
             چشم‌انداز و اهداف کلیدی
           </Typography>
@@ -132,7 +132,7 @@ function VisionSection() {
             جایی که هم‌افزایی دانش و صنعت، آینده‌ای پیشرو را برای ایران رقم می‌زند.
           </Typography>
         </div>
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[32px] lg:aspect-auto lg:w-1/2 lg:max-w-[640px] lg:rounded-[40px]">
+        <div className="relative order-1 aspect-4/3 w-full overflow-hidden rounded-4xl lg:aspect-auto lg:w-1/2 lg:max-w-[640px] lg:rounded-[40px]">
           <Image
             fill
             alt="نمادی از چشم‌انداز و هویت حرفه‌ای کارخانه نوآوری"
@@ -151,7 +151,7 @@ function ServiceCard({ service, index }: { service: Service; index: number }) {
     <article
       data-service-card
       className={cn(
-        'relative flex flex-col gap-4 rounded-[32px] bg-white p-6 shadow-[0_0_10px_rgb(10_10_10/0.05)] sm:p-10 lg:w-[800px] lg:rounded-[40px]',
+        'relative flex flex-col gap-4 rounded-4xl bg-white p-6 shadow-[0_0_10px_rgb(10_10_10/0.05)] sm:p-10 lg:w-[800px] lg:rounded-[40px]',
       )}
       style={{ zIndex: index + 1 }}
     >

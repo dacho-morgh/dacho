@@ -20,6 +20,7 @@ export { default as EventsArrowLeftWhiteIcon } from './events-arrow-left-white-i
 export { default as EventsCalendarIcon } from './events-calendar-icon'
 export { default as EventsLocationIcon } from './events-location-icon'
 export { default as EventsTimerIcon } from './events-timer-icon'
+export { EventClockIcon, EventMapIcon, EventTypeGridIcon } from './event-detail-icons'
 export { default as Favicon } from './favicon'
 export { default as FooterCallIcon } from './footer-call-icon'
 export { default as FooterHouseIcon } from './footer-house-icon'

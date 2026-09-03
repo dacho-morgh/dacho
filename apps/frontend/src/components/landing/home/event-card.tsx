@@ -1,5 +1,6 @@
 import type { Media } from '@dacho/cms-core'
 import Image from 'next/image'
+import Link from 'next/link'
 import type React from 'react'
 import {
   ArrowLeftIcon,
@@ -14,6 +15,7 @@ import { Typography } from '@/components/ui/typography'
 
 export type EventCardData = {
   id: string
+  href: string
   featuredImage?: number | Media | null
   fallbackImage: string
   tag: string
@@ -176,9 +178,11 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
               </Button>
             </div>
           ) : null}
-          <Button size="36" lg="48" className="w-auto font-[325]!">
-            مطالعه بیشتر
-            <ArrowUpIcon className="size-4.5 -rotate-90 lg:size-6.5" />
+          <Button asChild size="36" lg="48" className="w-auto font-[325]!">
+            <Link href={event.href}>
+              مطالعه بیشتر
+              <ArrowUpIcon className="size-4.5 -rotate-90 lg:size-6.5" />
+            </Link>
           </Button>
         </div>
       </div>
