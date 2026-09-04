@@ -1,9 +1,19 @@
 'use client'
 
-import React from 'react'
-import Link from 'next/link'
 import Image from 'next/image'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import React from 'react'
+import {
+  DashboardIcon,
+  RequestsIcon,
+  LettersIcon,
+  EventsIcon,
+  MoreOptionsIcon,
+  type SidebarIconProps,
+  BrandSandoqLogomark,
+  BrandSandoqLogotype,
+} from '@/components/icons'
 import {
   Sidebar,
   SidebarContent,
@@ -13,16 +23,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar'
-import {
-  DashboardIcon,
-  RequestsIcon,
-  LettersIcon,
-  EventsIcon,
-  MoreOptionsIcon,
-  FundLogoMark,
-  FundLogoType,
-  type SidebarIconProps,
-} from '@/components/icons'
 
 export interface NavItem {
   title: string
@@ -86,9 +86,9 @@ export function AppSidebar({
               title="صفحه اصلی داشبورد"
             >
               {/* Logomark (46x40) */}
-              <FundLogoMark className="h-10 w-[46px] shrink-0" />
+              <BrandSandoqLogomark className="h-10 w-[46px] shrink-0" />
               {/* Logotype (113x40) */}
-              <FundLogoType className="h-10 w-[113px] shrink-0" />
+              <BrandSandoqLogotype className="h-10 w-[113px] shrink-0" />
             </Link>
           </SidebarHeader>
 
@@ -96,7 +96,7 @@ export function AppSidebar({
           <div className="h-px w-full bg-neutral-200" />
 
           {/* Navigation Menu (Frame 2) */}
-          <SidebarContent className="p-0 overflow-visible">
+          <SidebarContent className="overflow-visible p-0">
             <SidebarMenu className="flex flex-col gap-2">
               {defaultNavItems.map((item) => {
                 const isActive = item.exact
@@ -121,8 +121,8 @@ export function AppSidebar({
                         isActive={isActive}
                         className={`group relative flex h-10 w-full flex-1 items-center rounded-[12px] px-3 py-2 transition-all duration-150 ${
                           isActive
-                            ? 'bg-[#EEF2FF] text-[#2563EB] font-semibold hover:bg-[#DBEAFE] hover:text-[#2563EB] active:bg-[#BFDBFE]'
-                            : 'bg-transparent text-[#525252] font-normal hover:bg-neutral-100 hover:text-neutral-900'
+                            ? 'bg-[#EEF2FF] font-semibold text-[#2563EB] hover:bg-[#DBEAFE] hover:text-[#2563EB] active:bg-[#BFDBFE]'
+                            : 'bg-transparent font-normal text-[#525252] hover:bg-neutral-100 hover:text-neutral-900'
                         }`}
                       >
                         <Link href={item.href} className="flex w-full items-center gap-2.5">
@@ -135,7 +135,7 @@ export function AppSidebar({
                                 : 'text-[#525252] group-hover:text-neutral-900'
                             }`}
                           />
-                          <span className="text-base leading-7 truncate">{item.title}</span>
+                          <span className="truncate text-base leading-7">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </div>
@@ -150,7 +150,11 @@ export function AppSidebar({
         <SidebarFooter className="p-0">
           <div className="flex h-10 w-full items-center justify-between">
             {/* Right: Company Avatar & Name (Frame 40) */}
-            <div className="flex items-center gap-2.5 overflow-hidden">
+            <Link
+              href="/dashboard/profile"
+              className="flex items-center gap-2.5 overflow-hidden transition-opacity hover:opacity-85"
+              title="مشاهده و ویرایش پروفایل"
+            >
               <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-neutral-200/80 shadow-2xs">
                 <Image
                   src="/figma/dashboard/company-avatar.png"
@@ -163,20 +167,20 @@ export function AppSidebar({
                   }}
                 />
               </div>
-              <span className="truncate text-sm font-semibold text-[#525252] leading-6">
+              <span className="truncate text-sm leading-6 font-semibold text-[#525252]">
                 {companyName}
               </span>
-            </div>
+            </Link>
 
             {/* Left: Three Dots Action Button */}
-            <button
-              type="button"
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition-colors cursor-pointer"
+            <Link
+              href="/dashboard/profile"
+              className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
               title="تنظیمات و گزینه‌ها"
             >
               <MoreOptionsIcon className="size-6 text-[#525252]" />
               <span className="sr-only">گزینه‌های بیشتر</span>
-            </button>
+            </Link>
           </div>
         </SidebarFooter>
       </div>

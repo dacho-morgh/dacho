@@ -72,6 +72,42 @@ export interface Paginated<T> {
   totalPages: number
 }
 
+export interface CompanyInfoDto {
+  name: string
+  establishmentDate: string
+  status: string
+  type: string
+  registrationNumber: string
+  economicCode: string
+  nationalId: string
+}
+
+export interface ContactInfoDto {
+  phone: string
+  email: string
+}
+
+export interface ExecutiveDto {
+  role: string
+  name: string
+}
+
+export interface AddressDto {
+  id: string
+  title: string
+  province: string
+  city: string
+  postalCode: string
+  address: string
+}
+
+export interface ProfileDto {
+  company: CompanyInfoDto
+  contacts: ContactInfoDto
+  executives: ExecutiveDto[]
+  addresses: AddressDto[]
+}
+
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   draft: 'درخواست داده نشده',
   in_review: 'درحال بررسی',
@@ -201,6 +237,43 @@ export function createRequest(input: { serviceId: string; title: string; answers
 
 export function submitRequest(id: string): Promise<{ request: RequestDto }> {
   return dashboardFetch<{ request: RequestDto }>(`/requests/${id}/submit`, { method: 'POST' })
+}
+
+export function fetchProfile(): Promise<ProfileDto | undefined> {
+  return dashboardFetch<ProfileDto>('/profile')
+}
+
+export function updateProfile(data: {
+  company?: Partial<CompanyInfoDto>
+  contacts?: Partial<ContactInfoDto>
+}): Promise<ProfileDto | undefined> {
+  return dashboardFetch<ProfileDto>('/profile', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
+export function addAddress(address: Omit<AddressDto, 'id'>): Promise<{ address: AddressDto } | undefined> {
+  return dashboardFetch<{ address: AddressDto }>('/profile/addresses', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(address),
+  })
+}
+
+export function updateAddress(id: string, address: Partial<Omit<AddressDto, 'id'>>): Promise<{ address: AddressDto } | undefined> {
+  return dashboardFetch<{ address: AddressDto }>(`/profile/addresses/${id}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(address),
+  })
+}
+
+export function deleteAddress(id: string): Promise<{ success: boolean } | undefined> {
+  return dashboardFetch<{ success: boolean }>(`/profile/addresses/${id}`, {
+    method: 'DELETE',
+  })
 }
 
 /* ── Display mappers (backend DTO → component prop shapes) ─────────────── */

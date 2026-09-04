@@ -32,27 +32,44 @@ const Reveal = ({ children, className, delay = 0.3, distance = 48 }: RevealProps
       const wrapper = wrapperRef.current
       if (!wrapper) return
 
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        gsap.set(wrapper, { clearProps: 'opacity,transform,visibility' })
-        return
-      }
+      const media = gsap.matchMedia()
 
-      gsap.fromTo(
-        wrapper,
-        { autoAlpha: 0, y: distance },
+      media.add(
         {
-          autoAlpha: 1,
-          y: 0,
-          duration: 0.9,
-          delay,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: wrapper,
-            start: 'top bottom',
-            once: true,
-          },
+          desktop: '(min-width: 768px)',
+          reduceMotion: '(prefers-reduced-motion: reduce)',
+        },
+        (context) => {
+          const { desktop, reduceMotion } = context.conditions as {
+            desktop: boolean
+            reduceMotion: boolean
+          }
+
+          if (!desktop || reduceMotion) {
+            gsap.set(wrapper, { clearProps: 'opacity,transform,visibility' })
+            return
+          }
+
+          gsap.fromTo(
+            wrapper,
+            { autoAlpha: 0, y: distance },
+            {
+              autoAlpha: 1,
+              y: 0,
+              duration: 0.9,
+              delay,
+              ease: 'power3.out',
+              scrollTrigger: {
+                trigger: wrapper,
+                start: 'top bottom',
+                once: true,
+              },
+            },
+          )
         },
       )
+
+      return () => media.revert()
     },
     { scope: wrapperRef },
   )

@@ -4,6 +4,8 @@ export { default as BrandFooterSandoqLogotype } from './brand-footer-sandoq-logo
 export { default as BrandSandoqLogomark } from './brand-sandoq-logomark'
 export { default as BrandSandoqLogotype } from './brand-sandoq-logotype'
 export { default as CarouselArrowRightIcon } from './carousel-arrow-right-icon'
+export { default as DashboardAddIcon } from './dashboard-add-icon'
+export { default as DashboardCloseCircle } from './dashboard-close-circle'
 export { default as DashboardEditIcon } from './dashboard-edit-icon'
 export { default as DashboardEmptyInboxIcon } from './dashboard-empty-inbox-icon'
 export { default as DashboardEventsIcon } from './dashboard-events-icon'
@@ -58,6 +60,7 @@ export {
   Message2Icon,
   MoreOptionsIcon as RequestMoreOptionsIcon,
   SearchNormalIcon,
+  TickSquareIcon,
   TrashIcon,
 } from './request-icons'
 export {
@@ -74,3 +77,4 @@ export {
 export { default as ShapeIconDark } from './shape-icon-dark'
 export { default as ShapeIcon } from './shape-icon'
 export { TickCircleIcon } from './tick-circle-icon'
+export { DashboardUserTagIcon } from './dashboard-user-tag-icon'

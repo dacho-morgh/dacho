@@ -7,7 +7,22 @@ import DashboardLayout from '@/app/(frontend)/dashboard/layout'
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
+  redirect: vi.fn(),
 }))
+
+vi.mock('next/headers', () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}))
+
+vi.mock('payload', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('payload')>()
+  return {
+    ...actual,
+    getPayload: vi.fn().mockResolvedValue({
+      auth: vi.fn().mockResolvedValue({ user: { id: 'test-user' } }),
+    }),
+  }
+})
 
 describe('dashboard mobile sidebar', () => {
   it('uses a compact absolute hamburger trigger at the top-left and opens from the right', async () => {
@@ -26,7 +41,8 @@ describe('dashboard mobile sidebar', () => {
       })),
     })
 
-    render(createElement(DashboardLayout, null, createElement('div', null, 'Dashboard content')))
+    const layout = await DashboardLayout({ children: createElement('div', null, 'Dashboard content') })
+    render(layout)
 
     const trigger = screen.getByRole('button', { name: 'باز کردن منو' })
 

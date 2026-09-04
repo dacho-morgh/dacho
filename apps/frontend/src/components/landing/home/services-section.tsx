@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/carousel'
 import { Typography } from '@/components/ui/typography'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
-import SectionHeading from './section-heading'
 import ServiceCard from './service-card'
 
 const ServicesSection = async () => {
@@ -26,11 +25,11 @@ const ServicesSection = async () => {
   if (services.length === 0) return null
 
   return (
-    <section className="flex w-full flex-col items-center gap-6 overflow-x-hidden py-16 md:py-24 lg:py-28 2xl:py-32">
+    <section className="flex w-full flex-col items-center gap-6 overflow-x-clip py-16 md:py-24 lg:py-28 2xl:py-32">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
         <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">
           <div className="my-2 w-1 rounded-full bg-[#FAB622] lg:my-3 lg:w-2" />
-           <Typography as="h2" variant="32/extrabold" sm="40/extrabold" color="neutral-600">
+          <Typography as="h2" variant="32/extrabold" sm="40/extrabold" color="neutral-600">
             ارائه خدمات
           </Typography>
         </div>

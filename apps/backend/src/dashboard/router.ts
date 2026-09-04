@@ -4,6 +4,7 @@ import type { Pool } from 'pg'
 import type { ServiceCatalog, ServiceDefinition } from '../catalog/service-catalog.js'
 import { ActivityRepository } from './activity-repo.js'
 import { LetterRepository } from './letter-repo.js'
+import { ProfileRepository } from './profile-repo.js'
 import { requireProxyAuth } from './proxy-auth.js'
 import { RequestRepository } from './request-repo.js'
 import { StatsRepository } from './stats-repo.js'
@@ -55,6 +56,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const letters = new LetterRepository(deps.pool)
   const activities = new ActivityRepository(deps.pool)
   const stats = new StatsRepository(deps.pool)
+  const profileRepo = new ProfileRepository(deps.pool)
   const engine = new WorkflowEngine(deps.pool, deps.serviceCatalog)
 
   router.use(requireProxyAuth(deps.proxySecret))
@@ -187,6 +189,69 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
     res.json(await activities.list(userId, page, limit))
+  })
+
+  router.get('/profile', async (_req, res) => {
+    const userId = res.locals.userId as string
+    const profile = await profileRepo.getProfile(userId)
+    res.json(profile)
+  })
+
+  router.patch('/profile', async (req, res) => {
+    const userId = res.locals.userId as string
+    const { company, contacts } = req.body ?? {}
+    let profile = await profileRepo.getProfile(userId)
+    if (company && typeof company === 'object') {
+      profile = await profileRepo.updateBasicInfo(userId, company)
+    }
+    if (contacts && typeof contacts === 'object') {
+      profile = await profileRepo.updateContactInfo(userId, contacts)
+    }
+    res.json(profile)
+  })
+
+  router.post('/profile/addresses', async (req, res) => {
+    const userId = res.locals.userId as string
+    const { title, province, city, postalCode, address } = req.body ?? {}
+    if (!title || !address) {
+      res.status(400).json({ error: 'invalid_address' })
+      return
+    }
+    const created = await profileRepo.addAddress(userId, {
+      title: String(title),
+      province: String(province ?? ''),
+      city: String(city ?? ''),
+      postalCode: String(postalCode ?? ''),
+      address: String(address),
+    })
+    res.status(201).json({ address: created })
+  })
+
+  router.put('/profile/addresses/:id', async (req, res) => {
+    const userId = res.locals.userId as string
+    const { title, province, city, postalCode, address } = req.body ?? {}
+    const updated = await profileRepo.updateAddress(userId, req.params.id, {
+      ...(title !== undefined ? { title: String(title) } : {}),
+      ...(province !== undefined ? { province: String(province) } : {}),
+      ...(city !== undefined ? { city: String(city) } : {}),
+      ...(postalCode !== undefined ? { postalCode: String(postalCode) } : {}),
+      ...(address !== undefined ? { address: String(address) } : {}),
+    })
+    if (!updated) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    res.json({ address: updated })
+  })
+
+  router.delete('/profile/addresses/:id', async (req, res) => {
+    const userId = res.locals.userId as string
+    const success = await profileRepo.deleteAddress(userId, req.params.id)
+    if (!success) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    res.json({ success: true })
   })
 
   router.post('/requests/:id/transition', async (req, res) => {
