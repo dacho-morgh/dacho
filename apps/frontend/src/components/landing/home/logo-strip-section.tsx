@@ -120,9 +120,13 @@ const LogoStripSection = () => {
     const track = trackRef.current
     if (!track) return
 
+    let rafId: number
     const measure = () => {
-      const contentWidth = track.scrollWidth / 2
-      setDuration(contentWidth / PIXELS_PER_SECOND)
+      rafId = requestAnimationFrame(() => {
+        if (!track) return
+        const contentWidth = track.scrollWidth / 2
+        setDuration(contentWidth / PIXELS_PER_SECOND)
+      })
     }
 
     measure()
@@ -132,6 +136,7 @@ const LogoStripSection = () => {
     window.addEventListener('resize', measure)
 
     return () => {
+      cancelAnimationFrame(rafId)
       resizeObserver.disconnect()
       window.removeEventListener('resize', measure)
     }

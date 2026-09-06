@@ -6,7 +6,7 @@ const SvgBrandFooterSandoqLogotype = (props: SVGProps<SVGSVGElement>) => (
     width={90}
     height={32}
     fill="none"
-    viewBox="0 0 s90 32"
+    viewBox="0 0 90 32"
     {...props}
   >
     <path

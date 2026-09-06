@@ -2,24 +2,21 @@
 
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
-import Image from 'next/image'
 import { useRef } from 'react'
 import HeroProofCard from '@/components/landing/home/hero-proof-card'
 
 gsap.registerPlugin(useGSAP)
 
-const HeroVisual = () => {
+const HeroVisual = ({ children }: { children?: React.ReactNode }) => {
   const panelRef = useRef<HTMLDivElement>(null)
-  const logoRef = useRef<HTMLImageElement>(null)
   const proofFieldRef = useRef<HTMLDivElement>(null)
 
   useGSAP(
     () => {
       const panel = panelRef.current
-      const logo = logoRef.current
       const proofField = proofFieldRef.current
 
-      if (!panel || !logo || !proofField) return
+      if (!panel || !proofField) return
 
       const proofCards = gsap.utils.toArray<HTMLElement>('[data-hero-proof]', proofField)
       const gravityCards = gsap.utils.toArray<HTMLElement>('[data-gravity-card]', proofField)
@@ -28,19 +25,12 @@ const HeroVisual = () => {
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       const supportsCursorMotion = window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
-      if (reducedMotion) {
-        gsap.set(logo, { clearProps: 'all' })
-        gsap.set(proofCards, { autoAlpha: 1 })
+      if (reducedMotion || !supportsCursorMotion) {
+        gsap.set(proofCards, { clearProps: 'all' })
         return
       }
 
       gsap.set(panel, { perspective: 1000 })
-
-      gsap.fromTo(
-        logo,
-        { autoAlpha: 0, y: 18, scale: 0.96 },
-        { autoAlpha: 1, y: 0, scale: 1, duration: 0.8, ease: 'power3.out' },
-      )
 
       gsap.fromTo(
         proofCards,
@@ -58,10 +48,19 @@ const HeroVisual = () => {
 
       if (!supportsCursorMotion) return
 
-      const moveLogoX = gsap.quickTo(logo, 'x', { duration: 0.7, ease: 'power3.out' })
-      const moveLogoY = gsap.quickTo(logo, 'y', { duration: 0.7, ease: 'power3.out' })
-      const rotateLogoX = gsap.quickTo(logo, 'rotationX', { duration: 0.7, ease: 'power3.out' })
-      const rotateLogoY = gsap.quickTo(logo, 'rotationY', { duration: 0.7, ease: 'power3.out' })
+      const logo = panel.querySelector<HTMLElement>('img')
+      const moveLogoX = logo
+        ? gsap.quickTo(logo, 'x', { duration: 0.7, ease: 'power3.out' })
+        : () => {}
+      const moveLogoY = logo
+        ? gsap.quickTo(logo, 'y', { duration: 0.7, ease: 'power3.out' })
+        : () => {}
+      const rotateLogoX = logo
+        ? gsap.quickTo(logo, 'rotationX', { duration: 0.7, ease: 'power3.out' })
+        : () => {}
+      const rotateLogoY = logo
+        ? gsap.quickTo(logo, 'rotationY', { duration: 0.7, ease: 'power3.out' })
+        : () => {}
       const gravityControllers = gravityCards.map((card) => ({
         card,
         moveX: gsap.quickTo(card, 'x', { duration: 0.7, ease: 'power3.out' }),
@@ -134,16 +133,7 @@ const HeroVisual = () => {
         </div>
       </div>
 
-      <Image
-        ref={logoRef}
-        src="/images/dashboard/hero-logo.webp"
-        alt="نشان صندوق"
-        width={500}
-        height={520}
-        priority
-        sizes="(max-width: 1024px) 90vw, 520px"
-        className="h-auto w-[min(90%,520px)] text-brand-500 will-change-transform transform-3d"
-      />
+      {children}
     </div>
   )
 }

@@ -35,9 +35,10 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
       if (paths.length === 0) return
 
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const isMobile = window.matchMedia('(max-width: 768px)').matches
       const supportsHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
-      if (reducedMotion) {
+      if (reducedMotion || isMobile) {
         gsap.set(paths, { clearProps: 'clipPath,opacity' })
         return
       }

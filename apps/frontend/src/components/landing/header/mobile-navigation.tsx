@@ -2,22 +2,10 @@
 
 import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useRef, useState, useSyncExternalStore } from 'react'
+import { useRef, useState } from 'react'
 import Brand from './brand'
 import NavList from './nav'
 import styles from './mobile-navigation.module.css'
-
-const mobileBreakpoint = '(max-width: 767px)'
-
-const subscribeToMobileBreakpoint = (onChange: () => void) => {
-  const mediaQuery = window.matchMedia(mobileBreakpoint)
-  mediaQuery.addEventListener('change', onChange)
-  return () => mediaQuery.removeEventListener('change', onChange)
-}
-
-const getMobileBreakpointSnapshot = () => window.matchMedia(mobileBreakpoint).matches
-const getServerBreakpointSnapshot = () => false
 
 const MobileNavigationContent = () => {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -97,7 +85,7 @@ const MobileNavigationContent = () => {
           <NavList />
         </div>
         <Link
-          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-brand-500 px-4 text-white"
+          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-brand-600 px-4 text-white"
           href="/login"
           onClick={closeMenu}
         >
@@ -109,14 +97,7 @@ const MobileNavigationContent = () => {
 }
 
 const MobileNavigation = () => {
-  const pathname = usePathname()
-  const isMobile = useSyncExternalStore(
-    subscribeToMobileBreakpoint,
-    getMobileBreakpointSnapshot,
-    getServerBreakpointSnapshot,
-  )
-
-  return <MobileNavigationContent key={`${isMobile ? 'mobile' : 'desktop'}:${pathname}`} />
+  return <MobileNavigationContent />
 }
 
 export default MobileNavigation

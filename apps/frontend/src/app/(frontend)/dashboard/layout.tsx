@@ -1,4 +1,5 @@
 import configPromise from '@payload-config'
+import { GeistMono } from 'geist/font/mono'
 import { Menu } from 'lucide-react'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
@@ -12,6 +13,7 @@ import {
   getLoginUrl,
   getSafeReturnUrl,
 } from '@/utilities/auth-return-url'
+import { cn } from '@/utilities/ui'
 
 export const metadata: Metadata = {
   robots: {
@@ -37,7 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen w-full bg-[#F8FAFC] text-slate-800 antialiased" dir="rtl">
+      <div className={cn('flex min-h-screen w-full bg-[#F8FAFC] text-slate-800 antialiased', GeistMono.variable)} dir="rtl">
         <AppSidebar />
         <SidebarInset className="flex min-w-0 flex-1 flex-col bg-[#F8FAFC]">
           <SidebarTrigger

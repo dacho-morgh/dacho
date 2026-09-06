@@ -29,6 +29,7 @@ const Reveal = ({ children, className, delay = 0.3, distance = 48 }: RevealProps
 
   useGSAP(
     () => {
+      if (typeof window === 'undefined' || window.matchMedia('(max-width: 767px)').matches) return
       const wrapper = wrapperRef.current
       if (!wrapper) return
 

@@ -374,6 +374,29 @@ const ShapeGrid = ({
       hoveredSquare.current = null
     }
 
+    const isMobileOrReduced =
+      window.matchMedia('(max-width: 768px)').matches ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    if (isMobileOrReduced) {
+      drawGrid()
+      return () => {
+        window.removeEventListener('resize', resizeCanvas)
+      }
+    }
+
+    let isVisible = true
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisible = entry.isIntersecting
+      if (isVisible && !requestRef.current) {
+        requestRef.current = requestAnimationFrame(updateAnimation)
+      } else if (!isVisible && requestRef.current) {
+        cancelAnimationFrame(requestRef.current)
+        requestRef.current = null
+      }
+    })
+    observer.observe(canvas)
+
     canvas.addEventListener('mousemove', handleMouseMove)
     canvas.addEventListener('mouseleave', handleMouseLeave)
 
@@ -381,7 +404,10 @@ const ShapeGrid = ({
 
     return () => {
       window.removeEventListener('resize', resizeCanvas)
-      cancelAnimationFrame(requestRef.current)
+      observer.disconnect()
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current)
+      }
       canvas.removeEventListener('mousemove', handleMouseMove)
       canvas.removeEventListener('mouseleave', handleMouseLeave)
     }

@@ -1,4 +1,3 @@
-import { GeistMono } from 'geist/font/mono'
 import type { Metadata, Viewport } from 'next'
 import localFont from 'next/font/local'
 import React from 'react'
@@ -9,17 +8,17 @@ import { Providers } from '@/providers'
 import { InitTheme } from '@/providers/Theme/InitTheme'
 import { siteMetadata, siteViewport } from '@/utilities/siteMetadata'
 import './globals.css'
-import { cn } from '@/utilities/ui'
 
 const yekanBakh = localFont({
   src: '../../../public/fonts/YekanBakhFaNum-VF.ttf',
   variable: '--font-yekan-bakh',
+  display: 'swap',
 })
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
-      className={cn(yekanBakh.variable, GeistMono.variable)}
+      className={yekanBakh.variable}
       dir="rtl"
       lang="fa"
       data-theme="light"

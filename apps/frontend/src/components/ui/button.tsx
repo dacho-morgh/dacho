@@ -19,9 +19,9 @@ const buttonVariants = cva(
       variant: {
         // --- FILL STYLES ---
         default:
-          "border-transparent bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700 disabled:bg-neutral-200 disabled:text-neutral-300",
+          "border-transparent bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-900 disabled:bg-neutral-200 disabled:text-neutral-300",
         primary:
-          "border-transparent bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700 disabled:bg-neutral-200 disabled:text-neutral-300",
+          "border-transparent bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-900 disabled:bg-neutral-200 disabled:text-neutral-300",
         gray:
           "border-transparent bg-neutral-100 text-neutral-600 hover:bg-neutral-300 hover:text-neutral-700 active:bg-neutral-400 active:text-neutral-700 disabled:bg-neutral-100 disabled:text-neutral-300",
         secondary:

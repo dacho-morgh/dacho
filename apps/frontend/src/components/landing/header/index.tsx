@@ -20,6 +20,7 @@ const Header = () => {
   useGSAP(
     () => {
       if (pathname?.startsWith('/dashboard')) return
+      if (typeof window === 'undefined' || window.matchMedia('(max-width: 767px)').matches) return
 
       const media = gsap.matchMedia()
       media.add('(min-width: 768px)', () => {

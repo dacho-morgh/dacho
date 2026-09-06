@@ -13,7 +13,7 @@ const HeroProofCard = ({ metric, message, className }: HeroProofCardProps) => {
       dir="rtl"
       data-hero-proof
       className={cn(
-        'absolute inset-0 flex items-center gap-0.5 rounded-[14px] border border-white bg-white/20 p-3 opacity-0 shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-[15px] will-change-transform sm:gap-1 sm:rounded-[18px] sm:p-4 lg:rounded-[20px] lg:p-5',
+        'absolute inset-0 flex items-center gap-0.5 rounded-[14px] border border-white bg-white/20 p-3 shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-[15px] will-change-transform sm:gap-1 sm:rounded-[18px] sm:p-4 lg:rounded-[20px] lg:p-5 lg:opacity-0',
         className,
       )}
     >
@@ -23,6 +23,7 @@ const HeroProofCard = ({ metric, message, className }: HeroProofCardProps) => {
         <span className="size-6 rounded-full border-2 border-white bg-linear-to-br from-neutral-300 to-neutral-700 sm:size-8 lg:size-9" />
       </div>
       <Typography
+        as="span"
         variant="24/bold"
         color="neutral-600"
         className="text-[18px] leading-7 whitespace-nowrap sm:text-[20px] sm:leading-8 lg:text-[24px] lg:leading-9"
@@ -30,6 +31,7 @@ const HeroProofCard = ({ metric, message, className }: HeroProofCardProps) => {
         {metric}
       </Typography>
       <Typography
+        as="span"
         variant="16/light"
         color="neutral-600"
         className="text-xs leading-5 whitespace-nowrap sm:text-sm sm:leading-6 lg:text-base lg:leading-7"

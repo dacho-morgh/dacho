@@ -1,21 +1,24 @@
 import type { Metadata } from 'next'
-import CommentsSection from '@/components/landing/home/comments-section'
-import EventsSection from '@/components/landing/home/events-section'
-import FaqSection from '@/components/landing/home/faq-section'
+import dynamic from 'next/dynamic'
 import HeroSection from '@/components/landing/home/hero-section'
 import LogoStripSection from '@/components/landing/home/logo-strip-section'
-import NewsSection from '@/components/landing/home/news-section'
-import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import ServicesSection from '@/components/landing/home/services-section'
-import ServicesDetailSection from '@/components/landing/home/services-detail-section'
 import Reveal from '@/components/landing/reveal'
-import ScrollProvider from '@/components/landing/scroll-provider'
 import { createPageMetadata } from '@/utilities/siteMetadata'
+
+const ScrollProvider = dynamic(() => import('@/components/landing/scroll-provider'))
+const EventsSection = dynamic(() => import('@/components/landing/home/events-section'))
+const ServicesDetailSection = dynamic(
+  () => import('@/components/landing/home/services-detail-section'),
+)
+const NewsSection = dynamic(() => import('@/components/landing/home/news-section'))
+const RecruitmentSection = dynamic(() => import('@/components/landing/home/recruitment-section'))
+const CommentsSection = dynamic(() => import('@/components/landing/home/comments-section'))
+const FaqSection = dynamic(() => import('@/components/landing/home/faq-section'))
 
 export const metadata: Metadata = createPageMetadata({ path: '/' })
 
-
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 
 export default function HomePage() {
   return (

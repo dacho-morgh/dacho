@@ -1,50 +1,13 @@
-'use client'
-
-import { useGSAP } from '@gsap/react'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { useRef } from 'react'
+import Image from 'next/image'
+import HeroScrollWrapper from '@/components/landing/home/hero-scroll-wrapper'
 import HeroVisual from '@/components/landing/home/hero-visual'
 import ShapeGrid from '@/components/landing/ShapeGrid'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 
-gsap.registerPlugin(useGSAP, ScrollTrigger)
-
 const HeroSection = () => {
-  const sectionRef = useRef<HTMLElement>(null)
-
-  useGSAP(
-    () => {
-      const section = sectionRef.current
-      if (!section) return
-
-      const media = gsap.matchMedia()
-
-      media.add('(min-width: 1024px) and (prefers-reduced-motion: no-preference)', () => {
-        gsap.to(section, {
-          paddingLeft: 'clamp(1rem, 6vw, 6rem)',
-          paddingRight: 'clamp(1rem, 6vw, 6rem)',
-          ease: 'none',
-          scrollTrigger: {
-            trigger: document.body,
-            start: 'top top',
-            end: '+=480',
-            scrub: 2,
-          },
-        })
-      })
-
-      return () => media.revert()
-    },
-    { scope: sectionRef },
-  )
-
   return (
-    <section
-      ref={sectionRef}
-      className="relative mx-auto w-full max-w-[1600px] overflow-hidden pt-25 will-change-[padding-left,padding-right] lg:h-200 lg:pt-0"
-    >
+    <HeroScrollWrapper>
       <div className="pointer-events-none absolute inset-0 z-0 lg:top-20">
         <ShapeGrid
           speed={0.1}
@@ -58,7 +21,20 @@ const HeroSection = () => {
       </div>
 
       <div className="relative z-10 mx-auto flex w-full flex-col lg:h-full lg:flex-row lg:items-center lg:justify-between">
-        <HeroVisual />
+        <HeroVisual>
+          <Image
+            src="/images/dashboard/hero-logo.webp"
+            alt="نشان صندوق"
+            width={500}
+            height={520}
+            priority
+            fetchPriority="high"
+            loading="eager"
+            decoding="sync"
+            sizes="(max-width: 768px) 350px, (max-width: 1024px) 450px, 520px"
+            className="h-auto w-[min(90%,520px)] text-brand-500 lg:will-change-transform lg:transform-3d"
+          />
+        </HeroVisual>
         <div className="flex w-full flex-1 flex-col items-end gap-8 px-4 text-right lg:order-1 lg:w-160 lg:gap-20 lg:px-10">
           <div className="ml-auto flex w-full max-w-150 flex-col items-end gap-4">
             <Typography
@@ -94,7 +70,7 @@ const HeroSection = () => {
           </div>
         </div>
       </div>
-    </section>
+    </HeroScrollWrapper>
   )
 }
 

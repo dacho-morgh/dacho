@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
         pathname: '/images/**',
       },
     ],
-    qualities: [100],
+    qualities: [75, 85, 100],
     remotePatterns: [
       ...[NEXT_PUBLIC_SERVER_URL /* 'https://example.com' */].map((item) => {
         const url = new URL(item)
@@ -60,6 +60,9 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: true,
   redirects,
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@payloadcms/ui', '@dacho/cms-core'],
+  },
   turbopack: {
     // Monorepo: `next` and the workspace packages are hoisted to the workspace
     // root, so Turbopack must resolve from there.

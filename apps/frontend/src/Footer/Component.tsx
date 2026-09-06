@@ -46,7 +46,7 @@ function NavColumn({
 }) {
   return (
     <div className={cn('flex min-w-0 flex-1 flex-col gap-4', className)}>
-      <Typography color="white" variant="20/bold">
+      <Typography as="h3" color="white" variant="20/bold">
         {heading}
       </Typography>
       <ul className="flex flex-col gap-2">
