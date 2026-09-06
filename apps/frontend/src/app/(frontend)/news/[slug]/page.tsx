@@ -95,11 +95,11 @@ export default async function NewsArticlePage({ params }: Args) {
 
       {draft && <LivePreviewListener />}
 
-      <article className="mx-auto flex w-full max-w-7xl flex-col gap-16 px-4 pt-10 pb-20 sm:px-6 lg:pt-14">
+      <article className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pt-25 pb-20 sm:px-6 lg:gap-12 lg:pt-30">
         <NewsBreadcrumb title={news.title} />
 
         <div className="grid items-center gap-10 lg:grid-cols-2">
-          <div className="relative aspect-[31/20] w-full overflow-hidden rounded-4xl bg-neutral-100">
+          <div className="relative aspect-31/20 w-full overflow-hidden rounded-4xl bg-neutral-100">
             {hasHeroImage ? (
               <Media
                 fill
@@ -127,20 +127,14 @@ export default async function NewsArticlePage({ params }: Args) {
             </Typography>
             <dl className="flex flex-col gap-4 text-neutral-500">
               <div className="flex items-center gap-2">
-                <NewsCalendarIcon
-                  aria-hidden="true"
-                  className="size-7 shrink-0 text-neutral-400"
-                />
+                <NewsCalendarIcon aria-hidden="true" className="size-7 shrink-0 text-neutral-400" />
                 <dt className="sr-only">تاریخ انتشار</dt>
                 <Typography as="dd" variant="16/regular" color="neutral-500">
                   {persianDateFormatter.format(new Date(publishedAt))}
                 </Typography>
               </div>
               <div className="flex items-center gap-2">
-                <NewsTimeIcon
-                  aria-hidden="true"
-                  className="size-7 shrink-0 text-neutral-400"
-                />
+                <NewsTimeIcon aria-hidden="true" className="size-7 shrink-0 text-neutral-400" />
                 <dt className="sr-only">زمان مطالعه</dt>
                 <Typography as="dd" variant="16/regular" color="neutral-500">
                   زمان مطالعه {readingMinutes.toLocaleString('fa-IR')} دقیقه

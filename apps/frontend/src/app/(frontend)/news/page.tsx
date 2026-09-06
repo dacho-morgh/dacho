@@ -7,17 +7,14 @@ import { NewsEmptyState } from '@/components/landing/news/news-empty-state'
 import { NewsBreadcrumb, NewsPageHeading } from '@/components/landing/news/news-page-header'
 import { createPageMetadata } from '@/utilities/siteMetadata'
 
-// Server-rendered rather than prerendered: this page has no dynamic params, so
-// a static build would query Payload at build time and require a live database.
-// Rendering on request keeps the database out of the build path (and avoids
-// serving an empty news archive after a database-less build).
-export const dynamic = 'force-dynamic'
-
 export const metadata: Metadata = createPageMetadata({
   title: 'اخبار',
-  description: 'آخرین اخبار، فرصت‌های صنعتی، داوری‌های تخصصی و رویدادهای کارخانه نوآوری صنایع انرژی بوشهر.',
+  description:
+    'آخرین اخبار، فرصت‌های صنعتی، داوری‌های تخصصی و رویدادهای کارخانه نوآوری صنایع انرژی بوشهر.',
   path: '/news',
 })
+
+export const revalidate = 60
 
 export default async function NewsPage() {
   const payload = await getPayload({ config: configPromise })
@@ -31,10 +28,9 @@ export default async function NewsPage() {
 
   return (
     <main className="overflow-x-clip bg-white">
-      <section className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 pt-10 pb-20 sm:px-6 lg:pt-14">
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 pt-25 pb-20 sm:px-6">
         <NewsBreadcrumb />
         <NewsPageHeading />
-
         {newsItems.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {newsItems.map((news) => (
