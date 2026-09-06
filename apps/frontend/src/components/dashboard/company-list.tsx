@@ -1,24 +1,12 @@
 'use client'
-
 import Image from 'next/image'
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
 import {
-  DashboardAddIcon,
-  DashboardFilterIcon,
-  DashboardMoreIcon,
-  DashboardSearchIcon,
-} from '@/components/icons'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
+  AdminListView,
+  AdminRowActions,
+  type AdminColumn,
+} from '@/components/dashboard/admin-list-view'
 import { Typography } from '@/components/ui/typography'
-
 type Company = {
   id: string
   name: string
@@ -75,131 +63,59 @@ const companies: Company[] = [
     activityAge: '۱ ماه پیش',
   },
 ]
-
-export function CompanyList() {
-  const [query, setQuery] = useState('')
-  const filtered = useMemo(
-    () => companies.filter((company) => Object.values(company).join(' ').includes(query)),
-    [query],
-  )
-  return (
-    <section className="flex flex-1 flex-col gap-4" dir="rtl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button size="48" className="min-w-[157px]" icon={<DashboardAddIcon className="size-6" />}>
-          <Typography variant="16/regular" color="white">
-            شرکت جدید
-          </Typography>
-        </Button>
-        <div className="flex gap-2">
-          <Button
-            variant="outline-gray"
-            size="48"
-            icon={<DashboardFilterIcon className="size-6" />}
-            aria-label="فیلتر"
-          />
-          <div className="relative">
-            <DashboardSearchIcon className="absolute right-3 top-3 size-6 text-neutral-400" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="h-12 w-[min(400px,70vw)] rounded-xl bg-white pr-11"
-              placeholder="جستجوی شرکت"
-            />
-          </div>
-        </div>
-      </div>
-      <div className="flex-1 overflow-x-auto rounded-xl border border-neutral-200 bg-white lg:min-h-[848px]">
-        <table className="w-full min-w-[1000px] border-collapse">
-          <thead>
-            <tr className="h-11 border-b border-neutral-200 bg-white">
-              {['نام شرکت', 'مدیر عامل', 'نوع شرکت', 'آدرس', 'سال فعالیت', ''].map((label) => (
-                <th key={label} className="px-4 text-right">
-                  <Typography variant="14/semibold" color="secondary">
-                    {label || <span className="sr-only">عملیات</span>}
-                  </Typography>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((company) => (
-              <tr key={company.id} className="h-[72px] border-b border-neutral-100 last:border-0">
-                <td className="px-4">
-                  <Link
-                    href={`/dashboard/admin/companies/${company.id}`}
-                    className="flex items-center gap-2"
-                  >
-                    <Image
-                      src={company.avatar}
-                      alt=""
-                      width={40}
-                      height={40}
-                      className="size-10 rounded-lg object-cover"
-                    />
-                    <Typography variant="14/semibold" color="secondary">
-                      {company.name}
-                    </Typography>
-                  </Link>
-                </td>
-                <Cell>{company.ceo}</Cell>
-                <Cell>
-                  <Typography
-                    variant="14/regular"
-                    color="brand-600"
-                    className="inline-block rounded-lg bg-brand-50 px-3 py-1"
-                  >
-                    {company.companyType}
-                  </Typography>
-                </Cell>
-                <Cell>{company.address}</Cell>
-                <Cell>{company.activityAge}</Cell>
-                <td className="px-4">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="text-gray" size="icon-sm" aria-label="عملیات">
-                        <DashboardMoreIcon className="size-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/admin/companies/${company.id}`}>
-                          <Typography variant="14/regular">مشاهده</Typography>
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Typography variant="14/regular">ویرایش</Typography>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Typography variant="14/regular" color="error">
-                          حذف
-                        </Typography>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className="h-60 text-center">
-                  <Typography variant="16/regular" color="muted">
-                    شرکتی با این مشخصات پیدا نشد
-                  </Typography>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-}
-function Cell({ children }: { children: React.ReactNode }) {
-  return (
-    <td className="px-4">
-      <Typography variant="14/regular" color="secondary">
-        {children}
+const text = (value: string) => (
+  <Typography variant="14/regular" color="secondary">
+    {value}
+  </Typography>
+)
+const columns: AdminColumn<Company>[] = [
+  {
+    id: 'name',
+    header: 'نام شرکت',
+    render: (item) => (
+      <Link href={`/dashboard/admin/companies/${item.id}`} className="flex items-center gap-2">
+        <Image
+          src={item.avatar}
+          alt=""
+          width={40}
+          height={40}
+          className="size-10 rounded-lg object-cover"
+        />
+        {text(item.name)}
+      </Link>
+    ),
+  },
+  { id: 'ceo', header: 'مدیر عامل', render: (item) => text(item.ceo) },
+  {
+    id: 'type',
+    header: 'نوع شرکت',
+    render: (item) => (
+      <Typography
+        variant="14/regular"
+        color="brand-600"
+        className="inline-block rounded-lg bg-brand-50 px-3 py-1"
+      >
+        {item.companyType}
       </Typography>
-    </td>
+    ),
+  },
+  { id: 'address', header: 'آدرس', render: (item) => text(item.address) },
+  { id: 'activity', header: 'سال فعالیت', render: (item) => text(item.activityAge) },
+  {
+    id: 'actions',
+    render: (item) => <AdminRowActions viewHref={`/dashboard/admin/companies/${item.id}`} />,
+  },
+]
+export function CompanyList() {
+  return (
+    <AdminListView
+      title="شرکت ها"
+      addLabel="شرکت جدید"
+      searchPlaceholder="جستجوی شرکت"
+      items={companies}
+      getSearchText={(item) => Object.values(item).join(' ')}
+      getKey={(item) => item.id}
+      columns={columns}
+    />
   )
 }

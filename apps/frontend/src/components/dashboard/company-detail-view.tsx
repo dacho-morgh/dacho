@@ -77,10 +77,10 @@ export function CompanyDetailView({ id }: { id: string }) {
             </div>
             <div className="flex gap-2">
               <Button variant="outline-gray" size="40">
-                بارگذاری لوگو
+                <Typography variant="14/regular">بارگذاری لوگو</Typography>
               </Button>
               <Button variant="text-gray" size="40">
-                حذف لوگو
+                <Typography variant="14/regular">حذف لوگو</Typography>
               </Button>
             </div>
           </div>
@@ -142,11 +142,11 @@ function InfoSection({
         </Typography>
         {edit ? (
           <Button variant="outline-gray" size="32" icon={<DashboardEditIcon className="size-5" />}>
-            ویرایش
+            <Typography variant="14/regular">ویرایش</Typography>
           </Button>
         ) : add ? (
           <Button variant="outline-gray" size="32" icon={<DashboardAddIcon className="size-5" />}>
-            افزودن آدرس
+            <Typography variant="14/regular">افزودن آدرس</Typography>
           </Button>
         ) : null}
       </div>
