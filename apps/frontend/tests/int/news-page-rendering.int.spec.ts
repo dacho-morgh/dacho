@@ -10,10 +10,10 @@ vi.mock('@/components/landing/news/news-page-header', () => ({
   NewsPageHeading: vi.fn(),
 }))
 
-import { dynamic } from '@/app/(frontend)/news/page'
+import { revalidate } from '@/app/(frontend)/news/page'
 
 describe('news listing rendering', () => {
-  it('waits until request time before querying Payload', () => {
-    expect(dynamic).toBe('force-dynamic')
+  it('revalidates the static page every minute', () => {
+    expect(revalidate).toBe(60)
   })
 })

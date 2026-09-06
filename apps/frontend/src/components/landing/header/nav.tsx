@@ -11,7 +11,11 @@ const navItems = [
   { label: 'تماس با ما', href: '/connect' },
 ]
 
-const NavList = () => {
+interface NavListProps {
+  onNavigate?: () => void
+}
+
+const NavList = ({ onNavigate }: NavListProps) => {
   const pathname = usePathname()
 
   return (
@@ -34,6 +38,7 @@ const NavList = () => {
               : 'false'
           }
           className="cursor-pointer self-start px-0.5 md:self-auto"
+          onClick={onNavigate}
         >
           <Typography
             as="span"

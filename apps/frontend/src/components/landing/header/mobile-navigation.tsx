@@ -82,7 +82,7 @@ const MobileNavigationContent = () => {
           </button>
         </div>
         <div className="mt-6" dir="rtl">
-          <NavList />
+          <NavList onNavigate={closeMenu} />
         </div>
         <Link
           className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-brand-600 px-4 text-white"
