@@ -6,7 +6,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import React from 'react'
-import { AppSidebar } from '@/components/dashboard/app-sidebar'
+import { DashboardSidebar } from '@/components/dashboard/sidebar-shell'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
 import {
   DASHBOARD_RETURN_URL_HEADER,
@@ -40,7 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <SidebarProvider defaultOpen={true}>
       <div className={cn('flex min-h-screen w-full bg-[#F8FAFC] text-slate-800 antialiased', GeistMono.variable)} dir="rtl">
-        <AppSidebar />
+        <DashboardSidebar />
         <SidebarInset className="flex min-w-0 flex-1 flex-col bg-[#F8FAFC]">
           <SidebarTrigger
             aria-label="باز کردن منو"
