@@ -8,8 +8,6 @@ import {
   FooterLocationIcon,
 } from '@/components/icons'
 import { Typography } from '@/components/ui/typography'
-import { buildSafe } from '@/utilities/buildSafe'
-import { getCachedGlobal } from '@/utilities/getGlobals'
 import { cn } from '@/utilities/ui'
 
 type FooterLink = {
@@ -25,7 +23,7 @@ const SERVICES_FALLBACK: FooterLink[] = [
 
 const PAGES_FALLBACK: FooterLink[] = [
   { label: 'خانه', href: '/' },
-  { label: 'رویداد ها و همایش ها', href: '/events' },
+  { label: 'رویداد ها و همایش ها', href: '#events' },
   { label: 'اخبار', href: '/news' },
   { label: 'درباره ما', href: '/about' },
   { label: 'تماس با ما', href: '/connect' },
@@ -78,20 +76,7 @@ function ContactRow({ icon, text }: { icon: React.ReactNode; text: string }) {
 }
 
 export async function Footer() {
-  const footerData = await buildSafe('footer global', () => getCachedGlobal('footer', 1)())
-
-  // Map CMS navItems to the «صفحات» column with static Figma fallbacks.
-  const cmsItems: FooterLink[] = Array.isArray(footerData?.navItems)
-    ? footerData.navItems.map((item: { link?: { url?: string | null; label?: string } }) => ({
-        label: item?.link?.label || '',
-        href: item?.link?.url || '#',
-      }))
-    : []
-
-  const configuredPages = cmsItems.length > 0 ? cmsItems : PAGES_FALLBACK
-  const pages = configuredPages.some((item) => item.href === '/connect')
-    ? configuredPages
-    : [...configuredPages, { label: 'تماس با ما', href: '/connect' }]
+  const pages = PAGES_FALLBACK
 
   return (
     <footer className="bg-neutral-800 py-12 lg:py-30">
@@ -103,14 +88,8 @@ export async function Footer() {
             {/* Brand block */}
             <div className="flex flex-col gap-6">
               <div className="flex items-center gap-4">
-                <BrandFooterSandoqLogomark
-                  aria-hidden="true"
-                  className="h-8 w-auto text-white"
-                />
-                <BrandFooterSandoqLogotype
-                  aria-label="صندوق"
-                  className="h-8 w-auto text-white"
-                />
+                <BrandFooterSandoqLogomark aria-hidden="true" className="h-8 w-auto text-white" />
+                <BrandFooterSandoqLogotype aria-label="صندوق" className="h-8 w-auto text-white" />
               </div>
               <Typography color="neutral-400" variant="16/regular">
                 {DESCRIPTION_FALLBACK}
@@ -130,10 +109,7 @@ export async function Footer() {
               />
               <ContactRow
                 icon={
-                  <FooterCallIcon
-                    aria-hidden="true"
-                    className="size-6 shrink-0 text-neutral-400"
-                  />
+                  <FooterCallIcon aria-hidden="true" className="size-6 shrink-0 text-neutral-400" />
                 }
                 text={PHONE_FALLBACK}
               />
