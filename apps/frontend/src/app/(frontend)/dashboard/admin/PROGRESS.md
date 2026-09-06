@@ -14,4 +14,10 @@
 
 Backend integration is explicitly deferred; current content is typed presentation data.
 
+## Phase 3
+
+- [x] UI-only request evaluation screen, Figma node `30851:15307`
+- [x] Route: `/dashboard/admin/requests/[id]/evaluation`
+- Backend integration deferred.
+
 Validation: Prettier, targeted ESLint, and TypeScript passed.

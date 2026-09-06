@@ -11,7 +11,7 @@ const steps = [
   'بررسی توسط کارشناسان صندوق',
   'بررسی توسط کارشناسان صندوق',
 ]
-export function AdminRequestDetail() {
+export function AdminRequestDetail({ id }: { id: string }) {
   return (
     <main className="flex min-w-0 flex-1 flex-col gap-4 p-4 lg:pt-10" dir="rtl">
       <Link href="/dashboard/admin/requests">
@@ -72,10 +72,12 @@ export function AdminRequestDetail() {
               عسلویه، بلوار سیراف، محل دائمی برگزاری همایش‌ها و نمایش‌های بین‌المللی
             </Typography>
           </div>
-          <Button size="40" className="self-end lg:self-center">
-            <Typography variant="14/regular" color="white">
-              ارزیابی درخواست
-            </Typography>
+          <Button asChild size="40" className="self-end lg:self-center">
+            <Link href={`/dashboard/admin/requests/${id}/evaluation`}>
+              <Typography variant="14/regular" color="white">
+                ارزیابی درخواست
+              </Typography>
+            </Link>
           </Button>
         </div>
         <div className="my-8 h-px bg-neutral-200" />
