@@ -45,7 +45,7 @@ const DetailCard = ({ title, className, children, bullets = [], index }: DetailC
 )
 
 const ServicesDetailSection = () => (
-  <section className="flex w-full flex-col gap-10 px-4 py-24 sm:px-6 sm:py-32 lg:h-615 lg:px-20 lg:py-60">
+  <section className="flex w-full flex-col gap-10 px-4 py-24 sm:px-6 sm:py-32 lg:h-640 lg:px-20 lg:py-60">
     <RecruitmentSection variant="blue" />
 
     <ServicesScrollStack
