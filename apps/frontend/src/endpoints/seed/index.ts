@@ -245,6 +245,84 @@ export const seed = async ({
     payload.updateGlobal({
       slug: 'footer',
       data: {
+        description:
+          'مکان محصول فلسفه توانبخشی ستون نامفهوم محیط هدف داده مجله توسعه برنامه‌نویسی یکپارچگی طبیعت روانشناسی',
+        address: 'بوشهر، بهمنی، خیابان ماهینی، سه راه دانشجو...',
+        phone: '077 - 1234 56 78  , 077 - 1234 78 98',
+        copyright: '© تمامی حقوق این سایت مربوط به کارخانه نوآوری صنایع انرژی بوشهر می‌باشد.',
+        columns: [
+          {
+            title: 'صفحات',
+            navItems: [
+              {
+                link: {
+                  type: 'custom',
+                  label: 'خانه',
+                  url: '/',
+                },
+              },
+              {
+                link: {
+                  type: 'custom',
+                  label: 'رویداد ها و همایش ها',
+                  url: '#events',
+                },
+              },
+              {
+                link: {
+                  type: 'custom',
+                  label: 'اخبار',
+                  url: '/news',
+                },
+              },
+              {
+                link: {
+                  type: 'custom',
+                  label: 'درباره ما',
+                  url: '/about',
+                },
+              },
+              {
+                link: {
+                  type: 'custom',
+                  label: 'تماس با ما',
+                  url: '/connect',
+                },
+              },
+            ],
+          },
+          {
+            title: 'خدمات',
+            navItems: [
+              {
+                link: {
+                  type: 'custom',
+                  label: 'خدمات تامین مالی',
+                  url: '/',
+                },
+              },
+              {
+                link: {
+                  type: 'custom',
+                  label: 'خدمات دانش بنیان',
+                  url: '/',
+                },
+              },
+              {
+                link: {
+                  type: 'custom',
+                  label: 'خدمات تجاری سازی و ورود به صنعت و بازار',
+                  url: '/',
+                },
+              },
+            ],
+          },
+        ],
+        socialLinks: [
+          { platform: 'شبکه اجتماعی ۱', url: '/' },
+          { platform: 'شبکه اجتماعی ۲', url: '/' },
+          { platform: 'شبکه اجتماعی ۳', url: '/' },
+        ],
         navItems: [
           {
             link: {

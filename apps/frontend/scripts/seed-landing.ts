@@ -581,6 +581,30 @@ async function main(): Promise<void> {
   await payload.updateGlobal({
     slug: 'footer',
     data: {
+      description:
+        'مکان محصول فلسفه توانبخشی ستون نامفهوم محیط هدف داده مجله توسعه برنامه‌نویسی یکپارچگی طبیعت روانشناسی',
+      address: 'بوشهر، بهمنی، خیابان ماهینی، سه راه دانشجو...',
+      phone: '077 - 1234 56 78  , 077 - 1234 78 98',
+      copyright: '© تمامی حقوق این سایت مربوط به کارخانه نوآوری صنایع انرژی بوشهر می‌باشد.',
+      columns: [
+        {
+          title: 'صفحات',
+          navItems,
+        },
+        {
+          title: 'خدمات',
+          navItems: [
+            customLink('خدمات تامین مالی', '/'),
+            customLink('خدمات دانش بنیان', '/'),
+            customLink('خدمات تجاری سازی و ورود به صنعت و بازار', '/'),
+          ],
+        },
+      ],
+      socialLinks: [
+        { platform: 'شبکه اجتماعی ۱', url: '/' },
+        { platform: 'شبکه اجتماعی ۲', url: '/' },
+        { platform: 'شبکه اجتماعی ۳', url: '/' },
+      ],
       navItems: [...navItems, customLink('خدمات', '/#services')],
     },
     context: { disableRevalidate: true },

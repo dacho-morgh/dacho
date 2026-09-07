@@ -2325,6 +2325,52 @@ export interface Header {
  */
 export interface Footer {
   id: number;
+  /**
+   * لوگوی فوتر (در صورت عدم انتخاب، از لوگوی پیش‌فرض استفاده می‌شود)
+   */
+  logo?: (number | null) | Media;
+  /**
+   * متن لوگوتایپ یا متن جایگزین برای دسترسی‌پذیری
+   */
+  logoText?: string | null;
+  /**
+   * متن توضیحات زیر لوگو در فوتر
+   */
+  description?: string | null;
+  /**
+   * آدرس دفتر یا شرکت در فوتر
+   */
+  address?: string | null;
+  /**
+   * شماره‌های تماس در فوتر
+   */
+  phone?: string | null;
+  columns?:
+    | {
+        title: string;
+        navItems?:
+          | {
+              link: {
+                type?: ('reference' | 'custom') | null;
+                newTab?: boolean | null;
+                reference?:
+                  | ({
+                      relationTo: 'pages';
+                      value: number | Page;
+                    } | null)
+                  | ({
+                      relationTo: 'posts';
+                      value: number | Post;
+                    } | null);
+                url?: string | null;
+                label: string;
+              };
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
   navItems?:
     | {
         link: {
@@ -2342,6 +2388,21 @@ export interface Footer {
           url?: string | null;
           label: string;
         };
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * متن حقوق و کپی‌رایت در انتهای فوتر
+   */
+  copyright?: string | null;
+  socialLinks?:
+    | {
+        platform: string;
+        url: string;
+        /**
+         * تصویر یا آیکون شبکه اجتماعی (PNG یا SVG)
+         */
+        icon?: (number | null) | Media;
         id?: string | null;
       }[]
     | null;
@@ -2449,6 +2510,31 @@ export interface HeaderSelect<T extends boolean = true> {
  * via the `definition` "footer_select".
  */
 export interface FooterSelect<T extends boolean = true> {
+  logo?: T;
+  logoText?: T;
+  description?: T;
+  address?: T;
+  phone?: T;
+  columns?:
+    | T
+    | {
+        title?: T;
+        navItems?:
+          | T
+          | {
+              link?:
+                | T
+                | {
+                    type?: T;
+                    newTab?: T;
+                    reference?: T;
+                    url?: T;
+                    label?: T;
+                  };
+              id?: T;
+            };
+        id?: T;
+      };
   navItems?:
     | T
     | {
@@ -2461,6 +2547,15 @@ export interface FooterSelect<T extends boolean = true> {
               url?: T;
               label?: T;
             };
+        id?: T;
+      };
+  copyright?: T;
+  socialLinks?:
+    | T
+    | {
+        platform?: T;
+        url?: T;
+        icon?: T;
         id?: T;
       };
   updatedAt?: T;

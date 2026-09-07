@@ -4,6 +4,8 @@ import * as migration_20260823_201906_news_clone_of_posts from './20260823_20190
 import * as migration_20260825_212808_add_roles_and_company_to_users from './20260825_212808_add_roles_and_company_to_users';
 import * as migration_20260831_213521_add_roles_and_services_fields from './20260831_213521_add_roles_and_services_fields';
 import * as migration_20260903_081500_backfill_applicant_usernames from './20260903_081500_backfill_applicant_usernames';
+import * as migration_20260907_081150_add_footer_customization_fields from './20260907_081150_add_footer_customization_fields';
+import * as migration_20260907_084600_add_social_links_icon from './20260907_084600_add_social_links_icon';
 
 export const migrations = [
   {
@@ -29,11 +31,21 @@ export const migrations = [
   {
     up: migration_20260831_213521_add_roles_and_services_fields.up,
     down: migration_20260831_213521_add_roles_and_services_fields.down,
-    name: '20260831_213521_add_roles_and_services_fields'
+    name: '20260831_213521_add_roles_and_services_fields',
   },
   {
     up: migration_20260903_081500_backfill_applicant_usernames.up,
     down: migration_20260903_081500_backfill_applicant_usernames.down,
     name: '20260903_081500_backfill_applicant_usernames',
+  },
+  {
+    up: migration_20260907_081150_add_footer_customization_fields.up,
+    down: migration_20260907_081150_add_footer_customization_fields.down,
+    name: '20260907_081150_add_footer_customization_fields',
+  },
+  {
+    up: migration_20260907_084600_add_social_links_icon.up,
+    down: migration_20260907_084600_add_social_links_icon.down,
+    name: '20260907_084600_add_social_links_icon'
   },
 ];
