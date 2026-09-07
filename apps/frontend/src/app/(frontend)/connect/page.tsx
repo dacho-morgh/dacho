@@ -7,9 +7,6 @@ import { Typography } from '@/components/ui/typography'
 import { getFormIdByTitle } from '@/utilities/getFormId'
 import { createPageMetadata } from '@/utilities/siteMetadata'
 
-// Server-rendered per request: the form id comes from the database (seeded via
-// `scripts/seed-forms.ts`), so the page must not be prerendered at build time.
-export const revalidate = 60
 const MESSAGE_FORM_TITLE = 'فرم تماس با ما'
 
 export const metadata: Metadata = createPageMetadata({
