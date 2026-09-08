@@ -16,6 +16,8 @@ const MobileNavigationContent = () => {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+
     const mediaQuery = window.matchMedia(mobileBreakpoint)
     const closeOnDesktop = (event: MediaQueryListEvent) => {
       if (!event.matches) setMenuOpen(false)
