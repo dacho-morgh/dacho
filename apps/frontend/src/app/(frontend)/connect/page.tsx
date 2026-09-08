@@ -9,6 +9,8 @@ import { createPageMetadata } from '@/utilities/siteMetadata'
 
 const MESSAGE_FORM_TITLE = 'فرم تماس با ما'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = createPageMetadata({
   title: 'تماس با ما',
   description:

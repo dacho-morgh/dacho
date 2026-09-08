@@ -8,16 +8,20 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Typography } from '@/components/ui/typography'
+import { buildSafe } from '@/utilities/buildSafe'
 
 const FaqSection = async () => {
-  const payload = await getPayload({ config: configPromise })
-  const { docs: faqs } = await payload.find({
-    collection: 'faq',
-    pagination: false,
-    sort: 'priority',
+  const faqs = await buildSafe('home FAQ', async () => {
+    const payload = await getPayload({ config: configPromise })
+    const { docs } = await payload.find({
+      collection: 'faq',
+      pagination: false,
+      sort: 'priority',
+    })
+    return docs
   })
 
-  if (faqs.length === 0) return null
+  if (!faqs || faqs.length === 0) return null
 
   return (
     <section className="flex w-full flex-col items-center gap-10 bg-neutral-50 px-4 py-24 sm:px-6 sm:py-32 lg:min-h-245 lg:px-0 lg:py-40">

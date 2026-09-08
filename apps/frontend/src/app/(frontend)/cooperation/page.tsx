@@ -6,6 +6,7 @@ import { createPageMetadata } from '@/utilities/siteMetadata'
 
 // Server-rendered per request: the form id comes from the database (seeded via
 // `scripts/seed-forms.ts`), so the page must not be prerendered at build time.
+export const dynamic = 'force-dynamic'
 
 const COOPERATION_FORM_TITLE = 'درخواست همکاری'
 

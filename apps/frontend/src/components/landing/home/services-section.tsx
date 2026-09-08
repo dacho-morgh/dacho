@@ -9,20 +9,24 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel'
 import { Typography } from '@/components/ui/typography'
+import { buildSafe } from '@/utilities/buildSafe'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
 import ServiceCard from './service-card'
 
 const ServicesSection = async () => {
-  const payload = await getPayload({ config: configPromise })
-  const { docs: services } = await payload.find({
-    collection: 'services',
-    depth: 1,
-    limit: 5,
-    overrideAccess: false,
-    sort: 'createdAt',
+  const services = await buildSafe('home services', async () => {
+    const payload = await getPayload({ config: configPromise })
+    const { docs } = await payload.find({
+      collection: 'services',
+      depth: 1,
+      limit: 5,
+      overrideAccess: false,
+      sort: 'createdAt',
+    })
+    return docs
   })
 
-  if (services.length === 0) return null
+  if (!services || services.length === 0) return null
 
   return (
     <section className="flex w-full flex-col items-center gap-6 overflow-x-clip py-16 md:py-24 lg:py-28 2xl:py-32">

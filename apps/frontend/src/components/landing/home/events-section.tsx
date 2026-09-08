@@ -3,6 +3,7 @@ import configPromise from '@payload-config'
 import { convertLexicalToPlaintext } from '@payloadcms/richtext-lexical/plaintext'
 import { getPayload } from 'payload'
 import { Typography } from '@/components/ui/typography'
+import { buildSafe } from '@/utilities/buildSafe'
 import type { EventCardData } from './event-card'
 import EventsCarousel from './events-carousel'
 
@@ -51,23 +52,29 @@ const toCardData = (item: Event | Exhibition, kind: 'event' | 'exhibition'): Eve
 })
 
 const EventsSection = async () => {
-  const payload = await getPayload({ config: configPromise })
-  const [eventsResult, exhibitionsResult] = await Promise.all([
-    payload.find({
-      collection: 'events',
-      depth: 1,
-      limit: 20,
-      overrideAccess: false,
-      sort: 'startDate',
-    }),
-    payload.find({
-      collection: 'exhibitions',
-      depth: 1,
-      limit: 20,
-      overrideAccess: false,
-      sort: 'startDate',
-    }),
-  ])
+  const results = await buildSafe('home events', async () => {
+    const payload = await getPayload({ config: configPromise })
+    return Promise.all([
+      payload.find({
+        collection: 'events',
+        depth: 1,
+        limit: 20,
+        overrideAccess: false,
+        sort: 'startDate',
+      }),
+      payload.find({
+        collection: 'exhibitions',
+        depth: 1,
+        limit: 20,
+        overrideAccess: false,
+        sort: 'startDate',
+      }),
+    ])
+  })
+
+  if (!results) return null
+
+  const [eventsResult, exhibitionsResult] = results
 
   const items = [
     ...eventsResult.docs.map((event) => toCardData(event, 'event')),

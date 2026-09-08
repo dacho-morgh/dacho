@@ -5,6 +5,7 @@ import NewsCard from '@/components/landing/home/news-card'
 import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import { NewsEmptyState } from '@/components/landing/news/news-empty-state'
 import { NewsBreadcrumb, NewsPageHeading } from '@/components/landing/news/news-page-header'
+import { buildSafe } from '@/utilities/buildSafe'
 import { createPageMetadata } from '@/utilities/siteMetadata'
 
 export const metadata: Metadata = createPageMetadata({
@@ -17,13 +18,16 @@ export const metadata: Metadata = createPageMetadata({
 export const revalidate = 60
 
 export default async function NewsPage() {
-  const payload = await getPayload({ config: configPromise })
-  const { docs: newsItems } = await payload.find({
-    collection: 'news',
-    depth: 1,
-    limit: 12,
-    overrideAccess: false,
-    sort: ['-pinned', '-publishedAt', '-createdAt'],
+  const newsItems = await buildSafe('news listing', async () => {
+    const payload = await getPayload({ config: configPromise })
+    const { docs } = await payload.find({
+      collection: 'news',
+      depth: 1,
+      limit: 12,
+      overrideAccess: false,
+      sort: ['-pinned', '-publishedAt', '-createdAt'],
+    })
+    return docs
   })
 
   return (
@@ -31,7 +35,7 @@ export default async function NewsPage() {
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 pt-25 pb-20 sm:px-6">
         <NewsBreadcrumb />
         <NewsPageHeading />
-        {newsItems.length > 0 ? (
+        {newsItems && newsItems.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {newsItems.map((news) => (
               <NewsCard key={news.id} news={news} variant="listing" />

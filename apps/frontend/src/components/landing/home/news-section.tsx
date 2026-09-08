@@ -2,19 +2,23 @@ import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import { buildSafe } from '@/utilities/buildSafe'
 import NewsCard from './news-card'
 
 const NewsSection = async () => {
-  const payload = await getPayload({ config: configPromise })
-  const { docs: newsItems } = await payload.find({
-    collection: 'news',
-    depth: 1,
-    limit: 6,
-    overrideAccess: false,
-    sort: ['-pinned', '-publishedAt', '-createdAt'],
+  const newsItems = await buildSafe('home news', async () => {
+    const payload = await getPayload({ config: configPromise })
+    const { docs } = await payload.find({
+      collection: 'news',
+      depth: 1,
+      limit: 6,
+      overrideAccess: false,
+      sort: ['-pinned', '-publishedAt', '-createdAt'],
+    })
+    return docs
   })
 
-  if (newsItems.length === 0) return null
+  if (!newsItems || newsItems.length === 0) return null
 
   return (
     <section

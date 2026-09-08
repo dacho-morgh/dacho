@@ -5,6 +5,10 @@ import { createElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import DashboardLayout from '@/app/(frontend)/dashboard/layout'
 
+vi.mock('geist/font/mono', () => ({
+  GeistMono: { variable: 'geist-mono-variable' },
+}))
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
   redirect: vi.fn(),

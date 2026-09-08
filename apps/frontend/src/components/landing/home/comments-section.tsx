@@ -1,19 +1,23 @@
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import { Typography } from '@/components/ui/typography'
+import { buildSafe } from '@/utilities/buildSafe'
 import CommentCard from './comment-card'
 import CommentsSlideshow from './comments-slideshow'
 
 const CommentsSection = async () => {
-  const payload = await getPayload({ config: configPromise })
-  const { docs: reviews } = await payload.find({
-    collection: 'reviews',
-    depth: 1,
-    pagination: false,
-    sort: 'priority',
+  const reviews = await buildSafe('home reviews', async () => {
+    const payload = await getPayload({ config: configPromise })
+    const { docs } = await payload.find({
+      collection: 'reviews',
+      depth: 1,
+      pagination: false,
+      sort: 'priority',
+    })
+    return docs
   })
 
-  if (reviews.length === 0) return null
+  if (!reviews || reviews.length === 0) return null
 
   const shouldLoop = reviews.length > 3
   const cards = reviews.map((review) => <CommentCard key={review.id} comment={review} />)
