@@ -4,8 +4,6 @@ import {
   generateEventDetailMetadata,
 } from '@/components/landing/event-detail/event-detail-route'
 
-export const dynamic = 'force-dynamic'
-
 export default function EventsPage() {
   return <EventDetailRoute collection="events" />
 }
