@@ -5,7 +5,7 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import Brand from './brand'
 import MobileNavigation from './mobile-navigation'
@@ -37,6 +37,13 @@ const Header = () => {
     },
     { scope: headerRef, dependencies: [pathname], revertOnUpdate: true },
   )
+
+  useEffect(() => {
+    if (pathname?.startsWith('/dashboard') || !headerRef.current) return
+
+    ScrollTrigger.refresh()
+    gsap.set(headerRef.current, { clearProps: 'maxWidth,paddingLeft,paddingRight' })
+  }, [pathname])
 
   if (pathname?.startsWith('/dashboard')) return null
 

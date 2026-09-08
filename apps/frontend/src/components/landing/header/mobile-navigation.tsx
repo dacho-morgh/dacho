@@ -2,15 +2,28 @@
 
 import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
-import { useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import Brand from './brand'
 import NavList from './nav'
 import styles from './mobile-navigation.module.css'
+
+const mobileBreakpoint = '(max-width: 767px)'
 
 const MobileNavigationContent = () => {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(mobileBreakpoint)
+    const closeOnDesktop = (event: MediaQueryListEvent) => {
+      if (!event.matches) setMenuOpen(false)
+    }
+
+    mediaQuery.addEventListener('change', closeOnDesktop)
+    return () => mediaQuery.removeEventListener('change', closeOnDesktop)
+  }, [])
 
   const openMenu = () => {
     setMenuOpen(true)
@@ -97,7 +110,9 @@ const MobileNavigationContent = () => {
 }
 
 const MobileNavigation = () => {
-  return <MobileNavigationContent />
+  const pathname = usePathname()
+
+  return <MobileNavigationContent key={pathname} />
 }
 
 export default MobileNavigation
