@@ -55,7 +55,12 @@ function formatHref(link?: {
   if (!link) return '/'
   if (link.type === 'reference' && link.reference?.value) {
     const val = link.reference.value
-    if (typeof val === 'object' && val !== null && 'slug' in val && typeof (val as { slug?: unknown }).slug === 'string') {
+    if (
+      typeof val === 'object' &&
+      val !== null &&
+      'slug' in val &&
+      typeof (val as { slug?: unknown }).slug === 'string'
+    ) {
       const slug = (val as { slug: string }).slug
       const relationTo = link.reference.relationTo
       if (relationTo === 'pages') {
@@ -222,7 +227,7 @@ export async function Footer() {
           <div className="order-first flex min-w-0 flex-1 flex-col gap-10 lg:order-0">
             {/* Brand block */}
             <div className="flex flex-col gap-6">
-              <Link href="/" aria-label="صفحه اصلی" className="inline-flex items-center gap-4">
+              <Link href="/" aria-label="صفحه اصلی" className="inline-flex items-center gap-2">
                 {typeof logo === 'object' && logo !== null && 'url' in logo && logo.url ? (
                   <Media
                     resource={logo}
@@ -231,8 +236,14 @@ export async function Footer() {
                   />
                 ) : (
                   <>
-                    <BrandFooterSandoqLogomark aria-hidden="true" className="h-8 w-auto text-white" />
-                    <BrandFooterSandoqLogotype aria-label={logoText} className="h-8 w-auto text-white" />
+                    <BrandFooterSandoqLogomark
+                      aria-hidden="true"
+                      className="h-8 w-auto text-white"
+                    />
+                    <BrandFooterSandoqLogotype
+                      aria-label={logoText}
+                      className="h-8 w-auto text-white"
+                    />
                   </>
                 )}
               </Link>
@@ -257,7 +268,10 @@ export async function Footer() {
               {phone ? (
                 <ContactRow
                   icon={
-                    <FooterCallIcon aria-hidden="true" className="size-6 shrink-0 text-neutral-400" />
+                    <FooterCallIcon
+                      aria-hidden="true"
+                      className="size-6 shrink-0 text-neutral-400"
+                    />
                   }
                   text={phone}
                 />
@@ -268,7 +282,10 @@ export async function Footer() {
           {columns.map((col, idx) => (
             <NavColumn
               key={`${col.title}-${idx}`}
-              className={cn(idx === 0 ? 'order-2' : idx === 1 ? 'order-3' : `order-${idx + 2}`, 'lg:order-0')}
+              className={cn(
+                idx === 0 ? 'order-2' : idx === 1 ? 'order-3' : `order-${idx + 2}`,
+                'lg:order-0',
+              )}
               heading={col.title}
               links={col.links}
             />
@@ -288,42 +305,36 @@ export async function Footer() {
             {copyright}
           </Typography>
           <div className="flex items-center gap-4">
-            {socialLinks ? (
-              socialLinks.map((item, i) => {
-                const href = item.url?.trim() && item.url !== '#' ? item.url : '/'
-                const icon = item.icon
-                const hasMediaIcon =
-                  typeof icon === 'object' && icon !== null && 'url' in icon && Boolean(icon.url)
+            {socialLinks
+              ? socialLinks.map((item, i) => {
+                  const href = item.url?.trim() && item.url !== '#' ? item.url : '/'
+                  const icon = item.icon
+                  const hasMediaIcon =
+                    typeof icon === 'object' && icon !== null && 'url' in icon && Boolean(icon.url)
 
-                return (
-                  <SocialLinkItem
-                    key={`${item.platform}-${i}`}
-                    ariaLabel={item.platform}
-                    href={href}
-                  >
-                    {hasMediaIcon ? (
-                      <Media
-                        resource={icon}
-                        className="flex size-8 shrink-0 items-center justify-center"
-                        imgClassName="size-8 object-contain"
-                      />
-                    ) : (
-                      <FooterHouseIcon aria-hidden="true" className="size-8" />
-                    )}
+                  return (
+                    <SocialLinkItem
+                      key={`${item.platform}-${i}`}
+                      ariaLabel={item.platform}
+                      href={href}
+                    >
+                      {hasMediaIcon ? (
+                        <Media
+                          resource={icon}
+                          className="flex size-8 shrink-0 items-center justify-center"
+                          imgClassName="size-8 object-contain"
+                        />
+                      ) : (
+                        <FooterHouseIcon aria-hidden="true" className="size-8" />
+                      )}
+                    </SocialLinkItem>
+                  )
+                })
+              : [0, 1, 2].map((i) => (
+                  <SocialLinkItem key={i} ariaLabel="شبکه اجتماعی (نماد موقت)" href="/">
+                    <FooterHouseIcon aria-hidden="true" className="size-8" />
                   </SocialLinkItem>
-                )
-              })
-            ) : (
-              [0, 1, 2].map((i) => (
-                <SocialLinkItem
-                  key={i}
-                  ariaLabel="شبکه اجتماعی (نماد موقت)"
-                  href="/"
-                >
-                  <FooterHouseIcon aria-hidden="true" className="size-8" />
-                </SocialLinkItem>
-              ))
-            )}
+                ))}
           </div>
         </div>
       </div>

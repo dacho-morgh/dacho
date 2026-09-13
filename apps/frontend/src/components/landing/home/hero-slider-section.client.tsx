@@ -155,10 +155,10 @@ export function HeroSliderSectionClient({ images, name }: HeroSliderSectionClien
           ) : null}
         </Carousel>
 
-        {/* <div
+        <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-1/3 bg-linear-to-b from-transparent to-neutral-900/60"
-        /> */}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-1/6 bg-linear-to-b from-transparent to-neutral-900/60"
+        />
 
         {images.length > 1 ? (
           <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center gap-2" dir="ltr">

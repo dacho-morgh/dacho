@@ -116,6 +116,48 @@ test.describe('Frontend', () => {
       .toBeCloseTo(initialWidth, 0)
   })
 
+  test('keeps the landing header white and applies responsive scroll sizing', async ({ page }) => {
+    for (const viewport of [
+      { height: 800, width: 1440 },
+      { height: 800, width: 390 },
+    ]) {
+      await page.setViewportSize(viewport)
+      await page.goto('http://localhost:3000')
+      await page.waitForTimeout(500)
+
+      const header = page.locator('header').first()
+      const surface = header.locator(':scope > div:first-child')
+      const hero = page.locator('main section').first()
+      const initialHeaderBox = await header.boundingBox()
+      const heroBox = await hero.boundingBox()
+
+      expect(initialHeaderBox).not.toBeNull()
+      expect(heroBox).not.toBeNull()
+      expect(initialHeaderBox!.x).toBeCloseTo(heroBox!.x, 0)
+      expect(initialHeaderBox!.width).toBeCloseTo(heroBox!.width, 0)
+      await expect(header).toHaveCSS('z-index', '100')
+      await expect
+        .poll(() => surface.evaluate((element) => getComputedStyle(element).backgroundColor))
+        .toMatch(/(?:, 0\)|\/ 0\))$/)
+
+      await page.evaluate(() => window.scrollTo(0, 80))
+      await expect
+        .poll(() => surface.evaluate((element) => getComputedStyle(element).backgroundColor))
+        .toMatch(/^rgba\(255, 255, 255, 0\.[1-9]/)
+
+      await page.evaluate(() => window.scrollTo(0, 700))
+      const scrolledWidth = await expect.poll(() =>
+        header.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      if (viewport.width >= 768) {
+        await scrolledWidth.toBeLessThan(initialHeaderBox!.width - 20)
+      } else {
+        await scrolledWidth.toBeCloseTo(initialHeaderBox!.width, 0)
+      }
+      await expect(surface).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.6)')
+    }
+  })
+
   test('fits the viewport and closes mobile navigation after routing', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 800 })
     await page.goto('http://localhost:3000')
