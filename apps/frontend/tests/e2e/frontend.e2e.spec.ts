@@ -95,7 +95,7 @@ test.describe('Frontend', () => {
     await expect(navigation).not.toBeInViewport()
   })
 
-  test('restores the full desktop header after client-side navigation', async ({ page }) => {
+  test('reinitializes the shrinking desktop header after client-side navigation', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 800 })
     await page.goto('http://localhost:3000')
     await page.waitForTimeout(1_000)
@@ -114,6 +114,11 @@ test.describe('Frontend', () => {
     await expect
       .poll(() => header.evaluate((element) => element.getBoundingClientRect().width))
       .toBeCloseTo(initialWidth, 0)
+
+    await page.evaluate(() => window.scrollTo(0, 700))
+    await expect
+      .poll(() => header.evaluate((element) => element.getBoundingClientRect().width))
+      .toBeLessThan(initialWidth - 100)
   })
 
   test('keeps the landing header white and applies responsive scroll sizing', async ({ page }) => {

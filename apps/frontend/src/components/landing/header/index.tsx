@@ -29,7 +29,13 @@ const Header = () => {
           paddingLeft: 0,
           paddingRight: 0,
           ease: 'none',
-          scrollTrigger: { trigger: document.body, start: 'top top', end: '+=480', scrub: 2 },
+          scrollTrigger: {
+            trigger: document.body,
+            scroller: window,
+            start: 'top top',
+            end: '+=480',
+            scrub: 2,
+          },
         })
       })
 

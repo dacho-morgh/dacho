@@ -11,6 +11,7 @@ import { Media } from '@/components/Media'
 import { Typography } from '@/components/ui/typography'
 import { buildSafe } from '@/utilities/buildSafe'
 import { getCachedGlobal } from '@/utilities/getGlobals'
+import { getMediaUrl } from '@/utilities/getMediaUrl'
 import { cn } from '@/utilities/ui'
 
 type FooterLinkItem = {
@@ -146,7 +147,7 @@ function SocialLinkItem({
 }) {
   const isInternal = href.startsWith('/')
   const className =
-    'flex size-8 items-center justify-center text-neutral-400 transition-colors hover:text-white'
+    'group flex size-8 items-center justify-center text-neutral-400 transition-colors hover:text-white'
 
   if (isInternal) {
     return (
@@ -299,11 +300,11 @@ export async function Footer() {
                       ? socialLinks.map((item, i) => {
                           const href = item.url?.trim() && item.url !== '#' ? item.url : '/'
                           const icon = item.icon
-                          const hasMediaIcon =
-                            typeof icon === 'object' &&
-                            icon !== null &&
-                            'url' in icon &&
-                            Boolean(icon.url)
+                          const mediaIcon =
+                            typeof icon === 'object' && icon !== null && 'url' in icon && icon.url
+                              ? icon
+                              : null
+                          const isSvgIcon = mediaIcon?.mimeType === 'image/svg+xml'
 
                           return (
                             <SocialLinkItem
@@ -311,9 +312,24 @@ export async function Footer() {
                               ariaLabel={item.platform}
                               href={href}
                             >
-                              {hasMediaIcon ? (
+                              {isSvgIcon ? (
+                                <span
+                                  aria-hidden="true"
+                                  className="size-8 shrink-0 bg-[#a3a3a3] transition-colors group-hover:bg-white"
+                                  style={{
+                                    WebkitMaskImage: `url("${getMediaUrl(mediaIcon.url, mediaIcon.updatedAt)}")`,
+                                    WebkitMaskPosition: 'center',
+                                    WebkitMaskRepeat: 'no-repeat',
+                                    WebkitMaskSize: 'contain',
+                                    maskImage: `url("${getMediaUrl(mediaIcon.url, mediaIcon.updatedAt)}")`,
+                                    maskPosition: 'center',
+                                    maskRepeat: 'no-repeat',
+                                    maskSize: 'contain',
+                                  }}
+                                />
+                              ) : mediaIcon ? (
                                 <Media
-                                  resource={icon}
+                                  resource={mediaIcon}
                                   className="flex size-8 shrink-0 items-center justify-center"
                                   imgClassName="size-8 object-contain"
                                 />
