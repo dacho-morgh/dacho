@@ -27,9 +27,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <html className={yekanBakh.variable} data-theme="light" dir="rtl" lang="fa">
       <body>
         <main className="flex min-h-svh w-full overflow-x-hidden bg-background lg:overflow-hidden">
+          <section className="min-h-svh min-w-0 flex-1" aria-label="احراز هویت">
+            {children}
+          </section>
           <div className="hidden min-w-0 flex-1 justify-center lg:flex">
             <aside
-              className="relative m-[40px_40px_40px_0] w-full min-w-0 overflow-hidden rounded-[40px]"
+              className="relative m-[40px_0_40px_40px] w-full min-w-0 overflow-hidden rounded-[40px]"
               aria-label="معرفی فضای نوآوری"
             >
               <Image
@@ -59,10 +62,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               </div>
             </aside>
           </div>
-
-          <section className="min-h-svh min-w-0 flex-1" aria-label="احراز هویت">
-            {children}
-          </section>
         </main>
       </body>
     </html>
