@@ -23,7 +23,7 @@ export const revalidate = 60
 
 export default function HomePage() {
   return (
-    <main className="relative flex w-full flex-col overflow-x-clip bg-white">
+    <main className="relative flex w-full flex-col overflow-x-clip bg-neutral-50">
       <ScrollProvider />
       <Suspense fallback={<HeroSliderSectionSkeleton />}>
         <HeroSliderSection />
@@ -44,7 +44,9 @@ export default function HomePage() {
         <LogoStripSection />
       </Reveal>
       <Reveal>
-        <RecruitmentSection />
+        <div className="py-10 lg:py-20">
+          <RecruitmentSection />
+        </div>
       </Reveal>
       {/* <Reveal>
         <CommentsSection />

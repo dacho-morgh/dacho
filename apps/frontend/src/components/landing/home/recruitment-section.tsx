@@ -22,70 +22,72 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
   useEffect(() => {
     let cancelled = false
     let cleanup = () => {}
-    void Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(([{ default: gsap }, { ScrollTrigger }]) => {
-      if (cancelled) return
-      const section = sectionRef.current
-      const shape = shapeRef.current
+    void Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(
+      ([{ default: gsap }, { ScrollTrigger }]) => {
+        if (cancelled) return
+        const section = sectionRef.current
+        const shape = shapeRef.current
 
-      if (!section || !shape) return
-      gsap.registerPlugin(ScrollTrigger)
+        if (!section || !shape) return
+        gsap.registerPlugin(ScrollTrigger)
 
-      const paths = gsap.utils.toArray<SVGPathElement>('path', shape)
-      if (paths.length === 0) return
+        const paths = gsap.utils.toArray<SVGPathElement>('path', shape)
+        if (paths.length === 0) return
 
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      const isMobile = window.matchMedia('(max-width: 768px)').matches
-      const supportsHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        const isMobile = window.matchMedia('(max-width: 768px)').matches
+        const supportsHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
-      if (reducedMotion || isMobile) {
-        gsap.set(paths, { clearProps: 'clipPath,opacity' })
-        return
-      }
+        if (reducedMotion || isMobile) {
+          gsap.set(paths, { clearProps: 'clipPath,opacity' })
+          return
+        }
 
-      let activeTimeline: gsap.core.Timeline | null = null
+        let activeTimeline: gsap.core.Timeline | null = null
 
-      const runFillCycle = () => {
-        activeTimeline?.kill()
+        const runFillCycle = () => {
+          activeTimeline?.kill()
 
-        activeTimeline = gsap
-          .timeline()
-          .to(paths, {
-            clipPath: 'inset(0 100% 0 0)',
-            opacity: 0,
-            duration: 0.35,
-            stagger: { each: 0.025, from: 'end' },
-            ease: 'power2.out',
-          })
-          .to(paths, {
-            clipPath: 'inset(0 0% 0 0)',
-            opacity: 1,
-            duration: 2,
-            stagger: 0.075,
-            ease: 'power2.inOut',
-          })
-      }
+          activeTimeline = gsap
+            .timeline()
+            .to(paths, {
+              clipPath: 'inset(0 100% 0 0)',
+              opacity: 0,
+              duration: 0.35,
+              stagger: { each: 0.025, from: 'end' },
+              ease: 'power2.out',
+            })
+            .to(paths, {
+              clipPath: 'inset(0 0% 0 0)',
+              opacity: 1,
+              duration: 2,
+              stagger: 0.075,
+              ease: 'power2.inOut',
+            })
+        }
 
-      const entranceTrigger = ScrollTrigger.create({
-        trigger: section,
-        start: 'top 85%',
-        once: true,
-        onEnter: runFillCycle,
-      })
+        const entranceTrigger = ScrollTrigger.create({
+          trigger: section,
+          start: 'top 85%',
+          once: true,
+          onEnter: runFillCycle,
+        })
 
-      const handlePointerEnter = () => {
-        runFillCycle()
-      }
+        const handlePointerEnter = () => {
+          runFillCycle()
+        }
 
-      if (supportsHover) {
-        section.addEventListener('pointerenter', handlePointerEnter)
-      }
+        if (supportsHover) {
+          section.addEventListener('pointerenter', handlePointerEnter)
+        }
 
-      cleanup = () => {
-        section.removeEventListener('pointerenter', handlePointerEnter)
-        activeTimeline?.kill()
-        entranceTrigger.kill()
-      }
-    })
+        cleanup = () => {
+          section.removeEventListener('pointerenter', handlePointerEnter)
+          activeTimeline?.kill()
+          entranceTrigger.kill()
+        }
+      },
+    )
     return () => {
       cancelled = true
       cleanup()
@@ -121,15 +123,11 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
           </Button>
         </div>
 
-        <div className="order-1 flex min-w-0 flex-col items-center gap-4 text-center md:order-2 md:items-end md:text-right">
-          <Typography
-            as="h2"
-            id="recruitment-title"
-            variant="24/bold"
-            sm="32/bold"
-            color="white"
-            className="sm:leading-12.5 lg:font-semibold"
-          >
+        <div
+          dir="rtl"
+          className="order-1 flex min-w-0 flex-col items-center gap-4 text-center md:order-2 md:items-start md:text-right"
+        >
+          <Typography as="h2" id="recruitment-title" variant="24/bold" sm="32/bold" color="white">
             مشتاق همکاری با شما هستیم
           </Typography>
           <Typography variant="16/regular" sm="20/regular" color="white" className="max-w-175.5">

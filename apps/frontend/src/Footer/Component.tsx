@@ -219,8 +219,8 @@ export async function Footer() {
   }
 
   return (
-    <footer className="bg-neutral-800 py-12 lg:py-30">
-      <div className="container flex flex-col gap-10 px-4 lg:px-8 xl:px-0">
+    <footer className="bg-neutral-800 py-12 lg:py-20">
+      <div className="container flex flex-col gap-6 px-4 lg:px-8 xl:px-0">
         {/* Band A — columns row. DOM order (RTL): خدمات rightmost, then صفحات, then brand/contact leftmost.
             On <lg we stack brand first, then صفحات, then خدمات via order utilities. */}
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-20">
@@ -279,63 +279,83 @@ export async function Footer() {
             </div>
           </div>
 
-          {columns.map((col, idx) => (
-            <NavColumn
-              key={`${col.title}-${idx}`}
-              className={cn(
-                idx === 0 ? 'order-2' : idx === 1 ? 'order-3' : `order-${idx + 2}`,
-                'lg:order-0',
-              )}
-              heading={col.title}
-              links={col.links}
-            />
-          ))}
+          {columns.map((col, idx) => {
+            const className = cn(
+              idx === 0 ? 'order-2' : idx === 1 ? 'order-3' : `order-${idx + 2}`,
+              'lg:order-0',
+            )
+
+            if (col.title.trim() === 'راه های ارتباطی با ما') {
+              return (
+                <div
+                  key={`${col.title}-${idx}`}
+                  className={cn('flex min-w-0 flex-1 flex-col gap-4', className)}
+                >
+                  <Typography as="h3" color="white" variant="20/bold">
+                    {col.title}
+                  </Typography>
+                  <div className="flex items-center gap-4">
+                    {socialLinks
+                      ? socialLinks.map((item, i) => {
+                          const href = item.url?.trim() && item.url !== '#' ? item.url : '/'
+                          const icon = item.icon
+                          const hasMediaIcon =
+                            typeof icon === 'object' &&
+                            icon !== null &&
+                            'url' in icon &&
+                            Boolean(icon.url)
+
+                          return (
+                            <SocialLinkItem
+                              key={`${item.platform}-${i}`}
+                              ariaLabel={item.platform}
+                              href={href}
+                            >
+                              {hasMediaIcon ? (
+                                <Media
+                                  resource={icon}
+                                  className="flex size-8 shrink-0 items-center justify-center"
+                                  imgClassName="size-8 object-contain"
+                                />
+                              ) : (
+                                <FooterHouseIcon aria-hidden="true" className="size-8" />
+                              )}
+                            </SocialLinkItem>
+                          )
+                        })
+                      : [0, 1, 2].map((i) => (
+                          <SocialLinkItem key={i} ariaLabel="شبکه اجتماعی (نماد موقت)" href="/">
+                            <FooterHouseIcon aria-hidden="true" className="size-8" />
+                          </SocialLinkItem>
+                        ))}
+                  </div>
+                </div>
+              )
+            }
+
+            return (
+              <NavColumn
+                key={`${col.title}-${idx}`}
+                className={className}
+                heading={col.title}
+                links={col.links}
+              />
+            )
+          })}
         </div>
 
         {/* Band B — divider */}
         <div aria-hidden="true" className="border-t-[1.5px] border-neutral-700" />
 
-        {/* Band C — bottom bar. RTL: social icons render right, copyright left. */}
-        <div className="flex items-center justify-between gap-4 max-lg:flex-col-reverse max-lg:items-start">
+        {/* Band C — copyright. */}
+        <div className="flex items-center">
           <Typography
-            className="text-center lg:whitespace-nowrap"
+            className="text-right lg:whitespace-nowrap"
             color="neutral-400"
             variant="14/light"
           >
             {copyright}
           </Typography>
-          <div className="flex items-center gap-4">
-            {socialLinks
-              ? socialLinks.map((item, i) => {
-                  const href = item.url?.trim() && item.url !== '#' ? item.url : '/'
-                  const icon = item.icon
-                  const hasMediaIcon =
-                    typeof icon === 'object' && icon !== null && 'url' in icon && Boolean(icon.url)
-
-                  return (
-                    <SocialLinkItem
-                      key={`${item.platform}-${i}`}
-                      ariaLabel={item.platform}
-                      href={href}
-                    >
-                      {hasMediaIcon ? (
-                        <Media
-                          resource={icon}
-                          className="flex size-8 shrink-0 items-center justify-center"
-                          imgClassName="size-8 object-contain"
-                        />
-                      ) : (
-                        <FooterHouseIcon aria-hidden="true" className="size-8" />
-                      )}
-                    </SocialLinkItem>
-                  )
-                })
-              : [0, 1, 2].map((i) => (
-                  <SocialLinkItem key={i} ariaLabel="شبکه اجتماعی (نماد موقت)" href="/">
-                    <FooterHouseIcon aria-hidden="true" className="size-8" />
-                  </SocialLinkItem>
-                ))}
-          </div>
         </div>
       </div>
     </footer>

@@ -85,7 +85,7 @@ export default async function NewsArticlePage({ params }: Args) {
   if (!news) return <PayloadRedirects url={url} />
 
   const publishedAt = news.publishedAt || news.createdAt
-  const readingMinutes = Math.max(1, Math.ceil(countTextWords(news.content) / 200))
+  // const readingMinutes = Math.max(1, Math.ceil(countTextWords(news.content) / 200))
   const hasHeroImage = typeof news.heroImage === 'object' && news.heroImage !== null
 
   return (
@@ -95,11 +95,11 @@ export default async function NewsArticlePage({ params }: Args) {
 
       {draft && <LivePreviewListener />}
 
-      <article className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pt-25 pb-20 sm:px-6 lg:gap-12 lg:pt-30">
+      <article className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 pt-25 pb-20 sm:px-6 lg:gap-18 lg:pt-30">
         <NewsBreadcrumb title={news.title} />
 
-        <div className="grid items-center gap-10 lg:grid-cols-2">
-          <div className="relative aspect-31/20 w-full overflow-hidden rounded-4xl bg-neutral-100">
+        <div className="flex flex-col items-center gap-5 lg:gap-10">
+          <div className="relative aspect-31/20 max-h-140 w-full flex-1 overflow-hidden rounded-4xl bg-neutral-100">
             {hasHeroImage ? (
               <Media
                 fill
@@ -121,8 +121,8 @@ export default async function NewsArticlePage({ params }: Args) {
             )}
           </div>
 
-          <header className="flex flex-col items-start gap-8 text-right lg:px-12">
-            <Typography as="h1" variant="32/bold" lg="48/bold" color="neutral-800">
+          <header className="flex w-full flex-1 flex-col gap-4 text-right">
+            <Typography as="h1" variant="20/bold" lg="32/extrabold" color="neutral-800">
               {news.title}
             </Typography>
             <dl className="flex flex-col gap-4 text-neutral-500">
@@ -133,13 +133,13 @@ export default async function NewsArticlePage({ params }: Args) {
                   {persianDateFormatter.format(new Date(publishedAt))}
                 </Typography>
               </div>
-              <div className="flex items-center gap-2">
-                <NewsTimeIcon aria-hidden="true" className="size-7 shrink-0 text-neutral-400" />
-                <dt className="sr-only">زمان مطالعه</dt>
-                <Typography as="dd" variant="16/regular" color="neutral-500">
+              {/* <div className="flex items-center gap-2"> */}
+              {/* <NewsTimeIcon aria-hidden="true" className="size-7 shrink-0 text-neutral-400" /> */}
+              {/* <dt className="sr-only">زمان مطالعه</dt> */}
+              {/* <Typography as="dd" variant="16/regular" color="neutral-500">
                   زمان مطالعه {readingMinutes.toLocaleString('fa-IR')} دقیقه
-                </Typography>
-              </div>
+                </Typography> */}
+              {/* </div> */}
             </dl>
           </header>
         </div>

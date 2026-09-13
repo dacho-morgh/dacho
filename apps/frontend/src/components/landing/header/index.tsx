@@ -15,13 +15,12 @@ gsap.registerPlugin(useGSAP, ScrollTrigger)
 
 const Header = () => {
   const headerRef = useRef<HTMLElement>(null)
-  const headerSurfaceRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
 
   useGSAP(
     () => {
       if (pathname?.startsWith('/dashboard')) return
-      if (typeof window === 'undefined') return
+      if (typeof window === 'undefined' || window.matchMedia('(max-width: 767px)').matches) return
 
       const media = gsap.matchMedia()
       media.add('(min-width: 768px)', () => {
@@ -33,26 +32,6 @@ const Header = () => {
           scrollTrigger: { trigger: document.body, start: 'top top', end: '+=480', scrub: 2 },
         })
       })
-
-      gsap.fromTo(
-        headerSurfaceRef.current,
-        {
-          backdropFilter: 'blur(0px)',
-          backgroundColor: 'rgba(255, 255, 255, 0)',
-          borderColor: 'rgba(255, 255, 255, 0)',
-          boxShadow: '0 2px 16px rgb(10 10 10 / 0)',
-          webkitBackdropFilter: 'blur(0px)',
-        },
-        {
-          backdropFilter: 'blur(8px)',
-          backgroundColor: 'rgba(255, 255, 255, 0.6)',
-          borderColor: 'rgba(255, 255, 255, 1)',
-          boxShadow: '0 2px 16px rgb(10 10 10 / 0.1)',
-          ease: 'none',
-          scrollTrigger: { trigger: document.body, start: 'top top', end: '+=160', scrub: 1 },
-          webkitBackdropFilter: 'blur(8px)',
-        },
-      )
 
       return () => media.revert()
     },
@@ -71,11 +50,10 @@ const Header = () => {
   return (
     <header
       ref={headerRef}
-      className="fixed inset-x-0 top-0 z-[100] mx-auto w-full max-w-[1600px] px-4 py-4 text-nowrap md:py-5 lg:px-10"
+      className="fixed inset-x-0 top-0 z-20 mx-auto w-full max-w-7xl px-4 py-4 text-nowrap md:px-0 md:py-5"
     >
       <div
-        ref={headerSurfaceRef}
-        className="flex h-14 items-center justify-between rounded-[20px] border border-white/0 bg-white/0 p-2 md:h-auto md:p-2.5"
+        className="flex h-14 items-center justify-between rounded-[20px] border border-white bg-white/20 p-2 shadow-[0_2px_16px_rgb(10_10_10/0.1)] backdrop-blur supports-backdrop-filter:bg-white/60 md:h-auto md:p-2.5"
         dir="rtl"
       >
         <div className="flex-1">

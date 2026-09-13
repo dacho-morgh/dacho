@@ -23,7 +23,6 @@ export default async function NewsPage() {
     const { docs } = await payload.find({
       collection: 'news',
       depth: 1,
-      limit: 12,
       overrideAccess: false,
       sort: ['-pinned', '-publishedAt', '-createdAt'],
     })
@@ -36,7 +35,7 @@ export default async function NewsPage() {
         <NewsBreadcrumb />
         <NewsPageHeading />
         {newsItems && newsItems.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {newsItems.map((news) => (
               <NewsCard key={news.id} news={news} variant="listing" />
             ))}

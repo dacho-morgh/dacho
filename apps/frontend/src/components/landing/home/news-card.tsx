@@ -23,7 +23,8 @@ const NewsCard = ({
     <article
       dir="rtl"
       className={cn(
-        'group flex w-full flex-col rounded-[32px] drop-shadow-xl lg:drop-shadow-lg items-end overflow-hidden rounded-4xl bg-white transition-all'      )}
+        'group flex w-full flex-col drop-shadow-xl lg:drop-shadow-md items-end overflow-hidden rounded-4xl bg-white transition-all',
+      )}
     >
       <Link
         href={href}
@@ -55,7 +56,7 @@ const NewsCard = ({
           variant="16/semibold"
           color="neutral-900"
           title={news.title}
-          className="w-full truncate text-right"
+          className="w-full text-right"
         >
           <Link href={href}>{news.title}</Link>
         </Typography>

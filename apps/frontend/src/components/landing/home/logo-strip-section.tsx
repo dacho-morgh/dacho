@@ -2,6 +2,7 @@
 
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
+import { useRef, type ComponentType, type SVGProps } from 'react'
 import {
   PartnerFaraboorsLogo,
   PartnerNeybadLogo,
@@ -12,7 +13,6 @@ import {
   PartnerRiasatLogo,
   PartnerSanayeLogo,
 } from '@/components/icons'
-import { useRef, type ComponentType, type SVGProps } from 'react'
 
 gsap.registerPlugin(useGSAP)
 
@@ -31,56 +31,56 @@ const logos: LogoAsset[] = [
     id: 'faraboors',
     name: 'فرابورس ایران',
     href: 'https://www.ifb.ir/',
-    width: 'w-[365px]',
+    width: 'w-[219px] sm:w-[292px]',
     Icon: PartnerFaraboorsLogo,
   },
   {
     id: 'noavari',
     name: 'صندوق نوآوری و شکوفایی',
     href: 'https://www.inif.ir/',
-    width: 'w-[147px]',
+    width: 'w-[88px] sm:w-[118px]',
     Icon: PartnerNoavariLogo,
   },
   {
     id: 'oloom',
     name: 'دانشگاه علوم پزشکی بوشهر',
     href: 'https://bpums.ac.ir/',
-    width: 'w-[138px]',
+    width: 'w-[83px] sm:w-[110px]',
     Icon: PartnerOloomLogo,
   },
   {
     id: 'park',
     name: 'پارک علم و فناوری خلیج فارس',
     href: 'https://pgstp.ir/',
-    width: 'w-[186px]',
+    width: 'w-[112px] sm:w-[149px]',
     Icon: PartnerParkLogo,
   },
   {
     id: 'neybad',
     name: 'سکوی تامین مالی جمعی نی‌باد',
     href: 'https://neybadcrowd.ir/',
-    width: 'w-[144px]',
+    width: 'w-[86px] sm:w-[115px]',
     Icon: PartnerNeybadLogo,
   },
   {
     id: 'pgu',
     name: 'دانشگاه خلیج فارس',
     href: 'https://www.pgu.ac.ir',
-    width: 'w-[102px]',
+    width: 'w-[61px] sm:w-[82px]',
     Icon: PartnerPguLogo,
   },
   {
     id: 'riasat',
     name: 'معاونت علمی و فناوری ریاست جمهوری',
     href: 'https://isti.ir/',
-    width: 'w-[122px]',
+    width: 'w-[73px] sm:w-[98px]',
     Icon: PartnerRiasatLogo,
   },
   {
     id: 'sanaye',
     name: 'صندوق حمایت از صنایع پیشرفته',
     href: 'http://www.imf.ir/',
-    width: 'w-[214px]',
+    width: 'w-[128px] sm:w-[171px]',
     Icon: PartnerSanayeLogo,
   },
 ]
@@ -101,7 +101,7 @@ const LogoBox = ({ logo, isClone }: { logo: LogoAsset; isClone?: boolean }) => {
         rel="noopener noreferrer"
         aria-label={logo.name}
         tabIndex={isClone ? -1 : undefined}
-        className={`logo-strip-item relative flex h-32 shrink-0 items-center justify-center transition-opacity hover:opacity-80 ${logo.width}`}
+        className={`logo-strip-item relative flex h-20 shrink-0 items-center justify-center transition-opacity hover:opacity-80 sm:h-24 ${logo.width}`}
       >
         {content}
       </a>
@@ -110,7 +110,7 @@ const LogoBox = ({ logo, isClone }: { logo: LogoAsset; isClone?: boolean }) => {
 
   return (
     <div
-      className={`logo-strip-item relative flex h-32 shrink-0 items-center justify-center ${logo.width}`}
+      className={`logo-strip-item relative flex h-20 shrink-0 items-center justify-center sm:h-24 ${logo.width}`}
       aria-label={logo.name}
     >
       {content}
@@ -175,7 +175,7 @@ const LogoStripSection = () => {
   }, [])
 
   return (
-    <section className="relative z-10 w-full overflow-x-hidden py-8 lg:py-12">
+    <section className="relative z-10 w-full overflow-x-hidden py-8">
       <div
         dir="ltr"
         className="w-full overflow-hidden"
@@ -191,11 +191,7 @@ const LogoStripSection = () => {
               className="flex shrink-0 items-center justify-center gap-20 pe-20"
             >
               {logos.map((logo) => (
-                <LogoBox
-                  key={`${setIndex}-${logo.id}`}
-                  logo={logo}
-                  isClone={setIndex > 0}
-                />
+                <LogoBox key={`${setIndex}-${logo.id}`} logo={logo} isClone={setIndex > 0} />
               ))}
             </div>
           ))}

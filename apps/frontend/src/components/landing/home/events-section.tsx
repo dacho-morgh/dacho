@@ -84,8 +84,8 @@ const EventsSection = async () => {
   if (items.length === 0) return null
 
   return (
-    <section className="relative z-10 flex w-full flex-col items-center gap-10 bg-neutral-50 px-4 py-24 sm:px-6 sm:py-32 lg:h-272 lg:gap-16 lg:px-0 lg:py-40">
-      <Typography as="h2" variant="32/extrabold" sm="40/extrabold" color="neutral-600">
+    <section className="relative z-10 flex w-full flex-col items-center gap-8 px-4 py-4 lg:gap-8 lg:px-0 lg:py-10">
+      <Typography as="h2" variant="32/extrabold" lg="40/extrabold" color="neutral-600">
         نمایشگاه و رویداد ها
       </Typography>
       <EventsCarousel items={items} />
