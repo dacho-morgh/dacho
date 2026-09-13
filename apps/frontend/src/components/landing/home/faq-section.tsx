@@ -24,7 +24,7 @@ const FaqSection = async () => {
   if (!faqs || faqs.length === 0) return null
 
   return (
-    <section className="flex w-full flex-col items-center gap-10 bg-neutral-50 px-4 py-24 sm:px-6 sm:py-32 lg:min-h-245 lg:px-0 lg:py-40">
+    <section className="flex w-full flex-col items-center gap-10 bg-neutral-50 px-4 pt-10 pb-15 sm:px-6 lg:px-0 lg:py-20">
       <div className="flex w-full max-w-200 flex-col items-center gap-2 text-center">
         <Typography as="h2" variant="32/extrabold" sm="40/extrabold" color="neutral-600">
           سوالات پر تکرار
@@ -35,11 +35,7 @@ const FaqSection = async () => {
         </Typography>
       </div>
 
-      <Accordion
-        type="single"
-        collapsible
-        className="w-full max-w-200 gap-4"
-      >
+      <Accordion type="single" collapsible className="w-full max-w-200 gap-4">
         {faqs.map((faq) => (
           <AccordionItem
             key={faq.id}

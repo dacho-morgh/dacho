@@ -89,8 +89,8 @@ function IntroductionSection({ content }: { content?: AboutUs['introduction'] | 
   const statement = content?.statement || INTRODUCTION_FALLBACK.statement
 
   return (
-    <section className="mx-auto flex min-h-200 w-full max-w-7xl flex-col justify-center gap-10 px-4 py-16 pt-25 md:px-8 lg:flex-row lg:items-center lg:py-20 lg:pt-40 2xl:px-0">
-      <div className="flex flex-1 flex-col gap-8 lg:max-w-150">
+    <section className="mx-auto flex w-full max-w-7xl flex-col justify-center gap-10 px-4 pt-25 md:px-8 lg:flex-row lg:items-center lg:pt-40 2xl:px-0">
+      <div className="order-2 flex flex-1 flex-col gap-8 lg:max-w-150">
         <div className="flex flex-col gap-4">
           <Typography as="h1" color="neutral-700" lg="48/black" variant="24/extrabold">
             {heading}
@@ -106,7 +106,7 @@ function IntroductionSection({ content }: { content?: AboutUs['introduction'] | 
           </Typography>
         </div>
       </div>
-      <div className="relative aspect-square w-full overflow-hidden rounded-[40px] lg:w-1/2 lg:max-w-160">
+      <div className="relative order-1 aspect-square w-full overflow-hidden rounded-[40px] lg:order-2 lg:w-1/2 lg:max-w-160">
         {content?.media ? (
           <Media
             fill

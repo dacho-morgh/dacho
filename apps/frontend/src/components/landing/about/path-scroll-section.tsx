@@ -5,6 +5,14 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Image from 'next/image'
 import { useRef } from 'react'
+import { CarouselArrowRightIcon } from '@/components/icons/generated'
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel'
 import { Typography } from '@/components/ui/typography'
 
 gsap.registerPlugin(useGSAP, ScrollTrigger)
@@ -72,20 +80,18 @@ export default function PathScrollSection() {
       media.add(
         {
           desktop: '(min-width: 1024px)',
-          mobile: '(max-width: 1023px)',
           motionAllowed: '(prefers-reduced-motion: no-preference)',
         },
         (context) => {
-          const { desktop, mobile, motionAllowed } = context.conditions as {
+          const { desktop, motionAllowed } = context.conditions as {
             desktop: boolean
-            mobile: boolean
             motionAllowed: boolean
           }
 
-          if (!motionAllowed) return
+          // Small screens use the carousel below and must never be pinned.
+          if (!desktop || !motionAllowed) return
 
           const items = gsap.utils.toArray<HTMLElement>('[data-path-item]', list)
-          const progressFill = list.querySelector<HTMLElement>('[data-path-progress-fill]')
           const counter = list.querySelector<HTMLElement>('[data-path-counter]')
           const rootStyles = getComputedStyle(document.documentElement)
           const activeTitleColor = rootStyles.getPropertyValue('--neutral-700').trim()
@@ -106,8 +112,7 @@ export default function PathScrollSection() {
               const isActive = index === nextIndex
 
               item.setAttribute('data-active', String(isActive))
-              if (mobile) item.setAttribute('aria-hidden', String(!isActive))
-              else item.removeAttribute('aria-hidden')
+              item.removeAttribute('aria-hidden')
             })
 
             if (counter) {
@@ -124,34 +129,21 @@ export default function PathScrollSection() {
           })
           gsap.set(images[0], { autoAlpha: 1, scale: 1, yPercent: 0 })
 
-          if (desktop) {
-            gsap.set(descriptions, { autoAlpha: 0, height: 0 })
-            gsap.set(descriptions[0], {
-              autoAlpha: 1,
-              height: () => descriptions[0].scrollHeight,
-            })
-            gsap.set(titles, {
-              color: inactiveTitleColor,
-              fontSize: '24px',
-              lineHeight: '36px',
-            })
-            gsap.set(titles[0], {
-              color: activeTitleColor,
-              fontSize: '32px',
-              lineHeight: '50px',
-            })
-          } else {
-            gsap.set(items, {
-              autoAlpha: 0,
-              pointerEvents: 'none',
-              y: 16,
-            })
-            gsap.set(items[0], { autoAlpha: 1, pointerEvents: 'auto', y: 0 })
-            gsap.set(descriptions, { autoAlpha: 1, height: 'auto' })
-            if (progressFill) {
-              gsap.set(progressFill, { scaleX: 0, transformOrigin: 'right center' })
-            }
-          }
+          gsap.set(descriptions, { autoAlpha: 0, height: 0 })
+          gsap.set(descriptions[0], {
+            autoAlpha: 1,
+            height: () => descriptions[0].scrollHeight,
+          })
+          gsap.set(titles, {
+            color: inactiveTitleColor,
+            fontSize: '24px',
+            lineHeight: '36px',
+          })
+          gsap.set(titles[0], {
+            color: activeTitleColor,
+            fontSize: '32px',
+            lineHeight: '50px',
+          })
 
           setAccessibleState(0)
 
@@ -177,74 +169,49 @@ export default function PathScrollSection() {
                 transitionStart + 0.04,
               )
 
-            if (desktop) {
-              scrollTimeline
-                .to(
-                  descriptions[previousIndex],
-                  { autoAlpha: 0, duration: 0.28, height: 0 },
-                  transitionStart,
-                )
-                .fromTo(
-                  descriptions[index],
-                  { autoAlpha: 0, height: 0 },
-                  {
-                    autoAlpha: 1,
-                    duration: 0.48,
-                    height: () => descriptions[index].scrollHeight,
-                  },
-                  transitionStart + 0.04,
-                )
-                .to(
-                  titles[previousIndex],
-                  {
-                    color: inactiveTitleColor,
-                    duration: 0.38,
-                    fontSize: '24px',
-                    lineHeight: '36px',
-                  },
-                  transitionStart,
-                )
-                .to(
-                  titles[index],
-                  {
-                    color: activeTitleColor,
-                    duration: 0.48,
-                    fontSize: '32px',
-                    lineHeight: '50px',
-                  },
-                  transitionStart + 0.04,
-                )
-            } else {
-              scrollTimeline
-                .to(
-                  items[previousIndex],
-                  { autoAlpha: 0, duration: 0.28, pointerEvents: 'none', y: -12 },
-                  transitionStart,
-                )
-                .fromTo(
-                  items[index],
-                  { autoAlpha: 0, pointerEvents: 'none', y: 16 },
-                  { autoAlpha: 1, duration: 0.48, pointerEvents: 'auto', y: 0 },
-                  transitionStart + 0.04,
-                )
-
-              if (progressFill) {
-                scrollTimeline.to(
-                  progressFill,
-                  { duration: 0.48, scaleX: index / (PATH_ITEMS.length - 1) },
-                  transitionStart + 0.04,
-                )
-              }
-            }
+            scrollTimeline
+              .to(
+                descriptions[previousIndex],
+                { autoAlpha: 0, duration: 0.28, height: 0 },
+                transitionStart,
+              )
+              .fromTo(
+                descriptions[index],
+                { autoAlpha: 0, height: 0 },
+                {
+                  autoAlpha: 1,
+                  duration: 0.48,
+                  height: () => descriptions[index].scrollHeight,
+                },
+                transitionStart + 0.04,
+              )
+              .to(
+                titles[previousIndex],
+                {
+                  color: inactiveTitleColor,
+                  duration: 0.38,
+                  fontSize: '24px',
+                  lineHeight: '36px',
+                },
+                transitionStart,
+              )
+              .to(
+                titles[index],
+                {
+                  color: activeTitleColor,
+                  duration: 0.48,
+                  fontSize: '32px',
+                  lineHeight: '50px',
+                },
+                transitionStart + 0.04,
+              )
           }
 
           const scrollTrigger = ScrollTrigger.create({
             animation: scrollTimeline,
             anticipatePin: 1,
             end: () => {
-              const stepDistance = desktop ? 640 : Math.max(window.innerHeight * 0.58, 420)
-
-              return `+=${(PATH_ITEMS.length - 1) * stepDistance}`
+              return `+=${(PATH_ITEMS.length - 1) * 640}`
             },
             invalidateOnRefresh: true,
             onUpdate: (self) => {
@@ -252,7 +219,7 @@ export default function PathScrollSection() {
               setAccessibleState(nextIndex)
             },
             pin: pinnedContent,
-            scrub: mobile ? 0.45 : 0.65,
+            scrub: 0.65,
             start: 'top top',
             trigger: section,
           })
@@ -270,17 +237,73 @@ export default function PathScrollSection() {
   )
 
   return (
-    <section ref={sectionRef} className="relative">
-      <div
-        ref={pinnedContentRef}
-        className="flex min-h-[100svh] items-start pt-20 md:items-center md:py-10 lg:min-h-screen lg:py-20"
-      >
-        <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-5 px-4 md:gap-8 md:px-8 lg:gap-10 2xl:px-0">
+    <section ref={sectionRef} className="relative" data-path-section>
+      <div className="mx-auto w-full max-w-[1280px] px-4 py-12 md:px-8 lg:hidden">
+        <div className="mb-6 flex flex-col items-start gap-2 md:mb-8">
+          <div className="flex items-center gap-4">
+            <Typography as="h2" color="neutral-600" lg="32/extrabold" variant="24/extrabold">
+              اهدافی که دنبال میکنیم
+            </Typography>
+          </div>
+          <Typography as="p" color="neutral-500" lg="20/regular" variant="16/regular">
+            ما در این کارخانه، نه فقط فضای کار، که «مسیر موفقیت» را برای فناوران ترسیم می‌کنیم.
+          </Typography>
+        </div>
+
+        <Carousel
+          aria-label="مسیر ایده تا بازار"
+          className="min-w-0"
+          opts={{ align: 'start', direction: 'rtl' }}
+        >
+          <CarouselContent className="ml-0 touch-pan-y">
+            {PATH_ITEMS.map((item, index) => (
+              <CarouselItem
+                aria-label={`${index + 1} از ${PATH_ITEMS.length}`}
+                className="pl-2"
+                key={item.title}
+              >
+                <article className="flex h-full flex-col gap-4 rounded-3xl border border-neutral-200 bg-white p-4">
+                  <div className="relative aspect-[4/3] max-h-[45svh] w-full overflow-hidden rounded-2xl bg-neutral-900">
+                    <Image
+                      fill
+                      alt=""
+                      className="object-cover"
+                      sizes="(min-width: 1024px) 1px, (min-width: 768px) calc(100vw - 96px), calc(100vw - 64px)"
+                      src={item.image}
+                    />
+                  </div>
+                  <Typography as="p" color="neutral-500" variant="14/regular">
+                    {(index + 1).toLocaleString('fa-IR')} از{' '}
+                    {PATH_ITEMS.length.toLocaleString('fa-IR')}
+                  </Typography>
+                  <Typography as="h3" color="neutral-700" variant="20/extrabold">
+                    {item.title}
+                  </Typography>
+                  <Typography as="p" color="neutral-500" variant="16/regular">
+                    {item.description}
+                  </Typography>
+                </article>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          <div className="mt-4 flex justify-center gap-4">
+            <CarouselPrevious aria-label="خدمت قبلی" className="static inset-auto m-0 size-12">
+              <CarouselArrowRightIcon aria-hidden="true" />
+            </CarouselPrevious>
+            <CarouselNext aria-label="خدمت بعدی" className="static inset-auto m-0 size-12">
+              <CarouselArrowRightIcon aria-hidden="true" className="rotate-180" />
+            </CarouselNext>
+          </div>
+        </Carousel>
+      </div>
+
+      <div ref={pinnedContentRef} className="hidden items-center lg:flex lg:min-h-screen">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-5 px-8 pt-40 pb-10 xl:gap-8 2xl:px-0">
           <div className="flex flex-col items-start gap-2">
             <div className="flex items-center gap-4">
               <span aria-hidden="true" className="h-12 w-2 shrink-0 rounded-lg bg-secondary-500" />
               <Typography as="h2" color="neutral-600" md="40/extrabold" variant="32/extrabold">
-                از ایده تا بازار
+                اهدافی که ما دنبال میکنیم
               </Typography>
             </div>
             <Typography as="p" color="neutral-500" variant="20/regular">
@@ -288,8 +311,8 @@ export default function PathScrollSection() {
             </Typography>
           </div>
 
-          <div className="flex flex-col gap-4 md:gap-6 lg:flex-row lg:items-center lg:gap-10">
-            <div className="relative h-[180px] w-full overflow-hidden rounded-3xl bg-neutral-900 md:h-[300px] lg:h-[600px] lg:w-[600px] lg:rounded-[40px]">
+          <div className="flex flex-row items-center gap-5 xl:gap-8">
+            <div className="relative h-[clamp(388px,calc(100svh-220px),580px)] w-[600px] overflow-hidden rounded-[40px] bg-neutral-900">
               {PATH_ITEMS.map((item, index) => (
                 <div
                   className={`absolute inset-0 will-change-[opacity,transform] ${index === 0 ? 'opacity-100' : 'opacity-0'}`}
@@ -310,7 +333,7 @@ export default function PathScrollSection() {
 
             <div
               ref={listRef}
-              className="relative h-[190px] min-w-0 shrink-0 overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-[0_8px_30px_rgb(10_10_10/0.06)] motion-reduce:h-auto motion-reduce:overflow-visible motion-reduce:rounded-none motion-reduce:border-0 motion-reduce:bg-transparent motion-reduce:shadow-none lg:flex lg:h-[600px] lg:flex-1 lg:flex-col lg:overflow-hidden lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none"
+              className="relative flex h-[clamp(388px,calc(100svh-220px),580px)] min-w-0 flex-1 flex-col overflow-hidden motion-reduce:h-auto motion-reduce:overflow-visible"
             >
               <div
                 aria-hidden="true"
@@ -329,7 +352,7 @@ export default function PathScrollSection() {
 
               {PATH_ITEMS.map((item, index) => (
                 <article
-                  className={`absolute inset-x-0 top-10 bottom-0 flex flex-col gap-2 px-4 pt-2 pb-4 motion-reduce:static motion-reduce:border-y motion-reduce:border-neutral-200 motion-reduce:px-0 motion-reduce:py-3 lg:static lg:border-y lg:border-neutral-200 lg:px-0 lg:py-6 ${index === 0 ? 'opacity-100' : 'opacity-0 motion-reduce:opacity-100 lg:opacity-100'}`}
+                  className={`static flex flex-col gap-2 border-y border-neutral-200 px-0 py-2 motion-reduce:py-3 xl:py-4 ${index === 0 ? 'opacity-100' : 'opacity-0 motion-reduce:opacity-100 lg:opacity-100'}`}
                   data-path-item
                   key={item.title}
                 >
