@@ -270,7 +270,7 @@ export default function PathScrollSection() {
   )
 
   return (
-    <section ref={sectionRef} className="relative bg-neutral-50">
+    <section ref={sectionRef} className="relative">
       <div
         ref={pinnedContentRef}
         className="flex min-h-[100svh] items-start pt-20 md:items-center md:py-10 lg:min-h-screen lg:py-20"

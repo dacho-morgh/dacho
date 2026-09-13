@@ -1,11 +1,9 @@
 'use client'
 
-import { cn } from '@/utilities/ui'
 import React, { useEffect, useRef } from 'react'
-
 import type { Props as MediaProps } from '@/components/Media/types'
-
 import { getMediaUrl } from '@/utilities/getMediaUrl'
+import { cn } from '@/utilities/ui'
 
 export const VideoMedia: React.FC<MediaProps> = (props) => {
   const { onClick, resource, videoClassName } = props
@@ -24,20 +22,23 @@ export const VideoMedia: React.FC<MediaProps> = (props) => {
   }, [])
 
   if (resource && typeof resource === 'object') {
-    const { filename } = resource
+    const { filename, mimeType, updatedAt, url } = resource
+    const src = getMediaUrl(url || (filename ? `/api/media/file/${filename}` : null), updatedAt)
+
+    if (!src) return null
 
     return (
       <video
         autoPlay
         className={cn(videoClassName)}
-        controls={false}
+        controls
         loop
         muted
         onClick={onClick}
         playsInline
         ref={videoRef}
       >
-        <source src={getMediaUrl(`/media/${filename}`)} />
+        <source src={src} type={mimeType || undefined} />
       </video>
     )
   }

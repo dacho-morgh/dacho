@@ -130,12 +130,14 @@ export interface Config {
   globals: {
     header: Header;
     footer: Footer;
+    'about-us': AboutUs;
     'contact-us': ContactUs;
     'site-settings': SiteSetting;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
     footer: FooterSelect<false> | FooterSelect<true>;
+    'about-us': AboutUsSelect<false> | AboutUsSelect<true>;
     'contact-us': ContactUsSelect<false> | ContactUsSelect<true>;
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
   };
@@ -2454,6 +2456,24 @@ export interface Footer {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "about-us".
+ */
+export interface AboutUs {
+  id: number;
+  introduction: {
+    heading: string;
+    description: string;
+    statement: string;
+    /**
+     * Upload an image or video for the introduction section.
+     */
+    media?: (number | null) | Media;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "contact-us".
  */
 export interface ContactUs {
@@ -2600,6 +2620,23 @@ export interface FooterSelect<T extends boolean = true> {
         url?: T;
         icon?: T;
         id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "about-us_select".
+ */
+export interface AboutUsSelect<T extends boolean = true> {
+  introduction?:
+    | T
+    | {
+        heading?: T;
+        description?: T;
+        statement?: T;
+        media?: T;
       };
   updatedAt?: T;
   createdAt?: T;

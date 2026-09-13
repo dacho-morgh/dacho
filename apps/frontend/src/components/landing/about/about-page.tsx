@@ -1,7 +1,9 @@
+import type { AboutUs } from '@dacho/cms-core'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { TickCircleIcon } from '@/components/icons'
+import { Media } from '@/components/Media'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
@@ -74,35 +76,58 @@ function TickItem({ children }: { children: ReactNode }) {
   )
 }
 
-function IntroductionSection() {
+const INTRODUCTION_FALLBACK = {
+  heading: 'پیوند هوشمندانه صنعت و فناوری در قلب انرژی کشور',
+  description:
+    'کارخانه نوآوری نفت، گاز و پتروشیمی بوشهر، با هدف راه‌اندازی نخستین هاب تخصصی نوآوری در حوزه انرژی‌های فسیلی و تجدیدپذیر در منطقه راهبردی عسلویه شکل گرفته است.',
+  statement: 'رسالت ما، تبدیل چالش‌های واقعی صنعت به راهکارهای فناورانه و اقتصادی است',
+}
+
+function IntroductionSection({ content }: { content?: AboutUs['introduction'] | null }) {
+  const heading = content?.heading || INTRODUCTION_FALLBACK.heading
+  const description = content?.description || INTRODUCTION_FALLBACK.description
+  const statement = content?.statement || INTRODUCTION_FALLBACK.statement
+
   return (
     <section className="mx-auto flex min-h-200 w-full max-w-7xl flex-col justify-center gap-10 px-4 py-16 pt-25 md:px-8 lg:flex-row lg:items-center lg:py-20 lg:pt-40 2xl:px-0">
       <div className="flex flex-1 flex-col gap-8 lg:max-w-150">
         <div className="flex flex-col gap-4">
           <Typography as="h1" color="neutral-700" lg="48/black" variant="24/extrabold">
-            پیوند هوشمندانه صنعت و فناوری در قلب انرژی کشور
+            {heading}
           </Typography>
           <Typography as="p" color="neutral-500" lg="20/regular" variant="16/regular">
-            کارخانه نوآوری نفت، گاز و پتروشیمی بوشهر، با هدف راه‌اندازی نخستین هاب تخصصی نوآوری در
-            حوزه انرژی‌های فسیلی و تجدیدپذیر در منطقه راهبردی عسلویه شکل گرفته است.
+            {description}
           </Typography>
         </div>
         <div className="flex items-stretch gap-4">
           <span aria-hidden="true" className="w-2 shrink-0 rounded-lg bg-secondary-500" />
           <Typography as="p" color="neutral-600" lg="20/bold" variant="16/semibold">
-            رسالت ما، تبدیل چالش‌های واقعی صنعت به راهکارهای فناورانه و اقتصادی است
+            {statement}
           </Typography>
         </div>
       </div>
       <div className="relative aspect-square w-full overflow-hidden rounded-[40px] lg:w-1/2 lg:max-w-160">
-        <Image
-          fill
-          priority
-          alt="نمونه‌ای از هویت بصری و فعالیت‌های کارخانه نوآوری"
-          className="object-cover"
-          sizes="(min-width: 1024px) 50vw, 100vw"
-          src="/figma/about/about-hero.png"
-        />
+        {content?.media ? (
+          <Media
+            fill
+            priority
+            htmlElement={null}
+            imgClassName="object-cover"
+            pictureClassName="absolute inset-0 size-full"
+            resource={content.media}
+            size="(min-width: 1024px) 50vw, 100vw"
+            videoClassName="size-full object-cover"
+          />
+        ) : (
+          <Image
+            fill
+            priority
+            alt="نمونه‌ای از هویت بصری و فعالیت‌های کارخانه نوآوری"
+            className="object-cover"
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            src="/figma/about/about-hero.png"
+          />
+        )}
       </div>
     </section>
   )
@@ -111,7 +136,7 @@ function IntroductionSection() {
 function VisionSection() {
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-20 md:px-8 lg:py-40 2xl:px-0">
-      <article className="flex flex-col gap-10 rounded-[40px] bg-white p-5 shadow-[0_0_20px_rgb(10_10_10/0.1)] sm:p-8 lg:flex-row lg:items-stretch lg:rounded-[80px] lg:p-10">
+      <article className="flex flex-col gap-10 rounded-[40px] p-5 shadow-[0_0_20px_rgb(10_10_10/0.1)] sm:p-8 lg:flex-row lg:items-stretch lg:rounded-[80px] lg:p-10">
         <div className="order-2 flex min-w-0 flex-1 flex-col justify-center gap-4 lg:py-10">
           <Typography as="h3" color="neutral-800" variant="24/bold">
             چشم‌انداز و اهداف کلیدی
@@ -151,7 +176,7 @@ function ServiceCard({ service, index }: { service: Service; index: number }) {
     <article
       data-service-card
       className={cn(
-        'relative flex flex-col gap-4 rounded-4xl bg-white p-6 shadow-[0_0_10px_rgb(10_10_10/0.05)] sm:p-10 lg:w-[800px] lg:rounded-[40px]',
+        'relative flex flex-col gap-4 rounded-4xl p-6 shadow-[0_0_10px_rgb(10_10_10/0.05)] sm:p-10 lg:w-[800px] lg:rounded-[40px]',
       )}
       style={{ zIndex: index + 1 }}
     >

@@ -21,6 +21,7 @@ import { Sponsors } from './collections/Sponsors'
 import { Users } from './collections/Users'
 import { openApiEndpoint } from './endpoints/openapi'
 import { Footer } from './Footer/config'
+import { AboutUs } from './globals/AboutUs'
 import { ContactUs } from './globals/ContactUs'
 import { SiteSettings } from './globals/SiteSettings'
 import { Header } from './Header/config'
@@ -165,7 +166,7 @@ export default buildConfig({
   // Pin it to the public HTTPS origin instead.
   serverURL: getServerSideURL(),
   cors: [getServerSideURL(), 'http://localhost:8080', 'http://127.0.0.1:8080'].filter(Boolean),
-  globals: [Header, Footer, ContactUs, SiteSettings],
+  globals: [Header, Footer, AboutUs, ContactUs, SiteSettings],
   endpoints: [openApiEndpoint],
   plugins,
   secret: payloadSecret,
