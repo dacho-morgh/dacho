@@ -11,9 +11,24 @@
 export const getMediaUrl = (url: string | null | undefined, cacheTag?: string | null): string => {
   if (!url) return ''
 
+  let mediaUrl = url
+
+  try {
+    const parsedUrl = new URL(url)
+
+    if (parsedUrl.pathname.startsWith('/api/media/file/')) {
+      mediaUrl = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`
+    }
+  } catch {
+    // Relative media URLs are already in the form Next Image expects.
+  }
+
   if (cacheTag && cacheTag !== '') {
     cacheTag = encodeURIComponent(cacheTag)
   }
 
-  return cacheTag ? `${url}?${cacheTag}` : url
+  if (!cacheTag) return mediaUrl
+
+  const separator = mediaUrl.includes('?') ? '&' : '?'
+  return `${mediaUrl}${separator}${cacheTag}`
 }

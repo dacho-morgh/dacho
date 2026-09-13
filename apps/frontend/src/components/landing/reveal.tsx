@@ -1,11 +1,6 @@
 'use client'
 
-import { useGSAP } from '@gsap/react'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { useRef, type ReactNode } from 'react'
-
-gsap.registerPlugin(useGSAP, ScrollTrigger)
+import { useEffect, useRef, type ReactNode } from 'react'
 
 type RevealProps = {
   children: ReactNode
@@ -27,15 +22,17 @@ type RevealProps = {
 const Reveal = ({ children, className, delay = 0.3, distance = 48 }: RevealProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null)
 
-  useGSAP(
-    () => {
+  useEffect(() => {
       if (typeof window === 'undefined' || window.matchMedia('(max-width: 767px)').matches) return
       const wrapper = wrapperRef.current
       if (!wrapper) return
-
-      const media = gsap.matchMedia()
-
-      media.add(
+      let cancelled = false
+      let cleanup = () => {}
+      void Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(([{ default: gsap }, { ScrollTrigger }]) => {
+        if (cancelled) return
+        gsap.registerPlugin(ScrollTrigger)
+        const media = gsap.matchMedia()
+        media.add(
         {
           desktop: '(min-width: 768px)',
           reduceMotion: '(prefers-reduced-motion: reduce)',
@@ -68,12 +65,11 @@ const Reveal = ({ children, className, delay = 0.3, distance = 48 }: RevealProps
             },
           )
         },
-      )
-
-      return () => media.revert()
-    },
-    { scope: wrapperRef },
-  )
+        )
+        cleanup = () => media.revert()
+      })
+      return () => { cancelled = true; cleanup() }
+  }, [delay, distance])
 
   return (
     <div ref={wrapperRef} className={className}>

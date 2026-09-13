@@ -16,6 +16,7 @@ import { Posts } from './collections/Posts'
 import { Reviews } from './collections/Reviews'
 import { Roles } from './collections/Roles'
 import { Services } from './collections/Services'
+import { Sliders } from './collections/Sliders'
 import { Sponsors } from './collections/Sponsors'
 import { Users } from './collections/Users'
 import { openApiEndpoint } from './endpoints/openapi'
@@ -155,6 +156,7 @@ export default buildConfig({
     Services,
     Events,
     Exhibitions,
+    Sliders,
   ],
   // Explicit serverURL: without this Payload derives it from the inbound
   // request, which is plain HTTP behind Caddy (TLS terminated). That makes

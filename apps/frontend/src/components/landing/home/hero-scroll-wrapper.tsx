@@ -1,25 +1,23 @@
 'use client'
 
-import { useGSAP } from '@gsap/react'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { useRef, type ReactNode } from 'react'
-
-gsap.registerPlugin(useGSAP, ScrollTrigger)
+import { useEffect, useRef, type ReactNode } from 'react'
 
 export default function HeroScrollWrapper({ children }: { children: ReactNode }) {
   const sectionRef = useRef<HTMLElement>(null)
 
-  useGSAP(
-    () => {
+  useEffect(() => {
       if (typeof window === 'undefined' || window.matchMedia('(max-width: 1023px)').matches) return
       const section = sectionRef.current
       if (!section) return
 
-      const media = gsap.matchMedia()
-
-      media.add('(min-width: 1024px) and (prefers-reduced-motion: no-preference)', () => {
-        gsap.to(section, {
+      let cancelled = false
+      let cleanup = () => {}
+      void Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(([{ default: gsap }, { ScrollTrigger }]) => {
+        if (cancelled) return
+        gsap.registerPlugin(ScrollTrigger)
+        const media = gsap.matchMedia()
+        media.add('(min-width: 1024px) and (prefers-reduced-motion: no-preference)', () => {
+          gsap.to(section, {
           paddingLeft: 'clamp(1rem, 6vw, 6rem)',
           paddingRight: 'clamp(1rem, 6vw, 6rem)',
           ease: 'none',
@@ -29,13 +27,12 @@ export default function HeroScrollWrapper({ children }: { children: ReactNode })
             end: '+=480',
             scrub: 2,
           },
+          })
         })
+        cleanup = () => media.revert()
       })
-
-      return () => media.revert()
-    },
-    { scope: sectionRef },
-  )
+      return () => { cancelled = true; cleanup() }
+  }, [])
 
   return (
     <section

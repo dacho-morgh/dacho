@@ -6,6 +6,7 @@ import {
   VisionSection,
 } from '@/components/landing/about/about-page'
 import PathScrollSection from '@/components/landing/about/path-scroll-section'
+import FaqSection from '@/components/landing/home/faq-section'
 import Reveal from '@/components/landing/reveal'
 import ScrollProvider from '@/components/landing/scroll-provider'
 import { createPageMetadata } from '@/utilities/siteMetadata'
@@ -29,6 +30,9 @@ export default function AboutPage() {
       <ServicesSection />
       <Reveal delay={0.1}>
         <AboutCallToAction />
+      </Reveal>
+      <Reveal>
+        <FaqSection />
       </Reveal>
     </main>
   )

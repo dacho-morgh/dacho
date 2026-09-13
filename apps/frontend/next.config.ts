@@ -73,4 +73,60 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['192.168.100.14', '192.168.0.113', '127.0.0.1'],
 }
 
-export default withPayload(nextConfig, { devBundleServerPackages: false })
+const payloadConfig = withPayload(nextConfig, { devBundleServerPackages: false })
+const colorSchemeHintHeaders = new Set(['accept-ch', 'critical-ch', 'vary'])
+const colorSchemeHint = 'Sec-CH-Prefers-Color-Scheme'
+
+const withoutColorSchemeHint = (header: { key: string; value: string }) => {
+  if (!colorSchemeHintHeaders.has(header.key.toLowerCase())) return header
+
+  const values = header.value
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.toLowerCase() !== colorSchemeHint.toLowerCase())
+
+  return values.length > 0 ? { ...header, value: values.join(', ') } : null
+}
+
+const configWithScopedPayloadHeaders: NextConfig = {
+  ...payloadConfig,
+  headers: async () => {
+    const configuredHeaders = payloadConfig.headers ? await payloadConfig.headers() : []
+    const adminHeaders: Array<{
+      source: string
+      headers: Array<{ key: string; value: string }>
+    }> = []
+    let adminRuleAdded = false
+
+    const headers = configuredHeaders.flatMap((rule) => {
+      const retained = rule.headers
+        .map(withoutColorSchemeHint)
+        .filter((header): header is { key: string; value: string } => header !== null)
+      const removedColorSchemeHints = rule.headers.some(
+        (header) =>
+          colorSchemeHintHeaders.has(header.key.toLowerCase()) &&
+          header.value
+            .split(',')
+            .some((value) => value.trim().toLowerCase() === colorSchemeHint.toLowerCase()),
+      )
+
+      if (removedColorSchemeHints && !adminRuleAdded) {
+        adminRuleAdded = true
+        adminHeaders.push({
+          source: '/admin/:path*',
+          headers: [
+            { key: 'Accept-CH', value: colorSchemeHint },
+            { key: 'Vary', value: colorSchemeHint },
+            { key: 'Critical-CH', value: colorSchemeHint },
+          ],
+        })
+      }
+
+      return retained.length > 0 ? [{ ...rule, headers: retained }] : []
+    })
+
+    return [...headers, ...adminHeaders]
+  },
+}
+
+export default configWithScopedPayloadHeaders

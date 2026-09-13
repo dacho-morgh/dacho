@@ -1,15 +1,10 @@
 'use client'
 
-import { useGSAP } from '@gsap/react'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Link from 'next/link'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { ShapeIcon, ShapeIconDark } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
-
-gsap.registerPlugin(useGSAP, ScrollTrigger)
 
 type RecruitmentSectionProps = {
   variant?: 'blue' | 'gold'
@@ -24,12 +19,16 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
   const sectionRef = useRef<HTMLElement>(null)
   const shapeRef = useRef<HTMLDivElement>(null)
 
-  useGSAP(
-    () => {
+  useEffect(() => {
+    let cancelled = false
+    let cleanup = () => {}
+    void Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(([{ default: gsap }, { ScrollTrigger }]) => {
+      if (cancelled) return
       const section = sectionRef.current
       const shape = shapeRef.current
 
       if (!section || !shape) return
+      gsap.registerPlugin(ScrollTrigger)
 
       const paths = gsap.utils.toArray<SVGPathElement>('path', shape)
       if (paths.length === 0) return
@@ -81,14 +80,17 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
         section.addEventListener('pointerenter', handlePointerEnter)
       }
 
-      return () => {
+      cleanup = () => {
         section.removeEventListener('pointerenter', handlePointerEnter)
         activeTimeline?.kill()
         entranceTrigger.kill()
       }
-    },
-    { scope: sectionRef },
-  )
+    })
+    return () => {
+      cancelled = true
+      cleanup()
+    }
+  }, [])
 
   return (
     <section

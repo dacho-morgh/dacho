@@ -80,6 +80,7 @@ export interface Config {
     services: Service;
     events: Event;
     exhibitions: Exhibition;
+    sliders: Slider;
     redirects: Redirect;
     forms: Form;
     'form-submissions': FormSubmission;
@@ -110,6 +111,7 @@ export interface Config {
     services: ServicesSelect<false> | ServicesSelect<true>;
     events: EventsSelect<false> | EventsSelect<true>;
     exhibitions: ExhibitionsSelect<false> | ExhibitionsSelect<true>;
+    sliders: SlidersSelect<false> | SlidersSelect<true>;
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
@@ -1175,6 +1177,27 @@ export interface News {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sliders".
+ */
+export interface Slider {
+  id: number;
+  name: string;
+  images: {
+    /**
+     * Landscape image for desktop and tablet. Only JPG and WebP are allowed.
+     */
+    landscapeImage: number | Media;
+    /**
+     * Portrait image for mobile screens. Only JPG and WebP are allowed.
+     */
+    mobileImage: number | Media;
+    id?: string | null;
+  }[];
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "redirects".
  */
 export interface Redirect {
@@ -1423,6 +1446,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'exhibitions';
         value: number | Exhibition;
+      } | null)
+    | ({
+        relationTo: 'sliders';
+        value: number | Slider;
       } | null)
     | ({
         relationTo: 'redirects';
@@ -2012,6 +2039,22 @@ export interface ExhibitionsSelect<T extends boolean = true> {
   startDate?: T;
   endDate?: T;
   status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sliders_select".
+ */
+export interface SlidersSelect<T extends boolean = true> {
+  name?: T;
+  images?:
+    | T
+    | {
+        landscapeImage?: T;
+        mobileImage?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

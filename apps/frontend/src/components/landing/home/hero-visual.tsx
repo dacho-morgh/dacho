@@ -1,18 +1,21 @@
 'use client'
 
-import { useGSAP } from '@gsap/react'
-import gsap from 'gsap'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import HeroProofCard from '@/components/landing/home/hero-proof-card'
-
-gsap.registerPlugin(useGSAP)
 
 const HeroVisual = ({ children }: { children?: React.ReactNode }) => {
   const panelRef = useRef<HTMLDivElement>(null)
   const proofFieldRef = useRef<HTMLDivElement>(null)
 
-  useGSAP(
-    () => {
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const supportsCursorMotion = window.matchMedia('(hover: hover) and (pointer: fine)')
+    if (reducedMotion.matches || !supportsCursorMotion.matches) return
+    let cancelled = false
+    let cleanup = () => {}
+    void import('gsap').then(({ default: gsap }) => {
+      if (cancelled) return
       const panel = panelRef.current
       const proofField = proofFieldRef.current
 
@@ -21,14 +24,6 @@ const HeroVisual = ({ children }: { children?: React.ReactNode }) => {
       const proofCards = gsap.utils.toArray<HTMLElement>('[data-hero-proof]', proofField)
       const gravityCards = gsap.utils.toArray<HTMLElement>('[data-gravity-card]', proofField)
       if (proofCards.length === 0) return
-
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      const supportsCursorMotion = window.matchMedia('(hover: hover) and (pointer: fine)').matches
-
-      if (reducedMotion || !supportsCursorMotion) {
-        gsap.set(proofCards, { clearProps: 'all' })
-        return
-      }
 
       gsap.set(panel, { perspective: 1000 })
 
@@ -105,13 +100,14 @@ const HeroVisual = ({ children }: { children?: React.ReactNode }) => {
       panel.addEventListener('pointermove', handlePointerMove)
       panel.addEventListener('pointerleave', resetPosition)
 
-      return () => {
+      cleanup = () => {
         panel.removeEventListener('pointermove', handlePointerMove)
         panel.removeEventListener('pointerleave', resetPosition)
+        gsap.killTweensOf([...proofCards, ...gravityCards])
       }
-    },
-    { scope: panelRef },
-  )
+    })
+    return () => { cancelled = true; cleanup() }
+  }, [])
 
   return (
     <div
