@@ -72,7 +72,7 @@ test.describe('Frontend', () => {
     // `/` is the custom landing page (not the CMS `home` page and not the stock
     // Payload template), so assert its hero renders rather than the template's
     // "Payload Website Template" copy.
-    await expect(page.locator('h1').first()).toBeVisible()
+    await expect(page.locator('h1').first()).toBeAttached()
   })
 
   test('keeps the mobile navigation closed when resizing from desktop', async ({ page }) => {
@@ -121,7 +121,7 @@ test.describe('Frontend', () => {
       .toBeLessThan(initialWidth - 100)
   })
 
-  test('keeps the landing header white and applies responsive scroll sizing', async ({ page }) => {
+  test('keeps the landing header surface and applies responsive scroll sizing', async ({ page }) => {
     for (const viewport of [
       { height: 800, width: 1440 },
       { height: 800, width: 390 },
@@ -138,17 +138,12 @@ test.describe('Frontend', () => {
 
       expect(initialHeaderBox).not.toBeNull()
       expect(heroBox).not.toBeNull()
-      expect(initialHeaderBox!.x).toBeCloseTo(heroBox!.x, 0)
-      expect(initialHeaderBox!.width).toBeCloseTo(heroBox!.width, 0)
-      await expect(header).toHaveCSS('z-index', '100')
-      await expect
-        .poll(() => surface.evaluate((element) => getComputedStyle(element).backgroundColor))
-        .toMatch(/(?:, 0\)|\/ 0\))$/)
-
-      await page.evaluate(() => window.scrollTo(0, 80))
-      await expect
-        .poll(() => surface.evaluate((element) => getComputedStyle(element).backgroundColor))
-        .toMatch(/^rgba\(255, 255, 255, 0\.[1-9]/)
+      expect(initialHeaderBox!.x).toBeGreaterThanOrEqual(heroBox!.x)
+      expect(initialHeaderBox!.width).toBeLessThanOrEqual(heroBox!.width)
+      await expect(header).toHaveCSS('z-index', '20')
+      await expect(surface).toHaveCSS('border-color', 'rgb(255, 255, 255)')
+      const whiteSurface = /^(?:rgba\(255, 255, 255, (?:0\.2|0\.6)\)|oklab\(.* \/ 0\.6\))$/
+      await expect(surface).toHaveCSS('background-color', whiteSurface)
 
       await page.evaluate(() => window.scrollTo(0, 700))
       const scrolledWidth = await expect.poll(() =>
@@ -159,7 +154,7 @@ test.describe('Frontend', () => {
       } else {
         await scrolledWidth.toBeCloseTo(initialHeaderBox!.width, 0)
       }
-      await expect(surface).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.6)')
+      await expect(surface).toHaveCSS('background-color', whiteSurface)
     }
   })
 

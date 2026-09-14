@@ -13,6 +13,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel'
+import { Typography } from '@/components/ui/typography'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
 import { cn } from '@/utilities/ui'
 
@@ -132,6 +133,9 @@ export function HeroSliderSectionClient({ images, name }: HeroSliderSectionClien
       aria-label={name}
       className="relative mx-auto h-180 w-full max-w-[1600px] px-4 pt-25 pb-8 lg:h-screen lg:px-10 lg:pt-28 lg:pb-10"
     >
+      <Typography as="h1" className="sr-only" variant="32/extrabold">
+        کارخانه نوآوری صنایع انرژی بوشهر
+      </Typography>
       <div className="relative h-full w-full overflow-hidden rounded-3xl bg-neutral-900 shadow-lg">
         <Carousel
           className="h-full w-full [&>[data-slot=carousel-content]]:h-full"

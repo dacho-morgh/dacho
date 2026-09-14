@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import HeroSliderSection from '@/components/landing/home/hero-slider-section'
 import HeroSliderSectionSkeleton from '@/components/landing/home/hero-slider-section-skeleton'
 import LogoStripSection from '@/components/landing/home/logo-strip-section'
-// import ServicesSection from '@/components/landing/home/services-section'
+import ServicesSection from '@/components/landing/home/services-section'
 import Reveal from '@/components/landing/reveal'
 import { createPageMetadata } from '@/utilities/siteMetadata'
 
@@ -28,9 +28,9 @@ export default function HomePage() {
       <Suspense fallback={<HeroSliderSectionSkeleton />}>
         <HeroSliderSection />
       </Suspense>
-      {/* <Reveal>
+      <Reveal>
         <ServicesSection />
-      </Reveal> */}
+      </Reveal>
       <Reveal>
         <EventsSection />
       </Reveal>

@@ -312,7 +312,7 @@ export default function PathScrollSection() {
           </div>
 
           <div className="flex flex-row items-center gap-5 xl:gap-8">
-            <div className="relative h-[clamp(388px,calc(100svh-220px),580px)] w-[600px] overflow-hidden rounded-[40px] bg-neutral-900">
+            <div className="relative h-[clamp(360px,calc(100svh-21rem),580px)] w-[600px] overflow-hidden rounded-[40px] bg-neutral-900">
               {PATH_ITEMS.map((item, index) => (
                 <div
                   className={`absolute inset-0 will-change-[opacity,transform] ${index === 0 ? 'opacity-100' : 'opacity-0'}`}
@@ -333,7 +333,7 @@ export default function PathScrollSection() {
 
             <div
               ref={listRef}
-              className="relative flex h-[clamp(388px,calc(100svh-220px),580px)] min-w-0 flex-1 flex-col overflow-hidden motion-reduce:h-auto motion-reduce:overflow-visible"
+              className="relative flex h-[clamp(360px,calc(100svh-21rem),580px)] min-w-0 flex-1 flex-col overflow-hidden motion-reduce:h-auto motion-reduce:overflow-visible"
             >
               <div
                 aria-hidden="true"
