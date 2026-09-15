@@ -13,6 +13,7 @@ import {
   getLoginUrl,
   getSafeReturnUrl,
 } from '@/utilities/auth-return-url'
+import { isSeniorManagerUser } from '@/utilities/dashboard-server'
 import { cn } from '@/utilities/ui'
 
 export const metadata: Metadata = {
@@ -36,12 +37,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   if (!user) redirect(getLoginUrl(returnUrl))
-  if (user.cmsRole === 'admin' || user.cmsRole === 'editor') redirect('/admin')
+
+  const isSeniorManager = await isSeniorManagerUser(payload, user)
 
   return (
     <SidebarProvider defaultOpen={true}>
       <div className={cn('flex min-h-screen w-full bg-[#F8FAFC] text-slate-800 antialiased', GeistMono.variable)} dir="rtl">
-        <DashboardSidebar user={user} />
+        <DashboardSidebar user={user} isSeniorManager={isSeniorManager} />
         <SidebarInset className="flex min-w-0 flex-1 flex-col bg-[#F8FAFC]">
           <SidebarTrigger
             aria-label="باز کردن منو"

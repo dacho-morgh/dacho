@@ -21,6 +21,7 @@ import {
   type RequestDto,
   type RequestStats,
 } from '@/utilities/dashboard-api'
+import { isSeniorManagerUser } from '@/utilities/dashboard-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +47,9 @@ export default async function DashboardPage() {
   const payload = await getPayload({ config: configPromise })
   const requestHeaders = await headers()
   const { user } = await payload.auth({ headers: requestHeaders })
-  if (user?.role === 'staff') return <CompanyList />
+  const isSeniorManager = await isSeniorManagerUser(payload, user)
+  if (isSeniorManager) return <CompanyList />
+
 
   // CMS-owned definitions read server-side via Payload's local API.
   const { docs: services } = await payload.find({ collection: 'services', limit: 100 })

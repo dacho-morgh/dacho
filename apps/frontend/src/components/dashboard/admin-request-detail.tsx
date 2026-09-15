@@ -12,7 +12,7 @@ export function AdminRequestDetail({ id }: { id: string }) {
   const request = data?.request
   return (
     <main className="flex min-w-0 flex-1 flex-col gap-4 p-4 lg:pt-10" dir="rtl">
-      <Link href="/dashboard/admin/requests">
+      <Link href="/dashboard/requests">
         <Typography variant="14/regular" color="brand-600">
           درخواست ها / {data?.owner?.companyName || data?.owner?.name || 'جزئیات درخواست'}
         </Typography>
@@ -29,7 +29,7 @@ export function AdminRequestDetail({ id }: { id: string }) {
           </div>
         </div>
           {request?.ownerId ? <Button asChild variant="outline" size="40">
-            <Link href={`/dashboard/admin/companies/${request.ownerId}`}>
+            <Link href={`/dashboard/companies/${request.ownerId}`}>
               <Typography variant="14/regular">مشاهده پروفایل شرکت</Typography>
             </Link>
           </Button> : <Typography variant="14/regular" color="muted">پروفایل شرکت در دسترس نیست</Typography>}
@@ -51,7 +51,7 @@ export function AdminRequestDetail({ id }: { id: string }) {
             {request?.currentStep && <Typography variant="14/regular" color="secondary">مرحله فعلی: {request.currentStep}</Typography>}
           </div>
           {request ? <Button asChild size="40" className="self-end lg:self-center">
-            <Link href={`/dashboard/admin/requests/${id}/evaluation`}>
+            <Link href={`/dashboard/requests/${id}/evaluation`}>
               <Typography variant="14/regular" color="white">ارزیابی درخواست</Typography>
             </Link>
           </Button> : <Typography variant="14/regular" color="muted">در حال بارگذاری...</Typography>}

@@ -34,7 +34,7 @@ const columns: AdminColumn<Request>[] = [
     id: 'company',
     header: 'نام شرکت',
     render: (item) => (
-      <Link href={`/dashboard/admin/requests/${item.id}`} className="flex items-center gap-2">
+      <Link href={`/dashboard/requests/${item.id}`} className="flex items-center gap-2">
         {text(item.company)}
       </Link>
     ),
@@ -53,7 +53,7 @@ const columns: AdminColumn<Request>[] = [
     id: 'actions',
     render: (item) => (
       <AdminRowActions
-        viewHref={`/dashboard/admin/requests/${item.id}`}
+        viewHref={`/dashboard/requests/${item.id}`}
       />
     ),
   },

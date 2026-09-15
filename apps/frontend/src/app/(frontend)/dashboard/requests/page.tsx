@@ -1,9 +1,13 @@
+import configPromise from '@payload-config'
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
+import { getPayload } from 'payload'
 import React from 'react'
 
+import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import { RequestsListView, type RequestItem } from '@/components/dashboard/requests'
 import { mapRequestItem, type Paginated, type RequestDto } from '@/utilities/dashboard-api'
-import { serverDashboardFetch } from '@/utilities/dashboard-server'
+import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +17,14 @@ export const metadata: Metadata = {
 }
 
 export default async function RequestsPage() {
+  const payload = await getPayload({ config: configPromise })
+  const { user } = await payload.auth({ headers: await headers() })
+  const isSeniorManager = await isSeniorManagerUser(payload, user)
+
+  if (isSeniorManager) {
+    return <AdminRequestList />
+  }
+
   const res = await serverDashboardFetch<Paginated<RequestDto>>('/requests?limit=100')
   const items: RequestItem[] = (res?.items ?? []).map(mapRequestItem)
 

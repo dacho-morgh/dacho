@@ -9,6 +9,7 @@ import {
   RequestsIcon,
   LettersIcon,
   EventsIcon,
+  PeopleIcon,
   MoreOptionsIcon,
   type SidebarIconProps,
   BrandSandoqLogomark,
@@ -31,7 +32,7 @@ export interface NavItem {
   exact?: boolean
 }
 
-const defaultNavItems: NavItem[] = [
+const applicantNavItems: NavItem[] = [
   {
     title: 'داشبورد',
     href: '/dashboard',
@@ -60,17 +61,90 @@ const defaultNavItems: NavItem[] = [
   },
 ]
 
-interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+const seniorManagerNavItems: NavItem[] = [
+  {
+    title: 'داشبورد',
+    href: '/dashboard',
+    icon: DashboardIcon,
+    exact: true,
+  },
+  {
+    title: 'شرکت ها',
+    href: '/dashboard/companies',
+    icon: EventsIcon,
+  },
+  {
+    title: 'کارکنان',
+    href: '/dashboard/employees',
+    icon: PeopleIcon,
+  },
+  {
+    title: 'درخواست ها',
+    href: '/dashboard/requests',
+    icon: RequestsIcon,
+  },
+  {
+    title: 'نامه‌ها',
+    href: '/dashboard/letters',
+    icon: LettersIcon,
+  },
+  {
+    title: 'رویدادها و نمایشگاه‌ها',
+    href: '/dashboard/events',
+    icon: EventsIcon,
+  },
+  {
+    title: 'پشتیبانی',
+    href: '/dashboard/support',
+    icon: LettersIcon,
+  },
+]
+
+export interface SidebarUser {
+  name?: string | null
+  email?: string | null
+  role?: string | null
+  cmsRole?: string | null
+  position?: string | null
+  companyName?: string | null
+  roles?: Array<number | string | { id?: number | string; name?: string | null }> | null
+}
+
+export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  user?: SidebarUser | null
+  isSeniorManager?: boolean
   companyName?: string
   fundName?: string
 }
 
 export function AppSidebar({
-  companyName = 'نام شرکت نمونه',
+  user,
+  isSeniorManager: isSeniorManagerProp,
+  companyName: companyNameProp,
   className,
   ...props
 }: AppSidebarProps) {
   const pathname = usePathname()
+
+  const isSeniorManager =
+    isSeniorManagerProp ??
+    Boolean(
+      user?.cmsRole === 'admin' ||
+        user?.role === 'staff' ||
+        user?.position === 'مدیر ارشد' ||
+        (Array.isArray(user?.roles) &&
+          user.roles.some((r) => {
+            if (typeof r === 'object' && r !== null && 'name' in r) {
+              return r.name === 'مدیر ارشد'
+            }
+            return r === 'مدیر ارشد'
+          })),
+    )
+
+  const navItems = isSeniorManager ? seniorManagerNavItems : applicantNavItems
+  const displayName = isSeniorManager
+    ? user?.name || user?.email || 'مدیر ارشد'
+    : companyNameProp || user?.companyName || user?.name || 'پروفایل شرکت'
 
   return (
     <Sidebar
@@ -97,13 +171,13 @@ export function AppSidebar({
             </Link>
           </SidebarHeader>
 
-          {/* Divider Line (Vector 1) */}
+          {/* Divider Line */}
           <div className="h-px w-full bg-neutral-200" />
 
-          {/* Navigation Menu (Frame 2) */}
+          {/* Navigation Menu */}
           <SidebarContent className="overflow-visible p-0">
             <SidebarMenu className="flex flex-col gap-2">
-              {defaultNavItems.map((item) => {
+              {navItems.map((item) => {
                 const isActive = item.exact
                   ? pathname === item.href
                   : pathname.startsWith(item.href)
@@ -151,10 +225,10 @@ export function AppSidebar({
           </SidebarContent>
         </div>
 
-        {/* Bottom Section: User / Company Card (Frame 41) */}
+        {/* Bottom Section: User / Company Card */}
         <SidebarFooter className="p-0">
           <div className="flex h-10 w-full items-center justify-between">
-            {/* Right: Company Avatar & Name (Frame 40) */}
+            {/* Right: Company Avatar & Name */}
             <Link
               href="/dashboard/profile"
               className="flex items-center gap-2.5 overflow-hidden transition-opacity hover:opacity-85"
@@ -163,7 +237,7 @@ export function AppSidebar({
               <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-neutral-200/80 shadow-2xs">
                 <Image
                   src="/figma/dashboard/company-avatar.png"
-                  alt={companyName}
+                  alt={displayName}
                   width={40}
                   height={40}
                   className="size-full object-cover"
@@ -173,7 +247,7 @@ export function AppSidebar({
                 />
               </div>
               <span className="truncate text-sm leading-6 font-semibold text-[#525252]">
-                {companyName}
+                {displayName}
               </span>
             </Link>
 

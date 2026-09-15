@@ -50,13 +50,12 @@ export default function LoginPage({
 
       const payload = (await response.json().catch(() => null)) as { user?: { role?: string; cmsRole?: string | null } } | null
       const user = payload?.user
-      const destination = user?.cmsRole === 'admin' || user?.cmsRole === 'editor'
-        ? '/admin'
-        : user?.role === 'staff'
-          ? '/dashboard'
-          : safeReturnUrl === '/admin'
-            ? '/dashboard'
-            : safeReturnUrl
+      const destination =
+        safeReturnUrl && safeReturnUrl !== '/login'
+          ? safeReturnUrl
+          : user?.cmsRole === 'admin' || user?.cmsRole === 'editor'
+            ? '/admin'
+            : '/dashboard'
       router.replace(destination)
       router.refresh()
     } catch {

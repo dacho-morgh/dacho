@@ -31,7 +31,7 @@ export function AdminRequestEvaluation({ id }: { id: string }) {
   return (
     <main className="flex min-w-0 flex-1 flex-col gap-5 p-4 lg:pt-10" dir="rtl">
       <div className="flex items-center gap-2">
-        <Link href={`/dashboard/admin/requests/${id}`}>
+        <Link href={`/dashboard/requests/${id}`}>
           <Typography variant="16/regular" color="muted">
             درخواست ها
           </Typography>

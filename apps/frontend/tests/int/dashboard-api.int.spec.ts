@@ -14,7 +14,7 @@ import {
 
 describe('REQUEST_STATUS_LABELS', () => {
   it('maps every request status to a Persian label', () => {
-    expect(REQUEST_STATUS_LABELS.draft).toBe('درخواست داده نشده')
+    expect(REQUEST_STATUS_LABELS.draft).toBe('پیش‌نویس')
     expect(REQUEST_STATUS_LABELS.in_review).toBe('درحال بررسی')
     expect(REQUEST_STATUS_LABELS.action_needed).toBe('نیاز به اقدام')
     expect(REQUEST_STATUS_LABELS.approved).toBe('تایید شده')

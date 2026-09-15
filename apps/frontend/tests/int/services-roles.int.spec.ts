@@ -134,6 +134,7 @@ describe('dashboard CMS definitions (roles + services)', () => {
         password: 'int-test-password',
         phone: TEST_PHONE,
         name: 'کاربر دارای نقش',
+        role: 'staff',
         roles: [role.id],
       },
       context: { allowRoleAssignment: true },

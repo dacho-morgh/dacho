@@ -9,7 +9,7 @@ vi.mock('@dacho/cms-core/utilities', () => ({
 }))
 
 import { extractJWT } from 'payload'
-import { serverDashboardFetch } from '@/utilities/dashboard-server'
+import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
 
 describe('serverDashboardFetch', () => {
   afterEach(() => {
@@ -40,5 +40,58 @@ describe('serverDashboardFetch', () => {
     )
 
     await expect(serverDashboardFetch('/profile')).resolves.toEqual(profile)
+  })
+})
+
+describe('isSeniorManagerUser', () => {
+  const mockPayload = {
+    findByID: vi.fn(async ({ id }: { id: number | string }) => {
+      if (id === 6 || id === '6') return { id: 6, name: 'مدیر ارشد' }
+      return { id, name: 'کارشناس' }
+    }),
+  } as never
+
+  it('returns false when user is null or undefined', async () => {
+    await expect(isSeniorManagerUser(mockPayload, null)).resolves.toBe(false)
+    await expect(isSeniorManagerUser(mockPayload, undefined)).resolves.toBe(false)
+  })
+
+  it('returns true when user has cmsRole admin', async () => {
+    await expect(isSeniorManagerUser(mockPayload, { cmsRole: 'admin' })).resolves.toBe(true)
+  })
+
+  it('returns true when user position is مدیر ارشد', async () => {
+    await expect(isSeniorManagerUser(mockPayload, { position: 'مدیر ارشد' })).resolves.toBe(true)
+  })
+
+  it('returns true when user has role staff', async () => {
+    await expect(isSeniorManagerUser(mockPayload, { role: 'staff' })).resolves.toBe(true)
+  })
+
+  it('returns true when user.roles contains a role object with name مدیر ارشد', async () => {
+    await expect(
+      isSeniorManagerUser(mockPayload, {
+        role: 'applicant',
+        roles: [{ id: 6, name: 'مدیر ارشد' }],
+      }),
+    ).resolves.toBe(true)
+  })
+
+  it('returns true when user.roles contains role id referencing مدیر ارشد', async () => {
+    await expect(
+      isSeniorManagerUser(mockPayload, {
+        role: 'applicant',
+        roles: [6],
+      }),
+    ).resolves.toBe(true)
+  })
+
+  it('returns false for regular applicant without senior manager role', async () => {
+    await expect(
+      isSeniorManagerUser(mockPayload, {
+        role: 'applicant',
+        roles: [1],
+      }),
+    ).resolves.toBe(false)
   })
 })

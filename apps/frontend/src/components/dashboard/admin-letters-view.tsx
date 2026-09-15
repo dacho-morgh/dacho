@@ -56,6 +56,6 @@ export function AdminLettersView({ initialLetters }: { initialLetters: LetterIte
       {error && <Typography role="alert" variant="14/regular" className="mt-2 text-error-600">{error}</Typography>}
       <Button type="submit" className="mt-4" disabled={saving || companies.length === 0}>{saving ? 'در حال ارسال...' : 'ارسال نامه'}</Button>
     </form>
-    <InboxListView letters={letters} onLettersChange={setLetters} basePath="/dashboard/admin/letters" showSupport={false} />
+    <InboxListView letters={letters} onLettersChange={setLetters} basePath="/dashboard/letters" showSupport={false} />
   </div>
 }

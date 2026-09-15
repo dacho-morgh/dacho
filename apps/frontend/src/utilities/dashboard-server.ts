@@ -1,5 +1,7 @@
+import type { Role, User } from '@dacho/cms-core'
 import { getServerSideURL } from '@dacho/cms-core/utilities'
 import { cookies } from 'next/headers'
+import type { Payload } from 'payload'
 
 /**
  * Server-side read through the same-origin `/api/dashboard/*` proxy. Forwards the
@@ -26,3 +28,55 @@ export async function serverDashboardFetch<T>(path: string): Promise<T | undefin
     return undefined
   }
 }
+
+export type SeniorManagerCandidate =
+  | User
+  | {
+      id?: number | string | null
+      cmsRole?: string | null
+      position?: string | null
+      role?: string | null
+      roles?: Array<number | string | Role | { id?: number | string; name?: string | null }> | null
+    }
+
+/**
+ * Determines whether a user is an administrator or senior manager ("مدیر ارشد").
+ * Evaluates:
+ * 1. `cmsRole === 'admin'`
+ * 2. `position === 'مدیر ارشد'`
+ * 3. `roles` (many-to-many relationship) containing a role named 'مدیر ارشد' (both object and ID refs)
+ * 4. `role === 'staff'` (operational staff / admin team)
+ */
+export async function isSeniorManagerUser(
+  payload: Payload,
+  user: SeniorManagerCandidate | null | undefined,
+): Promise<boolean> {
+  if (!user) return false
+  if (user.cmsRole === 'admin') return true
+  if (user.position === 'مدیر ارشد') return true
+
+  if (Array.isArray(user.roles) && user.roles.length > 0) {
+    for (const role of user.roles) {
+      if (typeof role === 'object' && role !== null && 'name' in role && role.name === 'مدیر ارشد') {
+        return true
+      }
+      if (typeof role === 'number' || typeof role === 'string') {
+        try {
+          const roleDoc = await payload.findByID({
+            collection: 'roles',
+            id: role,
+            depth: 0,
+          })
+          if (roleDoc?.name === 'مدیر ارشد') return true
+        } catch {
+          // Ignore lookup failure
+        }
+      }
+    }
+  }
+
+  if (user.role === 'staff') return true
+
+  return false
+}
+

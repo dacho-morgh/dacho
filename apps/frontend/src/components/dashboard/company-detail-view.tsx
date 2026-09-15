@@ -16,7 +16,7 @@ export function CompanyDetailView({ id }: { id: string }) {
   return (
     <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:p-10" dir="rtl">
       <div className="flex items-center gap-2">
-        <Link href="/dashboard/admin/companies">
+        <Link href="/dashboard/companies">
           <Typography variant="14/regular" color="brand-600">
             شرکت ها
           </Typography>

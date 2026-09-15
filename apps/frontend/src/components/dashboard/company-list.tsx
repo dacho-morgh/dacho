@@ -25,7 +25,7 @@ const columns: AdminColumn<Company>[] = [
     id: 'name',
     header: 'نام شرکت',
     render: (item) => (
-      <Link href={`/dashboard/admin/companies/${item.id}`} className="flex items-center gap-2">
+      <Link href={`/dashboard/companies/${item.id}`} className="flex items-center gap-2">
         {text(item.name)}
       </Link>
     ),
@@ -48,7 +48,7 @@ const columns: AdminColumn<Company>[] = [
   { id: 'activity', header: 'سال فعالیت', render: (item) => text(item.activityAge) },
   {
     id: 'actions',
-    render: (item) => <AdminRowActions viewHref={`/dashboard/admin/companies/${item.id}`} />,
+    render: (item) => <AdminRowActions viewHref={`/dashboard/companies/${item.id}`} />,
   },
 ]
 export function CompanyList() {
