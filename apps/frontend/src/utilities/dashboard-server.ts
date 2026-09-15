@@ -1,6 +1,5 @@
-import { cookies } from 'next/headers'
-
 import { getServerSideURL } from '@dacho/cms-core/utilities'
+import { cookies } from 'next/headers'
 
 /**
  * Server-side read through the same-origin `/api/dashboard/*` proxy. Forwards the
@@ -11,7 +10,14 @@ export async function serverDashboardFetch<T>(path: string): Promise<T | undefin
   try {
     const cookie = (await cookies()).toString()
     const res = await fetch(`${getServerSideURL()}/api/dashboard${path}`, {
-      headers: { cookie },
+      headers: {
+        cookie,
+        // This is a server-originated request to our own route handler. Payload's
+        // cookie strategy rejects requests with neither Origin nor Sec-Fetch-Site
+        // when CSRF origins are configured, so retain the same-origin context that
+        // the original browser navigation had.
+        'sec-fetch-site': 'same-origin',
+      },
       cache: 'no-store',
     })
     if (!res.ok) return undefined

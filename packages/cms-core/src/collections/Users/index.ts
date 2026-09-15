@@ -1,4 +1,4 @@
-import type { Access, CollectionConfig, FieldAccess } from 'payload'
+import type { Access, CollectionConfig, Condition, FieldAccess, Validate } from 'payload'
 
 import { hasCmsRole } from '@cms-core/access/hasCmsRole'
 import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
@@ -8,6 +8,13 @@ import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
 // `defaultValue` + this field-level gate. This is the privilege-escalation
 // guard: a self-registering visitor cannot become `staff` or gain a `cmsRole`.
 const adminOnly: FieldAccess = ({ req }) => Boolean(req.user?.cmsRole === 'admin')
+const applicantOnly: Condition = (_data, siblingData) => siblingData?.role !== 'staff'
+const requiredForApplicant = (label: string): Validate => (value, { siblingData }) => {
+  if (siblingData?.role !== 'staff' && (typeof value !== 'string' || value.trim() === '')) {
+    return `${label} برای متقاضی الزامی است.`
+  }
+  return true
+}
 const isBackendService = (req: { user?: { email?: string | null } | null }): boolean => req.user?.email === 'backend@dacho.local'
 const canUpdateUser: Access = ({ req }) => {
   if (req.user?.cmsRole === 'admin' || isBackendService(req)) return true
@@ -148,59 +155,74 @@ export const Users: CollectionConfig = {
         update: adminOnly,
       },
     },
-    // Company (applicant) data — flattened onto the user for v1. Non-required
-    // at the schema level (staff/editor/admin have no company); the signup form
-    // enforces them for applicants.
+    // Company data belongs only to applicants. Staff accounts only need their
+    // credentials and phone number, while applicants must identify their company.
     {
       name: 'companyName',
       type: 'text',
       label: 'نام شرکت',
+      validate: requiredForApplicant('نام شرکت'),
+      admin: { condition: applicantOnly },
     },
     {
       name: 'companyNationalId',
       type: 'text',
       label: 'شناسه ملی',
+      validate: requiredForApplicant('شناسه ملی'),
+      admin: { condition: applicantOnly },
     },
     {
       name: 'companyRegistrationNumber',
       type: 'text',
       label: 'شماره ثبت',
+      validate: requiredForApplicant('شماره ثبت'),
+      admin: { condition: applicantOnly },
     },
     {
       name: 'companyType',
       type: 'select',
       label: 'نوع شرکت',
       options: ['سهامی خاص', 'سهامی عام', 'مسئولیت محدود', 'دانش‌بنیان', 'استارتاپ', 'سایر'],
+      validate: requiredForApplicant('نوع شرکت'),
+      admin: { condition: applicantOnly },
     },
     {
       name: 'companyProvince',
       type: 'text',
       label: 'استان',
+      validate: requiredForApplicant('استان'),
+      admin: { condition: applicantOnly },
     },
     {
       name: 'companyCity',
       type: 'text',
       label: 'شهر',
+      validate: requiredForApplicant('شهر'),
+      admin: { condition: applicantOnly },
     },
     {
       name: 'companyEstablishmentDate',
       type: 'text',
       label: 'تاریخ تأسیس',
+      admin: { condition: applicantOnly },
     },
     {
       name: 'companyStatus',
       type: 'text',
       label: 'وضعیت شرکت',
+      admin: { condition: applicantOnly },
     },
     {
       name: 'companyEconomicCode',
       type: 'text',
       label: 'کد اقتصادی',
+      admin: { condition: applicantOnly },
     },
     {
       name: 'executives',
       type: 'array',
       label: 'اشخاص شرکت',
+      admin: { condition: applicantOnly },
       fields: [
         { name: 'role', type: 'text', required: true, label: 'سمت' },
         { name: 'name', type: 'text', required: true, label: 'نام' },
@@ -210,6 +232,7 @@ export const Users: CollectionConfig = {
       name: 'addresses',
       type: 'array',
       label: 'آدرس‌ها',
+      admin: { condition: applicantOnly },
       fields: [
         { name: 'title', type: 'text', required: true, label: 'عنوان' },
         { name: 'province', type: 'text', label: 'استان' },

@@ -1,4 +1,3 @@
-import type { PayloadRequest } from 'payload'
 import { getPayload } from 'payload'
 import { NextRequest } from 'next/server'
 
@@ -13,7 +12,7 @@ async function handle(req: NextRequest, path: string[]): Promise<Response> {
 
   let user: ProxyUser | null = null
   try {
-    const result = await payload.auth({ req: req as unknown as PayloadRequest, headers: req.headers })
+    const result = await payload.auth({ headers: req.headers })
     user = (result.user ?? null) as unknown as ProxyUser | null
   } catch {
     user = null

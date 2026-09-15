@@ -6,11 +6,11 @@ import config from '@/payload.config'
 // Public signup must produce an `applicant` (role) with no CMS role (cmsRole),
 // and must be impossible to self-elevate: any `role`/`cmsRole` supplied by an
 // anonymous visitor is ignored and forced to the safe defaults.
-const TEST_PHONES = ['09910000001', '09910000002', '09910000003']
+const TEST_PHONES = ['09910000001', '09910000002', '09910000003', '09910000004']
 const TEST_EMAILS = [
   'int-applicant@example.com',
   'int-escalation@example.com',
-  'int-admin@example.com',
+  'int-applicant-without-company@example.com',
 ]
 
 let payload: Payload
@@ -41,6 +41,12 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[0],
         name: 'متقاضی تست',
+        companyName: 'شرکت تست',
+        companyNationalId: '12345678901',
+        companyRegistrationNumber: '12345',
+        companyType: 'دانش‌بنیان',
+        companyProvince: 'بوشهر',
+        companyCity: 'بوشهر',
       },
     })
 
@@ -58,6 +64,12 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[1],
         name: 'متقاضی مخرب',
+        companyName: 'شرکت تست',
+        companyNationalId: '12345678901',
+        companyRegistrationNumber: '12345',
+        companyType: 'دانش‌بنیان',
+        companyProvince: 'بوشهر',
+        companyCity: 'بوشهر',
         role: 'staff',
         cmsRole: 'admin',
       },
@@ -71,18 +83,32 @@ describe('users roles & access control', () => {
     const user = await payload.create({
       collection: 'users',
       data: {
-        email: TEST_EMAILS[2],
+        username: 'int-staff-user',
         password: 'int-test-password',
         phone: TEST_PHONES[2],
         name: 'ادمین تست',
         role: 'staff',
-        cmsRole: 'admin',
       },
       context: { allowRoleAssignment: true },
     })
 
     expect(user.role).toBe('staff')
-    expect(user.cmsRole).toBe('admin')
+    expect(user.companyName).toBeNull()
+  })
+
+  it('requires company details for an applicant account', async () => {
+    await expect(
+      payload.create({
+        collection: 'users',
+        overrideAccess: false,
+        data: {
+          email: TEST_EMAILS[2],
+          password: 'int-test-password',
+          phone: TEST_PHONES[3],
+          name: 'متقاضی بدون شرکت',
+        },
+      }),
+    ).rejects.toThrow()
   })
 
   it('hasCmsRole only admits editor/admin', () => {

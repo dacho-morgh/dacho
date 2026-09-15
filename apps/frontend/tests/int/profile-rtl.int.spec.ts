@@ -1,104 +1,126 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ProfileView } from '@/components/dashboard/profile/profile-view'
+import { AccountProfileView } from '@/components/dashboard/profile/account-profile-view'
+import { CompanyProfileView } from '@/components/dashboard/profile/company-profile-view'
+import { ResumeProfileView } from '@/components/dashboard/profile/resume-profile-view'
+import type { ProfileDto } from '@/utilities/dashboard-api'
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}))
+const profile: ProfileDto = {
+  company: {
+    name: 'شرکت نمونه',
+    establishmentDate: '۱۳۵۱/۰۴/۱۲ (54 سال)',
+    status: 'فعال',
+    type: 'سهامی خاص',
+    registrationNumber: '۱۵۷۸۱',
+    economicCode: '10100578556',
+    nationalId: '411111495187',
+  },
+  contacts: { phone: '۰۹۱۲۳۴۵۶۷۸۹', email: 'sample@company.com' },
+  executives: [{ role: 'مدیرعامل', name: 'کاربر نمونه' }],
+  addresses: [
+    {
+      id: '1',
+      title: 'دفتر مرکزی',
+      province: 'تهران',
+      city: 'تهران',
+      postalCode: '1531638111',
+      address: 'تهران',
+    },
+  ],
+}
 
 function expectHeadingBeforeAction(heading: HTMLElement) {
   const header = heading.parentElement
-
-  expect(header).not.toBeNull()
   expect(header?.firstElementChild).toBe(heading)
   expect(header?.lastElementChild?.tagName).toBe('BUTTON')
 }
 
-describe('profile RTL layout', () => {
-  afterEach(cleanup)
-
+describe('company profile view', () => {
   beforeEach(() => {
-    render(createElement(ProfileView))
+    vi.stubGlobal('fetch', vi.fn())
+    render(createElement(CompanyProfileView, { initialProfile: profile }))
   })
 
-  it('places RTL content at the inline start and keeps actions at the inline end', () => {
-    const root = screen.getByRole('heading', { level: 1, name: 'صفحه پروفایل' }).parentElement
-    expect(root?.getAttribute('dir')).toBe('rtl')
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
 
-    const avatar = screen.getByAltText('Company Profile Avatar').parentElement
-    expect(avatar?.parentElement?.firstElementChild).toBe(avatar)
-
+  it('renders only company sections in RTL', () => {
+    const root = screen.getByAltText('Company Profile Avatar').closest('[dir="rtl"]')
+    expect(root).not.toBeNull()
     expectHeadingBeforeAction(screen.getByRole('heading', { level: 2, name: 'اطلاعات پایه' }))
     expectHeadingBeforeAction(screen.getByRole('heading', { level: 2, name: 'آدرس ها' }))
     expectHeadingBeforeAction(screen.getByRole('heading', { level: 2, name: 'اشخاص' }))
-
-    const addressActions = screen.getAllByTitle('ویرایش آدرس')[0]?.parentElement
-    expect(addressActions?.parentElement?.lastElementChild).toBe(addressActions)
-
-    for (const label of ['نام شرکت', 'وضعیت شرکت', 'شماره ثبت', 'شناسه ملی']) {
-      expect(screen.getByText(label).parentElement?.className).toContain('items-start')
-    }
+    expect(screen.queryByRole('heading', { name: 'اطلاعات تماس' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'رزومه و سوابق شرکت' })).toBeNull()
   })
 
-  it('uses logical direction utilities throughout the RTL profile', () => {
-    const root = screen.getByRole('heading', { level: 1, name: 'صفحه پروفایل' }).parentElement
-    const physicalDirectionPattern =
-      /^(?:[a-z]+:)*(?:left-|right-|pl-|pr-|border-l(?:$|-)|border-r(?:$|-)|text-left$|text-right$)/
-    const physicalTokens = [...(root?.querySelectorAll('[class]') ?? [])].flatMap((element) =>
-      [...element.classList].filter((token) => physicalDirectionPattern.test(token)),
-    )
-
-    expect(physicalTokens).toEqual([])
+  it('keeps mixed-direction values isolated', () => {
+    for (const label of ['شماره ثبت', 'کد اقتصادی', 'شناسه ملی']) {
+      expect(screen.getByRole('textbox', { name: label }).getAttribute('dir')).toBe('ltr')
+    }
+    expect(screen.getByRole('textbox', { name: 'تاریخ تاسیس' }).getAttribute('dir')).toBe('auto')
+    expect(screen.getByText('1531638111').getAttribute('dir')).toBe('ltr')
   })
 
-  it('isolates mixed-direction profile values', () => {
-    for (const value of ['۱۵۷۸۱', '10100578556', '411111495187']) {
-      for (const element of screen.getAllByText(value)) {
-        expect(element.getAttribute('dir')).toBe('ltr')
-      }
-    }
+  it('edits and saves company information inline', async () => {
+    const fetchMock = vi.mocked(fetch)
+    const savedProfile = { ...profile, company: { ...profile.company, name: 'شرکت ویرایش‌شده' } }
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(savedProfile), { status: 200 }))
 
-    expect(screen.getByText('۱۳۵۱/۰۴/۱۲ (54 سال)').getAttribute('dir')).toBe('auto')
-
-    for (const value of screen.getAllByText('1531638111')) {
-      expect(value.getAttribute('dir')).toBe('ltr')
-    }
-
-    fireEvent.click(screen.getByRole('button', { name: 'اطلاعات حساب' }))
-
-    for (const value of ['۰۹۱۲۳۴۵۶۷۸۹', 'sample@company.com']) {
-      expect(screen.getByText(value).getAttribute('dir')).toBe('ltr')
-    }
-  })
-
-  it('orders every modal heading before its close action in RTL', () => {
-    fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0])
-    let heading = screen.getByRole('heading', { level: 3, name: 'ویرایش اطلاعات پایه' })
-    expectHeadingBeforeAction(heading)
-    fireEvent.click(heading.parentElement?.lastElementChild as HTMLElement)
-
-    fireEvent.click(screen.getByRole('button', { name: 'آدرس جدید' }))
-    heading = screen.getByRole('heading', { level: 3, name: 'اضافه کردن آدرس جدید' })
-    expectHeadingBeforeAction(heading)
-    fireEvent.click(heading.parentElement?.lastElementChild as HTMLElement)
-
-    fireEvent.click(screen.getAllByTitle('ویرایش آدرس')[0])
-    heading = screen.getByRole('heading', { level: 3, name: 'ویرایش آدرس' })
-    expectHeadingBeforeAction(heading)
-    fireEvent.click(heading.parentElement?.lastElementChild as HTMLElement)
-
-    fireEvent.click(screen.getByRole('button', { name: 'اطلاعات حساب' }))
+    const input = screen.getByRole('textbox', { name: 'نام شرکت' }) as HTMLInputElement
+    expect(input.readOnly).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'ویرایش' }))
-    heading = screen.getByRole('heading', { level: 3, name: 'ویرایش اطلاعات تماس' })
-    expectHeadingBeforeAction(heading)
-    fireEvent.click(heading.parentElement?.lastElementChild as HTMLElement)
+    expect(input.readOnly).toBe(false)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.change(input, { target: { value: 'شرکت ویرایش‌شده' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'خروج از حساب کاربری' }))
-    expectHeadingBeforeAction(
-      screen.getByRole('heading', { level: 3, name: 'خروج از حساب کاربری' }),
+    await waitFor(() => expect(input.readOnly).toBe(true))
+    expect(input.value).toBe('شرکت ویرایش‌شده')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/dashboard/profile',
+      expect.objectContaining({ method: 'PATCH' }),
     )
+  })
+
+  it('keeps address dialogs inside the company component', () => {
+    fireEvent.click(screen.getByRole('button', { name: 'آدرس جدید' }))
+    expectHeadingBeforeAction(
+      screen.getByRole('heading', { level: 3, name: 'اضافه کردن آدرس جدید' }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'بستن پنجره' }))
+
+    fireEvent.click(screen.getByTitle('ویرایش آدرس'))
+    expectHeadingBeforeAction(screen.getByRole('heading', { level: 3, name: 'ویرایش آدرس' }))
+  })
+})
+
+describe('account and resume profile views', () => {
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('renders and edits only account fields', () => {
+    vi.stubGlobal('fetch', vi.fn())
+    render(createElement(AccountProfileView, { initialProfile: profile }))
+
+    const phone = screen.getByRole('textbox', { name: 'شماره تلفن همراه' }) as HTMLInputElement
+    expect(phone.dir).toBe('ltr')
+    expect(phone.readOnly).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'ویرایش' }))
+    expect(phone.readOnly).toBe(false)
+    expect(screen.queryByRole('heading', { name: 'اطلاعات پایه' })).toBeNull()
+  })
+
+  it('renders the resume route content independently', () => {
+    render(createElement(ResumeProfileView))
+    expect(screen.getByRole('heading', { name: 'رزومه و سوابق شرکت' })).toBeTruthy()
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 })
