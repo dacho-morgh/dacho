@@ -54,6 +54,11 @@ export async function PATCH(req: NextRequest, ctx: Context): Promise<Response> {
   return handle(req, path)
 }
 
+export async function PUT(req: NextRequest, ctx: Context): Promise<Response> {
+  const { path } = await ctx.params
+  return handle(req, path)
+}
+
 export async function DELETE(req: NextRequest, ctx: Context): Promise<Response> {
   const { path } = await ctx.params
   return handle(req, path)

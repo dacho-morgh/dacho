@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { deleteLetter } from '@/utilities/dashboard-api'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Message2Icon,
@@ -38,36 +39,12 @@ export interface MailData {
   }[]
 }
 
-const defaultMail: MailData = {
-  id: 'LTR-501',
-  title: 'همایش نفت و گاز عسلویه',
-  category: 'رویدادها و نمایشگاه‌ها',
-  senderName: 'نام و نام خانوادگی',
-  senderRole: 'عنوان و سمت',
-  senderEmail: 'support@dacho.ir',
-  datePersian: '1405/01/01',
-  dayOfWeek: 'دوشنبه',
-  timeStr: 'ساعت 14:50',
-  body: 'به‌عنوان بزرگ‌ترین رویداد صنعتی و تجاری منطقه در حوزه انرژی، هر ساله با حضور بیش از ۲۰۰ شرکت توانمند داخلی و خارجی برگزار می‌شود. این نمایشگاه، بستری مؤثر برای معرفی توانمندی‌ها، نوآوری‌ها و آخرین دستاوردهای صنعت نفت، گاز، پالایش و پتروشیمی فراهم می‌کند.',
-  attachments: [
-    {
-      name: 'دعوت‌نامه رسمی و ضوابط حضور در همایش.pdf',
-      size: '۲.۴ مگابایت',
-      ext: 'PDF',
-    },
-    {
-      name: 'فرم ثبت‌نام و جدول تخصیص غرفه‌ها.xlsx',
-      size: '۸۴۰ کیلوبایت',
-      ext: 'XLSX',
-    },
-  ],
-}
-
 interface MailDetailViewProps {
-  mail?: MailData
+  mail: MailData | null
+  showActions?: boolean
 }
 
-export function MailDetailView({ mail = defaultMail }: MailDetailViewProps) {
+export function MailDetailView({ mail, showActions = false }: MailDetailViewProps) {
   const router = useRouter()
   const [viewState, setViewState] = useState<'default' | 'loading'>('default')
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false)
@@ -75,12 +52,17 @@ export function MailDetailView({ mail = defaultMail }: MailDetailViewProps) {
   const [replyText, setReplyText] = useState('')
   const [actionNotice, setActionNotice] = useState<string | null>(null)
 
-  const handleDelete = () => {
-    setActionNotice('نامه با موفقیت حذف گردید.')
-    setTimeout(() => {
+  const handleDelete = async () => {
+    if (!mail) return
+    try {
+      await deleteLetter(mail.id)
       router.push('/dashboard/letters')
-    }, 1200)
+    } catch {
+      setActionNotice('حذف نامه انجام نشد.')
+    }
   }
+
+  if (!mail) return <div className="rounded-xl border border-neutral-200 bg-white p-6 text-neutral-600">نامه‌ای برای نمایش وجود ندارد.</div>
 
   return (
     <div className="flex w-full flex-col gap-6" dir="rtl">
@@ -237,7 +219,7 @@ export function MailDetailView({ mail = defaultMail }: MailDetailViewProps) {
               {/* Actions: Feedback & Delete (Frame 81 - 56:12942) */}
               <div className="flex items-center gap-2.5">
                 {/* Delete Button (56:12943) */}
-                <button
+                {showActions && <button
                   type="button"
                   onClick={handleDelete}
                   className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-100"
@@ -245,17 +227,17 @@ export function MailDetailView({ mail = defaultMail }: MailDetailViewProps) {
                 >
                   <TrashIcon className="h-5 w-5 text-current" />
                   <span className="sr-only">حذف نامه</span>
-                </button>
+                </button>}
 
                 {/* Submit Feedback Button (59:14131) */}
-                <Button
+                {showActions && <Button
                   onClick={() => setFeedbackModalOpen(true)}
                   variant="outline"
                   className="h-10 px-4 rounded-xl border-slate-200 text-sm font-medium text-[#404040] hover:bg-slate-50 hover:text-slate-900 inline-flex items-center gap-2"
                 >
                   <Message2Icon className="h-5 w-5 text-[#404040]" />
                   <span>ثبت بازخورد</span>
-                </Button>
+                </Button>}
               </div>
             </div>
 
@@ -286,12 +268,6 @@ export function MailDetailView({ mail = defaultMail }: MailDetailViewProps) {
             {/* 5. Letter Body (56:12559) */}
             <div className="mt-4 text-base leading-relaxed text-[#525252] text-justify space-y-4">
               <p>{mail.body}</p>
-              <p>
-                خواهشمند است جهت تکمیل فرآیند و هماهنگی‌های لازم پیرامون اختصاص غرفه،
-                اطلاعات نمایندگان و فایل‌های مورد نیاز را از طریق بخش پیوست‌ها بارگذاری
-                نموده و در صورت نیاز به هرگونه راهنمایی، بازخورد خود را در همین بخش ارسال
-                فرمایید.
-              </p>
             </div>
 
             {/* 6. Attachments Section */}
@@ -321,7 +297,7 @@ export function MailDetailView({ mail = defaultMail }: MailDetailViewProps) {
                         </div>
                       </div>
 
-                      <button
+                {showActions && <button
                         type="button"
                         onClick={() => {
                           setActionNotice(`دانلود فایل «${att.name}» آغاز گردید.`)
@@ -331,7 +307,7 @@ export function MailDetailView({ mail = defaultMail }: MailDetailViewProps) {
                         title="دانلود فایل"
                       >
                         <Download className="h-4 w-4" />
-                      </button>
+                </button>}
                     </div>
                   ))}
                 </div>
@@ -339,7 +315,7 @@ export function MailDetailView({ mail = defaultMail }: MailDetailViewProps) {
             )}
 
             {/* 7. Quick Reply Section */}
-            <div className="mt-8 rounded-xl border border-slate-100 p-5 bg-white">
+            {showActions && <div className="mt-8 rounded-xl border border-slate-100 p-5 bg-white">
               <h4 className="text-sm font-bold text-[#404040] mb-3">
                 پاسخ سریع به این نامه
               </h4>
@@ -364,13 +340,13 @@ export function MailDetailView({ mail = defaultMail }: MailDetailViewProps) {
                   ارسال پاسخ
                 </Button>
               </div>
-            </div>
+            </div>}
           </div>
         )}
       </div>
 
       {/* Feedback Dialog */}
-      {feedbackModalOpen && (
+      {showActions && feedbackModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-100 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">

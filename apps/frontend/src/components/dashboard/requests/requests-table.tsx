@@ -6,7 +6,6 @@ import {
   type RecentRequestsFilterType,
 } from './recent-requests-filter-tabs'
 import { RecentRequestRow } from './recent-request-row'
-import { mockRecentRequests } from './mock-data'
 import type { RecentRequestItem } from './types'
 
 export interface RequestsTableProps {
@@ -15,7 +14,7 @@ export interface RequestsTableProps {
 }
 
 export function RequestsTable({
-  items = mockRecentRequests,
+  items = [],
   className = '',
 }: RequestsTableProps) {
   const [filter, setFilter] = useState<RecentRequestsFilterType>('all')

@@ -1,5 +1,5 @@
 'use client'
-import Image from 'next/image'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   AdminListView,
@@ -10,59 +10,11 @@ import { Typography } from '@/components/ui/typography'
 type Company = {
   id: string
   name: string
-  avatar: string
   ceo: string
   companyType: string
   address: string
   activityAge: string
 }
-const companies: Company[] = [
-  {
-    id: '1',
-    name: 'پترو داده آوران پارس',
-    avatar: '/figma/dashboard/company-avatar.png',
-    ceo: 'مهندس سجادی',
-    companyType: 'سهامی خاص',
-    address: 'تهران، خیابان بهشتی',
-    activityAge: '۲ روز پیش',
-  },
-  {
-    id: '2',
-    name: 'راهکاران هوشمند جنوب',
-    avatar: '/figma/dashboard/company-avatar.png',
-    ceo: 'سارا محمدی',
-    companyType: 'مسئولیت محدود',
-    address: 'بوشهر، بلوار امام',
-    activityAge: '۵ روز پیش',
-  },
-  {
-    id: '3',
-    name: 'فناوری ایده پرداز',
-    avatar: '/figma/dashboard/company-avatar.png',
-    ceo: 'علی رضایی',
-    companyType: 'سهامی خاص',
-    address: 'شیراز، خیابان زند',
-    activityAge: '۱ هفته پیش',
-  },
-  {
-    id: '4',
-    name: 'توسعه کسب و کار نوین',
-    avatar: '/figma/dashboard/company-avatar.png',
-    ceo: 'نسترن احمدی',
-    companyType: 'سهامی عام',
-    address: 'تهران، خیابان ولیعصر',
-    activityAge: '۲ هفته پیش',
-  },
-  {
-    id: '5',
-    name: 'پیشگامان انرژی پارس',
-    avatar: '/figma/dashboard/company-avatar.png',
-    ceo: 'رضا کریمی',
-    companyType: 'سهامی خاص',
-    address: 'عسلویه، منطقه ویژه',
-    activityAge: '۱ ماه پیش',
-  },
-]
 const text = (value: string) => (
   <Typography variant="14/regular" color="secondary">
     {value}
@@ -74,13 +26,6 @@ const columns: AdminColumn<Company>[] = [
     header: 'نام شرکت',
     render: (item) => (
       <Link href={`/dashboard/admin/companies/${item.id}`} className="flex items-center gap-2">
-        <Image
-          src={item.avatar}
-          alt=""
-          width={40}
-          height={40}
-          className="size-10 rounded-lg object-cover"
-        />
         {text(item.name)}
       </Link>
     ),
@@ -107,6 +52,14 @@ const columns: AdminColumn<Company>[] = [
   },
 ]
 export function CompanyList() {
+  const [companies, setCompanies] = useState<Company[]>([])
+  useEffect(() => {
+    fetch('/api/dashboard/admin/companies?limit=100').then((res) => res.ok ? res.json() : null).then((data) => {
+      setCompanies((data?.items ?? []).map((item: { id: string; companyName?: string; name?: string; companyType?: string; companyProvince?: string; companyCity?: string; companyEstablishmentDate?: string; executives?: { role?: string; name?: string }[] }) => ({
+        id: item.id, name: item.companyName || item.name || '—', ceo: item.executives?.find((executive) => /مدیر\s*عامل/i.test(executive.role || ''))?.name || item.name || '—', companyType: item.companyType || '—', address: [item.companyProvince, item.companyCity].filter(Boolean).join('، ') || '—', activityAge: activityAgeLabel(item.companyEstablishmentDate),
+      })))
+    }).catch(() => setCompanies([]))
+  }, [])
   return (
     <AdminListView
       title="شرکت ها"
@@ -118,4 +71,12 @@ export function CompanyList() {
       columns={columns}
     />
   )
+}
+
+function activityAgeLabel(value?: string): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime()) || date.getTime() > Date.now()) return '—'
+  const years = new Date().getFullYear() - date.getFullYear() - (new Date().getTime() < new Date(new Date().getFullYear(), date.getMonth(), date.getDate()).getTime() ? 1 : 0)
+  return `${Math.max(0, years).toLocaleString('fa-IR')} سال`
 }

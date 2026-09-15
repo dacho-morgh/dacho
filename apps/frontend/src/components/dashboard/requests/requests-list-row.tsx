@@ -1,4 +1,5 @@
 import React from 'react'
+import Link from 'next/link'
 import { Typography } from '@/components/ui/typography'
 import { RequestStatusBadge } from './request-status-badge'
 import { RequestRowActions } from './request-row-actions'
@@ -22,7 +23,9 @@ export function RequestsListRow({
       {/* Column 1: Title (16/regular #525252) */}
       <td className="h-18 px-4">
         <Typography variant="16/regular" className="truncate text-neutral-600">
-          {item.title}
+          <Link href={`/dashboard/requests/${encodeURIComponent(item.id)}`} className="hover:text-brand-600">
+            {item.title}
+          </Link>
         </Typography>
       </td>
 

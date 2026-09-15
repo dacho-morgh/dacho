@@ -70,7 +70,7 @@ const nextConfig: NextConfig = {
   },
   // Transpile the workspace cms-core package (ships raw TS).
   transpilePackages: ['@dacho/cms-core'],
-  allowedDevOrigins: ['192.168.100.14', '192.168.0.113', '127.0.0.1'],
+  allowedDevOrigins: ['192.168.100.14', '192.168.0.113','10.163.138.225', '127.0.0.1'],
 }
 
 const payloadConfig = withPayload(nextConfig, { devBundleServerPackages: false })

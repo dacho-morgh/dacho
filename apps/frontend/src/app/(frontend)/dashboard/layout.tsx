@@ -36,11 +36,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   if (!user) redirect(getLoginUrl(returnUrl))
+  if (user.cmsRole === 'admin' || user.cmsRole === 'editor') redirect('/admin')
 
   return (
     <SidebarProvider defaultOpen={true}>
       <div className={cn('flex min-h-screen w-full bg-[#F8FAFC] text-slate-800 antialiased', GeistMono.variable)} dir="rtl">
-        <DashboardSidebar />
+        <DashboardSidebar user={user} />
         <SidebarInset className="flex min-w-0 flex-1 flex-col bg-[#F8FAFC]">
           <SidebarTrigger
             aria-label="باز کردن منو"

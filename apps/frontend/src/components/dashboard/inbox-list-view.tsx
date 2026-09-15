@@ -7,12 +7,10 @@ import {
   DashboardUserTagIcon,
   EmptyInboxIllustration,
   FilterIcon,
-  Message2Icon,
   MoreOptionsIcon,
   SearchNormalIcon,
   TrashIcon,
 } from '@/components/icons'
-import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +20,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import { SupportModal } from './support-modal'
+import { deleteLetter } from '@/utilities/dashboard-api'
 
 export type LetterStatus = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -37,59 +36,6 @@ export interface LetterItem {
   read?: boolean
   trackingCode?: string
 }
-
-export const mockLetters: LetterItem[] = [
-  {
-    id: 'LTR-501',
-    title: 'همایش نفت و گاز عسلویه',
-    status: 'rejected',
-    statusLabel: 'رد درخواست',
-    senderName: 'نام و نام خانوادگی',
-    senderRole: 'عنوان و سمت',
-    senderAvatar: '/figma/dashboard/inbox-sender-avatar.png',
-    sentDate: '۱۴۰۵/۰۱/۰۶',
-  },
-  {
-    id: 'LTR-502',
-    title: 'همایش نفت و گاز عسلویه',
-    status: 'approved',
-    statusLabel: 'تایید درخواست',
-    senderName: 'نام و نام خانوادگی',
-    senderRole: 'عنوان و سمت',
-    senderAvatar: '/figma/dashboard/inbox-sender-avatar.png',
-    sentDate: '۱۴۰۵/۰۱/۰۶',
-  },
-  {
-    id: 'LTR-503',
-    title: 'همایش نفت و گاز عسلویه',
-    status: 'needs_fix',
-    statusLabel: 'نیاز به اصلاح درخواست',
-    senderName: 'نام و نام خانوادگی',
-    senderRole: 'عنوان و سمت',
-    senderAvatar: '/figma/dashboard/inbox-sender-avatar.png',
-    sentDate: '۱۴۰۵/۰۱/۰۶',
-  },
-  {
-    id: 'LTR-504',
-    title: 'همایش نفت و گاز عسلویه',
-    status: 'official',
-    statusLabel: 'نامه رسمی',
-    senderName: 'نام و نام خانوادگی',
-    senderRole: 'عنوان و سمت',
-    senderAvatar: '/figma/dashboard/inbox-sender-avatar.png',
-    sentDate: '۱۴۰۵/۰۱/۰۶',
-  },
-  {
-    id: 'LTR-505',
-    title: 'همایش نفت و گاز عسلویه',
-    status: 'notification',
-    statusLabel: 'اطلاع رسانی',
-    senderName: 'نام و نام خانوادگی',
-    senderRole: 'عنوان و سمت',
-    senderAvatar: '/figma/dashboard/inbox-sender-avatar.png',
-    sentDate: '۱۴۰۵/۰۱/۰۶',
-  },
-]
 
 const filterOptions: Array<{ value: 'all' | LetterStatus; label: string }> = [
   { value: 'all', label: 'همه وضعیت‌ها' },
@@ -111,7 +57,11 @@ const statusTagStyles: Record<LetterStatus, { bg: string; text: string }> = {
 
 export interface InboxListViewProps {
   initialLetters?: LetterItem[]
+  letters?: LetterItem[]
+  onLettersChange?: (letters: LetterItem[]) => void
   state?: 'default' | 'loading' | 'empty'
+  basePath?: string
+  showSupport?: boolean
 }
 
 function StatusBadge({ status, label }: { status: LetterStatus; label: string }) {
@@ -152,11 +102,9 @@ function SenderCell({ item }: { item: LetterItem }) {
 
 function LetterActions({
   item,
-  onFeedback,
   onDelete,
 }: {
   item: LetterItem
-  onFeedback: (item: LetterItem) => void
   onDelete: (item: LetterItem) => void
 }) {
   return (
@@ -178,15 +126,6 @@ function LetterActions({
         sideOffset={6}
         className="flex w-[164px] min-w-[164px] flex-col gap-[4px] rounded-[12px] border border-neutral-100 bg-white p-[4px] shadow-[0px_2px_4px_rgba(21,21,21,0.1)]"
       >
-        <DropdownMenuItem
-          onClick={() => onFeedback(item)}
-          className="flex h-[32px] cursor-pointer items-center justify-end gap-[8px] rounded-[10px] px-[6px] py-[8px] text-[14px] text-[#404040] hover:bg-neutral-100 focus:bg-neutral-100"
-        >
-          <Typography as="span" variant="14/regular" className="text-inherit">
-            ثبت بازخورد
-          </Typography>
-          <Message2Icon className="size-[20px] shrink-0 text-[#404040]" />
-        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => onDelete(item)}
           className="flex h-[32px] cursor-pointer items-center justify-end gap-[8px] rounded-[10px] px-[6px] py-[8px] text-[14px] text-[#404040] hover:bg-neutral-100 focus:bg-neutral-100"
@@ -240,16 +179,25 @@ function InboxEmptyState() {
 }
 
 export function InboxListView({
-  initialLetters = mockLetters,
+  initialLetters = [],
+  letters: controlledLetters,
+  onLettersChange,
   state = 'default',
+  basePath = '/dashboard/letters',
+  showSupport = true,
 }: InboxListViewProps) {
-  const [letters, setLetters] = useState(initialLetters)
+  const [internalLetters, setInternalLetters] = useState(initialLetters)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | LetterStatus>('all')
   const [supportModalOpen, setSupportModalOpen] = useState(false)
-  const [feedbackModalLetter, setFeedbackModalLetter] = useState<LetterItem | null>(null)
-  const [feedbackText, setFeedbackText] = useState('')
   const [actionNotice, setActionNotice] = useState<string | null>(null)
+
+  const letters = controlledLetters ?? internalLetters
+  const updateLetters = (updater: (current: LetterItem[]) => LetterItem[]) => {
+    const next = updater(letters)
+    if (onLettersChange) onLettersChange(next)
+    else setInternalLetters(next)
+  }
 
   const filteredLetters = useMemo(() => {
     if (state === 'empty') return []
@@ -274,9 +222,14 @@ export function InboxListView({
     window.setTimeout(() => setActionNotice(null), 3500)
   }
 
-  const handleDelete = (item: LetterItem) => {
-    setLetters((current) => current.filter((letter) => letter.id !== item.id))
-    showNotice(`نامه «${item.title}» با موفقیت حذف گردید.`)
+  const handleDelete = async (item: LetterItem) => {
+    try {
+      await deleteLetter(item.id)
+      updateLetters((current) => current.filter((letter) => letter.id !== item.id))
+      showNotice(`نامه «${item.title}» با موفقیت حذف گردید.`)
+    } catch {
+      showNotice('حذف نامه انجام نشد.')
+    }
   }
 
   return (
@@ -365,14 +318,16 @@ export function InboxListView({
 
           {/* Search Input - Figma node 33:3925 */}
         </div>
-        <button
-          type="button"
-          onClick={() => setSupportModalOpen(true)}
-          className="flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[12px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500 sm:w-[199px]"
-        >
-          <span className="font-sans text-[20px] leading-[32px] font-normal">پیام به پشتیبانی</span>
-          <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
-        </button>
+        {showSupport && (
+          <button
+            type="button"
+            onClick={() => setSupportModalOpen(true)}
+            className="flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[12px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500 sm:w-[199px]"
+          >
+            <span className="font-sans text-[20px] leading-[32px] font-normal">پیام به پشتیبانی</span>
+            <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
+          </button>
+        )}
       </div>
 
       {/* Main Table Card - Figma Frame 6 (33:3926) */}
@@ -433,7 +388,7 @@ export function InboxListView({
                         {/* 2. Title Column */}
                         <td className="h-[72px] px-[16px]">
                           <Link
-                            href={`/dashboard/letters/${item.id}`}
+                            href={`${basePath}/${encodeURIComponent(item.id)}`}
                             className="block truncate font-sans text-[16px] leading-[28px] font-normal text-[#525252] transition-colors hover:text-[#2563eb]"
                           >
                             {item.title}
@@ -456,7 +411,6 @@ export function InboxListView({
                         <td className="h-[72px] px-[16px] text-center">
                           <LetterActions
                             item={item}
-                            onFeedback={setFeedbackModalLetter}
                             onDelete={handleDelete}
                           />
                         </td>
@@ -479,12 +433,11 @@ export function InboxListView({
                       <StatusBadge status={item.status} label={item.statusLabel} />
                       <LetterActions
                         item={item}
-                        onFeedback={setFeedbackModalLetter}
                         onDelete={handleDelete}
                       />
                     </div>
                     <Link
-                      href={`/dashboard/letters/${item.id}`}
+                      href={`${basePath}/${encodeURIComponent(item.id)}`}
                       className="mt-3 block font-sans text-[16px] leading-[28px] font-normal text-[#525252] hover:text-[#2563eb]"
                     >
                       {item.title}
@@ -515,67 +468,6 @@ export function InboxListView({
         }}
       />
 
-      {/* Feedback Modal */}
-      {feedbackModalLetter && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs"
-          dir="rtl"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-md animate-in rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl duration-150 zoom-in-95 fade-in">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
-              <Typography as="h2" variant="20/bold" className="text-neutral-700">
-                ثبت بازخورد
-              </Typography>
-              <button
-                type="button"
-                onClick={() => setFeedbackModalLetter(null)}
-                className="flex size-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100"
-                aria-label="بستن پنجره"
-              >
-                <span aria-hidden="true" className="text-xl leading-none">
-                  ×
-                </span>
-              </button>
-            </div>
-            <Typography variant="14/regular" className="mt-4 text-neutral-600">
-              بازخورد شما در رابطه با «{feedbackModalLetter.title}» مستقیماً برای ارسال‌کننده نامه
-              ارسال می‌شود.
-            </Typography>
-            <textarea
-              rows={4}
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              placeholder="نظر یا بازخورد خود را در اینجا بنویسید..."
-              className="mt-3 w-full rounded-xl border border-neutral-200 bg-white p-3 font-sans text-sm text-neutral-700 placeholder:text-neutral-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
-            />
-            <div className="mt-5 flex justify-end gap-3">
-              <Button
-                type="button"
-                variant="outline-gray"
-                onClick={() => setFeedbackModalLetter(null)}
-                className="rounded-xl px-5"
-              >
-                انصراف
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                disabled={!feedbackText.trim()}
-                onClick={() => {
-                  setFeedbackModalLetter(null)
-                  setFeedbackText('')
-                  showNotice('بازخورد شما با موفقیت ثبت و ارسال شد.')
-                }}
-                className="rounded-xl px-6"
-              >
-                ثبت و ارسال
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

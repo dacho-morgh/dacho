@@ -1,50 +1,12 @@
 'use client'
-import Image from 'next/image'
+import { useEffect, useState } from 'react'
 import {
   AdminListView,
-  AdminRowActions,
   type AdminColumn,
 } from '@/components/dashboard/admin-list-view'
 import { Typography } from '@/components/ui/typography'
-type EmployeeRole = 'داور' | 'کمیته سرمایه گذاری' | 'رئیس کمیته داوری' | 'ادمین'
+type EmployeeRole = string
 type Employee = { id: string; name: string; role: EmployeeRole; activity: string; degree: string }
-const employees: Employee[] = [
-  {
-    id: '1',
-    name: 'مهندس آرش حسینی',
-    role: 'داور',
-    activity: 'فناوری اطلاعات',
-    degree: 'کارشناسی ارشد مدیریت بازرگانی',
-  },
-  {
-    id: '2',
-    name: 'دکتر نازنین بهرامی',
-    role: 'کمیته سرمایه گذاری',
-    activity: 'خدمات مالی',
-    degree: 'کارشناسی ارشد فناوری اطلاعات',
-  },
-  {
-    id: '3',
-    name: 'مهندس سجاد کریمی',
-    role: 'داور',
-    activity: 'تولید صنعتی',
-    degree: 'کارشناسی مهندسی برق',
-  },
-  {
-    id: '4',
-    name: 'دکتر الهام رضایی',
-    role: 'رئیس کمیته داوری',
-    activity: 'بازاریابی دیجیتال',
-    degree: 'کارشناسی مهندسی کامپیوتر',
-  },
-  {
-    id: '5',
-    name: 'مهندس پیمان احمدی',
-    role: 'ادمین',
-    activity: 'مشاوره مدیریت',
-    degree: 'دکتری علوم کامپیوتر',
-  },
-]
 const text = (value: string) => (
   <Typography variant="14/regular" color="secondary">
     {value}
@@ -59,21 +21,13 @@ const roleStyles: Record<
   'رئیس کمیته داوری': { color: 'success', background: 'bg-success-50' },
   ادمین: { color: 'secondary', background: 'bg-neutral-100' },
 }
+const roleStyleFallback = { color: 'secondary' as const, background: 'bg-neutral-100' }
 const columns: AdminColumn<Employee>[] = [
   {
     id: 'name',
     header: 'نام کارمند',
     render: (item) => (
-      <div className="flex items-center gap-2">
-        <Image
-          src="/figma/dashboard/admin-employee-avatar.png"
-          alt=""
-          width={40}
-          height={40}
-          className="size-10 rounded-full object-cover"
-        />
-        {text(item.name)}
-      </div>
+      <div className="flex items-center gap-2">{text(item.name)}</div>
     ),
   },
   {
@@ -82,8 +36,8 @@ const columns: AdminColumn<Employee>[] = [
     render: (item) => (
       <Typography
         variant="14/regular"
-        color={roleStyles[item.role].color}
-        className={`inline-block rounded-lg px-3 py-1 ${roleStyles[item.role].background}`}
+        color={(roleStyles[item.role] ?? roleStyleFallback).color}
+        className={`inline-block rounded-lg px-3 py-1 ${(roleStyles[item.role] ?? roleStyleFallback).background}`}
       >
         {item.role}
       </Typography>
@@ -103,9 +57,15 @@ const columns: AdminColumn<Employee>[] = [
     ),
   },
   { id: 'degree', header: 'مدرک دانشگاهی', render: (item) => text(item.degree) },
-  { id: 'actions', render: () => <AdminRowActions deleteLabel="حذف کارمند" /> },
+  { id: 'actions', render: () => null },
 ]
 export function EmployeeList() {
+  const [employees, setEmployees] = useState<Employee[]>([])
+  useEffect(() => {
+    fetch('/api/dashboard/admin/employees?limit=100').then((res) => res.ok ? res.json() : null).then((data) => {
+      setEmployees((data?.items ?? []).map((item: { id: string; name?: string; position?: string; role?: string; companyType?: string }) => ({ id: item.id, name: item.name || '—', role: item.position || item.role || '—', activity: item.companyType || '—', degree: '—' })))
+    }).catch(() => setEmployees([]))
+  }, [])
   return (
     <AdminListView
       title="کارکنان"

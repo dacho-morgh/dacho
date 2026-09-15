@@ -4,20 +4,20 @@ import { FileText, Clock, CheckCircle2, AlertTriangle, TrendingUp } from 'lucide
 import type { RequestStats } from '@/utilities/dashboard-api'
 
 export interface StatCardsProps {
-  /** Real aggregates from GET /stats; falls back to the Figma sample when absent. */
+  /** Real aggregates from GET /stats. */
   data?: RequestStats
 }
 
-function card(value: number, sample: string) {
-  return value > 0 ? value.toLocaleString('fa-IR') : sample
+function card(value: number) {
+  return value.toLocaleString('fa-IR')
 }
 
 export function StatCards({ data }: StatCardsProps) {
   const stats = [
     {
       title: 'کل درخواست‌های ثبت شده',
-      value: card(data?.total ?? 0, '۸'),
-      change: '+۲ در این ماه',
+      value: card(data?.total ?? 0),
+      change: '',
       changeType: 'increase' as const,
       icon: FileText,
       bgColor: 'bg-blue-50',
@@ -26,8 +26,8 @@ export function StatCards({ data }: StatCardsProps) {
     },
     {
       title: 'در حال بررسی و داوری',
-      value: card(data?.in_review ?? 0, '۳'),
-      change: '۲ مورد در مرحله دبیرخانه',
+      value: card(data?.in_review ?? 0),
+      change: '',
       changeType: 'neutral' as const,
       icon: Clock,
       bgColor: 'bg-amber-50',
@@ -36,8 +36,8 @@ export function StatCards({ data }: StatCardsProps) {
     },
     {
       title: 'تأیید و تصویب شده',
-      value: card(data?.approved ?? 0, '۴'),
-      change: 'مجموع ۵۰ میلیارد ریال تسهیلات',
+      value: card(data?.approved ?? 0),
+      change: '',
       changeType: 'success' as const,
       icon: CheckCircle2,
       bgColor: 'bg-emerald-50',
@@ -46,8 +46,8 @@ export function StatCards({ data }: StatCardsProps) {
     },
     {
       title: 'نیازمند اقدام / رفع نقص',
-      value: card(data?.action_needed ?? 0, '۱'),
-      change: 'بارگذاری مدارک ثبتی',
+      value: card(data?.action_needed ?? 0),
+      change: '',
       changeType: 'warning' as const,
       icon: AlertTriangle,
       bgColor: 'bg-rose-50',

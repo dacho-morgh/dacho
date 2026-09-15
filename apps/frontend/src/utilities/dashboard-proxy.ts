@@ -5,6 +5,7 @@ export type ProxyRoleRef = string | number | { id: string | number }
 /** Minimal user shape the proxy needs from the resolved Payload session. */
 export interface ProxyUser {
   id: string | number
+  role?: 'applicant' | 'staff' | null
   cmsRole?: string | null
   roles?: ProxyRoleRef[] | null
 }
@@ -46,6 +47,7 @@ export async function buildBackendRequest(
     'x-user-id': String(user.id),
     'x-user-roles': normalizeRoles(user.roles).join(','),
   }
+  if (user.role) headers['x-user-role'] = user.role
   if (user.cmsRole) headers['x-user-cms-role'] = user.cmsRole
 
   const contentType = req.headers.get('content-type')

@@ -66,7 +66,7 @@ describe('PayloadServiceCatalog', () => {
 
     await catalog.findById('7')
 
-    expect(calls[0]?.headers?.Authorization).toBe('API-Key KEY')
+    expect(calls[0]?.headers?.Authorization).toBe('users API-Key KEY')
   })
 
   it('treats a null form and empty workflow as empty definitions', async () => {

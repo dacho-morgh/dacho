@@ -35,6 +35,7 @@ export function RequestRowActions({
   onCancel,
   className = '',
 }: RequestRowActionsProps) {
+  if (!onView && !onEdit && !onCancel) return null
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -65,26 +66,26 @@ export function RequestRowActions({
         </DropdownMenuItem>
 
         {/* Item 2: ویرایش (Edit) */}
-        <DropdownMenuItem
-          onClick={() => onEdit?.(requestId)}
+        {onEdit && <DropdownMenuItem
+          onClick={() => onEdit(requestId)}
           className="h-8 w-full rounded-[10px] px-1.5 py-2 flex items-center justify-end gap-2 hover:bg-[#F5F5F5] focus:bg-[#F5F5F5] cursor-pointer transition-colors border-none outline-none"
         >
           <Typography as="span" variant="14/regular" className="text-[#404040] leading-none">
             ویرایش
           </Typography>
           <EditIcon className="size-5 text-[#404040] shrink-0" />
-        </DropdownMenuItem>
+        </DropdownMenuItem>}
 
         {/* Item 3: لغو درخواست (Cancel) */}
-        <DropdownMenuItem
-          onClick={() => onCancel?.(requestId)}
+        {onCancel && <DropdownMenuItem
+          onClick={() => onCancel(requestId)}
           className="h-8 w-full rounded-[10px] px-1.5 py-2 flex items-center justify-end gap-2 hover:bg-[#F5F5F5] focus:bg-[#F5F5F5] cursor-pointer transition-colors border-none outline-none"
         >
           <Typography as="span" variant="14/regular" className="text-[#404040] leading-none">
             لغو درخواست
           </Typography>
           <TrashIcon className="size-5 text-[#404040] shrink-0" />
-        </DropdownMenuItem>
+        </DropdownMenuItem>}
       </DropdownMenuContent>
     </DropdownMenu>
   )

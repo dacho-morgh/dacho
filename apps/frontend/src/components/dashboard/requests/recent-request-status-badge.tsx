@@ -12,6 +12,12 @@ export function RecentRequestStatusBadge({
   className = '',
 }: RecentRequestStatusBadgeProps) {
   switch (status) {
+    case 'draft':
+      return (
+        <span className={`inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 ${className}`}>
+          پیش‌نویس
+        </span>
+      )
     case 'in_review':
       return (
         <span

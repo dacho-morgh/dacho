@@ -1,5 +1,5 @@
 'use client'
-import Image from 'next/image'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   AdminListView,
@@ -11,53 +11,18 @@ type Request = {
   id: string
   company: string
   request: string
-  status: 'درحال بررسی' | 'رد شده' | 'درخواست داده نشده'
+  status: 'پیش‌نویس' | 'درحال بررسی' | 'نیازمند اصلاح' | 'تایید شده' | 'رد شده'
   date: string
 }
-const requests: Request[] = [
-  {
-    id: '1',
-    company: 'شرکت آریانا فناوران',
-    request: 'کنفرانس انرژی پایدار تهران',
-    status: 'درحال بررسی',
-    date: '۱۴۰۵/۰۱/۰۶',
-  },
-  {
-    id: '2',
-    company: 'شرکت نوآوران پارس',
-    request: 'نمایشگاه فناوری‌های نوین نفت شیراز',
-    status: 'رد شده',
-    date: '۱۴۰۵/۰۱/۰۶',
-  },
-  {
-    id: '3',
-    company: 'شرکت توسعه سبز',
-    request: 'همایش بین‌المللی پتروشیمی اصفهان',
-    status: 'درخواست داده نشده',
-    date: '۱۴۰۵/۰۱/۰۶',
-  },
-  {
-    id: '4',
-    company: 'شرکت داده‌پردازان مهر',
-    request: 'کنفرانس انرژی پایدار تهران',
-    status: 'درحال بررسی',
-    date: '۱۴۰۵/۰۱/۰۶',
-  },
-  {
-    id: '5',
-    company: 'شرکت رایان ارتباطات',
-    request: 'نمایشگاه فناوری‌های نوین نفت شیراز',
-    status: 'رد شده',
-    date: '۱۴۰۵/۰۱/۰۶',
-  },
-]
 const statusStyle: Record<
   Request['status'],
-  { color: 'brand-600' | 'error' | 'secondary'; bg: string }
+  { color: 'brand-600' | 'error' | 'secondary' | 'success'; bg: string }
 > = {
   'درحال بررسی': { color: 'brand-600', bg: 'bg-brand-50' },
+  'نیازمند اصلاح': { color: 'secondary', bg: 'bg-warning-50' },
+  'تایید شده': { color: 'success', bg: 'bg-success-50' },
+  'پیش‌نویس': { color: 'secondary', bg: 'bg-neutral-100' },
   'رد شده': { color: 'error', bg: 'bg-error-50' },
-  'درخواست داده نشده': { color: 'secondary', bg: 'bg-neutral-100' },
 }
 const text = (value: string) => (
   <Typography variant="14/regular" color="secondary">
@@ -70,13 +35,6 @@ const columns: AdminColumn<Request>[] = [
     header: 'نام شرکت',
     render: (item) => (
       <Link href={`/dashboard/admin/requests/${item.id}`} className="flex items-center gap-2">
-        <Image
-          src="/figma/dashboard/admin-employee-avatar.png"
-          alt=""
-          width={40}
-          height={40}
-          className="size-10 rounded-full object-cover"
-        />
         {text(item.company)}
       </Link>
     ),
@@ -85,15 +43,10 @@ const columns: AdminColumn<Request>[] = [
   {
     id: 'status',
     header: 'وضعیت',
-    render: (item) => (
-      <Typography
-        variant="14/regular"
-        color={statusStyle[item.status].color}
-        className={`inline-block rounded-lg px-3 py-1 ${statusStyle[item.status].bg}`}
-      >
-        {item.status}
-      </Typography>
-    ),
+    render: (item) => {
+      const style = statusStyle[item.status] ?? statusStyle['درحال بررسی']
+      return <Typography variant="14/regular" color={style.color} className={`inline-block rounded-lg px-3 py-1 ${style.bg}`}>{item.status}</Typography>
+    },
   },
   { id: 'date', header: 'تاریخ ثبت', render: (item) => text(item.date) },
   {
@@ -101,12 +54,21 @@ const columns: AdminColumn<Request>[] = [
     render: (item) => (
       <AdminRowActions
         viewHref={`/dashboard/admin/requests/${item.id}`}
-        deleteLabel="حذف درخواست"
       />
     ),
   },
 ]
 export function AdminRequestList() {
+  const [requests, setRequests] = useState<Request[]>([])
+  useEffect(() => {
+    fetch('/api/dashboard/admin/requests?limit=100').then((res) => res.ok ? res.json() : null).then((data) => {
+      setRequests((data?.items ?? []).map((item: { id: string; title: string; status: string; createdAt: string; owner?: { companyName?: string; name?: string } }) => ({
+        id: item.id, company: item.owner?.companyName || item.owner?.name || '—', request: item.title,
+        status: ({ draft: 'پیش‌نویس', in_review: 'درحال بررسی', action_needed: 'نیازمند اصلاح', approved: 'تایید شده', rejected: 'رد شده' }[item.status] ?? item.status) as Request['status'],
+        date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fa-IR') : '—',
+      })))
+    }).catch(() => setRequests([]))
+  }, [])
   return (
     <AdminListView
       title="درخواست ها"

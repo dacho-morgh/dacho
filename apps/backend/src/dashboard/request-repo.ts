@@ -90,7 +90,7 @@ export interface CreateRequestInput {
 }
 
 export interface ListRequestOptions {
-  ownerId: string
+  ownerId?: string
   status?: string
   page: number
   limit: number
@@ -131,15 +131,16 @@ export class RequestRepository {
   }
 
   async list(options: ListRequestOptions): Promise<RequestList> {
-    const where: string[] = ['owner_id = $1']
-    const params: unknown[] = [options.ownerId]
+    const where: string[] = []
+    const params: unknown[] = []
+    if (options.ownerId) { params.push(options.ownerId); where.push(`owner_id = $${params.length}`) }
 
     if (options.status) {
       params.push(options.status)
       where.push(`status = $${params.length}`)
     }
 
-    const whereSql = where.join(' AND ')
+    const whereSql = where.length ? where.join(' AND ') : 'TRUE'
 
     const { rows: countRows } = await this.pool.query<{ total: string }>(
       `SELECT COUNT(*) AS total FROM dashboard.requests WHERE ${whereSql}`,
@@ -164,10 +165,21 @@ export class RequestRepository {
     }
   }
 
+  async listAll(options: Omit<ListRequestOptions, 'ownerId'>): Promise<RequestList> {
+    return this.list(options)
+  }
+
   async findById(id: string, ownerId: string): Promise<RequestDto | undefined> {
     const { rows } = await this.pool.query<RequestRow>(
       `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1 AND owner_id = $2`,
       [id, ownerId],
+    )
+    return rows[0] ? mapRequestRow(rows[0]) : undefined
+  }
+
+  async findByIdAny(id: string): Promise<RequestDto | undefined> {
+    const { rows } = await this.pool.query<RequestRow>(
+      `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1`, [id],
     )
     return rows[0] ? mapRequestRow(rows[0]) : undefined
   }

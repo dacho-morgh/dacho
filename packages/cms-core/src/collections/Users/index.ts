@@ -1,6 +1,5 @@
-import type { CollectionConfig, FieldAccess } from 'payload'
+import type { Access, CollectionConfig, FieldAccess } from 'payload'
 
-import { authenticated } from '@cms-core/access/authenticated'
 import { hasCmsRole } from '@cms-core/access/hasCmsRole'
 import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
 
@@ -9,6 +8,22 @@ import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
 // `defaultValue` + this field-level gate. This is the privilege-escalation
 // guard: a self-registering visitor cannot become `staff` or gain a `cmsRole`.
 const adminOnly: FieldAccess = ({ req }) => Boolean(req.user?.cmsRole === 'admin')
+const isBackendService = (req: { user?: { email?: string | null } | null }): boolean => req.user?.email === 'backend@dacho.local'
+const canUpdateUser: Access = ({ req }) => {
+  if (req.user?.cmsRole === 'admin' || isBackendService(req)) return true
+  if (!req.user?.id) return false
+  return { id: { equals: req.user.id } }
+}
+const canReadUser: Access = ({ req }) => {
+  if (req.user?.cmsRole === 'admin' || req.user?.cmsRole === 'editor' || isBackendService(req)) return true
+  if (!req.user?.id) return false
+  return { id: { equals: req.user.id } }
+}
+const canDeleteUser: Access = ({ req }) => {
+  if (req.user?.cmsRole === 'admin' || isBackendService(req)) return true
+  if (!req.user?.id) return false
+  return { id: { equals: req.user.id } }
+}
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -18,18 +33,21 @@ export const Users: CollectionConfig = {
     // Public self-registration (applicants). Escalation is prevented by the
     // `adminOnly` field-level access + defaults on `role`/`cmsRole` below.
     create: () => true,
-    delete: authenticated,
-    read: authenticated,
-    update: authenticated,
+    delete: canDeleteUser,
+    read: canReadUser,
+    update: canUpdateUser,
   },
   hooks: {
     // Defense-in-depth: even if field-level access were bypassed (e.g. a Local
     // API call with `overrideAccess`), a non-admin can never assign a role.
     // Trusted internal writes (seed scripts, service-account bootstrap) opt out
     // via `context.allowRoleAssignment`.
-    beforeChange: [
-      ({ data, req, context }) => {
-        if (req.user?.cmsRole !== 'admin' && context.allowRoleAssignment !== true) {
+      beforeChange: [
+      ({ data, req, context, operation }) => {
+        if (operation === 'update' && typeof data.phone === 'string' && data.phone.trim() !== '') {
+          data.username = data.phone.trim()
+        }
+        if (operation === 'create' && req.user?.cmsRole !== 'admin' && context.allowRoleAssignment !== true) {
           // Payload authenticates `loginWithUsername` against username/email.
           // Applicants use their unique phone as the username so the public
           // login form can truthfully accept either phone or email.
@@ -38,6 +56,8 @@ export const Users: CollectionConfig = {
           data.cmsRole = null
           data.roles = []
         }
+        // Profile updates must never silently demote existing operational or CMS users.
+        // Role fields remain protected by their field-level access gate.
         return data
       },
     ],
@@ -161,6 +181,42 @@ export const Users: CollectionConfig = {
       name: 'companyCity',
       type: 'text',
       label: 'شهر',
+    },
+    {
+      name: 'companyEstablishmentDate',
+      type: 'text',
+      label: 'تاریخ تأسیس',
+    },
+    {
+      name: 'companyStatus',
+      type: 'text',
+      label: 'وضعیت شرکت',
+    },
+    {
+      name: 'companyEconomicCode',
+      type: 'text',
+      label: 'کد اقتصادی',
+    },
+    {
+      name: 'executives',
+      type: 'array',
+      label: 'اشخاص شرکت',
+      fields: [
+        { name: 'role', type: 'text', required: true, label: 'سمت' },
+        { name: 'name', type: 'text', required: true, label: 'نام' },
+      ],
+    },
+    {
+      name: 'addresses',
+      type: 'array',
+      label: 'آدرس‌ها',
+      fields: [
+        { name: 'title', type: 'text', required: true, label: 'عنوان' },
+        { name: 'province', type: 'text', label: 'استان' },
+        { name: 'city', type: 'text', label: 'شهر' },
+        { name: 'postalCode', type: 'text', label: 'کد پستی' },
+        { name: 'address', type: 'textarea', required: true, label: 'نشانی' },
+      ],
     },
   ],
   timestamps: true,

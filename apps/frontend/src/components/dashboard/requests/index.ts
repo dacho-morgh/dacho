@@ -1,9 +1,6 @@
 // Types
 export * from './types'
 
-// Mock Data
-export * from './mock-data'
-
 // Requests List View & Subcomponents
 export * from './request-status-badge'
 export * from './request-row-actions'

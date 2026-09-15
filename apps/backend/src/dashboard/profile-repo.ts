@@ -1,144 +1,96 @@
-import type { Pool } from 'pg'
+import { randomUUID } from 'node:crypto'
+import type { Address as StoredAddress, Executive as StoredExecutive, UserStore } from '../auth/user-store.js'
 
-export interface CompanyInfo {
-  name: string
-  establishmentDate: string
-  status: string
-  type: string
-  registrationNumber: string
-  economicCode: string
-  nationalId: string
+export interface CompanyInfo { name: string; establishmentDate: string; status: string; type: string; registrationNumber: string; economicCode: string; nationalId: string }
+export interface ContactInfo { phone: string; email: string }
+export interface Executive { role: string; name: string }
+export interface Address { id: string; title: string; province: string; city: string; postalCode: string; address: string }
+export interface UserProfile { company: CompanyInfo; contacts: ContactInfo; executives: Executive[]; addresses: Address[] }
+
+const EMPTY_PROFILE: UserProfile = {
+  company: { name: '', establishmentDate: '', status: '', type: '', registrationNumber: '', economicCode: '', nationalId: '' },
+  contacts: { phone: '', email: '' }, executives: [], addresses: [],
 }
 
-export interface ContactInfo {
-  phone: string
-  email: string
-}
-
-export interface Executive {
-  role: string
-  name: string
-}
-
-export interface Address {
-  id: string
-  title: string
-  province: string
-  city: string
-  postalCode: string
-  address: string
-}
-
-export interface UserProfile {
-  company: CompanyInfo
-  contacts: ContactInfo
-  executives: Executive[]
-  addresses: Address[]
-}
-
-const DEFAULT_PROFILE: UserProfile = {
-  company: {
-    name: 'نام نمونه شرکت',
-    establishmentDate: '۱۳۵۱/۰۴/۱۲ (54 سال)',
-    status: 'فعال',
-    type: 'سهامی عام',
-    registrationNumber: '۱۵۷۸۱',
-    economicCode: '411111495187',
-    nationalId: '10100578556',
-  },
-  contacts: {
-    phone: '۰۹۱۲۳۴۵۶۷۸۹',
-    email: 'sample@company.com',
-  },
-  executives: [
-    { role: 'مدیر عامل', name: 'نام نمونه مدیر عامل' },
-    { role: 'رییس هیات مدیره', name: 'نام نمونه رییس هیات مدیره' },
-  ],
-  addresses: [
-    {
-      id: 'addr-1',
-      title: 'نام آدرس',
-      province: 'تهران',
-      city: 'تهران',
-      postalCode: '1531638111',
-      address: 'تهران خ بهشتی خ پاکستان کوچه دوم پلاک 29',
-    },
-    {
-      id: 'addr-2',
-      title: 'نام آدرس',
-      province: 'تهران',
-      city: 'تهران',
-      postalCode: '1531638111',
-      address: 'تهران خ بهشتی خ پاکستان کوچه دوم پلاک 29',
-    },
-  ],
-}
-
+/** Canonical dashboard profile backed by the Payload users collection. */
 export class ProfileRepository {
-  private inMemoryProfiles = new Map<string, UserProfile>()
-
-  constructor(private pool: Pool) {}
+  constructor(private readonly users: UserStore) {}
 
   async getProfile(userId: string): Promise<UserProfile> {
-    const existing = this.inMemoryProfiles.get(userId)
-    if (existing) {
-      return structuredClone(existing)
-    }
-    const initial = structuredClone(DEFAULT_PROFILE)
-    this.inMemoryProfiles.set(userId, initial)
-    return structuredClone(initial)
+    const user = await this.users.findById(userId)
+    if (!user) return structuredClone(EMPTY_PROFILE)
+    return fromUser(user)
   }
 
   async updateBasicInfo(userId: string, update: Partial<CompanyInfo>): Promise<UserProfile> {
-    const profile = await this.getProfile(userId)
-    profile.company = { ...profile.company, ...update }
-    this.inMemoryProfiles.set(userId, profile)
-    return structuredClone(profile)
+    await this.users.update(userId, {
+      ...(update.name !== undefined ? { companyName: update.name } : {}),
+      ...(update.establishmentDate !== undefined ? { companyEstablishmentDate: update.establishmentDate } : {}),
+      ...(update.status !== undefined ? { companyStatus: update.status } : {}),
+      ...(update.type !== undefined ? { companyType: update.type } : {}),
+      ...(update.registrationNumber !== undefined ? { companyRegistrationNumber: update.registrationNumber } : {}),
+      ...(update.economicCode !== undefined ? { companyEconomicCode: update.economicCode } : {}),
+      ...(update.nationalId !== undefined ? { companyNationalId: update.nationalId } : {}),
+    })
+    return this.getProfile(userId)
   }
 
   async updateContactInfo(userId: string, update: Partial<ContactInfo>): Promise<UserProfile> {
-    const profile = await this.getProfile(userId)
-    profile.contacts = { ...profile.contacts, ...update }
-    this.inMemoryProfiles.set(userId, profile)
-    return structuredClone(profile)
+    await this.users.update(userId, { ...(update.phone !== undefined ? { phone: update.phone } : {}), ...(update.email !== undefined ? { email: update.email } : {}) })
+    return this.getProfile(userId)
+  }
+
+  async updateExecutives(userId: string, executives: Executive[]): Promise<UserProfile> {
+    await this.users.update(userId, { executives })
+    return this.getProfile(userId)
   }
 
   async addAddress(userId: string, input: Omit<Address, 'id'>): Promise<Address> {
     const profile = await this.getProfile(userId)
-    const newAddress: Address = {
-      id: `addr-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      ...input,
-    }
-    profile.addresses.push(newAddress)
-    this.inMemoryProfiles.set(userId, profile)
-    return structuredClone(newAddress)
+    const address: Address = { id: randomUUID(), ...input }
+    await this.users.update(userId, { addresses: [...profile.addresses, address] })
+    return address
   }
 
   async updateAddress(userId: string, addressId: string, input: Partial<Omit<Address, 'id'>>): Promise<Address | null> {
     const profile = await this.getProfile(userId)
-    const existing = profile.addresses.find((a) => a.id === addressId)
-    if (!existing) return null
-
+    const index = profile.addresses.findIndex((address) => address.id === addressId)
+    if (index < 0) return null
+    const current = profile.addresses[index]
+    if (!current) return null
     const updated: Address = {
-      id: existing.id,
-      title: input.title ?? existing.title,
-      province: input.province ?? existing.province,
-      city: input.city ?? existing.city,
-      postalCode: input.postalCode ?? existing.postalCode,
-      address: input.address ?? existing.address,
+      id: addressId,
+      title: input.title ?? current.title,
+      province: input.province ?? current.province,
+      city: input.city ?? current.city,
+      postalCode: input.postalCode ?? current.postalCode,
+      address: input.address ?? current.address,
     }
-
-    const index = profile.addresses.findIndex((a) => a.id === addressId)
-    profile.addresses[index] = updated
-    this.inMemoryProfiles.set(userId, profile)
-    return structuredClone(updated)
+    const addresses = [...profile.addresses]
+    addresses[index] = updated
+    await this.users.update(userId, { addresses })
+    return updated
   }
 
   async deleteAddress(userId: string, addressId: string): Promise<boolean> {
     const profile = await this.getProfile(userId)
-    const initialLength = profile.addresses.length
-    profile.addresses = profile.addresses.filter((a) => a.id !== addressId)
-    this.inMemoryProfiles.set(userId, profile)
-    return profile.addresses.length < initialLength
+    const addresses = profile.addresses.filter((address) => address.id !== addressId)
+    if (addresses.length === profile.addresses.length) return false
+    await this.users.update(userId, { addresses })
+    return true
+  }
+}
+
+function fromUser(user: Exclude<Awaited<ReturnType<UserStore['findById']>>, undefined>): UserProfile {
+  return {
+    company: {
+      name: user.companyName ?? '', establishmentDate: user.companyEstablishmentDate ?? '', status: user.companyStatus ?? '',
+      type: user.companyType ?? '', registrationNumber: user.companyRegistrationNumber ?? '', economicCode: user.companyEconomicCode ?? '', nationalId: user.companyNationalId ?? '',
+    },
+    contacts: { phone: user.phone ?? '', email: user.email ?? '' },
+    executives: (user.executives ?? []).map((item: StoredExecutive) => ({ role: String(item.role ?? ''), name: String(item.name ?? '') })),
+    addresses: (user.addresses ?? []).map((item: StoredAddress, index) => ({
+      id: String(item.id ?? `address-${index}`), title: String(item.title ?? ''), province: String(item.province ?? ''), city: String(item.city ?? ''), postalCode: String(item.postalCode ?? ''), address: String(item.address ?? ''),
+    })),
   }
 }

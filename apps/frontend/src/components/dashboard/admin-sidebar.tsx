@@ -23,13 +23,14 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 const items = [
-  { label: 'داشبورد', href: '/dashboard/admin', icon: DashboardIcon },
+  { label: 'داشبورد', href: '/dashboard', icon: DashboardIcon },
   { label: 'شرکت ها', href: '/dashboard/admin/companies', icon: EventsIcon },
   { label: 'کارکنان', href: '/dashboard/admin/employees', icon: PeopleIcon },
   { label: 'درخواست ها', href: '/dashboard/admin/requests', icon: RequestsIcon },
-  { label: 'کارتابل نامه', href: '/dashboard/letters', icon: LettersIcon },
+  { label: 'نامه‌ها', href: '/dashboard/admin/letters', icon: LettersIcon },
+  { label: 'پشتیبانی', href: '/dashboard/admin/support', icon: LettersIcon },
 ]
-export function AdminSidebar() {
+export function AdminSidebar({ user }: { user?: { name?: string | null; email?: string | null } }) {
   const pathname = usePathname()
   return (
     <Sidebar
@@ -42,7 +43,7 @@ export function AdminSidebar() {
       <div className="flex h-full w-[268px] flex-col justify-between px-4 py-10">
         <div className="flex flex-col gap-5">
           <SidebarHeader className="p-0">
-            <Link href="/dashboard/admin" className="flex items-center justify-start gap-3 pr-2">
+            <Link href="/dashboard" className="flex items-center justify-start gap-3 pr-2">
               <BrandSandoqLogomark className="h-10 w-[46px]" />
               <BrandSandoqLogotype className="h-10 w-[113px]" />
             </Link>
@@ -52,7 +53,7 @@ export function AdminSidebar() {
             <SidebarMenu className="flex flex-col gap-2">
               {items.map(({ label, href, icon: Icon }) => {
                 const active =
-                  href === '/dashboard/admin' ? pathname === href : pathname.startsWith(href)
+                  href === '/dashboard' ? pathname === href : pathname.startsWith(href)
                 return (
                   <SidebarMenuItem key={href} className="relative">
                     <div className="flex w-full items-center gap-2">
@@ -88,13 +89,13 @@ export function AdminSidebar() {
             <Link href="/dashboard/profile" className="flex items-center gap-2.5">
               <Image
                 src="/figma/dashboard/company-avatar.png"
-                alt="نام ادمین"
+                alt={user?.name || user?.email || 'کاربر'}
                 width={40}
                 height={40}
                 className="size-10 rounded-lg object-cover"
               />
               <Typography variant="14/semibold" color="secondary">
-                نام ادمین
+                {user?.name || user?.email || 'کاربر'}
               </Typography>
             </Link>
             <MoreOptionsIcon className="size-6 text-neutral-600" />

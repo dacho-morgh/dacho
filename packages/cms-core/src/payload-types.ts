@@ -536,6 +536,26 @@ export interface User {
   companyType?: ('سهامی خاص' | 'سهامی عام' | 'مسئولیت محدود' | 'دانش‌بنیان' | 'استارتاپ' | 'سایر') | null;
   companyProvince?: string | null;
   companyCity?: string | null;
+  companyEstablishmentDate?: string | null;
+  companyStatus?: string | null;
+  companyEconomicCode?: string | null;
+  executives?:
+    | {
+        role: string;
+        name: string;
+        id?: string | null;
+      }[]
+    | null;
+  addresses?:
+    | {
+        title: string;
+        province?: string | null;
+        city?: string | null;
+        postalCode?: string | null;
+        address: string;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
   enableAPIKey?: boolean | null;
@@ -1876,6 +1896,26 @@ export interface UsersSelect<T extends boolean = true> {
   companyType?: T;
   companyProvince?: T;
   companyCity?: T;
+  companyEstablishmentDate?: T;
+  companyStatus?: T;
+  companyEconomicCode?: T;
+  executives?:
+    | T
+    | {
+        role?: T;
+        name?: T;
+        id?: T;
+      };
+  addresses?:
+    | T
+    | {
+        title?: T;
+        province?: T;
+        city?: T;
+        postalCode?: T;
+        address?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   enableAPIKey?: T;

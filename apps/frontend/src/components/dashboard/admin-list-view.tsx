@@ -18,12 +18,11 @@ import {
 } from '@/components/icons'
 export type AdminColumn<T> = { id: string; header?: string; render: (item: T) => React.ReactNode }
 export function AdminRowActions({
-  deleteLabel = 'حذف',
   viewHref,
 }: {
-  deleteLabel?: string
   viewHref?: string
 }) {
+  if (!viewHref) return null
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -38,19 +37,10 @@ export function AdminRowActions({
               <Typography variant="14/regular">مشاهده</Typography>
             </Link>
           </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem>
-            <Typography variant="14/regular">مشاهده</Typography>
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem>
-          <Typography variant="14/regular">ویرایش</Typography>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Typography variant="14/regular" color="error">
-            {deleteLabel}
-          </Typography>
-        </DropdownMenuItem>
+        ) : null}
+        {viewHref && <DropdownMenuItem disabled>
+          <Typography variant="14/regular" color="muted">ویرایش از این بخش فعال نیست</Typography>
+        </DropdownMenuItem>}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -83,13 +73,13 @@ export function AdminListView<T>({
         {title}
       </Typography>
       <div className="flex flex-row-reverse flex-wrap items-center justify-between gap-3">
-        <Button size="48" icon={<DashboardAddIcon className="size-6" />}>
+        <Button disabled size="48" icon={<DashboardAddIcon className="size-6" />}>
           <Typography variant="16/regular" color="white">
             {addLabel}
           </Typography>
         </Button>
         <div className="flex flex-row-reverse gap-2">
-          <Button
+          <Button disabled
             variant="outline-gray"
             size="48"
             icon={<DashboardFilterIcon className="size-6" />}

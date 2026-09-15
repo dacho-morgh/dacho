@@ -19,22 +19,9 @@ export interface ServiceCard {
 }
 
 export interface ServicesQuickAccessProps {
-  /** Services read server-side from Payload; the sample set is shown when absent. */
+  /** Services read server-side from Payload. */
   services?: ServiceCard[]
 }
-
-const SAMPLE: ServiceCard[] = [
-  {
-    key: 'financing',
-    title: 'تأمین مالی و سرمایه‌گذاری',
-    description: 'جذب سرمایه، تسهیلات قرض‌الحسنه و صدور انواع ضمانت‌نامه‌های بانکی',
-    tag: 'سرمایه‌گذاری',
-  },
-  { key: 'events', title: 'رویدادها و رقابت‌ها', description: 'ثبت‌نام در رویدادهای تخصصی نفت و گاز، ارائه به داوران و جذب حامی', tag: 'رویداد / داوری' },
-  { key: 'exhibitions', title: 'خدمات نمایشگاهی', description: 'رزرو غرفه، طراحی و ساخت سازه، تبلیغات و خدمات پذیرایی در نمایشگاه‌ها', tag: 'غرفه و سازه' },
-  { key: 'knowledge', title: 'خدمات دانش‌بنیانی', description: 'ارزیابی پرونده، مشاوره حقوقی، اخذ گرید دانش‌بنیانی و معافیت‌ها', tag: 'مشاوره و ارزیابی' },
-  { key: 'commercialization', title: 'تجاری‌سازی و ورود به بازار', description: 'هم‌رسانی فناوری با صنایع پتروشیمی عسلویه و انعقاد قراردادهای پایلوت', tag: 'بازار هدف' },
-]
 
 const ICONS: Record<string, LucideIcon> = {
   coins: Coins,
@@ -53,7 +40,7 @@ const GRADIENTS: Record<string, string> = {
   commercialization: 'from-amber-600 to-orange-600',
 }
 
-export function ServicesQuickAccess({ services = SAMPLE }: ServicesQuickAccessProps) {
+export function ServicesQuickAccess({ services = [] }: ServicesQuickAccessProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">

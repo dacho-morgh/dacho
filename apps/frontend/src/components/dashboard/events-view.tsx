@@ -1,8 +1,9 @@
 'use client'
 
-import { Check, Send, X } from 'lucide-react'
+import { Check } from 'lucide-react'
 import Image from 'next/image'
-import React, { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   CalendarBulkIcon,
   EmptyInboxIllustration,
@@ -11,7 +12,6 @@ import {
   SearchNormalIcon,
   TickSquareIcon,
 } from '@/components/icons'
-import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,49 +23,16 @@ import { Typography } from '@/components/ui/typography'
 
 export interface EventItem {
   id: string
+  serviceKey: 'events' | 'exhibitions'
   title: string
   badgeText: string
   badgeType: 'ended' | 'active' | 'upcoming'
   dates: string
   location: string
-  imageSrc: string
+  imageSrc?: string
   hasActionButton?: boolean
   actionButtonText?: string
 }
-
-export const initialEvents: EventItem[] = [
-  {
-    id: 'EVT-01',
-    title: 'نمایشگاه بین‌المللی نفت، گاز، پالایش و پتروشیمی پارس جنوبی (عسلویه)',
-    badgeText: 'تمام شده',
-    badgeType: 'ended',
-    dates: '12-15 بهمن 1405',
-    location: 'عسلویه، بلوار سیراف، محل دائمی برگزاری همایش‌ها و نمایش‌های بین‌المللی',
-    imageSrc: '/images/dashboard/event-stage.png',
-    hasActionButton: false,
-  },
-  {
-    id: 'EVT-02',
-    title: 'نمایشگاه بین‌المللی نفت، گاز، پالایش و پتروشیمی پارس جنوبی (عسلویه)',
-    badgeText: 'تمام شده',
-    badgeType: 'ended',
-    dates: '12-15 بهمن 1405',
-    location: 'عسلویه، بلوار سیراف، محل دائمی برگزاری همایش‌ها و نمایش‌های بین‌المللی',
-    imageSrc: '/images/dashboard/event-stage.png',
-    hasActionButton: true,
-    actionButtonText: 'ثبت درخواست',
-  },
-  {
-    id: 'EVT-03',
-    title: 'نمایشگاه بین‌المللی نفت، گاز، پالایش و پتروشیمی پارس جنوبی (عسلویه)',
-    badgeText: 'تمام شده',
-    badgeType: 'ended',
-    dates: '12-15 بهمن 1405',
-    location: 'عسلویه، بلوار سیراف، محل دائمی برگزاری همایش‌ها و نمایش‌های بین‌المللی',
-    imageSrc: '/images/dashboard/event-stage.png',
-    hasActionButton: false,
-  },
-]
 
 export interface EventsViewProps {
   initialEventsList?: EventItem[]
@@ -121,19 +88,13 @@ function EventsEmptyState() {
 }
 
 export function EventsView({
-  initialEventsList = initialEvents,
+  initialEventsList = [],
   state = 'default',
 }: EventsViewProps) {
+  const router = useRouter()
   const [events] = useState<EventItem[]>(initialEventsList)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
-  const [registerModalEvent, setRegisterModalEvent] = useState<EventItem | null>(null)
-  const [actionNotice, setActionNotice] = useState<string | null>(null)
-
-  // Registration modal form state
-  const [companyName, setCompanyName] = useState('شرکت دانش‌بنیان نمونه')
-  const [delegatesCount, setDelegatesCount] = useState('2')
-  const [needsBooth, setNeedsBooth] = useState(true)
 
   const filteredEvents = useMemo(() => {
     if (state === 'empty') return []
@@ -154,28 +115,6 @@ export function EventsView({
 
   return (
     <div className="flex w-full flex-1 flex-col text-right" dir="rtl">
-      {/* Toast Alert */}
-      {actionNotice && (
-        <div
-          role="status"
-          className="mb-4 flex items-center justify-between rounded-xl border border-brand-100 bg-brand-50 p-3 text-brand-900 shadow-xs"
-        >
-          <Typography variant="14/regular" className="text-inherit">
-            {actionNotice}
-          </Typography>
-          <button
-            type="button"
-            onClick={() => setActionNotice(null)}
-            className="flex size-8 items-center justify-center rounded-lg text-brand-600 hover:bg-brand-100"
-            aria-label="بستن پیام"
-          >
-            <span aria-hidden="true" className="text-xl leading-none">
-              ×
-            </span>
-          </button>
-        </div>
-      )}
-
       {/* Page Title - Figma node 56:13203 */}
       <h1 className="font-sans text-[24px] leading-[36px] font-bold text-[#404040]">
         رویدادها و نمایشگاه‌ها
@@ -268,13 +207,7 @@ export function EventsView({
                     className="flex flex-col-reverse items-start justify-end gap-[16px] sm:h-[200px] sm:flex-row"
                   >
                     <div className="relative size-[200px] shrink-0 overflow-hidden rounded-[8px] bg-slate-100">
-                      <Image
-                        src={evt.imageSrc}
-                        alt={evt.title}
-                        fill
-                        className="object-cover"
-                        sizes="200px"
-                      />
+                      {evt.imageSrc ? <Image src={evt.imageSrc} alt={evt.title} fill className="object-cover" sizes="200px" /> : <Typography variant="14/regular" className="flex h-full items-center justify-center text-neutral-400">تصویری ثبت نشده است</Typography>}
                     </div>
                     {/* Content Column on Left (Frame 46) */}
                     <div className="flex h-[176px] w-full flex-1 flex-col justify-between py-1">
@@ -311,7 +244,7 @@ export function EventsView({
                           {/* "ثبت درخواست" Button - Figma node 56:14063 */}
                           <button
                             type="button"
-                            onClick={() => setRegisterModalEvent(evt)}
+                            onClick={() => router.push(`/dashboard/new-request?service=${evt.serviceKey}&eventId=${encodeURIComponent(evt.id)}&eventTitle=${encodeURIComponent(evt.title)}`)}
                             className="flex h-[40px] items-center justify-center gap-[8px] rounded-[10px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500"
                           >
                             <span className="font-sans text-[16px] leading-[28px] font-semibold">
@@ -351,113 +284,6 @@ export function EventsView({
         )}
       </section>
 
-      {/* Registration / Request Modal */}
-      {registerModalEvent && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs"
-          dir="rtl"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="relative w-full max-w-md animate-in rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl duration-150 zoom-in-95 fade-in">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
-              <Typography as="h2" variant="20/bold" className="text-neutral-700">
-                ثبت درخواست در رویداد
-              </Typography>
-              <button
-                type="button"
-                onClick={() => setRegisterModalEvent(null)}
-                className="flex size-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100"
-                aria-label="بستن پنجره"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-              {registerModalEvent.title}
-            </p>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                setRegisterModalEvent(null)
-                setActionNotice(`درخواست حضور در «${registerModalEvent.title}» با موفقیت ثبت شد.`)
-                setTimeout(() => setActionNotice(null), 4000)
-              }}
-              className="mt-4 space-y-4"
-            >
-              <div>
-                <label className="mb-1.5 block">
-                  <Typography variant="14/semibold" className="text-neutral-700">
-                    نام شرکت متقاضی
-                  </Typography>
-                </label>
-                <input
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  required
-                  className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3.5 text-sm text-neutral-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block">
-                  <Typography variant="14/semibold" className="text-neutral-700">
-                    تعداد نمایندگان حاضر
-                  </Typography>
-                </label>
-                <select
-                  value={delegatesCount}
-                  onChange={(e) => setDelegatesCount(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3.5 text-sm text-neutral-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
-                >
-                  <option value="1">۱ نفر</option>
-                  <option value="2">۲ نفر</option>
-                  <option value="3">۳ نفر</option>
-                  <option value="4">۴ نفر یا بیشتر</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="needsBoothCheck"
-                  checked={needsBooth}
-                  onChange={(e) => setNeedsBooth(e.target.checked)}
-                  className="size-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-                />
-                <label
-                  htmlFor="needsBoothCheck"
-                  className="cursor-pointer text-xs text-neutral-700"
-                >
-                  متقاضی اختصاص کانتر / غرفه در پاویون اختصاصی هستم
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-3 border-t border-neutral-100 pt-4">
-                <Button
-                  type="button"
-                  variant="outline-gray"
-                  onClick={() => setRegisterModalEvent(null)}
-                  className="rounded-xl px-5"
-                >
-                  انصراف
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  className="flex items-center gap-2 rounded-xl px-6"
-                >
-                  <Send className="size-4" />
-                  <span>ارسال درخواست</span>
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

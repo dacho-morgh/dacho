@@ -2,18 +2,16 @@
 
 import {
   CheckCircle2,
-  FileText,
   Mail,
-  Paperclip,
   Phone,
   Send,
-  Trash2,
   X,
 } from 'lucide-react'
-import React, { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { DashboardUserTagIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import { createSupportTicket } from '@/utilities/dashboard-api'
 
 export interface SupportModalProps {
   isOpen: boolean
@@ -41,34 +39,31 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [phone, setPhone] = useState('')
-  const [attachments, setAttachments] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [trackingCode, setTrackingCode] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   if (!isOpen) return null
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files)
-      setAttachments((prev) => [...prev, ...newFiles])
-    }
-  }
-
-  const removeFile = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!subject.trim() || !message.trim()) return
 
     setIsSubmitting(true)
-    setTimeout(() => {
-      const generatedCode = `SUP-${Math.floor(100000 + Math.random() * 900000)}`
+    setSubmitError(null)
+    try {
+      const result = await createSupportTicket({
+        subject: `[${category} / ${priority}] ${subject.trim()}`,
+        message: `${message.trim()}${phone.trim() ? `\n\nشماره تماس: ${phone.trim()}` : ''}`,
+      })
+      const generatedCode = result.ticket.id
       setIsSubmitting(false)
       setTrackingCode(generatedCode)
       if (onSuccess) onSuccess(generatedCode)
-    }, 600)
+    } catch {
+      setIsSubmitting(false)
+      setSubmitError('ارسال پیام انجام نشد. لطفاً دوباره تلاش کنید.')
+    }
   }
 
   const handleReset = () => {
@@ -77,8 +72,8 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
     setSubject('')
     setMessage('')
     setPhone('')
-    setAttachments([])
     setTrackingCode(null)
+    setSubmitError(null)
     onClose()
   }
 
@@ -155,6 +150,7 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
           ) : (
             /* Form View */
             <form onSubmit={handleSubmit} className="space-y-4">
+              {submitError && <Typography role="alert" variant="14/regular" className="text-error-600">{submitError}</Typography>}
               {/* Quick Contact Banner */}
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-neutral-50 p-3 text-xs text-neutral-600">
                 <div className="flex items-center gap-2">
@@ -269,56 +265,6 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                   placeholder="توضیحات کامل درخواست یا سوال خود را اینجا یادداشت فرمایید..."
                   className="w-full rounded-xl border border-neutral-200 bg-white p-3.5 text-sm leading-relaxed text-neutral-700 placeholder:text-neutral-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
                 />
-              </div>
-
-              {/* Attachments */}
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <Typography variant="14/semibold" className="text-neutral-700">
-                    فایل‌های پیوست
-                  </Typography>
-                  <label
-                    htmlFor="support-file-input"
-                    className="flex cursor-pointer items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700"
-                  >
-                    <Paperclip className="size-3.5" />
-                    <span>افزودن فایل</span>
-                  </label>
-                  <input
-                    id="support-file-input"
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={handleFileSelect}
-                  />
-                </div>
-
-                {attachments.length > 0 && (
-                  <div className="space-y-1.5 rounded-xl border border-neutral-100 bg-neutral-50 p-2">
-                    {attachments.map((file, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 text-xs text-neutral-600 shadow-2xs"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <FileText className="size-4 shrink-0 text-brand-500" />
-                          <span className="truncate">{file.name}</span>
-                          <span className="text-neutral-400">
-                            ({Math.round(file.size / 1024)} KB)
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(idx)}
-                          className="text-neutral-400 hover:text-error-600"
-                          aria-label="حذف فایل"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {/* Form Actions */}

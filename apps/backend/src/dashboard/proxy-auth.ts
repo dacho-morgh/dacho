@@ -33,6 +33,9 @@ export function requireProxyAuth(proxySecret: string) {
     const cmsRole = req.headers['x-user-cms-role']
     res.locals.userCmsRole = typeof cmsRole === 'string' ? cmsRole : undefined
 
+    const dashboardRole = req.headers['x-user-role']
+    res.locals.userRole = typeof dashboardRole === 'string' ? dashboardRole : undefined
+
     next()
   }
 }

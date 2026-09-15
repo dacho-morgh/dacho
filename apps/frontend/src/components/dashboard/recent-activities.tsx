@@ -1,10 +1,10 @@
 import React from 'react'
-import { Bell, CheckCircle, FileEdit, MessageSquare, UploadCloud } from 'lucide-react'
+import { Bell } from 'lucide-react'
 
 import { formatDate, type ActivityDto } from '@/utilities/dashboard-api'
 
 export interface RecentActivitiesProps {
-  /** Recent activity log from GET /activities; the Figma sample shows when absent. */
+  /** Recent activity log from GET /activities. */
   activityItems?: ActivityDto[]
 }
 
@@ -18,50 +18,9 @@ export function RecentActivities({ activityItems }: RecentActivitiesProps) {
       icon: Bell,
       iconColor: 'text-blue-500',
       bgColor: 'bg-blue-50',
-    })) ?? [
-    {
-      id: 1,
-      title: 'امتیازدهی داور تخصصی ثبت شد',
-      description: 'داور فنی برای طرح «پلتفرم هوشمند پایش خوردگی» امتیاز ۸۲/۱۰۰ را ثبت نمود.',
-      time: '۲ ساعت پیش',
-      icon: CheckCircle,
-      iconColor: 'text-emerald-500',
-      bgColor: 'bg-emerald-50',
-    },
-    {
-      id: 2,
-      title: 'صدور پیش‌فاکتور غرفه نمایشگاه',
-      description: 'پیش‌فاکتور خدمات نمایشگاهی عسلویه با شماره فاکتور INV-892 صادر گردید.',
-      time: 'دیروز، ساعت ۱۴:۳۰',
-      icon: FileEdit,
-      iconColor: 'text-blue-500',
-      bgColor: 'bg-blue-50',
-    },
-    {
-      id: 3,
-      title: 'پیام از دبیرخانه کارخانه',
-      description: '«لطفاً نسخه دارای مهر و امضای دیجیتال پروپوزال را مجدداً بارگذاری فرمایید.»',
-      time: '۲ روز پیش',
-      icon: MessageSquare,
-      iconColor: 'text-amber-500',
-      bgColor: 'bg-amber-50',
-    },
-  ]
+    })) ?? []
 
-  const upcomingDeadlines = [
-    {
-      id: 1,
-      title: 'مهلت تکمیل پروپوزال رویداد سرمایه‌گذاری',
-      date: 'تا ۲۵ مرداد ۱۴۰۳',
-      urgent: true,
-    },
-    {
-      id: 2,
-      title: 'جلسه دفاع آنلاین با کمیته علمی و داوران',
-      date: '۲۸ مرداد ۱۴۰۳ - ساعت ۱۰:۰۰',
-      urgent: false,
-    },
-  ]
+  const upcomingDeadlines: { id: string; title: string; date: string; urgent: boolean }[] = []
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -72,7 +31,7 @@ export function RecentActivities({ activityItems }: RecentActivitiesProps) {
             <Bell className="h-4 w-4 text-blue-600" />
             رویدادها و اعلان‌های اخیر
           </h2>
-          <span className="text-xs text-slate-400">۳ اعلان جدید</span>
+          <span className="text-xs text-slate-400">{activities.length.toLocaleString('fa-IR')} اعلان</span>
         </div>
 
         <div className="mt-5 space-y-4">
@@ -96,36 +55,15 @@ export function RecentActivities({ activityItems }: RecentActivitiesProps) {
         </div>
       </div>
 
-      {/* Upcoming Deadlines & Profile completion status */}
+      {/* Upcoming deadlines */}
       <div className="space-y-6">
-        {/* Profile Completion Box */}
-        <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/60 to-indigo-50/60 p-6 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-blue-700">تکمیل پروفایل حقوقی</span>
-            <span className="text-xs font-bold text-blue-800">۸۵٪</span>
-          </div>
-
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-blue-100">
-            <div className="h-full rounded-full bg-blue-600" style={{ width: '85%' }} />
-          </div>
-
-          <p className="mt-3 text-xs text-slate-600 leading-relaxed">
-            برای تسریع در فرآیند تسهیلات، لطفا آخرین آگهی تغییرات روزنامه رسمی را بارگذاری کنید.
-          </p>
-
-          <button className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-white border border-blue-200 py-2.5 text-xs font-bold text-blue-700 hover:bg-blue-50 transition-colors shadow-xs">
-            <UploadCloud className="h-4 w-4" />
-            تکمیل مدارک ثبتی
-          </button>
-        </div>
-
         {/* Deadlines */}
         <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
             سررسیدها و جلسات پیش‌رو
           </h2>
           <div className="mt-4 space-y-3">
-            {upcomingDeadlines.map((d) => (
+            {upcomingDeadlines.length === 0 ? <p className="text-xs text-slate-400">سررسید ثبت نشده است.</p> : upcomingDeadlines.map((d) => (
               <div
                 key={d.id}
                 className={`rounded-xl border p-3 ${

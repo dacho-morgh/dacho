@@ -53,6 +53,11 @@ const defaultNavItems: NavItem[] = [
     href: '/dashboard/events',
     icon: EventsIcon,
   },
+  {
+    title: 'پشتیبانی',
+    href: '/dashboard/support',
+    icon: LettersIcon,
+  },
 ]
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {

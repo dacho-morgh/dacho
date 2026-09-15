@@ -4,23 +4,15 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import { useEffect, useState } from 'react'
 import { DashboardAddIcon, DashboardEditIcon, DashboardTrashIcon } from '@/components/icons'
 
-const fields = [
-  ['نام شرکت', 'نام نمونه شرکت'],
-  ['تاریخ تاسیس', '۱۳۵۱/۰۴/۱۲ (۵۴ سال)'],
-  ['وضعیت شرکت', 'فعال'],
-  ['نوع شرکت', 'سهامی عام'],
-  ['شماره ثبت', '۱۵۷۸۱'],
-  ['کد اقتصادی', '411111495187'],
-  ['شناسه ملی', '10100578556'],
-]
-const addresses = [
-  'تهران خ بهشتی خ پاکستان کوچه دوم پلاک 29',
-  'بوشهر، خیابان نوآوری، ساختمان کارخانه',
-]
-
 export function CompanyDetailView({ id }: { id: string }) {
+  const [data, setData] = useState<{ user?: { companyName?: string; companyEstablishmentDate?: string; companyStatus?: string; companyType?: string; companyRegistrationNumber?: string; companyEconomicCode?: string; companyNationalId?: string }; profile?: { addresses: { title: string; address: string; postalCode: string }[] } } | null>(null)
+  useEffect(() => { fetch(`/api/dashboard/admin/companies/${encodeURIComponent(id)}`).then((response) => response.ok ? response.json() : null).then(setData).catch(() => setData(null)) }, [id])
+  const user = data?.user
+  const fields: Array<[string, string | undefined]> = [['نام شرکت', user?.companyName], ['تاریخ تاسیس', user?.companyEstablishmentDate], ['وضعیت شرکت', user?.companyStatus], ['نوع شرکت', user?.companyType], ['شماره ثبت', user?.companyRegistrationNumber], ['کد اقتصادی', user?.companyEconomicCode], ['شناسه ملی', user?.companyNationalId]]
+  const addresses = data?.profile?.addresses ?? []
   return (
     <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:p-10" dir="rtl">
       <div className="flex items-center gap-2">
@@ -30,7 +22,7 @@ export function CompanyDetailView({ id }: { id: string }) {
           </Typography>
         </Link>
         <Typography variant="14/regular" color="muted">
-          / نام شرکت نمونه
+            / {user?.companyName || '—'}
         </Typography>
       </div>
       <div className="flex min-h-[912px] flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:flex-row">
@@ -61,58 +53,50 @@ export function CompanyDetailView({ id }: { id: string }) {
             <div className="flex items-center gap-4">
               <Image
                 src="/figma/dashboard/profile-avatar.png"
-                alt="نام شرکت نمونه"
+                alt={user?.companyName || 'شرکت'}
                 width={80}
                 height={80}
                 className="rounded-xl object-cover"
               />
               <div>
                 <Typography variant="20/bold" color="neutral-900">
-                  نام شرکت نمونه
+                  {user?.companyName || '—'}
                 </Typography>
                 <Typography variant="14/regular" color="muted">
                   شناسه: {id}
                 </Typography>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline-gray" size="40">
-                <Typography variant="14/regular">بارگذاری لوگو</Typography>
-              </Button>
-              <Button variant="text-gray" size="40">
-                <Typography variant="14/regular">حذف لوگو</Typography>
-              </Button>
-            </div>
           </div>
           <InfoSection title="اطلاعات پایه" edit>
             <div className="grid gap-3 sm:grid-cols-2">
               {fields.map(([label, value]) => (
-                <InfoField key={label} label={label} value={value} />
+                <InfoField key={label} label={label} value={value || '—'} />
               ))}
             </div>
           </InfoSection>
           <InfoSection title="آدرس ها" add>
             <div className="flex flex-col gap-3">
               {addresses.map((address) => (
-                <div key={address} className="rounded-xl border border-neutral-200 p-4">
+                <div key={address.title} className="rounded-xl border border-neutral-200 p-4">
                   <div className="flex items-center justify-between">
                     <Typography variant="14/semibold" color="secondary">
-                      نام آدرس
+                      {address.title}
                     </Typography>
                     <div className="flex gap-1">
-                      <Button variant="text-gray" size="icon-sm" aria-label="ویرایش">
+                      <Button disabled variant="text-gray" size="icon-sm" aria-label="ویرایش">
                         <DashboardEditIcon className="size-5" />
                       </Button>
-                      <Button variant="text-gray" size="icon-sm" aria-label="حذف">
+                      <Button disabled variant="text-gray" size="icon-sm" aria-label="حذف">
                         <DashboardTrashIcon className="size-5" />
                       </Button>
                     </div>
                   </div>
                   <Typography variant="14/regular" color="secondary" className="mt-3">
-                    {address}
+                    {address.address}
                   </Typography>
                   <Typography variant="12/regular" color="muted" className="mt-2">
-                    کد پستی: 1531638111
+                    کد پستی: {address.postalCode || '—'}
                   </Typography>
                 </div>
               ))}
@@ -141,11 +125,11 @@ function InfoSection({
           {title}
         </Typography>
         {edit ? (
-          <Button variant="outline-gray" size="32" icon={<DashboardEditIcon className="size-5" />}>
+          <Button disabled variant="outline-gray" size="32" icon={<DashboardEditIcon className="size-5" />}>
             <Typography variant="14/regular">ویرایش</Typography>
           </Button>
         ) : add ? (
-          <Button variant="outline-gray" size="32" icon={<DashboardAddIcon className="size-5" />}>
+          <Button disabled variant="outline-gray" size="32" icon={<DashboardAddIcon className="size-5" />}>
             <Typography variant="14/regular">افزودن آدرس</Typography>
           </Button>
         ) : null}

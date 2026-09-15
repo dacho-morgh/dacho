@@ -33,7 +33,7 @@ export class PayloadServiceCatalog implements ServiceCatalog {
   }
 
   private headers(): Record<string, string> {
-    return { Authorization: `API-Key ${this.apiKey}` }
+    return { Authorization: `users API-Key ${this.apiKey}` }
   }
 
   private async ok(res: Awaited<ReturnType<HttpFetcher>>): Promise<unknown> {

@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import React, { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import {
   DashboardAddIcon,
   DashboardCloseCircle,
@@ -20,42 +20,15 @@ import {
   deleteAddress as apiDeleteAddress,
 } from '@/utilities/dashboard-api'
 
-export const mockDefaultProfile: ProfileDto = {
+const emptyProfile: ProfileDto = {
   company: {
-    name: 'نام نمونه شرکت',
-    establishmentDate: '۱۳۵۱/۰۴/۱۲ (54 سال)',
-    status: 'فعال',
-    type: 'سهامی عام',
-    registrationNumber: '۱۵۷۸۱',
-    economicCode: '411111495187',
-    nationalId: '10100578556',
+    name: '', establishmentDate: '', status: '', type: '', registrationNumber: '', economicCode: '', nationalId: '',
   },
   contacts: {
-    phone: '۰۹۱۲۳۴۵۶۷۸۹',
-    email: 'sample@company.com',
+    phone: '', email: '',
   },
-  executives: [
-    { role: 'مدیر عامل', name: 'نام نمونه مدیر عامل' },
-    { role: 'رییس هیات مدیره', name: 'نام نمونه رییس هیات مدیره' },
-  ],
-  addresses: [
-    {
-      id: 'addr-1',
-      title: 'نام آدرس',
-      province: 'تهران',
-      city: 'تهران',
-      postalCode: '1531638111',
-      address: 'تهران خ بهشتی خ پاکستان کوچه دوم پلاک 29',
-    },
-    {
-      id: 'addr-2',
-      title: 'نام آدرس',
-      province: 'تهران',
-      city: 'تهران',
-      postalCode: '1531638111',
-      address: 'تهران خ بهشتی خ پاکستان کوچه دوم پلاک 29',
-    },
-  ],
+  executives: [],
+  addresses: [],
 }
 
 type TabType = 'company' | 'resume' | 'account'
@@ -64,12 +37,10 @@ interface ProfileViewProps {
   initialProfile?: ProfileDto
 }
 
-export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileViewProps) {
+export function ProfileView({ initialProfile = emptyProfile }: ProfileViewProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('company')
   const [profile, setProfile] = useState<ProfileDto>(initialProfile)
-  const [avatarUrl, setAvatarUrl] = useState<string>('/figma/dashboard/profile-avatar.png')
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Modals state
   const [isEditBasicOpen, setIsEditBasicOpen] = useState(false)
@@ -77,6 +48,8 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
   const [editingAddress, setEditingAddress] = useState<AddressDto | null>(null)
   const [isEditContactOpen, setIsEditContactOpen] = useState(false)
   const [isLogoutOpen, setIsLogoutOpen] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [editingExecutiveIndex, setEditingExecutiveIndex] = useState<number | null>(null)
 
   // Form states for modals
   const [basicForm, setBasicForm] = useState<CompanyInfoDto>(profile.company)
@@ -88,19 +61,7 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
     address: '',
   })
   const [contactForm, setContactForm] = useState<ContactInfoDto>(profile.contacts)
-
-  // Avatar upload handler
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setAvatarUrl(url)
-    }
-  }
-
-  const handleDeleteAvatar = () => {
-    setAvatarUrl('/figma/dashboard/company-avatar.png')
-  }
+  const [executiveForm, setExecutiveForm] = useState({ role: '', name: '' })
 
   // Open Edit Basic Info modal
   const handleOpenEditBasic = () => {
@@ -110,16 +71,14 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
 
   // Save Edit Basic Info
   const handleSaveBasic = async () => {
-    const updated = {
-      ...profile,
-      company: { ...basicForm },
-    }
-    setProfile(updated)
-    setIsEditBasicOpen(false)
+    setActionError(null)
     try {
-      await apiUpdateProfile({ company: basicForm })
+      const updated = await apiUpdateProfile({ company: basicForm })
+      if (!updated) throw new Error('profile_update_failed')
+      setProfile(updated)
+      setIsEditBasicOpen(false)
     } catch {
-      // optimistic update retained
+      setActionError('ذخیره اطلاعات پایه انجام نشد.')
     }
   }
 
@@ -137,25 +96,15 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
 
   // Save New Address
   const handleSaveAddAddress = async () => {
-    if (!addressForm.title && !addressForm.address) return
-    const newAddr: AddressDto = {
-      id: `addr-${Date.now()}`,
-      title: addressForm.title || 'نام آدرس',
-      province: addressForm.province || 'تهران',
-      city: addressForm.city || 'تهران',
-      postalCode: addressForm.postalCode || '1531638111',
-      address: addressForm.address || 'تهران خ بهشتی خ پاکستان کوچه دوم پلاک 29',
-    }
-    const updated = {
-      ...profile,
-      addresses: [...profile.addresses, newAddr],
-    }
-    setProfile(updated)
-    setIsAddAddressOpen(false)
+    if (!addressForm.title || !addressForm.address) return
+    setActionError(null)
     try {
-      await apiAddAddress(addressForm)
+      const result = await apiAddAddress(addressForm)
+      if (!result?.address) throw new Error('address_create_failed')
+      setProfile((current) => ({ ...current, addresses: [...current.addresses, result.address] }))
+      setIsAddAddressOpen(false)
     } catch {
-      // optimistic update retained
+      setActionError('افزودن آدرس انجام نشد.')
     }
   }
 
@@ -174,27 +123,26 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
   // Save Edit Address
   const handleSaveEditAddress = async () => {
     if (!editingAddress) return
-    const updatedAddresses = profile.addresses.map((a) =>
-      a.id === editingAddress.id ? { ...a, ...addressForm } : a,
-    )
-    setProfile({ ...profile, addresses: updatedAddresses })
     const targetId = editingAddress.id
-    setEditingAddress(null)
+    setActionError(null)
     try {
-      await apiUpdateAddress(targetId, addressForm)
+      const result = await apiUpdateAddress(targetId, addressForm)
+      if (!result?.address) throw new Error('address_update_failed')
+      setProfile((current) => ({ ...current, addresses: current.addresses.map((a) => a.id === targetId ? result.address : a) }))
+      setEditingAddress(null)
     } catch {
-      // optimistic update retained
+      setActionError('ویرایش آدرس انجام نشد.')
     }
   }
 
   // Delete Address
   const handleDeleteAddress = async (id: string) => {
-    const filtered = profile.addresses.filter((a) => a.id !== id)
-    setProfile({ ...profile, addresses: filtered })
+    setActionError(null)
     try {
       await apiDeleteAddress(id)
+      setProfile((current) => ({ ...current, addresses: current.addresses.filter((a) => a.id !== id) }))
     } catch {
-      // optimistic update retained
+      setActionError('حذف آدرس انجام نشد.')
     }
   }
 
@@ -206,16 +154,47 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
 
   // Save Contact Info
   const handleSaveContact = async () => {
-    const updated = {
-      ...profile,
-      contacts: { ...contactForm },
-    }
-    setProfile(updated)
-    setIsEditContactOpen(false)
+    setActionError(null)
     try {
-      await apiUpdateProfile({ contacts: contactForm })
+      const updated = await apiUpdateProfile({ contacts: contactForm })
+      if (!updated) throw new Error('contact_update_failed')
+      setProfile(updated)
+      setIsEditContactOpen(false)
     } catch {
-      // optimistic update retained
+      setActionError('ذخیره اطلاعات تماس انجام نشد.')
+    }
+  }
+
+  const handleOpenExecutive = (index?: number) => {
+    setActionError(null)
+    setEditingExecutiveIndex(index ?? -1)
+    setExecutiveForm(index === undefined ? { role: '', name: '' } : { ...profile.executives[index] })
+  }
+
+  const handleSaveExecutive = async () => {
+    if (!executiveForm.name.trim() || !executiveForm.role.trim()) return
+    setActionError(null)
+    const executives = [...profile.executives]
+    if (editingExecutiveIndex === -1) executives.push({ ...executiveForm })
+    else if (editingExecutiveIndex !== null) executives[editingExecutiveIndex] = { ...executiveForm }
+    try {
+      const updated = await apiUpdateProfile({ executives })
+      if (!updated) throw new Error('executive_update_failed')
+      setProfile(updated)
+      setEditingExecutiveIndex(null)
+    } catch {
+      setActionError('ذخیره شخص انجام نشد.')
+    }
+  }
+
+  const handleDeleteExecutive = async (index: number) => {
+    setActionError(null)
+    try {
+      const updated = await apiUpdateProfile({ executives: profile.executives.filter((_, itemIndex) => itemIndex !== index) })
+      if (!updated) throw new Error('executive_delete_failed')
+      setProfile(updated)
+    } catch {
+      setActionError('حذف شخص انجام نشد.')
     }
   }
 
@@ -231,17 +210,9 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
 
   return (
     <div className="flex w-full flex-col gap-6 p-4 font-sans sm:p-6 lg:p-10" dir="rtl">
-      {/* Hidden file input for avatar upload */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleAvatarUpload}
-        accept="image/*"
-        className="hidden"
-      />
-
       {/* Page Title: "صفحه پروفایل" (Figma node 238:4215) */}
       <h1 className="text-2xl leading-9 font-bold text-[#404040] sm:text-[24px]">صفحه پروفایل</h1>
+      {actionError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
 
       {/* Main Container Card: (Figma node 238:4479) */}
       <div className="flex min-h-[880px] flex-col items-stretch gap-6 rounded-[16px] border border-[#e5e5e5] bg-white p-4 shadow-xs sm:p-6 lg:flex-row lg:gap-8">
@@ -331,28 +302,12 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
               <div className="flex flex-col items-start justify-start gap-4 sm:flex-row sm:items-center">
                 <div className="relative size-20 shrink-0 overflow-hidden rounded-[16px] border border-[#e5e5e5] bg-neutral-100 shadow-2xs">
                   <Image
-                    src={avatarUrl}
+                    src="/figma/dashboard/profile-avatar.png"
                     alt="Company Profile Avatar"
                     fill
                     className="object-cover"
                     priority
                   />
-                </div>
-                <div className="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={handleDeleteAvatar}
-                    className="min-h-10 cursor-pointer rounded-[10px] bg-[#f5f5f5] px-3 text-sm font-semibold text-[#525252] transition-colors hover:bg-neutral-200 sm:px-4 sm:text-base"
-                  >
-                    حذف پروفایل
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="min-h-10 cursor-pointer rounded-[10px] border border-[#e5e5e5] px-3 text-sm font-semibold text-[#525252] transition-colors hover:bg-neutral-50 sm:px-4 sm:text-base"
-                  >
-                    آپلود پروفایل جدید
-                  </button>
                 </div>
               </div>
 
@@ -513,6 +468,7 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
                   <h2 className="text-xl leading-8 font-bold text-[#525252]">اشخاص</h2>
                   <button
                     type="button"
+                    onClick={() => handleOpenExecutive()}
                     className="flex h-8 cursor-pointer items-center gap-2 rounded-[10px] bg-[#f5f5f5] px-3 py-2 text-sm leading-6 text-[#525252] transition-colors hover:bg-neutral-200"
                   >
                     <DashboardAddIcon className="size-5 text-[#525252]" />
@@ -521,6 +477,7 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {profile.executives.length === 0 && <p className="text-sm text-neutral-400">شخصی ثبت نشده است.</p>}
                   {profile.executives.map((exec, idx) => (
                     <div
                       key={idx}
@@ -529,9 +486,13 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
                       <span className="text-sm leading-6 font-semibold text-[#a3a3a3]">
                         {exec.role}
                       </span>
-                      <span className="text-base leading-7 font-semibold text-[#525252]">
-                        {exec.name}
-                      </span>
+                        <div className="flex w-full items-center justify-between gap-2">
+                          <span className="text-base leading-7 font-semibold text-[#525252]">{exec.name}</span>
+                          <span className="flex gap-1">
+                            <button type="button" onClick={() => handleOpenExecutive(idx)} className="flex size-8 items-center justify-center rounded-lg hover:bg-neutral-100" title="ویرایش شخص"><DashboardEditIcon className="size-5" /></button>
+                            <button type="button" onClick={() => handleDeleteExecutive(idx)} className="flex size-8 items-center justify-center rounded-lg hover:bg-red-50" title="حذف شخص"><DashboardTrashIcon className="size-5" /></button>
+                          </span>
+                        </div>
                     </div>
                   ))}
                 </div>
@@ -544,7 +505,7 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
             <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-[16px] border border-[#e5e5e5] bg-white p-8 text-center">
               <span className="text-xl font-bold text-[#525252]">رزومه و سوابق شرکت</span>
               <p className="max-w-md text-sm text-[#a3a3a3]">
-                اطلاعات و فایل‌های سوابق کاری، افتخارات و گواهینامه‌های شرکت در این بخش مدیریت می‌شوند.
+                هنوز رزومه یا سابقه‌ای برای این شرکت ثبت نشده است.
               </p>
             </div>
           )}
@@ -593,7 +554,7 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
               <div className="flex justify-start">
                 <button
                   type="button"
-                  onClick={() => alert('درخواست تغییر رمز عبور ثبت شد')}
+                  disabled
                   className="flex h-10 cursor-pointer items-center gap-2 rounded-[10px] bg-[#f5f5f5] px-4 py-2 text-base font-semibold text-[#525252] transition-colors hover:bg-neutral-200"
                 >
                   <DashboardEditIcon className="size-5 text-[#525252]" />
@@ -604,6 +565,20 @@ export function ProfileView({ initialProfile = mockDefaultProfile }: ProfileView
           )}
         </div>
       </div>
+
+      {editingExecutiveIndex !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="flex w-full max-w-[420px] flex-col gap-5 rounded-[16px] border border-[#e5e5e5] bg-white p-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl leading-8 font-bold text-[#525252]">{editingExecutiveIndex === -1 ? 'افزودن شخص' : 'ویرایش شخص'}</h3>
+              <button type="button" onClick={() => setEditingExecutiveIndex(null)} className="flex size-10 items-center justify-center rounded-[10px] text-[#525252] hover:bg-neutral-100" aria-label="بستن پنجره"><DashboardCloseCircle className="size-6" /></button>
+            </div>
+            <label className="flex flex-col gap-2 text-sm font-semibold text-[#404040]">نام و نام خانوادگی<input value={executiveForm.name} onChange={(event) => setExecutiveForm({ ...executiveForm, name: event.target.value })} className="h-10 rounded-lg border border-neutral-200 px-3 font-normal" required /></label>
+            <label className="flex flex-col gap-2 text-sm font-semibold text-[#404040]">سمت<input value={executiveForm.role} onChange={(event) => setExecutiveForm({ ...executiveForm, role: event.target.value })} className="h-10 rounded-lg border border-neutral-200 px-3 font-normal" required /></label>
+            <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditingExecutiveIndex(null)} className="h-10 rounded-lg border border-neutral-200 px-4 text-sm">انصراف</button><button type="button" onClick={handleSaveExecutive} className="h-10 rounded-lg bg-brand-600 px-4 text-sm text-white">ذخیره</button></div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL 1: ویرایش اطلاعات پایه (Figma node 30510:11062) */}

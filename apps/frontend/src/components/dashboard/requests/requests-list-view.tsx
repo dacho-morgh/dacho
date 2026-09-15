@@ -2,7 +2,6 @@ import React from 'react'
 import { Typography } from '@/components/ui/typography'
 import { RequestsToolbar } from './requests-toolbar'
 import { RequestsListTable } from './requests-list-table'
-import { mockRequestsList } from './mock-data'
 import type { RequestItem } from './types'
 
 export interface RequestsListViewProps {
@@ -26,7 +25,7 @@ export function RequestsListView({
   onEditRequest,
   onCancelRequest,
 }: RequestsListViewProps) {
-  const data = items ?? (state === 'default' ? mockRequestsList : [])
+  const data = items ?? []
   const isLoading = state === 'loading'
   const isEmpty = state === 'empty' || (state === 'default' && data.length === 0)
 

@@ -90,15 +90,50 @@ export class PayloadUserStore implements UserStore {
   }
 
   private toUser(data: unknown): User {
-    const d = data as { id?: unknown; phone?: unknown; name?: unknown; companyId?: unknown }
+    const d = data as Record<string, unknown>
     if (d.id === undefined || d.id === null) throw new Error('Payload user missing id')
     return {
       id: String(d.id),
       phone: String(d.phone ?? ''),
       ...(typeof d.name === 'string' ? { name: d.name } : {}),
       ...(typeof d.companyId === 'string' ? { companyId: d.companyId } : {}),
+      ...(typeof d.email === 'string' ? { email: d.email } : {}),
+      ...(typeof d.position === 'string' ? { position: d.position } : {}),
+      ...(d.role === 'applicant' || d.role === 'staff' ? { role: d.role } : {}),
+      ...(d.cmsRole === 'admin' || d.cmsRole === 'editor' || d.cmsRole === null
+        ? { cmsRole: d.cmsRole }
+        : {}),
+      ...mapStringFields(d, [
+        'companyName',
+        'companyNationalId',
+        'companyRegistrationNumber',
+        'companyType',
+        'companyProvince',
+        'companyCity',
+        'companyEstablishmentDate',
+        'companyStatus',
+        'companyEconomicCode',
+      ]),
+      ...(Array.isArray(d.executives) ? { executives: d.executives as User['executives'] } : {}),
+      ...(Array.isArray(d.addresses) ? { addresses: d.addresses as User['addresses'] } : {}),
     }
   }
+
+  async list(options: { role?: User['role']; search?: string } = {}): Promise<User[]> {
+    const params = new URLSearchParams({ depth: '0', limit: '100', sort: '-createdAt' })
+    if (options.role) params.set('where[role][equals]', options.role)
+    if (options.search) params.set('where[or][0][name][contains]', options.search)
+    const res = await this.fetcher(`${this.baseUrl}/api/users?${params.toString()}`, {
+      headers: this.headers(),
+    })
+    const data = await this.ok(res)
+    const docs = (data as { docs?: unknown[] }).docs ?? []
+    return docs.map((doc) => this.toUser(doc))
+  }
+}
+
+function mapStringFields(data: Record<string, unknown>, names: string[]): Partial<User> {
+  return Object.fromEntries(names.filter((name) => typeof data[name] === 'string').map((name) => [name, data[name]])) as Partial<User>
 }
 
 function unwrap(data: unknown): unknown {

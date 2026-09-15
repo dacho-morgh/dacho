@@ -48,7 +48,16 @@ export default function LoginPage({
         return
       }
 
-      router.replace(safeReturnUrl)
+      const payload = (await response.json().catch(() => null)) as { user?: { role?: string; cmsRole?: string | null } } | null
+      const user = payload?.user
+      const destination = user?.cmsRole === 'admin' || user?.cmsRole === 'editor'
+        ? '/admin'
+        : user?.role === 'staff'
+          ? '/dashboard'
+          : safeReturnUrl === '/admin'
+            ? '/dashboard'
+            : safeReturnUrl
+      router.replace(destination)
       router.refresh()
     } catch {
       setNotice({

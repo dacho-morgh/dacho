@@ -23,8 +23,7 @@ export default async function LettersPage(props: PageProps) {
   const res = await serverDashboardFetch<Paginated<LetterDto>>('/letters?limit=100')
   const fetchedLetters: LetterItem[] = (res?.items ?? []).map(mapLetterItem)
 
-  // Use fetched letters if any exist in the database; otherwise fallback to Figma mock data for 1:1 parity
-  const initialLetters = fetchedLetters.length > 0 ? fetchedLetters : undefined
+  const initialLetters = fetchedLetters
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">

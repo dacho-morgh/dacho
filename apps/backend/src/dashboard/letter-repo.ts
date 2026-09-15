@@ -74,8 +74,39 @@ export interface LetterList {
   totalPages: number
 }
 
+export interface CreateLetterInput {
+  type: LetterType
+  title: string
+  body: string
+  recipientId: string
+  senderId?: string | null
+  senderName?: string | null
+  senderRole?: string | null
+  requestId?: string | null
+}
+
 export class LetterRepository {
   constructor(private readonly pool: Pool) {}
+
+  async create(input: CreateLetterInput): Promise<LetterDto> {
+    const { rows } = await this.pool.query<LetterRow>(
+      `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false) RETURNING ${LETTER_COLUMNS}`,
+      [input.type, input.title, input.body, input.senderId ?? null, input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId ?? null],
+    )
+    if (!rows[0]) throw new Error('INSERT dashboard.letters returned no row')
+    return mapRow(rows[0])
+  }
+
+  async listAll(options: { page: number; limit: number; recipientId?: string }): Promise<LetterList> {
+    const where = options.recipientId ? 'WHERE recipient_id = $1' : ''
+    const params: unknown[] = options.recipientId ? [options.recipientId] : []
+    const count = await this.pool.query<{ total: string }>(`SELECT COUNT(*) AS total FROM dashboard.letters ${where}`, params)
+    const total = Number(count.rows[0]?.total ?? 0)
+    const offset = (options.page - 1) * options.limit
+    const result = await this.pool.query<LetterRow>(`SELECT ${LETTER_COLUMNS} FROM dashboard.letters ${where} ORDER BY sent_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, options.limit, offset])
+    return { items: result.rows.map(mapRow), total, page: options.page, totalPages: Math.max(1, Math.ceil(total / options.limit)) }
+  }
 
   async list(options: ListLetterOptions): Promise<LetterList> {
     const where: string[] = ['recipient_id = $1']
@@ -121,5 +152,15 @@ export class LetterRepository {
     )
     const row = rows[0]
     return row ? mapRow(row) : undefined
+  }
+
+  async findById(id: string): Promise<LetterDto | undefined> {
+    const { rows } = await this.pool.query<LetterRow>(`SELECT ${LETTER_COLUMNS} FROM dashboard.letters WHERE id = $1`, [id])
+    return rows[0] ? mapRow(rows[0]) : undefined
+  }
+
+  async delete(id: string, ownerId: string, staff = false): Promise<boolean> {
+    const result = await this.pool.query('DELETE FROM dashboard.letters WHERE id = $1 AND ($2::boolean OR recipient_id = $3)', [id, staff, ownerId])
+    return (result.rowCount ?? 0) > 0
   }
 }

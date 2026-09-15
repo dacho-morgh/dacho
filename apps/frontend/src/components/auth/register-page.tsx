@@ -63,6 +63,17 @@ const EMPTY_FORM: FormState = {
 
 type FormErrors = Partial<Record<keyof FormState, string>>
 
+type PayloadError = {
+  field?: unknown
+  path?: unknown
+  message?: unknown
+}
+
+type PayloadErrorBody = {
+  errors?: unknown
+  message?: unknown
+}
+
 const registerInputClasses = {
   className: 'text-sm leading-6 text-neutral-800 placeholder:text-neutral-300',
   containerClassName: 'h-12 rounded-lg border-neutral-200 px-3 py-2 shadow-none',
@@ -74,6 +85,62 @@ const required = (value: string, label: string): string | undefined =>
   value.trim() ? undefined : `${label} را وارد کنید.`
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const NATIONAL_ID_RE = /^\d{11}$/
+const IRANIAN_MOBILE_RE = /^09\d{9}$/
+
+const toEnglishDigits = (value: string): string =>
+  value
+    .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+
+const fieldStep: Record<keyof FormState, number> = {
+  companyName: 1,
+  companyNationalId: 1,
+  companyRegistrationNumber: 1,
+  companyType: 1,
+  companyProvince: 1,
+  companyCity: 1,
+  name: 2,
+  position: 2,
+  phone: 2,
+  email: 2,
+  password: 3,
+  passwordConfirmation: 3,
+}
+
+const fieldElementId: Partial<Record<keyof FormState, string>> = {
+  companyName: 'register-companyName',
+  companyNationalId: 'register-companyNationalId',
+  companyRegistrationNumber: 'register-companyRegistrationNumber',
+  companyProvince: 'register-companyProvince',
+  companyCity: 'register-companyCity',
+  name: 'register-name',
+  position: 'register-position',
+  phone: 'register-phone',
+  email: 'register-email',
+  password: 'register-password',
+  passwordConfirmation: 'register-password-confirmation',
+}
+
+function payloadErrors(body: PayloadErrorBody | null): PayloadError[] {
+  return Array.isArray(body?.errors) ? (body.errors as PayloadError[]) : []
+}
+
+function payloadErrorField(error: PayloadError): keyof FormState | undefined {
+  const raw = typeof error.path === 'string' ? error.path : typeof error.field === 'string' ? error.field : ''
+  const message = typeof error.message === 'string' ? error.message : ''
+  const messageField = message.match(/field is invalid:\s*([\w.-]+)/i)?.[1]
+  const candidate = (raw || messageField || '').split('.').at(-1)
+  // Payload reports either a duplicate phone-as-username or a duplicate email
+  // as `invalid: username`, so it cannot be assigned honestly to one field.
+  if (candidate === 'username') return undefined
+  return candidate && candidate in EMPTY_FORM ? (candidate as keyof FormState) : undefined
+}
+
+function isDuplicateError(error: PayloadError): boolean {
+  const message = typeof error.message === 'string' ? error.message.toLocaleLowerCase() : ''
+  return /unique|duplicate|already|exists|قبلاً|تکراری/.test(message)
+}
 
 export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?: string }) {
   const router = useRouter()
@@ -97,6 +164,12 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
   const setField = (name: keyof FormState) => (value: string) => {
     setForm((current) => ({ ...current, [name]: value }))
     setErrors((current) => ({ ...current, [name]: undefined }))
+    setNotice(null)
+  }
+
+  const focusField = (name: keyof FormState) => {
+    const id = fieldElementId[name]
+    if (id) requestAnimationFrame(() => document.getElementById(id)?.focus())
   }
 
   const validateStep = (stepNumber: number): boolean => {
@@ -105,6 +178,9 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
     if (stepNumber === 1) {
       next.companyName = required(form.companyName, 'نام شرکت')
       next.companyNationalId = required(form.companyNationalId, 'شناسه ملی')
+      if (form.companyNationalId.trim() && !NATIONAL_ID_RE.test(toEnglishDigits(form.companyNationalId.trim()))) {
+        next.companyNationalId = 'شناسه ملی باید دقیقاً ۱۱ رقم باشد.'
+      }
       next.companyRegistrationNumber = required(form.companyRegistrationNumber, 'شماره ثبت')
       next.companyType = required(form.companyType, 'نوع شرکت')
       next.companyProvince = required(form.companyProvince, 'استان')
@@ -115,6 +191,9 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
       next.name = required(form.name, 'نام و نام خانوادگی')
       next.position = required(form.position, 'سمت')
       next.phone = required(form.phone, 'شماره موبایل')
+      if (form.phone.trim() && !IRANIAN_MOBILE_RE.test(toEnglishDigits(form.phone.trim()))) {
+        next.phone = 'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.'
+      }
       next.email = required(form.email, 'ایمیل')
       if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) {
         next.email = 'ایمیل معتبر نیست.'
@@ -137,18 +216,25 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
     }
 
     setErrors(next)
-    return Object.values(next).every((error) => !error)
+    const firstInvalidField = (Object.keys(next) as Array<keyof FormState>).find((name) => next[name])
+    if (firstInvalidField) focusField(firstInvalidField)
+    return !firstInvalidField
   }
 
-  const goBack = () => setStep((current) => Math.max(1, current - 1))
+  const goBack = () => {
+    if (submitting) return
+    setNotice(null)
+    setStep((current) => Math.max(1, current - 1))
+  }
   const goForward = () => {
     if (validateStep(step)) {
+      setNotice(null)
       setStep((current) => Math.min(3, current + 1))
     }
   }
 
   const handleSubmit = async () => {
-    if (!validateStep(3)) return
+    if (submitting || !validateStep(3)) return
     setSubmitting(true)
     setNotice(null)
 
@@ -157,15 +243,15 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: form.email.trim(),
-          username: form.phone.trim(),
+          email: form.email.trim().toLocaleLowerCase(),
+          username: toEnglishDigits(form.phone.trim()),
           password: form.password,
-          phone: form.phone.trim(),
+          phone: toEnglishDigits(form.phone.trim()),
           name: form.name.trim(),
           position: form.position.trim(),
           companyName: form.companyName.trim(),
-          companyNationalId: form.companyNationalId.trim(),
-          companyRegistrationNumber: form.companyRegistrationNumber.trim(),
+          companyNationalId: toEnglishDigits(form.companyNationalId.trim()),
+          companyRegistrationNumber: toEnglishDigits(form.companyRegistrationNumber.trim()),
           companyType: form.companyType,
           companyProvince: form.companyProvince.trim(),
           companyCity: form.companyCity.trim(),
@@ -173,9 +259,50 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
       })
 
       if (!response.ok) {
-        // Payload returns validation errors keyed by field when a unique
-        // phone/email already exists; surface a single friendly message.
-        setNotice('ثبت‌نام انجام نشد. ممکن است این شماره موبایل یا ایمیل قبلاً ثبت شده باشد.')
+        const body = (await response.json().catch(() => null)) as PayloadErrorBody | null
+        const serverErrors: FormErrors = {}
+        const responseErrors = payloadErrors(body)
+        const hasAmbiguousIdentityError = responseErrors.some((error) =>
+          /field is invalid:\s*username/i.test(
+            typeof error.message === 'string' ? error.message : '',
+          ),
+        )
+
+        for (const error of responseErrors) {
+          const field = payloadErrorField(error)
+          if (!field) continue
+          const message = typeof error.message === 'string' ? error.message : ''
+          const payloadInvalidUniqueField = /field is invalid:\s*(username|phone|email)/i.test(message)
+
+          if ((isDuplicateError(error) || payloadInvalidUniqueField) && field === 'phone') {
+            serverErrors.phone = 'این شماره موبایل قبلاً ثبت شده است.'
+          } else if ((isDuplicateError(error) || payloadInvalidUniqueField) && field === 'email') {
+            serverErrors.email = 'این ایمیل قبلاً ثبت شده است.'
+          } else if (typeof error.message === 'string' && error.message.trim()) {
+            serverErrors[field] = error.message.trim()
+          }
+        }
+
+        const invalidFields = Object.keys(serverErrors) as Array<keyof FormState>
+        if (invalidFields.length > 0) {
+          const firstField = invalidFields.sort((left, right) => fieldStep[left] - fieldStep[right])[0]
+          setErrors(serverErrors)
+          if (firstField) {
+            setStep(fieldStep[firstField])
+            focusField(firstField)
+          }
+          setNotice('لطفاً موارد مشخص‌شده را اصلاح کنید.')
+        } else if (hasAmbiguousIdentityError || response.status === 409) {
+          setStep(2)
+          setNotice('شماره موبایل یا ایمیل واردشده قبلاً ثبت شده است.')
+          focusField('phone')
+        } else if (response.status >= 500) {
+          setNotice(
+            'ثبت‌نام به دلیل خطای سامانه انجام نشد. اطلاعات شما حفظ شده است؛ لطفاً دوباره تلاش کنید.',
+          )
+        } else {
+          setNotice('اطلاعات ارسالی پذیرفته نشد. موارد واردشده را بررسی و دوباره تلاش کنید.')
+        }
         return
       }
 
@@ -492,6 +619,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
         >
           {step > 1 && (
             <Button
+              disabled={submitting}
               icon={<ArrowRight />}
               onClick={goBack}
               size="clear"
@@ -508,7 +636,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
               <ArrowLeft />
             </Button>
           ) : (
-            <Button loading={submitting} size="40" type="submit">
+            <Button disabled={submitting} loading={submitting} size="40" type="submit">
               ثبت شرکت
             </Button>
           )}

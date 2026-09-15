@@ -109,7 +109,7 @@ export interface ProfileDto {
 }
 
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
-  draft: 'درخواست داده نشده',
+  draft: 'پیش‌نویس',
   in_review: 'درحال بررسی',
   action_needed: 'نیاز به اقدام',
   approved: 'تایید شده',
@@ -203,7 +203,7 @@ export interface RequestDetail {
 }
 
 export function getRequest(id: string): Promise<RequestDetail> {
-  return dashboardFetch<RequestDetail>(`/requests/${id}`)
+  return dashboardFetch<RequestDetail>(`/requests/${encodeURIComponent(id)}`)
 }
 
 export function listLetters(params?: { read?: boolean; page?: number; limit?: number }): Promise<Paginated<LetterDto>> {
@@ -246,6 +246,7 @@ export function fetchProfile(): Promise<ProfileDto | undefined> {
 export function updateProfile(data: {
   company?: Partial<CompanyInfoDto>
   contacts?: Partial<ContactInfoDto>
+  executives?: ExecutiveDto[]
 }): Promise<ProfileDto | undefined> {
   return dashboardFetch<ProfileDto>('/profile', {
     method: 'PATCH',
@@ -315,4 +316,29 @@ export function mapMailData(dto: LetterDto): MailData {
     body: dto.body,
     attachments: [],
   }
+}
+
+export function deleteLetter(id: string): Promise<{ success: boolean }> {
+  return dashboardFetch<{ success: boolean }>(`/letters/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export interface SupportTicketDto {
+  id: string
+  requesterId: string
+  subject: string
+  message: string
+  status: 'open' | 'answered' | 'closed'
+  response: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export function createSupportTicket(input: { subject: string; message: string }): Promise<{ ticket: SupportTicketDto }> {
+  return dashboardFetch<{ ticket: SupportTicketDto }>('/support', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input),
+  })
+}
+
+export function listSupportTickets(): Promise<Paginated<SupportTicketDto>> {
+  return dashboardFetch<Paginated<SupportTicketDto>>('/support?limit=100')
 }

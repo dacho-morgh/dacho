@@ -9,11 +9,14 @@ import { requireProxyAuth } from './proxy-auth.js'
 import { RequestRepository } from './request-repo.js'
 import { StatsRepository } from './stats-repo.js'
 import { WorkflowEngine, type TransitionType } from './workflow-engine.js'
+import type { UserStore } from '../auth/user-store.js'
+import { SupportRepository } from './support-repo.js'
 
 export interface DashboardDeps {
   pool: Pool
   serviceCatalog: ServiceCatalog
   proxySecret: string
+  userStore: UserStore
 }
 
 const TRANSITIONS: TransitionType[] = ['forward', 'return-to-company', 'return-to-previous', 'reject']
@@ -29,6 +32,10 @@ function parseBoolean(value: unknown): boolean | undefined {
   if (value === 'true') return true
   if (value === 'false') return false
   return undefined
+}
+
+function isStaff(res: { locals: Record<string, unknown> }): boolean {
+  return res.locals.userRole === 'staff'
 }
 
 /** Returns the names of required form fields missing from `answers`, or null when complete. */
@@ -56,12 +63,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const letters = new LetterRepository(deps.pool)
   const activities = new ActivityRepository(deps.pool)
   const stats = new StatsRepository(deps.pool)
-  const profileRepo = new ProfileRepository(deps.pool)
+  const profileRepo = new ProfileRepository(deps.userStore)
+  const support = new SupportRepository(deps.pool)
   const engine = new WorkflowEngine(deps.pool, deps.serviceCatalog)
 
   router.use(requireProxyAuth(deps.proxySecret))
 
   router.post('/requests', async (req, res) => {
+    if (res.locals.userRole !== 'applicant') { res.status(403).json({ error: 'applicant_only' }); return }
     const userId = res.locals.userId as string
     const { serviceId, title, answers } = req.body ?? {}
 
@@ -105,6 +114,23 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
     const result = await repo.list({ ownerId: userId, status, page, limit })
     res.json(result)
+  })
+
+  // Staff queue: applicant-owned requests remain isolated from this route.
+  router.get('/admin/requests', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined
+    const result = await repo.listAll({ status, page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25) })
+    const items = await Promise.all(result.items.map(async (item) => ({ ...item, owner: await deps.userStore.findById(item.ownerId) })))
+    res.json({ ...result, items })
+  })
+
+  router.get('/admin/requests/:id', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    const request = await repo.findByIdAny(req.params.id)
+    if (!request) { res.status(404).json({ error: 'not_found' }); return }
+    const service = await deps.serviceCatalog.findById(request.serviceId)
+    res.json({ request, owner: await deps.userStore.findById(request.ownerId), timeline: await activities.listForRequest(request.id), workflow: service?.workflow ?? [] })
   })
 
   router.get('/requests/:id', async (req, res) => {
@@ -207,6 +233,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (contacts && typeof contacts === 'object') {
       profile = await profileRepo.updateContactInfo(userId, contacts)
     }
+    if (Array.isArray(req.body?.executives)) {
+      profile = await profileRepo.updateExecutives(userId, req.body.executives)
+    }
     res.json(profile)
   })
 
@@ -255,6 +284,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   })
 
   router.post('/requests/:id/transition', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
     const actor = {
       userId: res.locals.userId as string,
       roles: res.locals.userRoles as string[],
@@ -299,6 +329,103 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
 
     res.json({ request: result.request })
+  })
+
+  router.delete('/letters/:id', async (req, res) => {
+    const deleted = await letters.delete(req.params.id, res.locals.userId as string, isStaff(res))
+    if (!deleted) { res.status(404).json({ error: 'not_found' }); return }
+    res.json({ success: true })
+  })
+
+  router.post('/admin/requests/:id/transition', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    const actor = { userId: res.locals.userId as string, roles: res.locals.userRoles as string[], cmsRole: res.locals.userCmsRole as string | undefined }
+    const { transition, note } = req.body ?? {}
+    if (!TRANSITIONS.includes(transition as TransitionType)) { res.status(400).json({ error: 'invalid_transition' }); return }
+    const result = await engine.transition({ requestId: req.params.id, actor, transition, note })
+    if ('error' in result) { res.status(result.error === 'request_not_found' ? 404 : result.error === 'forbidden' ? 403 : 409).json({ error: result.error }); return }
+    res.json(result)
+  })
+
+  router.get('/admin/companies', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    res.json({ items: await deps.userStore.list({ role: 'applicant', search: typeof req.query.search === 'string' ? req.query.search : undefined }) })
+  })
+
+  router.get('/admin/companies/:id', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    const user = await deps.userStore.findById(req.params.id)
+    if (!user || user.role === 'staff') { res.status(404).json({ error: 'not_found' }); return }
+    res.json({ user, profile: await profileRepo.getProfile(user.id) })
+  })
+
+  router.get('/admin/employees', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    res.json({ items: await deps.userStore.list({ role: 'staff', search: typeof req.query.search === 'string' ? req.query.search : undefined }) })
+  })
+
+  router.get('/admin/letters', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    res.json(await letters.listAll({ page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25), recipientId: typeof req.query.recipientId === 'string' ? req.query.recipientId : undefined }))
+  })
+
+  router.get('/admin/letters/:id', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    const letter = await letters.findById(req.params.id)
+    if (!letter) { res.status(404).json({ error: 'not_found' }); return }
+    res.json({ letter })
+  })
+
+  router.post('/admin/letters', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    const { title, body, recipientId, type } = req.body ?? {}
+    const trimmedTitle = typeof title === 'string' ? title.trim() : ''
+    const trimmedBody = typeof body === 'string' ? body.trim() : ''
+    const trimmedRecipientId = typeof recipientId === 'string' ? recipientId.trim() : ''
+    if (!trimmedTitle || !trimmedBody || !trimmedRecipientId) { res.status(400).json({ error: 'invalid_letter' }); return }
+    const recipient = await deps.userStore.findById(trimmedRecipientId)
+    if (!recipient || recipient.role !== 'applicant') { res.status(404).json({ error: 'recipient_not_found' }); return }
+    const letterType = type === 'approved' || type === 'needs_fix' || type === 'rejected' || type === 'notification' ? type : 'official'
+    res.status(201).json({ letter: await letters.create({ type: letterType, title: trimmedTitle, body: trimmedBody, recipientId: trimmedRecipientId, senderId: res.locals.userId as string, senderRole: 'staff' }) })
+  })
+
+  router.get('/support', async (req, res) => {
+    const userId = res.locals.userId as string
+    const result = isStaff(res)
+      ? await support.list({ page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25), status: typeof req.query.status === 'string' ? req.query.status : undefined })
+      : await support.list({ requesterId: userId, page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25) })
+    res.json(result)
+  })
+
+  router.post('/support', async (req, res) => {
+    if (res.locals.userRole !== 'applicant') { res.status(403).json({ error: 'applicant_only' }); return }
+    const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : ''
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : ''
+    if (!subject || !message) { res.status(400).json({ error: 'invalid_ticket' }); return }
+    res.status(201).json({ ticket: await support.create({ requesterId: res.locals.userId as string, subject, message }) })
+  })
+
+  router.get('/support/:id', async (req, res) => {
+    const ticket = await support.findById(req.params.id)
+    if (!ticket || (!isStaff(res) && ticket.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
+    res.json({ ticket })
+  })
+
+  router.post('/support/:id/respond', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
+    if (!body) { res.status(400).json({ error: 'invalid_response' }); return }
+    const ticket = await support.respond(req.params.id, res.locals.userId as string, body)
+    if (!ticket) { res.status(404).json({ error: 'not_found' }); return }
+    await letters.create({ type: 'official', title: `پاسخ پشتیبانی: ${ticket.subject}`, body, senderId: res.locals.userId as string, senderRole: 'staff', recipientId: ticket.requesterId })
+    res.json({ ticket })
+  })
+
+  router.post('/support/:id/close', async (req, res) => {
+    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    const ticket = await support.close(req.params.id, res.locals.userId as string)
+    if (!ticket) { res.status(404).json({ error: 'not_found' }); return }
+    res.json({ ticket })
   })
 
   return router

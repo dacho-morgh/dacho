@@ -9,7 +9,7 @@ export interface RequestItem {
   createdDate: string
 }
 
-export type RecentRequestStatus = 'in_review' | 'action_needed' | 'approved' | 'rejected'
+export type RecentRequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
 export type RecentRequestServiceType =
   | 'financing'
