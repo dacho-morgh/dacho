@@ -34,13 +34,18 @@ const service: ServiceDefinition = {
 }
 
 function ownerHeaders() {
-  return { 'x-internal-proxy-secret': PROXY_SECRET, 'x-user-id': OWNER }
+  return {
+    'x-internal-proxy-secret': PROXY_SECRET,
+    'x-user-id': OWNER,
+    'x-user-role': 'applicant',
+  }
 }
 
 function staffHeaders(roles: string[] = [], cmsRole?: string) {
   return {
     'x-internal-proxy-secret': PROXY_SECRET,
     'x-user-id': STAFF,
+    'x-user-role': 'staff',
     ...(roles.length > 0 ? { 'x-user-roles': roles.join(',') } : {}),
     ...(cmsRole ? { 'x-user-cms-role': cmsRole } : {}),
   }

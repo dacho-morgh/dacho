@@ -54,11 +54,6 @@ const applicantNavItems: NavItem[] = [
     href: '/dashboard/events',
     icon: EventsIcon,
   },
-  {
-    title: 'پشتیبانی',
-    href: '/dashboard/support',
-    icon: LettersIcon,
-  },
 ]
 
 const seniorManagerNavItems: NavItem[] = [
@@ -88,16 +83,11 @@ const seniorManagerNavItems: NavItem[] = [
     href: '/dashboard/letters',
     icon: LettersIcon,
   },
-  {
-    title: 'رویدادها و نمایشگاه‌ها',
-    href: '/dashboard/events',
-    icon: EventsIcon,
-  },
-  {
-    title: 'پشتیبانی',
-    href: '/dashboard/support',
-    icon: LettersIcon,
-  },
+  // {
+  //   title: 'رویدادها و نمایشگاه‌ها',
+  //   href: '/dashboard/events',
+  //   icon: EventsIcon,
+  // },
 ]
 
 export interface SidebarUser {
@@ -130,15 +120,15 @@ export function AppSidebar({
     isSeniorManagerProp ??
     Boolean(
       user?.cmsRole === 'admin' ||
-        user?.role === 'staff' ||
-        user?.position === 'مدیر ارشد' ||
-        (Array.isArray(user?.roles) &&
-          user.roles.some((r) => {
-            if (typeof r === 'object' && r !== null && 'name' in r) {
-              return r.name === 'مدیر ارشد'
-            }
-            return r === 'مدیر ارشد'
-          })),
+      user?.role === 'staff' ||
+      user?.position === 'مدیر ارشد' ||
+      (Array.isArray(user?.roles) &&
+        user.roles.some((r) => {
+          if (typeof r === 'object' && r !== null && 'name' in r) {
+            return r.name === 'مدیر ارشد'
+          }
+          return r === 'مدیر ارشد'
+        })),
     )
 
   const navItems = isSeniorManager ? seniorManagerNavItems : applicantNavItems

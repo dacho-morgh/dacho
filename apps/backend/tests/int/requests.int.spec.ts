@@ -36,6 +36,7 @@ function authHeaders(userId: string) {
   return {
     'x-internal-proxy-secret': PROXY_SECRET,
     'x-user-id': userId,
+    'x-user-role': 'applicant',
   }
 }
 

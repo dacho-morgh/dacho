@@ -4,28 +4,35 @@ import request from 'supertest'
 import { createTestApp } from './helpers.js'
 
 describe('Dashboard Profile Endpoints', () => {
-  const headers = {
-    'x-internal-proxy-secret': 'test-proxy-secret',
-    'x-user-id': 'user-1',
+  async function createProfileTestApp() {
+    const testApp = await createTestApp()
+    const user = await testApp.userStore.findOrCreateByPhone('۰۹۱۲۳۴۵۶۷۸۹')
+    return {
+      ...testApp,
+      headers: {
+        'x-internal-proxy-secret': 'test-proxy-secret',
+        'x-user-id': user.id,
+      },
+    }
   }
 
   it('GET /profile returns default profile structure with company and addresses', async () => {
-    const { app } = await createTestApp()
+    const { app, headers } = await createProfileTestApp()
     const res = await request(app).get('/profile').set(headers)
 
     expect(res.status).toBe(200)
     expect(res.body).toHaveProperty('company')
-    expect(res.body.company.name).toBe('نام نمونه شرکت')
-    expect(res.body.company.status).toBe('فعال')
+    expect(res.body.company.name).toBe('')
+    expect(res.body.company.status).toBe('')
     expect(res.body).toHaveProperty('contacts')
     expect(res.body.contacts.phone).toBe('۰۹۱۲۳۴۵۶۷۸۹')
     expect(res.body).toHaveProperty('addresses')
     expect(Array.isArray(res.body.addresses)).toBe(true)
-    expect(res.body.addresses.length).toBeGreaterThan(0)
+    expect(res.body.addresses).toEqual([])
   })
 
   it('PATCH /profile updates basic company info and contacts', async () => {
-    const { app } = await createTestApp()
+    const { app, headers } = await createProfileTestApp()
 
     const updateRes = await request(app)
       .patch('/profile')
@@ -46,7 +53,7 @@ describe('Dashboard Profile Endpoints', () => {
   })
 
   it('POST, PUT, DELETE /profile/addresses manages user addresses', async () => {
-    const { app } = await createTestApp()
+    const { app, headers } = await createProfileTestApp()
 
     // Add address
     const addRes = await request(app)

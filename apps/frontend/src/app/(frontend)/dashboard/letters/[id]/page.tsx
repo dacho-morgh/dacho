@@ -1,61 +1,44 @@
 import configPromise from '@payload-config'
-import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
-import React from 'react'
-
-import { MailDetailView } from '@/components/dashboard/mail-detail-view'
-import { Typography } from '@/components/ui/typography'
-import { mapMailData, type LetterDto } from '@/utilities/dashboard-api'
+import type { ReactNode } from 'react'
+import Link from 'next/link'
+import { MailDetailView, type MailData } from '@/components/dashboard/mail-detail-view'
+import { SupportTicketActions } from '@/components/dashboard/support-ticket-actions'
+import { formatDate, formatTime, formatWeekday, mapMailData, type LetterDto, type SupportTicketDto } from '@/utilities/dashboard-api'
 import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
-  title: 'مشاهده نامه',
-  description: 'مشاهده جزئیات نامه و مکاتبات اداری',
-}
-
-interface PageProps {
-  params: Promise<{ id: string }>
-}
-
-export default async function LetterDetailPage({ params }: PageProps) {
-  const { id } = await params
+export default async function LetterDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const raw = decodeURIComponent((await params).id)
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: await headers() })
-  const isSeniorManager = await isSeniorManagerUser(payload, user)
-
-  if (isSeniorManager) {
-    const result = await serverDashboardFetch<{ letter: LetterDto }>(
-      `/admin/letters/${encodeURIComponent(id)}`,
-    )
+  const admin = await isSeniorManagerUser(payload, user)
+  const split = raw.indexOf(':')
+  const prefix = split > 0 ? raw.slice(0, split) : 'letter'
+  const id = split > 0 ? raw.slice(split + 1) : raw
+  let mail: MailData
+  let actions: ReactNode = null
+  if (prefix === 'support') {
+    const result = await serverDashboardFetch<{ ticket: SupportTicketDto }>(`/support/${encodeURIComponent(id)}`)
+    if (!result?.ticket) notFound()
+    const t = result.ticket
+    mail = { id: raw, title: t.subject, category: 'پشتیبانی', senderName: admin ? t.requesterId : 'پشتیبانی', senderRole: 'تیکت پشتیبانی', datePersian: formatDate(t.createdAt), dayOfWeek: formatWeekday(t.createdAt), timeStr: formatTime(t.createdAt), body: `متن پیام:\n${t.message}${t.response ? `\n\nپاسخ پشتیبانی:\n${t.response}` : ''}` }
+    if (admin) actions = <SupportTicketActions id={id} status={t.status} />
+  } else if (prefix === 'form') {
+    if (!admin) notFound()
+    const doc = await payload.findByID({ collection: 'form-submissions', id, depth: 1 })
+    const title = typeof doc.form === 'object' ? doc.form?.title : undefined
+    if (title !== 'فرم تماس با ما' && title !== 'درخواست همکاری') notFound()
+    const fields = Object.fromEntries((doc.submissionData ?? []).map((x: { field: string; value: unknown }) => [x.field, x.value]))
+    const labels: Record<string, string> = { fullName: 'نام و نام خانوادگی', email: 'ایمیل', phone: 'شماره همراه', subject: 'موضوع', message: 'پیام' }
+    mail = { id: raw, title, category: title, senderName: String(fields.fullName || 'فرستنده فرم'), senderRole: String(fields.email || 'فرم وب‌سایت'), datePersian: formatDate(doc.createdAt), dayOfWeek: formatWeekday(doc.createdAt), timeStr: formatTime(doc.createdAt), body: Object.entries(fields).map(([k, v]) => `${labels[k] ?? k}: ${String(v)}`).join('\n') }
+  } else {
+    const result = await serverDashboardFetch<{ letter: LetterDto }>(`${admin ? '/admin/letters' : '/letters'}/${encodeURIComponent(id)}`)
     if (!result?.letter) notFound()
-    return (
-      <main className="mx-auto w-full max-w-3xl p-6 sm:p-10" dir="rtl">
-        <Typography as="h1" variant="24/bold" className="text-neutral-900">
-          {result.letter.title}
-        </Typography>
-        <Typography variant="14/regular" className="mt-2 text-neutral-500">
-          فرستنده: {result.letter.senderName || '—'} · گیرنده: {result.letter.recipientId}
-        </Typography>
-        <article className="mt-6 rounded-2xl border border-neutral-200 bg-white p-6">
-          <Typography variant="16/regular" className="whitespace-pre-wrap text-neutral-800">
-            {result.letter.body}
-          </Typography>
-        </article>
-      </main>
-    )
+    mail = mapMailData(result.letter)
   }
-
-  const res = await serverDashboardFetch<{ letter: LetterDto }>(`/letters/${id}`)
-  if (!res?.letter) notFound()
-  const mail = mapMailData(res.letter)
-
-  return (
-    <div className="p-6 pb-12 sm:p-8">
-      <MailDetailView mail={mail} />
-    </div>
-  )
+  return <main className="mx-auto w-full max-w-4xl p-6 sm:p-10" dir="rtl"><Link href="/dashboard/letters" className="mb-6 inline-flex text-sm text-brand-600">← بازگشت به کارتابل</Link><MailDetailView mail={mail} showActions={false} />{actions}</main>
 }

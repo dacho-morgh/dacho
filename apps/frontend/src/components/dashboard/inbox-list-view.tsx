@@ -20,7 +20,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import { SupportModal } from './support-modal'
-import { deleteLetter } from '@/utilities/dashboard-api'
+import { deleteLetter, listSupportTickets, type SupportTicketDto } from '@/utilities/dashboard-api'
 
 export type LetterStatus = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -35,15 +35,19 @@ export interface LetterItem {
   sentDate: string
   read?: boolean
   trackingCode?: string
+  source?: 'letter' | 'support' | 'form'
 }
 
-const filterOptions: Array<{ value: 'all' | LetterStatus; label: string }> = [
+const filterOptions: Array<{ value: 'all' | LetterStatus | 'support' | 'contact_form' | 'cooperation_form'; label: string }> = [
   { value: 'all', label: 'همه وضعیت‌ها' },
   { value: 'rejected', label: 'رد درخواست' },
   { value: 'approved', label: 'تایید درخواست' },
   { value: 'needs_fix', label: 'نیاز به اصلاح درخواست' },
   { value: 'official', label: 'نامه رسمی' },
   { value: 'notification', label: 'اطلاع رسانی' },
+  { value: 'support', label: 'پشتیبانی' },
+  { value: 'contact_form', label: 'فرم تماس با ما' },
+  { value: 'cooperation_form', label: 'درخواست همکاری' },
 ]
 
 // Exact tokens from Figma node 53:12475
@@ -59,9 +63,11 @@ export interface InboxListViewProps {
   initialLetters?: LetterItem[]
   letters?: LetterItem[]
   onLettersChange?: (letters: LetterItem[]) => void
+  initialTickets?: SupportTicketDto[]
   state?: 'default' | 'loading' | 'empty'
   basePath?: string
   showSupport?: boolean
+  showHeader?: boolean
 }
 
 function StatusBadge({ status, label }: { status: LetterStatus; label: string }) {
@@ -182,17 +188,34 @@ export function InboxListView({
   initialLetters = [],
   letters: controlledLetters,
   onLettersChange,
+  initialTickets = [],
   state = 'default',
   basePath = '/dashboard/letters',
   showSupport = true,
+  showHeader = true,
 }: InboxListViewProps) {
   const [internalLetters, setInternalLetters] = useState(initialLetters)
+  const [tickets, setTickets] = useState<SupportTicketDto[]>(initialTickets)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | LetterStatus>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | LetterStatus | 'support' | 'contact_form' | 'cooperation_form'>('all')
   const [supportModalOpen, setSupportModalOpen] = useState(false)
   const [actionNotice, setActionNotice] = useState<string | null>(null)
 
   const letters = controlledLetters ?? internalLetters
+  const unifiedItems = useMemo<LetterItem[]>(() => [
+    ...letters.map((item) => ({ ...item, source: item.source ?? 'letter' as const })),
+    ...tickets.map((ticket) => ({
+      id: `support:${ticket.id}`,
+      title: ticket.subject,
+      status: 'notification' as LetterStatus,
+      statusLabel: 'پشتیبانی',
+      senderName: 'کاربر سامانه',
+      senderRole: ticket.status === 'open' ? 'باز' : ticket.status === 'answered' ? 'پاسخ داده شده' : 'بسته شده',
+      sentDate: new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ticket.createdAt)),
+      read: ticket.status !== 'open',
+      source: 'support' as const,
+    })),
+  ], [letters, tickets])
   const updateLetters = (updater: (current: LetterItem[]) => LetterItem[]) => {
     const next = updater(letters)
     if (onLettersChange) onLettersChange(next)
@@ -203,16 +226,19 @@ export function InboxListView({
     if (state === 'empty') return []
 
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase('fa')
-    return letters.filter((item) => {
+    return unifiedItems.filter((item) => {
       const matchesSearch =
         normalizedQuery.length === 0 ||
         [item.title, item.statusLabel, item.senderName, item.senderRole, item.sentDate].some(
           (value) => value.toLocaleLowerCase('fa').includes(normalizedQuery),
         )
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter
+      const matchesStatus = statusFilter === 'all' ||
+        (statusFilter === 'support' ? item.source === 'support' :
+          statusFilter === 'contact_form' ? item.statusLabel === 'فرم تماس با ما' :
+            statusFilter === 'cooperation_form' ? item.statusLabel === 'درخواست همکاری' : item.status === statusFilter)
       return matchesSearch && matchesStatus
     })
-  }, [letters, searchQuery, state, statusFilter])
+  }, [unifiedItems, searchQuery, state, statusFilter])
 
   const isLoading = state === 'loading'
   const isEmpty = !isLoading && filteredLetters.length === 0
@@ -223,6 +249,10 @@ export function InboxListView({
   }
 
   const handleDelete = async (item: LetterItem) => {
+    if (item.source !== 'letter') {
+      showNotice('تیکت‌های پشتیبانی از اینجا حذف نمی‌شوند.')
+      return
+    }
     try {
       await deleteLetter(item.id)
       updateLetters((current) => current.filter((letter) => letter.id !== item.id))
@@ -256,79 +286,84 @@ export function InboxListView({
         </div>
       )}
 
-      {/* Page Title - Figma node 33:3921 */}
-      <h1 className="font-sans text-[24px] leading-[36px] font-bold text-[#404040]">
-        کارتابل نامه
-      </h1>
+      {/* Page Title */}
+      {showHeader && <div className="flex flex-col gap-4 border-b border-neutral-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="font-sans text-[24px] leading-[36px] font-bold text-[#404040]">
+            کارتابل نامه و مکاتبات
+          </h1>
+          <Typography variant="12/regular" className="text-neutral-400 mt-0.5">
+            مشاهده نامه‌های رسمی، پیام‌ها و تیکت‌های پشتیبانی
+          </Typography>
+        </div>
 
-      {/* Action Bar - Figma Frame 1 (33:3923) */}
-      <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {/* Left Side: Button "پیام به پشتیبانی" - Figma node 33:3924 */}
+      </div>}
 
-        {/* Right Side: Search Input + Filter - Figma Frame 84 (53:12430) */}
-        <div className="flex h-[48px] w-full items-center gap-[8px] sm:w-[458px]">
-          <div className="flex h-[48px] flex-1 items-center gap-[8px] overflow-hidden rounded-[8px] border border-[#f5f5f5] bg-white px-[12px] py-[8px] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100 sm:w-[400px]">
-            <SearchNormalIcon className="size-[24px] shrink-0 text-[#d4d4d4]" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="درخواست خود را جست و جو کنید"
-              aria-label="جستجوی نامه‌ها"
-              className="h-[28px] w-full bg-transparent text-right font-sans text-[16px] leading-[28px] font-normal text-[#525252] outline-none placeholder:text-[#d4d4d4]"
-            />
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+      <>
+          {/* Action Bar - Figma Frame 1 (33:3923) */}
+          <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* Right Side: Search Input + Filter - Figma Frame 84 (53:12430) */}
+            <div className="flex h-[48px] w-full items-center gap-[8px] sm:w-[458px]">
+              <div className="flex h-[48px] flex-1 items-center gap-[8px] overflow-hidden rounded-[8px] border border-[#f5f5f5] bg-white px-[12px] py-[8px] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100 sm:w-[400px]">
+                <SearchNormalIcon className="size-[24px] shrink-0 text-[#d4d4d4]" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="درخواست خود را جست و جو کنید"
+                  aria-label="جستجوی نامه‌ها"
+                  className="h-[28px] w-full bg-transparent text-right font-sans text-[16px] leading-[28px] font-normal text-[#525252] outline-none placeholder:text-[#d4d4d4]"
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={`flex h-[48px] w-[50px] shrink-0 items-center justify-center rounded-[12px] bg-white transition-colors hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-brand-500 ${
+                      statusFilter !== 'all'
+                        ? 'text-brand-600 ring-2 ring-brand-500/20'
+                        : 'text-[#525252]'
+                    }`}
+                    title="فیلتر وضعیت نامه"
+                  >
+                    <FilterIcon className="size-[26px]" />
+                    <span className="sr-only">فیلتر</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="w-52 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-md"
+                >
+                  {filterOptions.map((option) => (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onClick={() => setStatusFilter(option.value)}
+                      className={`flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5 text-sm ${
+                        statusFilter === option.value
+                          ? 'bg-brand-50 font-medium text-brand-600'
+                          : 'text-neutral-700 hover:bg-neutral-100'
+                      }`}
+                    >
+                      <span>{option.label}</span>
+                      {statusFilter === option.value && (
+                        <span aria-hidden="true" className="size-1.5 rounded-full bg-brand-500" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {showSupport && (
               <button
                 type="button"
-                className={`flex h-[48px] w-[50px] shrink-0 items-center justify-center rounded-[12px] bg-white transition-colors hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-brand-500 ${
-                  statusFilter !== 'all'
-                    ? 'text-brand-600 ring-2 ring-brand-500/20'
-                    : 'text-[#525252]'
-                }`}
-                title="فیلتر وضعیت نامه"
+                onClick={() => setSupportModalOpen(true)}
+                className="flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[12px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500 sm:w-[199px]"
               >
-                <FilterIcon className="size-[26px]" />
-                <span className="sr-only">فیلتر</span>
+                <span className="font-sans text-[20px] leading-[32px] font-normal">پیام به پشتیبانی</span>
+                <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-52 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-md"
-            >
-              {filterOptions.map((option) => (
-                <DropdownMenuItem
-                  key={option.value}
-                  onClick={() => setStatusFilter(option.value)}
-                  className={`flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5 text-sm ${
-                    statusFilter === option.value
-                      ? 'bg-brand-50 font-medium text-brand-600'
-                      : 'text-neutral-700 hover:bg-neutral-100'
-                  }`}
-                >
-                  <span>{option.label}</span>
-                  {statusFilter === option.value && (
-                    <span aria-hidden="true" className="size-1.5 rounded-full bg-brand-500" />
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Search Input - Figma node 33:3925 */}
-        </div>
-        {showSupport && (
-          <button
-            type="button"
-            onClick={() => setSupportModalOpen(true)}
-            className="flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[12px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500 sm:w-[199px]"
-          >
-            <span className="font-sans text-[20px] leading-[32px] font-normal">پیام به پشتیبانی</span>
-            <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
-          </button>
-        )}
-      </div>
+            )}
+          </div>
 
       {/* Main Table Card - Figma Frame 6 (33:3926) */}
       <section className="relative mt-[16px] flex h-fit h-full w-full flex-col rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
@@ -409,10 +444,7 @@ export function InboxListView({
 
                         {/* 5. Actions Column */}
                         <td className="h-[72px] px-[16px] text-center">
-                          <LetterActions
-                            item={item}
-                            onDelete={handleDelete}
-                          />
+                          {item.source === 'letter' && <LetterActions item={item} onDelete={handleDelete} />}
                         </td>
                       </tr>
                     ))}
@@ -431,10 +463,7 @@ export function InboxListView({
                   >
                     <div className="flex items-center justify-between gap-3">
                       <StatusBadge status={item.status} label={item.statusLabel} />
-                      <LetterActions
-                        item={item}
-                        onDelete={handleDelete}
-                      />
+                      {item.source === 'letter' && <LetterActions item={item} onDelete={handleDelete} />}
                     </div>
                     <Link
                       href={`${basePath}/${encodeURIComponent(item.id)}`}
@@ -458,15 +487,20 @@ export function InboxListView({
           </>
         )}
       </section>
+      </>
 
       {/* Connect to Support Modal */}
-      <SupportModal
+      {showSupport && <SupportModal
         isOpen={supportModalOpen}
         onClose={() => setSupportModalOpen(false)}
-        onSuccess={(code) => {
+        onSuccess={async (code) => {
           showNotice(`پیام شما با کد پیگیری ${code} با موفقیت برای پشتیبانی ارسال گردید.`)
+          try {
+            const fresh = await listSupportTickets()
+            setTickets(fresh.items)
+          } catch {}
         }}
-      />
+      />}
 
     </div>
   )

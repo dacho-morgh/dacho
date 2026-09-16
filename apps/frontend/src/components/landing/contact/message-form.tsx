@@ -25,7 +25,8 @@ export function MessageForm({ className, formId }: MessageFormProps) {
     setLoading(true)
     setNotice(null)
 
-    const form = new FormData(event.currentTarget)
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
     const submissionData = [
       { field: 'fullName', value: String(form.get('fullName') ?? '') },
       { field: 'email', value: String(form.get('email') ?? '') },
@@ -46,7 +47,7 @@ export function MessageForm({ className, formId }: MessageFormProps) {
         return
       }
 
-      event.currentTarget.reset()
+      formElement.reset()
       setNotice({ kind: 'success', message: 'پیام شما با موفقیت ارسال شد.' })
     } catch {
       setNotice({ kind: 'error', message: 'در حال حاضر ارتباط با سامانه برقرار نیست. کمی بعد دوباره تلاش کنید.' })

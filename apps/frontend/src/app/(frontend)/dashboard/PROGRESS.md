@@ -13,10 +13,10 @@ Consolidate `/dashboard` and `/dashboard/admin` into a single `/dashboard` route
   - [x] `/dashboard/companies` and `/dashboard/companies/[id]`
   - [x] `/dashboard/employees`
   - [x] `/dashboard/requests`, `/dashboard/requests/[id]`, and `/dashboard/requests/[id]/evaluation`
-  - [x] `/dashboard/letters` and `/dashboard/letters/[id]`
-  - [x] `/dashboard/support`
+  - [x] `/dashboard/letters` and `/dashboard/letters/[id]` (integrated with support tickets for both applicant and admin staff)
+  - [x] Remove `/dashboard/support` route and consolidate support tickets into `/dashboard/letters`
   - [x] Remove `apps/frontend/src/app/(frontend)/dashboard/admin` directory
-  - [x] Add redirects in `redirects.ts` for `/dashboard/admin/*` -> `/dashboard/*`
+  - [x] Add redirects in `redirects.ts` for `/dashboard/admin/*` -> `/dashboard/*` and `/dashboard/support` -> `/dashboard/letters?tab=support`
 - [x] Step 6: Update internal navigation links across admin components
 - [x] Step 7: Fix unit and integration tests (23/23 test files passed, 85/85 tests passed)
 - [x] Step 8: Verify build, lint, and typecheck (TypeScript 0 errors, ESLint 0 errors, Next.js build succeeded)

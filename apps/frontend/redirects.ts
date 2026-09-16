@@ -26,5 +26,23 @@ export const redirects: NextConfig['redirects'] = async () => {
     permanent: false,
   }
 
-  return [internetExplorerRedirect, dashboardAdminRedirect, dashboardAdminSubpathRedirect]
+  const dashboardSupportRedirect = {
+    source: '/dashboard/support',
+      destination: '/dashboard/letters',
+    permanent: false,
+  }
+
+  const dashboardSupportSubpathRedirect = {
+    source: '/dashboard/support/:path*',
+      destination: '/dashboard/letters',
+    permanent: false,
+  }
+
+  return [
+    internetExplorerRedirect,
+    dashboardAdminRedirect,
+    dashboardAdminSubpathRedirect,
+    dashboardSupportRedirect,
+    dashboardSupportSubpathRedirect,
+  ]
 }

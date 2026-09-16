@@ -266,7 +266,7 @@ export function MailDetailView({ mail, showActions = false }: MailDetailViewProp
             </h2>
 
             {/* 5. Letter Body (56:12559) */}
-            <div className="mt-4 text-base leading-relaxed text-[#525252] text-justify space-y-4">
+            <div className="mt-4 whitespace-pre-wrap text-base leading-relaxed text-[#525252] text-justify space-y-4">
               <p>{mail.body}</p>
             </div>
 
