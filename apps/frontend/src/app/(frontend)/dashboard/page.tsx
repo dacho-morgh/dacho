@@ -1,7 +1,5 @@
-import { getServerSideURL } from '@dacho/cms-core/utilities'
 import configPromise from '@payload-config'
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import React from 'react'
@@ -21,7 +19,8 @@ import {
   type RequestDto,
   type RequestStats,
 } from '@/utilities/dashboard-api'
-import { isSeniorManagerUser } from '@/utilities/dashboard-server'
+import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
+import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,23 +29,10 @@ export const metadata: Metadata = {
   description: 'سامانه مدیریت درخواست‌ها، طرح‌ها و پیگیری فرآیندهای خدمات کارخانه نوآوری بوشهر',
 }
 
-async function proxyFetch<T>(path: string, cookie: string): Promise<T | undefined> {
-  try {
-    const res = await fetch(`${getServerSideURL()}/api/dashboard${path}`, {
-      headers: { cookie },
-      cache: 'no-store',
-    })
-    if (!res.ok) return undefined
-    return (await res.json()) as T
-  } catch {
-    return undefined
-  }
-}
-
 export default async function DashboardPage() {
   const payload = await getPayload({ config: configPromise })
   const requestHeaders = await headers()
-  const { user } = await payload.auth({ headers: requestHeaders })
+  const { user } = await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })
   const isSeniorManager = await isSeniorManagerUser(payload, user)
   if (isSeniorManager) return <CompanyList />
 
@@ -63,11 +49,10 @@ export default async function DashboardPage() {
     .filter((s) => s.key)
 
   // Application-owned instances read through the same-origin proxy.
-  const cookie = (await cookies()).toString()
   const [stats, requests, activities] = await Promise.all([
-    proxyFetch<RequestStats>('/stats', cookie),
-    proxyFetch<Paginated<RequestDto>>('/requests?limit=10', cookie),
-    proxyFetch<Paginated<ActivityDto>>('/activities?limit=10', cookie),
+    serverDashboardFetch<RequestStats>('/stats'),
+    serverDashboardFetch<Paginated<RequestDto>>('/requests?limit=10'),
+    serverDashboardFetch<Paginated<ActivityDto>>('/activities?limit=10'),
   ])
 
   const recentRequests: RecentRequestItem[] = (requests?.items ?? []).map((r) => ({

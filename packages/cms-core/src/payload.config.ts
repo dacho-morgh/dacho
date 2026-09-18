@@ -1,5 +1,6 @@
 import path from 'path'
 import { readFileSync } from 'node:fs'
+import os from 'node:os'
 import { fileURLToPath } from 'url'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, PayloadRequest } from 'payload'
@@ -53,6 +54,30 @@ const resolveSecret = (): string => {
 const payloadSecret = resolveSecret()
 const databaseURL = requireEnv('DATABASE_URL')
 const siteName = 'کارخانه نوآوری صنایع انرژی بوشهر'
+
+const getLocalNetworkOrigins = (): string[] => {
+  if (process.env.NODE_ENV === 'production') return []
+  const origins = new Set<string>()
+  origins.add('http://localhost:3000')
+  origins.add('http://127.0.0.1:3000')
+  try {
+    const port = process.env.PORT || '3000'
+    origins.add(`http://localhost:${port}`)
+    origins.add(`http://127.0.0.1:${port}`)
+    const ifaces = os.networkInterfaces()
+    for (const dev of Object.keys(ifaces)) {
+      for (const details of ifaces[dev] ?? []) {
+        if (details.family === 'IPv4' && !details.internal) {
+          origins.add(`http://${details.address}:3000`)
+          origins.add(`http://${details.address}:${port}`)
+        }
+      }
+    }
+  } catch {
+    // Ignore network interface enumeration failures in sandboxed environments
+  }
+  return [...origins]
+}
 
 export default buildConfig({
   admin: {
@@ -165,7 +190,15 @@ export default buildConfig({
   // `Origin: https://…`, so cookie auth is rejected on every write (403).
   // Pin it to the public HTTPS origin instead.
   serverURL: getServerSideURL(),
-  cors: [getServerSideURL(), 'http://localhost:8080', 'http://127.0.0.1:8080'].filter(Boolean),
+  cors: Array.from(
+    new Set([
+      getServerSideURL(),
+      'http://localhost:8080',
+      'http://127.0.0.1:8080',
+      ...getLocalNetworkOrigins(),
+    ]),
+  ).filter(Boolean),
+  csrf: Array.from(new Set([getServerSideURL(), ...getLocalNetworkOrigins()])).filter(Boolean),
   globals: [Header, Footer, AboutUs, ContactUs, SiteSettings],
   endpoints: [openApiEndpoint],
   plugins,

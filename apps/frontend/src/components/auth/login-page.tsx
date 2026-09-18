@@ -2,7 +2,6 @@
 
 import { Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { FormEvent, useState } from 'react'
 import { BrandSandoqLogomark, BrandSandoqLogotype } from '@/components/icons'
 import { Button } from '@/components/ui/button'
@@ -19,7 +18,6 @@ export default function LoginPage({
   registered?: boolean
   returnUrl?: string
 }) {
-  const router = useRouter()
   const safeReturnUrl = getSafeReturnUrl(returnUrl)
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -56,8 +54,10 @@ export default function LoginPage({
           : user?.cmsRole === 'admin' || user?.cmsRole === 'editor'
             ? '/admin'
             : '/dashboard'
-      router.replace(destination)
-      router.refresh()
+      // Authentication changes server-visible cookie state. A document-level
+      // navigation guarantees that the protected route is requested with the
+      // newly stored cookie instead of reusing an unauthenticated router cache.
+      window.location.assign(destination)
     } catch {
       setNotice({
         kind: 'error',

@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 import configPromise from '@payload-config'
 
 import { buildBackendRequest, type ProxyUser } from '@/utilities/dashboard-proxy'
+import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 type Context = { params: Promise<{ path: string[] }> }
 
@@ -12,7 +13,7 @@ async function handle(req: NextRequest, path: string[]): Promise<Response> {
 
   let user: ProxyUser | null = null
   try {
-    const result = await payload.auth({ headers: req.headers })
+    const result = await payload.auth({ headers: getPayloadAuthHeaders(req) })
     user = (result.user ?? null) as unknown as ProxyUser | null
   } catch {
     user = null

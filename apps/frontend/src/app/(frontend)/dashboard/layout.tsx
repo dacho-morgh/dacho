@@ -14,6 +14,7 @@ import {
   getSafeReturnUrl,
 } from '@/utilities/auth-return-url'
 import { isSeniorManagerUser } from '@/utilities/dashboard-server'
+import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 import { cn } from '@/utilities/ui'
 
 export const metadata: Metadata = {
@@ -31,7 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   let user = null
   try {
-    user = (await payload.auth({ headers: requestHeaders })).user
+    user = (await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })).user
   } catch {
     // Invalid, expired, or otherwise unreadable sessions are unauthenticated.
   }
