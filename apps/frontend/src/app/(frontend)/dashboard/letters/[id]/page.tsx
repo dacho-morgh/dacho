@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import type { ReactNode } from 'react'
-import Link from 'next/link'
+
 import { MailDetailView, type MailData } from '@/components/dashboard/mail-detail-view'
 import { SupportTicketActions } from '@/components/dashboard/support-ticket-actions'
 import { formatDate, formatTime, formatWeekday, mapMailData, type LetterDto, type SupportTicketDto } from '@/utilities/dashboard-api'
@@ -21,12 +21,18 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
   const id = split > 0 ? raw.slice(split + 1) : raw
   let mail: MailData
   let actions: ReactNode = null
+  let supportClosed = false
   if (prefix === 'support') {
     const result = await serverDashboardFetch<{ ticket: SupportTicketDto }>(`/support/${encodeURIComponent(id)}`)
     if (!result?.ticket) notFound()
     const t = result.ticket
-    mail = { id: raw, title: t.subject, category: 'پشتیبانی', senderName: admin ? t.requesterId : 'پشتیبانی', senderRole: 'تیکت پشتیبانی', datePersian: formatDate(t.createdAt), dayOfWeek: formatWeekday(t.createdAt), timeStr: formatTime(t.createdAt), body: `متن پیام:\n${t.message}${t.response ? `\n\nپاسخ پشتیبانی:\n${t.response}` : ''}` }
-    if (admin) actions = <SupportTicketActions id={id} status={t.status} />
+    supportClosed = t.status === 'closed'
+    const messages = t.messages?.length ? t.messages : [
+      { id: `${id}:initial`, authorId: t.requesterId, authorRole: 'applicant' as const, body: t.message, createdAt: t.createdAt },
+      ...(t.response ? [{ id: `${id}:response`, authorId: t.respondedBy ?? 'staff', authorRole: 'staff' as const, body: t.response, createdAt: t.updatedAt }] : []),
+    ]
+    mail = { id: raw, title: t.subject, category: 'پشتیبانی', senderName: t.requesterName || 'شرکت متقاضی', senderRole: 'فرستنده تیکت', datePersian: formatDate(t.createdAt), dayOfWeek: formatWeekday(t.createdAt), timeStr: formatTime(t.createdAt), body: t.message }
+    actions = <SupportTicketActions key={t.updatedAt} id={id} status={t.status} isAdmin={admin} requesterName={t.requesterName} initialMessageId={messages[0]?.id} initialMessages={messages} />
   } else if (prefix === 'form') {
     if (!admin) notFound()
     const doc = await payload.findByID({ collection: 'form-submissions', id, depth: 1 })
@@ -40,5 +46,10 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
     if (!result?.letter) notFound()
     mail = mapMailData(result.letter)
   }
-  return <main className="mx-auto w-full max-w-4xl p-6 sm:p-10" dir="rtl"><Link href="/dashboard/letters" className="mb-6 inline-flex text-sm text-brand-600">← بازگشت به کارتابل</Link><MailDetailView mail={mail} showActions={false} />{actions}</main>
+  return (
+    <>
+      <MailDetailView mail={mail} showActions={prefix === 'letter'} supportReply={prefix === 'support' && !!actions} supportClosed={supportClosed} />
+      {actions}
+    </>
+  )
 }

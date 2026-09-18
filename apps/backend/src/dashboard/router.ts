@@ -38,6 +38,34 @@ function isStaff(res: { locals: Record<string, unknown> }): boolean {
   return res.locals.userRole === 'staff'
 }
 
+function requesterDisplayName(user: Awaited<ReturnType<UserStore['findById']>>): string {
+  return user?.companyName || user?.name || 'شرکت متقاضی'
+}
+
+async function resolveRequesterNames(userStore: UserStore, requesterIds: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(requesterIds)]
+  const users = await Promise.all(ids.map(async (id) => {
+    try {
+      return [id, await userStore.findById(id)] as const
+    } catch {
+      return [id, undefined] as const
+    }
+  }))
+  const byId = new Map(users)
+
+  if (users.some(([, user]) => !user)) {
+    try {
+      for (const user of await userStore.list({ role: 'applicant' })) {
+        if (!byId.get(user.id)) byId.set(user.id, user)
+      }
+    } catch {
+      // Ticket access must remain available when the optional CMS name lookup fails.
+    }
+  }
+
+  return new Map(ids.map((id) => [id, requesterDisplayName(byId.get(id))]))
+}
+
 /** Returns the names of required form fields missing from `answers`, or null when complete. */
 function missingRequiredFields(service: ServiceDefinition, answers: Record<string, unknown>): string[] | null {
   const fields = service.formFields
@@ -394,7 +422,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const result = isStaff(res)
       ? await support.list({ page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25), status: typeof req.query.status === 'string' ? req.query.status : undefined })
       : await support.list({ requesterId: userId, page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25) })
-    res.json(result)
+    const requesterNames = await resolveRequesterNames(deps.userStore, result.items.map((ticket) => ticket.requesterId))
+    const items = result.items.map((ticket) => ({ ...ticket, requesterName: requesterNames.get(ticket.requesterId) ?? 'شرکت متقاضی' }))
+    res.json({ ...result, items })
   })
 
   router.post('/support', async (req, res) => {
@@ -408,22 +438,25 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   router.get('/support/:id', async (req, res) => {
     const ticket = await support.findById(req.params.id)
     if (!ticket || (!isStaff(res) && ticket.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
-    res.json({ ticket })
+    const requesterNames = await resolveRequesterNames(deps.userStore, [ticket.requesterId])
+    res.json({ ticket: { ...ticket, requesterName: requesterNames.get(ticket.requesterId) ?? 'شرکت متقاضی' } })
   })
 
   router.post('/support/:id/respond', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
     const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
     if (!body) { res.status(400).json({ error: 'invalid_response' }); return }
-    const ticket = await support.respond(req.params.id, res.locals.userId as string, body)
+    const existing = await support.findById(req.params.id)
+    if (!existing || (!isStaff(res) && existing.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
+    const authorRole = isStaff(res) ? 'staff' : 'applicant'
+    const ticket = await support.respond(req.params.id, res.locals.userId as string, authorRole, body)
     if (!ticket) { res.status(404).json({ error: 'not_found' }); return }
-    await letters.create({ type: 'official', title: `پاسخ پشتیبانی: ${ticket.subject}`, body, senderId: res.locals.userId as string, senderRole: 'staff', recipientId: ticket.requesterId })
     res.json({ ticket })
   })
 
   router.post('/support/:id/close', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
-    const ticket = await support.close(req.params.id, res.locals.userId as string)
+    const existing = await support.findById(req.params.id)
+    if (!existing || (!isStaff(res) && existing.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
+    const ticket = await support.close(req.params.id, res.locals.userId as string, isStaff(res) ? 'staff' : 'applicant')
     if (!ticket) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ ticket })
   })

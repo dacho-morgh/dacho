@@ -72,6 +72,11 @@ describe('dashboard migrations', () => {
     )
   })
 
+  it('creates the support ticket messages table', async () => {
+    const cols = await tableColumns('support_ticket_messages')
+    expect(cols).toEqual(expect.arrayContaining(['id', 'ticket_id', 'author_id', 'author_role', 'body', 'created_at']))
+  })
+
   it('types requests.status with the request_status enum', async () => {
     const { rows } = await pool.query(
       `SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'requests' AND table_schema = 'dashboard' AND column_name = 'status'`,
