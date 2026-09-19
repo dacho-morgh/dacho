@@ -24,7 +24,7 @@ const NewsSection = async () => {
   return (
     <section
       dir="rtl"
-      className="relative z-10 flex w-full flex-col items-center gap-10 bg-[#FAFAFA] px-4 py-8 lg:px-0 lg:py-10"
+      className="relative z-10 flex w-full flex-col items-center gap-10 bg-neutral-50 px-4 py-8 lg:px-0 lg:py-10"
     >
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
         <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">

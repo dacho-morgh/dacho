@@ -24,7 +24,7 @@ const FaqSection = async () => {
   if (!faqs || faqs.length === 0) return null
 
   return (
-    <section className="flex w-full flex-col items-center gap-10 bg-neutral-50 px-4 pt-10 pb-15 sm:px-6 lg:px-0 lg:py-20">
+    <section className="flex w-full flex-col items-center gap-10 bg-white px-4 pt-10 pb-15 sm:px-6 lg:px-0 lg:pt-10 lg:pb-20">
       <div className="flex w-full max-w-200 flex-col items-center gap-2 text-center">
         <Typography as="h2" variant="32/extrabold" sm="40/extrabold" color="neutral-600">
           سوالات پر تکرار
@@ -40,7 +40,7 @@ const FaqSection = async () => {
           <AccordionItem
             key={faq.id}
             value={String(faq.id)}
-            className="rounded-2xl border-0! bg-neutral-100 px-4 data-[state=open]:pb-4"
+            className="rounded-2xl border-0! bg-neutral-100/45 px-4 data-[state=open]:pb-4"
           >
             <AccordionTrigger className="min-h-16 flex-row-reverse items-center rounded-none py-4 text-right hover:no-underline [&>svg]:size-8 [&>svg]:rounded-full [&>svg]:bg-neutral-200 [&>svg]:p-1.5 [&>svg]:text-neutral-700 [&[data-state=open]>svg]:bg-neutral-700 [&[data-state=open]>svg]:text-neutral-50">
               <Typography as="span" variant="16/semibold" color="neutral-700">

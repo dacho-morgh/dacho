@@ -9,13 +9,7 @@ import { cn } from '@/utilities/ui'
 
 export type NewsCardData = Pick<News, 'heroImage' | 'slug' | 'title'>
 
-const NewsCard = ({
-  news,
-  variant = 'home',
-}: {
-  news: NewsCardData
-  variant?: 'home' | 'listing'
-}) => {
+const NewsCard = ({ news }: { news: NewsCardData }) => {
   const hasHeroImage = typeof news.heroImage === 'object' && news.heroImage !== null
   const href = news.slug ? `/news/${news.slug}` : '/news'
 
@@ -50,7 +44,7 @@ const NewsCard = ({
         )}
       </Link>
 
-      <div className="flex w-full flex-col items-end gap-4 p-5">
+      <div className="flex h-full w-full flex-col justify-between gap-4 p-5">
         <Typography
           as="h3"
           variant="16/semibold"

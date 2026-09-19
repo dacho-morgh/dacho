@@ -8,7 +8,7 @@ import { Typography } from '@/components/ui/typography'
 const HeroSection = () => {
   return (
     <HeroScrollWrapper>
-      <div className="pointer-events-none absolute inset-0 z-0 lg:top-20">
+      <div className="pointer-events-none absolute inset-0 z-0 lg:top-25">
         <ShapeGrid
           speed={0.1}
           squareSize={50}
@@ -20,7 +20,7 @@ const HeroSection = () => {
         <div className="absolute inset-y-0 right-0 w-[2%] bg-linear-to-l from-white to-white/15" />
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full flex-col lg:h-full lg:flex-row lg:items-center lg:justify-between">
+      <div className="relative z-10 mx-auto flex w-full flex-col pt-1 lg:h-full lg:flex-row lg:items-center lg:justify-between">
         <HeroVisual>
           <Image
             src="/images/dashboard/hero-logo.webp"
@@ -31,8 +31,8 @@ const HeroSection = () => {
             fetchPriority="high"
             loading="eager"
             decoding="sync"
-            sizes="(max-width: 768px) 350px, (max-width: 1024px) 450px, 520px"
-            className="h-auto w-[min(90%,520px)] text-brand-500 lg:will-change-transform lg:transform-3d"
+            sizes="(max-width: 768px) 350px, (max-width: 1024px) 450px, 640px"
+            className="h-auto w-[min(90%,520px)] text-brand-500 lg:w-[min(90%,640px)] lg:will-change-transform lg:transform-3d"
           />
         </HeroVisual>
         <div className="flex w-full flex-1 flex-col items-end gap-8 px-4 text-right lg:order-1 lg:w-160 lg:gap-20 lg:px-10">

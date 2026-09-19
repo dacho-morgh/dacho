@@ -35,9 +35,6 @@ export default async function AboutPage() {
       {/* <Reveal delay={0.1}>
         <AboutCallToAction />
       </Reveal> */}
-      <Reveal>
-        <FaqSection />
-      </Reveal>
     </main>
   )
 }

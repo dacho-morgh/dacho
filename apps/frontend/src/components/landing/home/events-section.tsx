@@ -84,7 +84,7 @@ const EventsSection = async () => {
   if (items.length === 0) return null
 
   return (
-    <section className="relative z-10 flex w-full flex-col items-center gap-8 px-4 py-4 lg:gap-8 lg:px-0 lg:py-10">
+    <section className="relative z-10 flex w-full flex-col items-center gap-8 bg-white px-4 py-4 lg:gap-8 lg:px-0 lg:py-12">
       <Typography as="h2" variant="32/extrabold" lg="40/extrabold" color="neutral-600">
         نمایشگاه و رویداد ها
       </Typography>
