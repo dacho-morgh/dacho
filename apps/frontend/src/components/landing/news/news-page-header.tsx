@@ -4,7 +4,15 @@ import { Typography } from '@/components/ui/typography'
 const NEWS_DESCRIPTION =
   'از انتشار فرصت‌های صنعتی تا داوری تخصصی و تخصیص بودجه، تمام مسیر همکاری در یک فضای یکپارچه مدیریت می‌شود.'
 
-export function NewsBreadcrumb({ title }: { title?: string }) {
+export function NewsBreadcrumb({
+  title,
+  section = 'اخبار',
+  sectionHref = '/news',
+}: {
+  title?: string
+  section?: string
+  sectionHref?: string
+}) {
   return (
     <nav aria-label="مسیر صفحه" className="flex min-h-9 items-center gap-2 text-right">
       <Link href="/">
@@ -23,9 +31,9 @@ export function NewsBreadcrumb({ title }: { title?: string }) {
       </Typography>
       {title && (
         <>
-          <Link href="/news">
+          <Link href={sectionHref}>
             <Typography as="span" variant="14/regular" lg="16/regular" color="neutral-500">
-              اخبار
+              {section}
             </Typography>
           </Link>
           <Typography
@@ -47,23 +55,32 @@ export function NewsBreadcrumb({ title }: { title?: string }) {
         className={title ? 'max-w-[65vw] truncate lg:max-w-230' : undefined}
         aria-current="page"
       >
-        {title || 'اخبار'}
+        {title || section}
       </Typography>
     </nav>
   )
 }
 
-export function NewsPageHeading() {
+export function NewsPageHeading({
+  title = 'اخبار',
+  description = NEWS_DESCRIPTION,
+}: {
+  title?: string
+  description?: string
+}) {
   return (
     <header className="flex flex-col items-start gap-2 text-right">
       <div className="flex items-center gap-2 sm:gap-4">
-        <span aria-hidden="true" className="h-10 w-1 rounded-full bg-[#FAB622] sm:h-12 sm:w-2" />
+        <span
+          aria-hidden="true"
+          className="h-10 w-1 rounded-full bg-secondary-500 sm:h-12 sm:w-2"
+        />
         <Typography as="h1" variant="24/bold" lg="40/bold" color="neutral-600">
-          اخبار
+          {title}
         </Typography>
       </div>
       <Typography variant="16/regular" lg="20/regular" color="neutral-500">
-        {NEWS_DESCRIPTION}
+        {description}
       </Typography>
     </header>
   )

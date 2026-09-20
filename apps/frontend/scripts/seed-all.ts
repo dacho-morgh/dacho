@@ -9,6 +9,7 @@ const payloadCli = fileURLToPath(new URL('../node_modules/payload/bin.js', impor
 // enriches those services with their operational keys and workflows.
 const seedScripts = [
   'seed-landing.ts',
+  'seed-mag.ts',
   'seed-dashboard.ts',
   'seed-forms.ts',
   'seed-service-account.ts',

@@ -55,17 +55,17 @@ const HeroSection = () => {
             </Typography>
           </div>
 
-          <div className="flex w-full justify-center gap-4 self-start pb-20 lg:justify-start lg:gap-2 lg:px-0 lg:pb-0">
-            <Button variant="primary" size="36" lg="48" className="w-40 font-light! lg:w-45">
-              ثبت‌نام شرکت
+          <div className="flex w-full flex-col justify-center gap-4 self-start px-20 pb-20 md:flex-row lg:justify-start lg:gap-2 lg:px-0 lg:pb-0">
+            <Button variant="primary" size="36" lg="48" className="font-light!">
+              ثبت‌نام در پتروفاند
             </Button>
             <Button
               variant="outline-primary"
               size="36"
               lg="48"
-              className="w-40 bg-transparent font-light! lg:w-45"
+              className="bg-transparent font-light!"
             >
-              مشاهده فرصت‌ها
+              نمایش اطلاعات پتروفاند{' '}
             </Button>
           </div>
         </div>

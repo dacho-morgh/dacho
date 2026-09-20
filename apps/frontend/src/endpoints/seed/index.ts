@@ -271,8 +271,8 @@ export const seed = async ({
               {
                 link: {
                   type: 'custom',
-                  label: 'اخبار',
-                  url: '/news',
+                  label: 'مجله',
+                  url: '/mag',
                 },
               },
               {

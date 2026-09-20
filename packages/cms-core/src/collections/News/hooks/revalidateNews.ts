@@ -10,6 +10,7 @@ export const revalidateNews: CollectionAfterChangeHook<News> = ({
   req: { payload, context },
 }) => {
   if (!context.disableRevalidate) {
+    revalidatePath('/mag')
     if (doc._status === 'published') {
       const path = `/news/${doc.slug}`
 
@@ -34,6 +35,7 @@ export const revalidateNews: CollectionAfterChangeHook<News> = ({
 
 export const revalidateDelete: CollectionAfterDeleteHook<News> = ({ doc, req: { context } }) => {
   if (!context.disableRevalidate) {
+    revalidatePath('/mag')
     const path = `/news/${doc?.slug}`
 
     revalidatePath(path)

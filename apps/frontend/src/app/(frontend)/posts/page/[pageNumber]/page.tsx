@@ -1,100 +1,40 @@
 import configPromise from '@payload-config'
-import { notFound } from 'next/navigation'
-import type { Metadata } from 'next/types'
+import type { Metadata } from 'next'
+import { notFound, redirect } from 'next/navigation'
 import { getPayload } from 'payload'
-import React from 'react'
-import { CollectionArchive } from '@/components/CollectionArchive'
-import { PageRange } from '@/components/PageRange'
-import { Pagination } from '@/components/Pagination'
-import { buildSafe } from '@/utilities/buildSafe'
+import { PostsArchive } from '@/components/landing/posts/posts-archive'
 import { createPageMetadata } from '@/utilities/siteMetadata'
-import PageClient from './page.client'
 
-export const revalidate = 600
+export const dynamic = 'force-dynamic'
 
-type Args = {
-  params: Promise<{
-    pageNumber: string
-  }>
-}
+type Args = { params: Promise<{ pageNumber: string }> }
 
-// The body is only prerendered for params returned by generateStaticParams,
-// which is empty when no database is reachable — so this query is never run at
-// build time without a database and needs no guard.
-export default async function Page({ params: paramsPromise }: Args) {
-  const { pageNumber } = await paramsPromise
+export default async function PostsPageNumber({ params }: Args) {
+  const { pageNumber } = await params
+  const page = Number(pageNumber)
+  if (!Number.isInteger(page) || page < 1) notFound()
+  if (page === 1) redirect('/posts')
+
   const payload = await getPayload({ config: configPromise })
-
-  const sanitizedPageNumber = Number(pageNumber)
-
-  if (!Number.isInteger(sanitizedPageNumber)) notFound()
-
   const posts = await payload.find({
     collection: 'posts',
     depth: 1,
     limit: 12,
-    page: sanitizedPageNumber,
+    page,
     overrideAccess: false,
+    where: { _status: { equals: 'published' } },
+    sort: '-publishedAt',
   })
+  if (page > posts.totalPages) notFound()
 
-  return (
-    <div className="pt-24 pb-24">
-      <PageClient />
-      <div className="container mb-16">
-        <div className="prose max-w-none">
-          <h1>Posts</h1>
-        </div>
-      </div>
-
-      <div className="container mb-8">
-        <PageRange
-          collection="posts"
-          currentPage={posts.page}
-          limit={12}
-          totalDocs={posts.totalDocs}
-        />
-      </div>
-
-      <CollectionArchive posts={posts.docs} />
-
-      <div className="container">
-        {posts?.page && posts?.totalPages > 1 && (
-          <Pagination page={posts.page} totalPages={posts.totalPages} />
-        )}
-      </div>
-    </div>
-  )
+  return <PostsArchive posts={posts.docs} page={page} totalPages={posts.totalPages} />
 }
 
-export async function generateMetadata({ params: paramsPromise }: Args): Promise<Metadata> {
-  const { pageNumber } = await paramsPromise
-  const pageLabel = Number(pageNumber).toLocaleString('fa-IR')
-
+export async function generateMetadata({ params }: Args): Promise<Metadata> {
+  const { pageNumber } = await params
   return createPageMetadata({
-    title: `مقالات - صفحه ${pageLabel}`,
-    description: `مقالات و محتوای تخصصی کارخانه نوآوری صنایع انرژی بوشهر، صفحه ${pageLabel}.`,
+    title: `مقالات - صفحه ${Number(pageNumber).toLocaleString('fa-IR')}`,
+    description: `مقالات و محتوای تخصصی کارخانه نوآوری صنایع انرژی بوشهر، صفحه ${Number(pageNumber).toLocaleString('fa-IR')}.`,
     path: `/posts/page/${pageNumber}`,
   })
-}
-
-export async function generateStaticParams() {
-  const result = await buildSafe('posts page count', async () => {
-    const payload = await getPayload({ config: configPromise })
-    return payload.count({
-      collection: 'posts',
-      overrideAccess: false,
-    })
-  })
-
-  if (!result) return []
-
-  const totalPages = Math.ceil(result.totalDocs / 10)
-
-  const pages: { pageNumber: string }[] = []
-
-  for (let i = 1; i <= totalPages; i++) {
-    pages.push({ pageNumber: String(i) })
-  }
-
-  return pages
 }

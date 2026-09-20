@@ -12,6 +12,7 @@ import { Exhibitions } from './collections/Exhibitions'
 import { FAQ } from './collections/FAQ'
 import { Media } from './collections/Media'
 import { News } from './collections/News'
+import { NewsletterSubscribers } from './collections/NewsletterSubscribers'
 import { Pages } from './collections/Pages'
 import { Posts } from './collections/Posts'
 import { Reviews } from './collections/Reviews'
@@ -25,6 +26,7 @@ import { Footer } from './Footer/config'
 import { AboutUs } from './globals/AboutUs'
 import { ContactUs } from './globals/ContactUs'
 import { SiteSettings } from './globals/SiteSettings'
+import { Mag } from './globals/Mag'
 import { Header } from './Header/config'
 import { plugins } from './plugins'
 import { getServerSideURL } from './utilities/getURL'
@@ -178,6 +180,7 @@ export default buildConfig({
     FAQ,
     Reviews,
     News,
+    NewsletterSubscribers,
     Sponsors,
     Services,
     Events,
@@ -199,7 +202,7 @@ export default buildConfig({
     ]),
   ).filter(Boolean),
   csrf: Array.from(new Set([getServerSideURL(), ...getLocalNetworkOrigins()])).filter(Boolean),
-  globals: [Header, Footer, AboutUs, ContactUs, SiteSettings],
+  globals: [Header, Footer, AboutUs, ContactUs, SiteSettings, Mag],
   endpoints: [openApiEndpoint],
   plugins,
   secret: payloadSecret,

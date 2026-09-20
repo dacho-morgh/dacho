@@ -41,6 +41,7 @@ export const Posts: CollectionConfig<'posts'> = {
   // https://payloadcms.com/docs/queries/select#defaultpopulate-collection-config-property
   // Type safe if the collection slug generic is passed to `CollectionConfig` - `CollectionConfig<'posts'>
   defaultPopulate: {
+    _status: true,
     title: true,
     slug: true,
     categories: true,
@@ -83,6 +84,8 @@ export const Posts: CollectionConfig<'posts'> = {
               type: 'upload',
               relationTo: 'media',
             },
+            { name: 'excerpt', type: 'textarea', admin: { description: 'Short summary for Mag and listings.' } },
+            { name: 'editorialLabel', type: 'text', admin: { description: 'Optional badge, e.g. analysis or interview.' } },
             {
               name: 'content',
               type: 'richText',
@@ -132,6 +135,8 @@ export const Posts: CollectionConfig<'posts'> = {
               hasMany: true,
               relationTo: 'categories',
             },
+            { name: 'tags', type: 'array', fields: [{ name: 'tag', type: 'text', required: true }] },
+            { name: 'readingMinutes', type: 'number', min: 1, admin: { description: 'Estimated reading time in minutes.' } },
           ],
           label: 'Meta',
         },

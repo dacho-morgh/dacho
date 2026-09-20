@@ -76,6 +76,7 @@ export interface Config {
     faq: Faq;
     reviews: Review;
     news: News;
+    'newsletter-subscribers': NewsletterSubscriber;
     sponsors: Sponsor;
     services: Service;
     events: Event;
@@ -107,6 +108,7 @@ export interface Config {
     faq: FaqSelect<false> | FaqSelect<true>;
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
     news: NewsSelect<false> | NewsSelect<true>;
+    'newsletter-subscribers': NewsletterSubscribersSelect<false> | NewsletterSubscribersSelect<true>;
     sponsors: SponsorsSelect<false> | SponsorsSelect<true>;
     services: ServicesSelect<false> | ServicesSelect<true>;
     events: EventsSelect<false> | EventsSelect<true>;
@@ -133,6 +135,7 @@ export interface Config {
     'about-us': AboutUs;
     'contact-us': ContactUs;
     'site-settings': SiteSetting;
+    mag: Mag;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
@@ -140,6 +143,7 @@ export interface Config {
     'about-us': AboutUsSelect<false> | AboutUsSelect<true>;
     'contact-us': ContactUsSelect<false> | ContactUsSelect<true>;
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    mag: MagSelect<false> | MagSelect<true>;
   };
   locale: null;
   widgets: {
@@ -333,6 +337,14 @@ export interface Post {
   id: number;
   title: string;
   heroImage?: (number | null) | Media;
+  /**
+   * Short summary for Mag and listings.
+   */
+  excerpt?: string | null;
+  /**
+   * Optional badge, e.g. analysis or interview.
+   */
+  editorialLabel?: string | null;
   content: {
     root: {
       type: string;
@@ -350,6 +362,16 @@ export interface Post {
   };
   relatedPosts?: (number | Post)[] | null;
   categories?: (number | Category)[] | null;
+  tags?:
+    | {
+        tag: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Estimated reading time in minutes.
+   */
+  readingMinutes?: number | null;
   meta?: {
     title?: string | null;
     /**
@@ -1145,6 +1167,10 @@ export interface News {
    * Short summary for listings and previews
    */
   excerpt?: string | null;
+  /**
+   * Optional badge on Mag cards.
+   */
+  editorialLabel?: string | null;
   content: {
     root: {
       type: string;
@@ -1168,6 +1194,10 @@ export interface News {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Estimated reading time in minutes.
+   */
+  readingMinutes?: number | null;
   meta?: {
     title?: string | null;
     /**
@@ -1196,6 +1226,17 @@ export interface News {
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "newsletter-subscribers".
+ */
+export interface NewsletterSubscriber {
+  id: number;
+  email: string;
+  source?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1452,6 +1493,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'news';
         value: number | News;
+      } | null)
+    | ({
+        relationTo: 'newsletter-subscribers';
+        value: number | NewsletterSubscriber;
       } | null)
     | ({
         relationTo: 'sponsors';
@@ -1741,9 +1786,18 @@ export interface FormBlockSelect<T extends boolean = true> {
 export interface PostsSelect<T extends boolean = true> {
   title?: T;
   heroImage?: T;
+  excerpt?: T;
+  editorialLabel?: T;
   content?: T;
   relatedPosts?: T;
   categories?: T;
+  tags?:
+    | T
+    | {
+        tag?: T;
+        id?: T;
+      };
+  readingMinutes?: T;
   meta?:
     | T
     | {
@@ -1980,6 +2034,7 @@ export interface NewsSelect<T extends boolean = true> {
   title?: T;
   heroImage?: T;
   excerpt?: T;
+  editorialLabel?: T;
   content?: T;
   relatedNews?: T;
   categories?: T;
@@ -1989,6 +2044,7 @@ export interface NewsSelect<T extends boolean = true> {
         tag?: T;
         id?: T;
       };
+  readingMinutes?: T;
   meta?:
     | T
     | {
@@ -2010,6 +2066,16 @@ export interface NewsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "newsletter-subscribers_select".
+ */
+export interface NewsletterSubscribersSelect<T extends boolean = true> {
+  email?: T;
+  source?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2587,6 +2653,112 @@ export interface SiteSetting {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mag".
+ */
+export interface Mag {
+  id: number;
+  /**
+   * Drag selected items to set their display order.
+   */
+  hero?: (number | null) | News;
+  /**
+   * Drag selected items to set their display order.
+   */
+  latestNews?: (number | News)[] | null;
+  /**
+   * Drag selected items to set their display order.
+   */
+  latestArticles?: (number | Post)[] | null;
+  hotHashtags?:
+    | {
+        tag: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Add and drag sections to set their order on the Mag page.
+   */
+  sections?:
+    | {
+        title: string;
+        featured:
+          | {
+              relationTo: 'news';
+              value: number | News;
+            }
+          | {
+              relationTo: 'posts';
+              value: number | Post;
+            };
+        /**
+         * Drag selected stories to set their display order.
+         */
+        stories?:
+          | (
+              | {
+                  relationTo: 'news';
+                  value: number | News;
+                }
+              | {
+                  relationTo: 'posts';
+                  value: number | Post;
+                }
+            )[]
+          | null;
+        /**
+         * Optional. Shows a link to matching Mag search results.
+         */
+        hashtag?: string | null;
+        reverseLayout?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Drag selected items to set their display order.
+   */
+  featuredReport?: (number | null) | Post;
+  /**
+   * Curated ranking. Drag items to reorder.
+   */
+  mostRead?:
+    | (
+        | {
+            relationTo: 'news';
+            value: number | News;
+          }
+        | {
+            relationTo: 'posts';
+            value: number | Post;
+          }
+      )[]
+    | null;
+  /**
+   * Drag items to set their display order.
+   */
+  editorPicks?:
+    | (
+        | {
+            relationTo: 'news';
+            value: number | News;
+          }
+        | {
+            relationTo: 'posts';
+            value: number | Post;
+          }
+      )[]
+    | null;
+  /**
+   * Drag selected items to set their display order.
+   */
+  eventNews?: (number | News)[] | null;
+  newsletterTitle?: string | null;
+  newsletterDescription?: string | null;
+  showRecruitment?: boolean | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "header_select".
  */
 export interface HeaderSelect<T extends boolean = true> {
@@ -2722,6 +2894,41 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         url?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mag_select".
+ */
+export interface MagSelect<T extends boolean = true> {
+  hero?: T;
+  latestNews?: T;
+  latestArticles?: T;
+  hotHashtags?:
+    | T
+    | {
+        tag?: T;
+        id?: T;
+      };
+  sections?:
+    | T
+    | {
+        title?: T;
+        featured?: T;
+        stories?: T;
+        hashtag?: T;
+        reverseLayout?: T;
+        id?: T;
+      };
+  featuredReport?: T;
+  mostRead?: T;
+  editorPicks?: T;
+  eventNews?: T;
+  newsletterTitle?: T;
+  newsletterDescription?: T;
+  showRecruitment?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

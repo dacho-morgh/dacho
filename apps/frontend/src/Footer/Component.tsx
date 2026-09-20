@@ -34,7 +34,7 @@ const SERVICES_FALLBACK: FooterLinkItem[] = [
 const PAGES_FALLBACK: FooterLinkItem[] = [
   { label: 'خانه', href: '/' },
   { label: 'رویداد ها و همایش ها', href: '#events' },
-  { label: 'اخبار', href: '/news' },
+  { label: 'مجله', href: '/mag' },
   { label: 'درباره ما', href: '/about' },
   { label: 'تماس با ما', href: '/connect' },
 ]

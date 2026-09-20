@@ -573,7 +573,7 @@ async function main(): Promise<void> {
   const navItems: any[] = [
     customLink('خانه', '/'),
     customLink('رویدادها', '/#events'),
-    customLink('اخبار', '/#news'),
+    customLink('مجله', '/mag'),
     customLink('درباره ما', '/#about'),
     customLink('تماس با ما', '/#contact'),
   ]

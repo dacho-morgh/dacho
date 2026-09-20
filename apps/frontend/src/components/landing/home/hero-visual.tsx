@@ -117,7 +117,7 @@ const HeroVisual = ({ children }: { children?: React.ReactNode }) => {
       ref={panelRef}
       className="relative mx-auto flex h-[clamp(320px,47vw,600px)] w-full max-w-160 flex-1 items-center justify-center overflow-hidden rounded-[48px] lg:order-2 lg:h-[clamp(420px,47vw,600px)] lg:max-w-200 lg:rounded-[80px]"
     >
-      <div ref={proofFieldRef} className="pointer-events-none absolute inset-0 z-10">
+      {/* <div ref={proofFieldRef} className="pointer-events-none absolute inset-0 z-10">
         <div
           data-gravity-card
           className="absolute -top-2 right-3 h-15 w-63 max-w-[calc(100%-32px)] will-change-transform sm:h-17 sm:w-75 lg:top-4 lg:h-19.5 lg:w-87.75"
@@ -130,7 +130,7 @@ const HeroVisual = ({ children }: { children?: React.ReactNode }) => {
         >
           <HeroProofCard metric="۵۰+" message="فرصت تازه برای پیشرفت" />
         </div>
-      </div>
+      </div> */}
 
       {children}
     </div>

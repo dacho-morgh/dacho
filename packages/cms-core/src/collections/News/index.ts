@@ -45,6 +45,7 @@ export const News: CollectionConfig<'news'> = {
   // https://payloadcms.com/docs/queries/select#defaultpopulate-collection-config-property
   // Type safe if the collection slug generic is passed to `CollectionConfig` - `CollectionConfig<'news'>
   defaultPopulate: {
+    _status: true,
     title: true,
     slug: true,
     categories: true,
@@ -94,6 +95,7 @@ export const News: CollectionConfig<'news'> = {
                 description: 'Short summary for listings and previews',
               },
             },
+            { name: 'editorialLabel', type: 'text', admin: { description: 'Optional badge on Mag cards.' } },
             {
               name: 'content',
               type: 'richText',
@@ -154,6 +156,7 @@ export const News: CollectionConfig<'news'> = {
                 },
               ],
             },
+            { name: 'readingMinutes', type: 'number', min: 1, admin: { description: 'Estimated reading time in minutes.' } },
           ],
           label: 'Meta',
         },

@@ -39,13 +39,13 @@ export default function HomePage() {
         <LogoStripSection />
       </Suspense>
       <Reveal>
-        <Suspense fallback={<ServicesSectionSkeleton />}>
-          <ServicesSection />
+        <Suspense fallback={<EventsSectionSkeleton />}>
+          <EventsSection />
         </Suspense>
       </Reveal>
       <Reveal>
-        <Suspense fallback={<EventsSectionSkeleton />}>
-          <EventsSection />
+        <Suspense fallback={<ServicesSectionSkeleton />}>
+          <ServicesSection />
         </Suspense>
       </Reveal>
       {/* <Reveal>

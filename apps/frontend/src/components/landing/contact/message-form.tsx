@@ -1,7 +1,7 @@
 'use client'
 
-import { ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
+import { EventsArrowLeftWhiteIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Typography } from '@/components/ui/typography'
@@ -50,7 +50,10 @@ export function MessageForm({ className, formId }: MessageFormProps) {
       formElement.reset()
       setNotice({ kind: 'success', message: 'پیام شما با موفقیت ارسال شد.' })
     } catch {
-      setNotice({ kind: 'error', message: 'در حال حاضر ارتباط با سامانه برقرار نیست. کمی بعد دوباره تلاش کنید.' })
+      setNotice({
+        kind: 'error',
+        message: 'در حال حاضر ارتباط با سامانه برقرار نیست. کمی بعد دوباره تلاش کنید.',
+      })
     } finally {
       setLoading(false)
     }
@@ -59,7 +62,7 @@ export function MessageForm({ className, formId }: MessageFormProps) {
   return (
     <form
       className={cn(
-        'grid gap-6 rounded-[32px] bg-white p-5 shadow-[0_8px_32px_rgb(23_23_23/0.06)] sm:p-8 lg:grid-cols-2 lg:p-10',
+        'grid gap-8 rounded-[40px] bg-white p-5 shadow-[0_0_20px_rgb(10_10_10/0.05)] sm:p-10 lg:grid-cols-2',
         className,
       )}
       onSubmit={handleSubmit}
@@ -101,7 +104,7 @@ export function MessageForm({ className, formId }: MessageFormProps) {
           پیام
         </Typography>
         <textarea
-          className="min-h-48 w-full resize-y rounded-lg border border-neutral-100 bg-white p-3 text-right text-base leading-7 text-neutral-600 transition-colors outline-none placeholder:font-light placeholder:text-neutral-400 hover:border-brand-500 focus:border-brand-500"
+          className="min-h-36 w-full resize-y rounded-lg border border-neutral-100 bg-white p-2 text-right text-base leading-7 text-neutral-600 transition-colors outline-none placeholder:font-light placeholder:text-neutral-400 hover:border-brand-500 focus:border-brand-500"
           id="message"
           name="message"
           placeholder="پیام خود را در اینجا وارد کنید"
@@ -109,10 +112,16 @@ export function MessageForm({ className, formId }: MessageFormProps) {
         />
       </div>
 
-      <div className="flex flex-col items-start gap-4 lg:col-span-2 lg:items-end">
-        <Button className="w-full sm:w-fit" disabled={!formId} loading={loading} size="40" type="submit">
+      <div className="flex flex-col items-end gap-4 lg:col-span-2">
+        <Button
+          className="w-full sm:w-fit"
+          disabled={!formId}
+          loading={loading}
+          size="48"
+          type="submit"
+        >
           ارسال پیام
-          <ArrowLeft aria-hidden="true" />
+          <EventsArrowLeftWhiteIcon aria-hidden="true" />
         </Button>
 
         {notice && (

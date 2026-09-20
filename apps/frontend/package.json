@@ -21,6 +21,7 @@
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "seed:service-account": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-service-account.ts",
     "seed:landing": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-landing.ts",
+    "seed:mag": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-mag.ts",
     "seed:dashboard": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-dashboard.ts",
     "seed:forms": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-forms.ts",
     "seed:all": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-all.ts",

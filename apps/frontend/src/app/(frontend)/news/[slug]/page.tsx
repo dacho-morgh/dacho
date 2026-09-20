@@ -4,6 +4,7 @@ import { draftMode } from 'next/headers'
 import Image from 'next/image'
 import { getPayload } from 'payload'
 import { cache } from 'react'
+import Link from 'next/link'
 import { NewsCalendarIcon, NewsTimeIcon } from '@/components/icons'
 import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import { NewsBreadcrumb } from '@/components/landing/news/news-page-header'
@@ -85,7 +86,7 @@ export default async function NewsArticlePage({ params }: Args) {
   if (!news) return <PayloadRedirects url={url} />
 
   const publishedAt = news.publishedAt || news.createdAt
-  // const readingMinutes = Math.max(1, Math.ceil(countTextWords(news.content) / 200))
+  const readingMinutes = news.readingMinutes || Math.max(1, Math.ceil(countTextWords(news.content) / 200))
   const hasHeroImage = typeof news.heroImage === 'object' && news.heroImage !== null
 
   return (
@@ -133,13 +134,13 @@ export default async function NewsArticlePage({ params }: Args) {
                   {persianDateFormatter.format(new Date(publishedAt))}
                 </Typography>
               </div>
-              {/* <div className="flex items-center gap-2"> */}
-              {/* <NewsTimeIcon aria-hidden="true" className="size-7 shrink-0 text-neutral-400" /> */}
-              {/* <dt className="sr-only">زمان مطالعه</dt> */}
-              {/* <Typography as="dd" variant="16/regular" color="neutral-500">
+              <div className="flex items-center gap-2">
+                <NewsTimeIcon aria-hidden="true" className="size-7 shrink-0 text-neutral-400" />
+                <dt className="sr-only">زمان مطالعه</dt>
+                <Typography as="dd" variant="16/regular" color="neutral-500">
                   زمان مطالعه {readingMinutes.toLocaleString('fa-IR')} دقیقه
-                </Typography> */}
-              {/* </div> */}
+                </Typography>
+              </div>
             </dl>
           </header>
         </div>
@@ -150,6 +151,12 @@ export default async function NewsArticlePage({ params }: Args) {
           enableProse={false}
           className="w-full text-right [&_a]:text-brand-500 [&_h2]:mt-20 [&_h2]:mb-4 [&_h2]:text-2xl [&_h2]:leading-10 [&_h2]:font-bold [&_h2]:text-neutral-600 lg:[&_h2]:text-[32px] lg:[&_h2]:leading-12.5 [&_h3]:mt-12 [&_h3]:mb-4 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-neutral-600 [&_img]:my-20 [&_img]:w-full [&_img]:rounded-4xl [&_li]:text-base [&_li]:leading-8 [&_li]:text-neutral-500 lg:[&_li]:text-xl [&_p]:mb-4 [&_p]:text-base [&_p]:leading-8 [&_p]:font-normal [&_p]:text-neutral-500 lg:[&_p]:text-xl"
         />
+        {news.relatedNews && news.relatedNews.length > 0 && <section className="mt-12 w-full text-right">
+          <Typography as="h2" variant="24/bold" color="neutral-800" className="mb-5">اخبار مرتبط</Typography>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {news.relatedNews.filter((item) => typeof item === 'object' && (draft || item._status === 'published')).map((item) => typeof item === 'object' && <Link key={item.id} href={`/news/${item.slug}`} className="rounded-2xl border border-neutral-100 bg-neutral-50 p-5 hover:bg-neutral-100"><Typography as="h3" variant="16/semibold" color="neutral-800">{item.title}</Typography></Link>)}
+          </div>
+        </section>}
       </article>
 
       <RecruitmentSection />

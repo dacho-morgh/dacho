@@ -2,6 +2,7 @@ import { convertLexicalToPlaintext } from '@payloadcms/richtext-lexical/plaintex
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import EventDetailPage from './event-detail-page'
+import EventFigmaPage from './event-figma-page'
 import { type EventDetailCollection, queryEventDetail } from './query'
 
 type EventDetailRouteProps = {
@@ -13,8 +14,10 @@ export async function EventDetailRoute({ collection, id }: EventDetailRouteProps
   const document = await queryEventDetail(collection, id)
   if (!document) notFound()
 
-  return (
-    <EventDetailPage document={document} kind={collection === 'events' ? 'event' : 'exhibition'} />
+  return collection === 'events' ? (
+    <EventFigmaPage document={document} kind="event" />
+  ) : (
+    <EventDetailPage document={document} kind="exhibition" />
   )
 }
 
