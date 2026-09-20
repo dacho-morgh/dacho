@@ -58,7 +58,7 @@ function SectionHeading({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-4">
       <span aria-hidden="true" className="h-12 w-2 shrink-0 rounded-lg bg-secondary-500" />
-      <Typography as="h2" color="neutral-600" md="40/extrabold" variant="32/extrabold">
+      <Typography as="h2" color="neutral-600" lg="40/extrabold" variant="34/extrabold">
         {children}
       </Typography>
     </div>
@@ -69,7 +69,7 @@ function TickItem({ children }: { children: ReactNode }) {
   return (
     <li className="flex items-start gap-2">
       <TickCircleIcon aria-hidden="true" className="mt-0.5 size-7 shrink-0 text-secondary-500" />
-      <Typography as="span" color="neutral-700" variant="16/semibold">
+      <Typography as="span" color="neutral-700" lg="16/semibold" variant="14/semibold">
         {children}
       </Typography>
     </li>
@@ -92,7 +92,7 @@ function IntroductionSection({ content }: { content?: AboutUs['introduction'] | 
     <section className="mx-auto flex w-full max-w-7xl flex-col justify-center gap-10 px-4 pt-25 md:px-8 lg:flex-row lg:items-center lg:pt-40 2xl:px-0">
       <div className="order-2 flex flex-1 flex-col gap-8 lg:max-w-150">
         <div className="flex flex-col gap-4">
-          <Typography as="h1" color="neutral-700" lg="48/black" variant="24/extrabold">
+          <Typography as="h1" color="neutral-700" lg="48/black" variant="24/black">
             {heading}
           </Typography>
           <Typography as="p" color="neutral-500" lg="20/regular" variant="16/regular">
@@ -101,7 +101,7 @@ function IntroductionSection({ content }: { content?: AboutUs['introduction'] | 
         </div>
         <div className="flex items-stretch gap-4">
           <span aria-hidden="true" className="w-2 shrink-0 rounded-lg bg-secondary-500" />
-          <Typography as="p" color="neutral-600" lg="20/bold" variant="16/semibold">
+          <Typography as="p" color="neutral-600" lg="20/bold" variant="16/bold">
             {statement}
           </Typography>
         </div>
@@ -135,13 +135,13 @@ function IntroductionSection({ content }: { content?: AboutUs['introduction'] | 
 
 function VisionSection() {
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 py-20 md:px-8 lg:py-40 2xl:px-0">
+    <section className="mx-auto w-full max-w-7xl px-4 py-2 md:px-8 lg:py-10 2xl:px-0">
       <article className="flex flex-col gap-10 rounded-[40px] p-5 shadow-[0_0_20px_rgb(10_10_10/0.1)] sm:p-8 lg:flex-row lg:items-stretch lg:rounded-[80px] lg:p-10">
         <div className="order-2 flex min-w-0 flex-1 flex-col justify-center gap-4 lg:py-10">
-          <Typography as="h3" color="neutral-800" variant="24/bold">
+          <Typography as="h3" color="neutral-800" lg="24/bold" variant="20/bold">
             چشم‌انداز و اهداف کلیدی
           </Typography>
-          <Typography as="p" color="neutral-500" variant="16/regular">
+          <Typography as="p" color="neutral-500" lg="16/regular" variant="14/regular">
             با تکیه بر این اهداف، در مسیرِ توسعه خدمات تکمیلی (توسعه آزمایشگاه‌های پیشرفته و گسترش
             شبکه‌های بین‌المللی) گام برمی‌داریم:
           </Typography>
@@ -150,7 +150,7 @@ function VisionSection() {
               <TickItem key={item}>{item}</TickItem>
             ))}
           </ul>
-          <Typography as="p" color="neutral-500" variant="16/regular">
+          <Typography as="p" color="neutral-500" lg="16/regular" variant="14/regular">
             ما در کارخانه نوآوری نفت، گاز و پتروشیمی بوشهر، نه‌تنها پاسخی جامع به نیازهای فناورانه
             صنعت انرژی کشور هستیم، بلکه به‌عنوان یک الگوی ملی برای توسعه منطقه‌ای شناخته می‌شویم.
             چشم‌انداز ما، ایفای نقشی محوری در زنجیره تأمین فناوری انرژی غرب آسیا تا سال ۱۴۱۰ است؛
@@ -176,14 +176,14 @@ function ServiceCard({ service, index }: { service: Service; index: number }) {
     <article
       data-service-card
       className={cn(
-        'relative flex flex-col gap-4 rounded-4xl p-6 shadow-[0_0_10px_rgb(10_10_10/0.05)] sm:p-10 lg:w-[800px] lg:rounded-[40px]',
+        'relative flex w-full flex-col gap-4 rounded-4xl bg-white p-6 shadow-[0_0_10px_rgb(10_10_10/0.05)] sm:p-10 lg:w-[800px] lg:rounded-[40px]',
       )}
       style={{ zIndex: index + 1 }}
     >
-      <Typography as="h3" color="neutral-700" variant="24/extrabold">
+      <Typography as="h3" color="neutral-700" lg="24/extrabold" variant="20/extrabold">
         {service.title}
       </Typography>
-      <Typography as="p" color="neutral-500" variant="16/regular">
+      <Typography as="p" color="neutral-500" lg="16/regular" variant="14/regular">
         {service.description}
       </Typography>
       {service.bullets ? (
@@ -199,7 +199,7 @@ function ServiceCard({ service, index }: { service: Service; index: number }) {
 
 function ServicesSection() {
   return (
-    <section className="bg-neutral-50 py-20 lg:py-40" id="services">
+    <section className="bg-neutral-50 py-20 lg:py-10" id="services">
       <div className="mx-auto w-full max-w-[1280px] px-4 md:px-8 2xl:px-0">
         <ServicesScrollStack heading={<SectionHeading>ما چه خدماتی ارائه می‌دهیم؟</SectionHeading>}>
           {SERVICES.map((service, index) => (
@@ -224,21 +224,21 @@ function AboutCallToAction() {
           width={635}
         />
         <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-14">
-          <Typography as="p" className="max-w-[702px]" color="white" md="32/bold" variant="24/bold">
+          <Typography as="p" className="max-w-[702px]" color="white" lg="32/bold" variant="20/bold">
             کارخانه نوآوری نفت، گاز و پتروشیمی بوشهر؛ جایی که نیاز صنعت، به راهکار فناورانه تبدیل
             می‌شود.
           </Typography>
           <div className="flex shrink-0 flex-col gap-4 sm:flex-row lg:w-[200px] lg:flex-col">
             <Button asChild className="w-full" size="48" variant="white">
               <Link href="#services">
-                <Typography as="span" color="neutral-700" variant="20/regular">
+                <Typography as="span" color="neutral-700" lg="20/regular" variant="16/regular">
                   آشنایی با خدمات
                 </Typography>
               </Link>
             </Button>
             <Button asChild className="w-full" size="48" variant="outline-white">
               <Link href="/connect">
-                <Typography as="span" color="white" variant="20/regular">
+                <Typography as="span" color="white" lg="20/regular" variant="16/regular">
                   ارتباط با ما
                 </Typography>
               </Link>

@@ -1,12 +1,10 @@
 import type { Metadata } from 'next'
 import {
-  AboutCallToAction,
   IntroductionSection,
   ServicesSection,
   VisionSection,
 } from '@/components/landing/about/about-page'
-import PathScrollSection from '@/components/landing/about/path-scroll-section'
-import FaqSection from '@/components/landing/home/faq-section'
+import PathSection from '@/components/landing/about/path-section'
 import Reveal from '@/components/landing/reveal'
 import ScrollProvider from '@/components/landing/scroll-provider'
 import { buildSafe } from '@/utilities/buildSafe'
@@ -27,11 +25,11 @@ export default async function AboutPage() {
     <main className="overflow-x-clip bg-neutral-50">
       <ScrollProvider />
       <IntroductionSection content={aboutUs?.introduction} />
-      <PathScrollSection />
-      {/* <Reveal delay={0.1}>
+      <PathSection />
+      <Reveal delay={0.1}>
         <VisionSection />
-      </Reveal> */}
-      {/* <ServicesSection /> */}
+      </Reveal>
+      <ServicesSection />
       {/* <Reveal delay={0.1}>
         <AboutCallToAction />
       </Reveal> */}

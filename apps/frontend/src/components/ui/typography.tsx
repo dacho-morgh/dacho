@@ -11,10 +11,11 @@ import { cn } from "@/utilities/ui"
  * Scales:
  * - 48: 48px / 74px (Black, Bold, Regular)
  * - 40: 40px / 60px (ExtraBold, Bold, Regular)
+ * - 34: 34px / 52px (ExtraBold, Bold, Regular)
  * - 32: 32px / 48px (ExtraBold, Bold, Regular)
  * - 24: 24px / 36px (ExtraBold, Bold, Regular)
  * - 20: 20px / 32px (ExtraBold, Bold, Regular)
- * - 16: 16px / 28px (SemiBold, Regular, Light)
+ * - 16: 16px / 28px (Bold, SemiBold, Regular, Light)
  * - 14: 14px / 24px (SemiBold, Regular, Light)
  * - 12: 12px / 20px (SemiBold, Regular, Light)
  * - 10: 10px / 14px (Light)
@@ -34,6 +35,11 @@ const typographyVariants = cva("font-sans antialiased text-foreground", {
       "40/regular": "text-[40px] leading-[64px] font-[325]",
       h1: "text-[40px] leading-[64px] font-[600]",
 
+      // 34px scale
+      "34/extrabold": "text-[34px] leading-[52px] font-[725]",
+      "34/bold": "text-[34px] leading-[52px] font-[600]",
+      "34/regular": "text-[34px] leading-[52px] font-[325]",
+
       // 32px scale (H2)
       "32/extrabold": "text-[32px] leading-[50px] font-[725]",
       "32/bold": "text-[32px] leading-[50px] font-[600]",
@@ -42,6 +48,7 @@ const typographyVariants = cva("font-sans antialiased text-foreground", {
 
       // 24px scale (H3)
       "24/extrabold": "text-[24px] leading-[36px] font-[725]",
+      "24/black": "text-[24px] leading-[36px] font-[875]",
       "24/bold": "text-[24px] leading-[36px] font-[600]",
       "24/regular": "text-[24px] leading-[36px] font-[325]",
       h3: "text-[24px] leading-[36px] font-[600]",
@@ -54,6 +61,7 @@ const typographyVariants = cva("font-sans antialiased text-foreground", {
       title: "text-[20px] leading-[32px] font-[450]",
 
       // 16px scale (Body Large)
+      "16/bold": "text-[16px] leading-[28px] font-[600]",
       "16/semibold": "text-[16px] leading-[28px] font-[450]",
       "16/regular": "text-[16px] leading-[28px] font-[325]",
       "16/light": "text-[16px] leading-[28px] font-[150]",
@@ -141,6 +149,7 @@ const variantAliases: Partial<Record<TypographyVariant, `${number}/${string}`>> 
 const lineHeights: Record<string, string> = {
   "48": "74px",
   "40": "64px",
+  "34": "52px",
   "32": "50px",
   "24": "36px",
   "20": "32px",
