@@ -5,6 +5,7 @@ import NewsCard from '@/components/landing/home/news-card'
 import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import { cn } from '@/utilities/ui'
 import type { MagData, MagStory } from './data'
 import { NewsletterForm } from './newsletter-form'
 
@@ -57,9 +58,9 @@ function Heading({
   )
 }
 
-function Badge({ label }: { label: string }) {
+function Badge({ label, className }: { label: string; className?: string }) {
   return (
-    <span className="inline-flex w-fit rounded-lg bg-neutral-100 px-2 py-1">
+    <span className={cn(`inline-flex w-fit rounded-lg bg-neutral-100 px-2 py-1`, className)}>
       <Typography as="span" variant="12/semibold" color="neutral-600">
         {label}
       </Typography>
@@ -89,19 +90,25 @@ function Hero({ data }: { data: MagData }) {
               className="absolute inset-0 bg-gradient-to-t from-neutral-900/90 via-neutral-900/45 to-transparent"
             />
             <div className="absolute inset-x-4 bottom-4 flex flex-col items-start gap-3 rounded-3xl border border-white/20 bg-neutral-900/35 p-5 text-right shadow-lg backdrop-blur-sm sm:right-8 sm:bottom-8 sm:left-auto sm:w-[calc(100%-4rem)] sm:max-w-2xl sm:p-8">
-              <Badge label={data.hero.category} />
+              <Badge className="hidden md:inline-flex" label={data.hero.category} />
               <Typography
                 as="h1"
-                variant="32/extrabold"
+                lg="40/extrabold"
+                variant="20/extrabold"
                 color="white"
-                className="max-w-xl text-[28px]! leading-9! sm:text-[36px]! sm:leading-[45px]!"
+                className="max-w-xl"
               >
                 {data.hero.title}
               </Typography>
               <Typography variant="16/regular" color="white" className="max-w-lg text-white/80!">
                 {data.hero.excerpt}
               </Typography>
-              <Typography as="span" variant="14/light" color="white">
+              <Typography
+                className="hidden md:inline-flex"
+                as="span"
+                variant="14/light"
+                color="white"
+              >
                 {data.hero.author} • {data.hero.readingTime} • {data.hero.time}
               </Typography>
               <Button
@@ -207,7 +214,7 @@ function CategorySection({
                 className="absolute inset-0 bg-gradient-to-t from-neutral-900/60 to-transparent"
               />
               <div className="absolute right-4 bottom-4">
-                <Badge label={featured.category} />
+                <Badge className="hidden md:inline-flex" label={featured.category} />
               </div>
             </div>
             <div className="flex items-center justify-between gap-2 p-5">
