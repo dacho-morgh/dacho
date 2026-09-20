@@ -4,8 +4,8 @@ import { draftMode } from 'next/headers'
 import Image from 'next/image'
 import { getPayload } from 'payload'
 import { cache } from 'react'
-import Link from 'next/link'
 import { NewsCalendarIcon, NewsTimeIcon } from '@/components/icons'
+import NewsCard from '@/components/landing/home/news-card'
 import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import { NewsBreadcrumb } from '@/components/landing/news/news-page-header'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
@@ -86,7 +86,8 @@ export default async function NewsArticlePage({ params }: Args) {
   if (!news) return <PayloadRedirects url={url} />
 
   const publishedAt = news.publishedAt || news.createdAt
-  const readingMinutes = news.readingMinutes || Math.max(1, Math.ceil(countTextWords(news.content) / 200))
+  const readingMinutes =
+    news.readingMinutes || Math.max(1, Math.ceil(countTextWords(news.content) / 200))
   const hasHeroImage = typeof news.heroImage === 'object' && news.heroImage !== null
 
   return (
@@ -96,11 +97,11 @@ export default async function NewsArticlePage({ params }: Args) {
 
       {draft && <LivePreviewListener />}
 
-      <article className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 pt-25 pb-20 sm:px-6 lg:gap-18 lg:pt-30">
+      <article className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 pt-25 pb-20 sm:px-6 lg:gap-10 lg:pt-30">
         <NewsBreadcrumb title={news.title} />
 
-        <div className="flex flex-col items-center gap-5 lg:gap-10">
-          <div className="relative aspect-31/20 max-h-140 w-full flex-1 overflow-hidden rounded-4xl bg-neutral-100">
+        <div className="grid items-center gap-8 lg:grid-cols-2">
+          <div className="relative aspect-31/20 w-full overflow-hidden rounded-4xl bg-neutral-100">
             {hasHeroImage ? (
               <Media
                 fill
@@ -122,7 +123,7 @@ export default async function NewsArticlePage({ params }: Args) {
             )}
           </div>
 
-          <header className="flex w-full flex-1 flex-col gap-4 text-right">
+          <header className="flex h-full w-full flex-1 flex-col gap-4 text-right">
             <Typography as="h1" variant="20/bold" lg="32/extrabold" color="neutral-800">
               {news.title}
             </Typography>
@@ -151,12 +152,25 @@ export default async function NewsArticlePage({ params }: Args) {
           enableProse={false}
           className="w-full text-right [&_a]:text-brand-500 [&_h2]:mt-20 [&_h2]:mb-4 [&_h2]:text-2xl [&_h2]:leading-10 [&_h2]:font-bold [&_h2]:text-neutral-600 lg:[&_h2]:text-[32px] lg:[&_h2]:leading-12.5 [&_h3]:mt-12 [&_h3]:mb-4 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-neutral-600 [&_img]:my-20 [&_img]:w-full [&_img]:rounded-4xl [&_li]:text-base [&_li]:leading-8 [&_li]:text-neutral-500 lg:[&_li]:text-xl [&_p]:mb-4 [&_p]:text-base [&_p]:leading-8 [&_p]:font-normal [&_p]:text-neutral-500 lg:[&_p]:text-xl"
         />
-        {news.relatedNews && news.relatedNews.length > 0 && <section className="mt-12 w-full text-right">
-          <Typography as="h2" variant="24/bold" color="neutral-800" className="mb-5">اخبار مرتبط</Typography>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {news.relatedNews.filter((item) => typeof item === 'object' && (draft || item._status === 'published')).map((item) => typeof item === 'object' && <Link key={item.id} href={`/news/${item.slug}`} className="rounded-2xl border border-neutral-100 bg-neutral-50 p-5 hover:bg-neutral-100"><Typography as="h3" variant="16/semibold" color="neutral-800">{item.title}</Typography></Link>)}
-          </div>
-        </section>}
+        {news.relatedNews && news.relatedNews.length > 0 && (
+          <section className="mt-12 w-full text-right">
+            <Typography as="h2" variant="24/bold" color="neutral-800" className="mb-5">
+              اخبار مرتبط
+            </Typography>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {news.relatedNews
+                .filter(
+                  (item) => typeof item === 'object' && (draft || item._status === 'published'),
+                )
+                .map(
+                  (item) =>
+                    typeof item === 'object' && (
+                      <NewsCard key={item.id} news={item} variant="listing" />
+                    ),
+                )}
+            </div>
+          </section>
+        )}
       </article>
 
       <RecruitmentSection />
