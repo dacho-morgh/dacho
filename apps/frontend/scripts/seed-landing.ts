@@ -82,6 +82,8 @@ async function main(): Promise<void> {
     where: { email: { equals: ADMIN_EMAIL } },
     limit: 1,
   })
+  const adminRoles = { role: 'staff', cmsRole: 'admin' } as const
+  const adminContext = { allowRoleAssignment: true }
 
   if (existingAdmin.docs[0]) {
     await payload.update({
@@ -92,7 +94,9 @@ async function main(): Promise<void> {
         name: ADMIN_NAME,
         password: ADMIN_PASSWORD,
         phone: ADMIN_PHONE,
+        ...adminRoles,
       },
+      context: adminContext,
     })
   } else {
     await payload.create({
@@ -102,7 +106,9 @@ async function main(): Promise<void> {
         name: ADMIN_NAME,
         password: ADMIN_PASSWORD,
         phone: ADMIN_PHONE,
+        ...adminRoles,
       },
+      context: adminContext,
     })
   }
 

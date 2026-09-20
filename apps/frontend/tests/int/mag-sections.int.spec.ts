@@ -1,21 +1,44 @@
+import { randomUUID } from 'node:crypto'
 import { getPayload } from 'payload'
 import { expect, test } from 'vitest'
 import config from '@/payload.config'
 
 test('editors can add and order a mixed-content Mag section', async () => {
   const payload = await getPayload({ config: await config })
-  const [news, posts] = await Promise.all([
-    payload.find({ collection: 'news', where: { _status: { equals: 'published' } }, limit: 1 }),
-    payload.find({ collection: 'posts', where: { _status: { equals: 'published' } }, limit: 1 }),
-  ])
-  const newsId = news.docs[0]?.id
-  const postId = posts.docs[0]?.id
-  expect(newsId).toBeDefined()
-  expect(postId).toBeDefined()
-  if (!newsId || !postId) return
-
   const original = await payload.findGlobal({ slug: 'mag', depth: 0 })
+  const slug = `int-mag-section-${randomUUID()}`
+  const content = {
+    root: {
+      type: 'root' as const,
+      children: [
+        {
+          type: 'paragraph' as const,
+          version: 1,
+          children: [{ type: 'text' as const, version: 1, text: 'محتوای تست' }],
+        },
+      ],
+      direction: 'rtl' as const,
+      format: '' as const,
+      indent: 0,
+      version: 1,
+    },
+  }
+  let newsId: number | undefined
+  let postId: number | undefined
   try {
+    const news = await payload.create({
+      collection: 'news',
+      context: { disableRevalidate: true },
+      data: { title: 'خبر آزمایشی مجله', slug: `${slug}-news`, content, _status: 'published' },
+    })
+    newsId = news.id
+    const post = await payload.create({
+      collection: 'posts',
+      context: { disableRevalidate: true },
+      data: { title: 'مقاله آزمایشی مجله', slug: `${slug}-post`, content, _status: 'published' },
+    })
+    postId = post.id
+
     await payload.updateGlobal({
       slug: 'mag',
       context: { disableRevalidate: true },
@@ -53,5 +76,13 @@ test('editors can add and order a mixed-content Mag section', async () => {
       context: { disableRevalidate: true },
       data: { sections: original.sections ?? [] },
     })
+    if (postId)
+      await payload.delete({
+        collection: 'posts',
+        id: postId,
+        context: { disableRevalidate: true },
+      })
+    if (newsId)
+      await payload.delete({ collection: 'news', id: newsId, context: { disableRevalidate: true } })
   }
-})
+}, 20_000)
