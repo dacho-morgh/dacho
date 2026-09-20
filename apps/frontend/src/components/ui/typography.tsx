@@ -41,6 +41,7 @@ const typographyVariants = cva("font-sans antialiased text-foreground", {
       "34/regular": "text-[34px] leading-[52px] font-[325]",
 
       // 32px scale (H2)
+      "32/black": "text-[32px] leading-[50px] font-[875]",
       "32/extrabold": "text-[32px] leading-[50px] font-[725]",
       "32/bold": "text-[32px] leading-[50px] font-[600]",
       "32/regular": "text-[32px] leading-[50px] font-[325]",

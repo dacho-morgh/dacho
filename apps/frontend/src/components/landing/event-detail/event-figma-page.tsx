@@ -15,6 +15,7 @@ import {
 import SectionHeading from '@/components/landing/home/section-heading'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import RecruitmentSection from '../home/recruitment-section'
 import {
   EVENT_ABOUT_PARAGRAPHS,
   AUDIENCES,
@@ -63,7 +64,7 @@ function DetailHero({ document, kind }: EventDetailPageProps) {
 
   return (
     <section
-      className="relative flex min-h-[620px] items-center justify-center overflow-hidden px-4 py-20 md:min-h-[720px] md:justify-end md:px-20"
+      className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-20 md:min-h-screen md:justify-end md:px-20"
       dir="ltr"
     >
       <Image
@@ -81,7 +82,7 @@ function DetailHero({ document, kind }: EventDetailPageProps) {
       >
         <div className="flex flex-col items-start gap-8">
           <div className="flex flex-col gap-4">
-            <Typography as="h1" className="text-white" lg="48/black" variant="32/extrabold">
+            <Typography as="h1" className="text-white" lg="48/black" variant="32/black">
               {document.title}
             </Typography>
             <Typography className="text-white" lg="20/regular" variant="16/regular">
@@ -121,11 +122,17 @@ function EventMetadata({ document, kind }: EventDetailPageProps) {
           <div className="min-w-0 border-r-4 border-brand-200 px-6" key={label}>
             <div className="flex items-center gap-4">
               <Icon aria-hidden="true" className="size-9 shrink-0 text-brand-500" />
-              <Typography as="dt" color="primary" variant="20/bold">
+              <Typography as="dt" color="primary" lg="20/bold" variant="16/bold">
                 {label}
               </Typography>
             </div>
-            <Typography as="dd" className="mt-5 truncate" color="neutral-500" variant="24/bold">
+            <Typography
+              as="dd"
+              className="mt-5 truncate"
+              color="neutral-500"
+              lg="24/bold"
+              variant="20/bold"
+            >
               {value}
             </Typography>
           </div>
@@ -137,22 +144,25 @@ function EventMetadata({ document, kind }: EventDetailPageProps) {
 
 function AboutSection({ kind }: { kind: EventDetailKind }) {
   return (
-    <section className="px-4 pt-20 pb-40 md:px-8">
+    <section className="px-4 md:px-8 md:py-10">
       <article
-        className="mx-auto grid w-full max-w-7xl gap-10 rounded-[40px] bg-white p-5 shadow-[0_0_40px_rgb(10_10_10/0.1)] sm:p-8 lg:h-[640px] lg:grid-cols-[520px_640px] lg:rounded-[80px] lg:p-10"
+        className="mx-auto grid w-full max-w-7xl rounded-[40px] bg-white p-5 shadow-[0_0_40px_rgb(10_10_10/0.1)] sm:p-8 lg:h-[640px] lg:grid-cols-[520px_640px] lg:gap-10 lg:rounded-[80px] lg:p-10"
         dir="ltr"
       >
-        <div className="flex flex-col justify-start gap-4 pt-10 text-right" dir="rtl">
-          <Typography as="h2" color="neutral-800" variant="24/bold">
+        <div
+          className="order-2 flex flex-col justify-start gap-4 pt-10 text-right lg:order-1"
+          dir="rtl"
+        >
+          <Typography as="h2" color="neutral-800" lg="24/bold" variant="20/bold">
             {COPY_BY_KIND[kind].aboutTitle}
           </Typography>
           {EVENT_ABOUT_PARAGRAPHS.map((paragraph) => (
-            <Typography color="neutral-500" key={paragraph} variant="16/regular">
+            <Typography color="neutral-500" key={paragraph} lg="16/regular" variant="14/regular">
               {paragraph}
             </Typography>
           ))}
         </div>
-        <div className="relative min-h-80 overflow-hidden rounded-[40px] lg:min-h-0">
+        <div className="relative order-1 min-h-80 overflow-hidden rounded-[40px] lg:order-2 lg:min-h-0">
           <Image
             alt=""
             className="object-cover"
@@ -180,12 +190,18 @@ function OpportunitiesSection({ kind }: { kind: EventDetailKind }) {
               <li className="border-y border-neutral-200 py-6 text-right" key={opportunity.title}>
                 <Typography
                   color={index === 0 ? 'neutral-700' : 'neutral-600'}
-                  variant={index === 0 ? '32/extrabold' : '24/extrabold'}
+                  lg={index === 0 ? '32/extrabold' : '24/extrabold'}
+                  variant="20/extrabold"
                 >
                   {opportunity.title}
                 </Typography>
                 {opportunity.description && (
-                  <Typography className="mt-2" color="neutral-500" variant="20/regular">
+                  <Typography
+                    className="mt-2"
+                    color="neutral-500"
+                    lg="20/regular"
+                    variant="16/regular"
+                  >
                     {opportunity.description}
                   </Typography>
                 )}
@@ -210,13 +226,13 @@ function OpportunitiesSection({ kind }: { kind: EventDetailKind }) {
 function AudienceSection({ kind }: { kind: EventDetailKind }) {
   const copy = COPY_BY_KIND[kind]
   return (
-    <section className="bg-neutral-50 px-4 py-40 md:px-8">
+    <section className="bg-neutral-50 px-4 py-10 md:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
         <SectionHeading description={copy.audienceDescription} title={copy.audienceTitle} />
         <ul className="flex flex-wrap items-center justify-start gap-5" dir="rtl">
           {AUDIENCES.map((audience) => (
             <li className="border-r-[6px] border-neutral-300 py-2 pr-5 pl-10" key={audience}>
-              <Typography as="span" color="neutral-500" variant="24/bold">
+              <Typography as="span" color="neutral-500" lg="24/bold" variant="20/bold">
                 {audience}
               </Typography>
             </li>
@@ -229,13 +245,13 @@ function AudienceSection({ kind }: { kind: EventDetailKind }) {
 
 function StepsSection({ kind }: { kind: EventDetailKind }) {
   return (
-    <section className="px-4 py-40 md:px-8">
+    <section className="px-4 py-20 md:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-20 text-center">
         <div className="flex flex-col gap-2">
-          <Typography as="h2" color="neutral-600" variant="40/extrabold">
+          <Typography as="h2" color="neutral-600" lg="40/extrabold" variant="34/extrabold">
             {COPY_BY_KIND[kind].stepsTitle}
           </Typography>
-          <Typography color="neutral-500" variant="20/regular">
+          <Typography color="neutral-500" lg="20/regular" variant="16/regular">
             {SECTION_DESCRIPTION}
           </Typography>
         </div>
@@ -245,17 +261,17 @@ function StepsSection({ kind }: { kind: EventDetailKind }) {
               <div className="flex w-full items-center gap-2">
                 <span className="h-px flex-1 bg-brand-300" aria-hidden="true" />
                 <span className="flex size-14 items-center justify-center rounded-full bg-brand-100">
-                  <Typography as="span" color="primary" variant="24/bold">
+                  <Typography as="span" color="primary" lg="24/bold" variant="20/bold">
                     {(index + 1).toLocaleString('fa-IR')}
                   </Typography>
                 </span>
                 <span className="h-px flex-1 bg-brand-300" aria-hidden="true" />
               </div>
               <div className="flex flex-col gap-2 px-4">
-                <Typography color="neutral-600" variant="20/bold">
+                <Typography color="neutral-600" lg="20/bold" variant="16/bold">
                   {step.title}
                 </Typography>
-                <Typography color="neutral-500" variant="16/regular">
+                <Typography color="neutral-500" lg="16/regular" variant="14/regular">
                   {step.description}
                 </Typography>
               </div>
@@ -272,10 +288,10 @@ function GuestsSection({ kind }: { kind: EventDetailKind }) {
     <section className="overflow-hidden px-4 py-20 md:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
         <SectionHeading description={SECTION_DESCRIPTION} title={COPY_BY_KIND[kind].guestTitle} />
-        <ul className="grid gap-5 sm:grid-cols-2 lg:flex lg:w-[1680px] lg:self-end" dir="rtl">
+        <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" dir="rtl">
           {EVENT_DETAIL_IMAGES.guests.map((image, index) => (
             <li
-              className="flex min-w-0 items-center gap-4 rounded-[32px] bg-white p-4 shadow-[0_0_20px_rgb(10_10_10/0.05)] lg:w-[400px] lg:shrink-0"
+              className="flex min-w-0 items-center gap-4 rounded-[32px] bg-white p-4 shadow-[0_0_20px_rgb(10_10_10/0.05)] lg:shrink-0"
               key={`${image}-${index}`}
             >
               <Image
@@ -286,10 +302,10 @@ function GuestsSection({ kind }: { kind: EventDetailKind }) {
                 width={80}
               />
               <div className="min-w-0 text-right">
-                <Typography className="truncate" color="neutral-600" variant="20/bold">
+                <Typography className="truncate" color="neutral-600" lg="20/bold" variant="16/bold">
                   نام و نام خانوادگی
                 </Typography>
-                <Typography color="neutral-500" variant="20/regular">
+                <Typography color="neutral-500" lg="20/regular" variant="16/regular">
                   سمت
                 </Typography>
               </div>
@@ -303,7 +319,7 @@ function GuestsSection({ kind }: { kind: EventDetailKind }) {
 
 function SponsorsSection() {
   return (
-    <section className="bg-neutral-50 px-4 py-40 md:px-8">
+    <section className="bg-neutral-50 px-4 py-10 md:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
         <SectionHeading description="حامیان پیشرو در صنعت کشور" title="حامیان" />
         <ul className="flex flex-wrap justify-start gap-x-5 gap-y-10" dir="rtl">
@@ -313,7 +329,7 @@ function SponsorsSection() {
               key={`${name}-${index}`}
             >
               <EventAwardIcon aria-hidden="true" className="size-10 text-neutral-500" />
-              <Typography as="span" color="neutral-500" variant="24/bold">
+              <Typography as="span" color="neutral-500" lg="24/bold" variant="20/bold">
                 {name}
               </Typography>
             </li>
@@ -329,10 +345,10 @@ function GallerySection() {
     <section className="overflow-hidden px-4 py-40 md:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-20 text-center">
         <div className="flex flex-col gap-2">
-          <Typography as="h2" color="neutral-600" variant="40/extrabold">
+          <Typography as="h2" color="neutral-600" lg="40/extrabold" variant="34/extrabold">
             گالری تصاویر
           </Typography>
-          <Typography color="neutral-500" variant="20/regular">
+          <Typography color="neutral-500" lg="20/regular" variant="16/regular">
             لحظاتی از رویداد های پیشین
           </Typography>
         </div>
@@ -374,39 +390,39 @@ function GallerySection() {
 
 function ScheduleSection({ kind }: { kind: EventDetailKind }) {
   return (
-    <section className="bg-neutral-50 px-4 py-40 md:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-20">
+    <section className="bg-neutral-50 px-4 py-10 md:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 sm:gap-20">
         <SectionHeading description="این رویداد برای شرکت‌های دانش‌بنیان،" title="برنامه رویداد" />
-        <div className="flex flex-col items-end gap-10" dir="rtl">
-          <div className="flex flex-wrap gap-4">
+        <div className="flex flex-col gap-8 sm:gap-10" dir="rtl">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
             {[0, 1, 2].map((index) => (
               <Button
                 asChild
-                className="w-[200px] font-[325]!"
                 key={index}
-                size="48"
+                size="32"
+                lg="48"
                 variant={index === 0 ? 'primary' : 'outline-gray'}
               >
-                <Link href="/dashboard/events">{COPY_BY_KIND[kind].registrationLabel}</Link>
+                <Link href="#">{COPY_BY_KIND[kind].registrationLabel}</Link>
               </Button>
             ))}
           </div>
-          <ol className="flex w-full flex-col">
+          <ol className="flex w-full flex-col gap-4 sm:gap-0">
             {EVENT_SCHEDULE.map((item) => (
               <li
-                className="relative flex min-h-[120px] items-center gap-8 before:absolute before:top-0 before:right-[90px] before:h-full before:w-px before:bg-brand-300"
+                className="relative flex min-w-0 flex-col items-start gap-3 sm:min-h-[120px] sm:flex-row sm:items-center sm:gap-8 sm:before:absolute sm:before:top-0 sm:before:right-[90px] sm:before:h-full sm:before:w-px sm:before:bg-brand-300"
                 key={item.time}
               >
-                <span className="relative z-10 flex h-14 w-[180px] shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-500">
-                  <Typography as="span" color="primary" variant="24/bold">
+                <span className="relative z-10 flex h-12 w-36 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-500 sm:h-14 sm:w-[180px]">
+                  <Typography as="span" color="primary" lg="24/bold" variant="20/bold">
                     {item.time}
                   </Typography>
                 </span>
-                <div className="flex min-h-[72px] flex-1 flex-col items-end gap-2 rounded-[20px] bg-white p-4 text-right shadow-[0_0_20px_rgb(10_10_10/0.05)]">
-                  <Typography color="neutral-600" variant="20/bold">
+                <div className="flex min-h-[72px] w-full min-w-0 flex-col gap-2 rounded-[20px] bg-white p-4 text-right shadow-[0_0_20px_rgb(10_10_10/0.05)] sm:w-auto sm:flex-1">
+                  <Typography color="neutral-600" lg="20/bold" variant="16/bold">
                     {item.title}
                   </Typography>
-                  <Typography color="neutral-500" variant="16/regular">
+                  <Typography color="neutral-500" lg="16/regular" variant="14/regular">
                     اطلاعات شرکت و نماینده خود را ثبت کنید
                   </Typography>
                 </div>
@@ -436,7 +452,7 @@ function VenueSection({ document }: { document: Event | Exhibition }) {
           />
         </div>
         <div className="flex flex-col gap-10 text-right" dir="rtl">
-          <Typography as="h2" color="neutral-600" variant="32/extrabold">
+          <Typography as="h2" color="neutral-600" lg="32/extrabold" variant="20/extrabold">
             اطلاعات برگزاری
           </Typography>
           {[
@@ -445,10 +461,10 @@ function VenueSection({ document }: { document: Event | Exhibition }) {
             ['تاریخ برگزاری', formatDateRange(document.startDate, document.endDate)],
           ].map(([label, value]) => (
             <div className="flex flex-col gap-4" key={label}>
-              <Typography color="neutral-600" variant="20/bold">
+              <Typography color="neutral-600" lg="20/bold" variant="16/bold">
                 {label}
               </Typography>
-              <Typography color="neutral-500" variant="20/regular">
+              <Typography color="neutral-500" lg="20/regular" variant="16/regular">
                 {value}
               </Typography>
             </div>
@@ -460,40 +476,18 @@ function VenueSection({ document }: { document: Event | Exhibition }) {
 }
 
 function RegistrationCallToAction({ kind }: { kind: EventDetailKind }) {
-  const copy = COPY_BY_KIND[kind]
-  return (
-    <section className="relative overflow-hidden bg-linear-[101deg] from-brand-600 to-brand-900 px-4 py-40 md:px-8">
-      <ShapeIcon
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 left-0 h-[520px] w-[940px] -translate-y-1/2 text-brand-50 opacity-20"
-      />
-      <div
-        className="relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-8 md:flex-row"
-        dir="ltr"
-      >
-        {registerButton(kind)}
-        <div className="flex flex-col gap-4 text-right" dir="rtl">
-          <Typography as="h2" color="white" variant="32/bold">
-            {copy.ctaTitle}
-          </Typography>
-          <Typography color="white" variant="20/regular">
-            {copy.ctaDescription}
-          </Typography>
-        </div>
-      </div>
-    </section>
-  )
+  return <RecruitmentSection />
 }
 
 function FaqSection() {
   return (
-    <section className="bg-neutral-50 px-4 py-40 md:px-8">
+    <section className="bg-neutral-50 px-4 py-20 md:px-8">
       <div className="mx-auto flex w-full max-w-[800px] flex-col items-center gap-10">
         <div className="flex flex-col items-center gap-2 text-center">
-          <Typography as="h2" color="neutral-600" variant="40/extrabold">
+          <Typography as="h2" color="neutral-600" lg="40/extrabold" variant="34/extrabold">
             سوالات پر تکرار
           </Typography>
-          <Typography color="neutral-500" variant="20/regular">
+          <Typography color="neutral-500" lg="20/regular" variant="16/regular">
             از انتشار فرصت‌های صنعتی تا داوری تخصصی و تخصیص بودجه، تمام مسیر همکاری در یک فضای
             یکپارچه مدیریت می‌شود.
           </Typography>
@@ -506,7 +500,7 @@ function FaqSection() {
               open={index === 0 ? true : undefined}
             >
               <summary className="flex cursor-pointer list-none items-center justify-between [&::-webkit-details-marker]:hidden">
-                <Typography as="span" color="neutral-700" variant="16/semibold">
+                <Typography as="span" color="neutral-700" lg="16/semibold" variant="14/semibold">
                   {item.title}
                 </Typography>
                 <span className="flex size-8 items-center justify-center rounded-full bg-neutral-200 text-neutral-700 group-open:bg-neutral-700 group-open:text-white">
@@ -516,7 +510,12 @@ function FaqSection() {
                   />
                 </span>
               </summary>
-              <Typography className="mt-4 text-right" color="neutral-600" variant="16/regular">
+              <Typography
+                className="mt-4 text-right"
+                color="neutral-600"
+                lg="16/regular"
+                variant="14/regular"
+              >
                 {item.description}
               </Typography>
             </details>
@@ -529,7 +528,7 @@ function FaqSection() {
 
 export default function EventDetailPage({ document, kind }: EventDetailPageProps) {
   return (
-    <main className="overflow-x-clip bg-white pt-[74px]">
+    <main className="overflow-x-clip bg-white">
       <DetailHero document={document} kind={kind} />
       <EventMetadata document={document} kind={kind} />
       <AboutSection kind={kind} />
