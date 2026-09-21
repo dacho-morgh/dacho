@@ -14,6 +14,12 @@ test.describe('Frontend', () => {
         password,
         phone,
         name: 'متقاضی تست سایدبار',
+        companyName: 'شرکت تست سایدبار',
+        companyNationalId: `10${suffix}`,
+        companyRegistrationNumber: suffix,
+        companyType: 'سهامی خاص',
+        companyProvince: 'بوشهر',
+        companyCity: 'بوشهر',
       },
     })
     expect(registration.ok()).toBe(true)
@@ -95,7 +101,9 @@ test.describe('Frontend', () => {
     await expect(navigation).not.toBeInViewport()
   })
 
-  test('reinitializes the shrinking desktop header after client-side navigation', async ({ page }) => {
+  test('reinitializes the shrinking desktop header after client-side navigation', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 800 })
     await page.goto('http://localhost:3000')
     await page.waitForTimeout(1_000)
@@ -108,8 +116,8 @@ test.describe('Frontend', () => {
       .poll(() => header.evaluate((element) => element.getBoundingClientRect().width))
       .toBeLessThan(initialWidth - 100)
 
-    await header.locator(':scope > div:first-child nav a[href="/news"]').click()
-    await page.waitForURL('**/news')
+    await header.locator(':scope > div:first-child nav a[href="/mag"]').click()
+    await page.waitForURL('**/mag')
 
     await expect
       .poll(() => header.evaluate((element) => element.getBoundingClientRect().width))
@@ -121,7 +129,9 @@ test.describe('Frontend', () => {
       .toBeLessThan(initialWidth - 100)
   })
 
-  test('keeps the landing header surface and applies responsive scroll sizing', async ({ page }) => {
+  test('keeps the landing header surface and applies responsive scroll sizing', async ({
+    page,
+  }) => {
     for (const viewport of [
       { height: 800, width: 1440 },
       { height: 800, width: 390 },
@@ -166,9 +176,9 @@ test.describe('Frontend', () => {
     await page
       .locator('header')
       .first()
-      .locator(':scope > div:first-child nav a[href="/news"]')
+      .locator(':scope > div:first-child nav a[href="/mag"]')
       .click()
-    await page.waitForURL('**/news')
+    await page.waitForURL('**/mag')
 
     await page.setViewportSize({ width: 1024, height: 800 })
     await expect

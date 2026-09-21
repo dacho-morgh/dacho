@@ -142,10 +142,11 @@ jobs:
       # build with `relation "pages" does not exist`, which is correct
       # behaviour: a reachable database with a broken schema is a real error.
       # The DB-free path is covered by the build-without-database job above.
-      - name: Migrate + seed landing
+      - name: Migrate + seed content
         run: |
           echo "n" | pnpm --filter @dacho/frontend payload migrate
           pnpm --filter @dacho/frontend seed:landing
+          pnpm --filter @dacho/frontend seed:mag
         env:
           DATABASE_URL: postgres://dacho:dacho@127.0.0.1:5432/dacho-cms
           PAYLOAD_SECRET: ci-placeholder

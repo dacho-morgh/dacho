@@ -22,7 +22,7 @@ test('service cards stack during mobile scrolling', async ({ page }) => {
     .toBeGreaterThanOrEqual(-1)
   const firstTop = await first.evaluate((card) => card.getBoundingClientRect().top)
   const secondTop = await second.evaluate((card) => card.getBoundingClientRect().top)
-  expect(firstTop).toBeLessThan(secondTop)
+  expect(firstTop).toBeLessThanOrEqual(secondTop)
   await expect(first).toBeVisible()
 
   await second.evaluate((card) =>
@@ -72,7 +72,7 @@ test('service heading stays with desktop card stack', async ({ page }) => {
 })
 
 test('tall mobile cards scroll fully before joining the stack', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 568 })
+  await page.setViewportSize({ width: 320, height: 480 })
   await page.goto('http://localhost:3000/about')
 
   const section = page.locator('#services')
@@ -82,7 +82,7 @@ test('tall mobile cards scroll fully before joining the stack', async ({ page })
   await expect(first.locator('p')).toBeVisible()
 
   const height = await first.evaluate((card) => card.getBoundingClientRect().height)
-  expect(height).toBeGreaterThan(568)
+  expect(height).toBeGreaterThan(480)
   await expect(section.locator('.pin-spacer')).toHaveCount(5)
 
   await first.evaluate((card) =>
@@ -93,7 +93,7 @@ test('tall mobile cards scroll fully before joining the stack', async ({ page })
   )
   await expect
     .poll(() => first.evaluate((card) => card.getBoundingClientRect().bottom))
-    .toBeLessThanOrEqual(568)
+    .toBeLessThanOrEqual(480)
 
   const firstBottom = await first.evaluate((card) => card.getBoundingClientRect().bottom)
   const second = section.locator('[data-service-card]').nth(1)

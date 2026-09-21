@@ -1,10 +1,11 @@
+import { randomInt } from 'node:crypto'
 import { getPayload } from 'payload'
 import config from '../../src/payload.config.js'
 
 export const testUser = {
   email: 'dev@payloadcms.com',
   password: 'test',
-  phone: '09120000002',
+  phone: `09${randomInt(100_000_000, 1_000_000_000)}`,
 }
 
 /**

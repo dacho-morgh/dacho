@@ -48,12 +48,12 @@ test('newsletter stores a subscriber and accepts a repeated subscription', async
 
 test('admin-selected related posts appear on a seeded article', async ({ page }) => {
   await page.goto('http://localhost:3000/posts/mag-sample-post-1')
-  await expect(page.locator('a[href="/posts/mag-sample-post-2"]')).toBeVisible()
-  await expect(page.locator('a[href="/posts/mag-sample-post-3"]')).toBeVisible()
+  await expect(page.locator('a[href="/posts/mag-sample-post-2"]').first()).toBeVisible()
+  await expect(page.locator('a[href="/posts/mag-sample-post-3"]').first()).toBeVisible()
 })
 
 test('admin-selected related news appears on a seeded news story', async ({ page }) => {
   await page.goto('http://localhost:3000/news/mag-sample-news-1')
   await expect(page.getByRole('heading', { name: 'اخبار مرتبط' })).toBeVisible()
-  await expect(page.locator('a[href="/news/mag-sample-news-7"]')).toBeVisible()
+  await expect(page.locator('a[href="/news/mag-sample-news-7"]').first()).toBeVisible()
 })
