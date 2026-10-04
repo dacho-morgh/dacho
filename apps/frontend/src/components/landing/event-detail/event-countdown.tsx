@@ -1,5 +1,6 @@
 'use client'
 
+import type { Event } from '@dacho/cms-core'
 import { useEffect, useState } from 'react'
 import { Typography } from '@/components/ui/typography'
 
@@ -12,7 +13,13 @@ function getTimeLeft(startDate: string) {
   return [days, hours, minutes, seconds]
 }
 
-export default function EventCountdown({ startDate }: { startDate: string }) {
+export default function EventCountdown({
+  startDate,
+  labels,
+}: {
+  startDate: string
+  labels?: Event['countdown']
+}) {
   const [timeLeft, setTimeLeft] = useState([0, 0, 0, 0])
 
   useEffect(() => {
@@ -24,7 +31,7 @@ export default function EventCountdown({ startDate }: { startDate: string }) {
 
   return (
     <div
-      aria-label="زمان باقی‌مانده تا رویداد"
+      aria-label={labels ? labels.label || undefined : 'زمان باقی‌مانده تا رویداد'}
       className="flex flex-row items-start gap-2 sm:gap-3"
       dir="ltr"
     >
@@ -46,7 +53,11 @@ export default function EventCountdown({ startDate }: { startDate: string }) {
               </Typography>
             </div>
             <Typography as="span" className="text-white/70" variant="12/regular">
-              {['روز', 'ساعت', 'دقیقه', 'ثانیه'][index]}
+              {
+                (labels
+                  ? [labels.daysLabel, labels.hoursLabel, labels.minutesLabel, labels.secondsLabel]
+                  : ['روز', 'ساعت', 'دقیقه', 'ثانیه'])[index]
+              }
             </Typography>
           </div>
         </div>

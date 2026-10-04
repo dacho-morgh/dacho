@@ -8,6 +8,8 @@ type Args = {
   params: Promise<{ id: string }>
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function EventPage({ params }: Args) {
   const { id } = await params
   return <EventDetailRoute collection="events" id={decodeURIComponent(id)} />

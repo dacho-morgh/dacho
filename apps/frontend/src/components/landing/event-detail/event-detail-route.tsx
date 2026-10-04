@@ -15,7 +15,7 @@ export async function EventDetailRoute({ collection, id }: EventDetailRouteProps
   if (!document) notFound()
 
   return collection === 'events' ? (
-    <EventFigmaPage document={document} kind="event" />
+    <EventFigmaPage document={document} />
   ) : (
     <EventDetailPage document={document} kind="exhibition" />
   )
