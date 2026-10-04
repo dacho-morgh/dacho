@@ -5,6 +5,9 @@ import config from '../../src/payload.config.js'
 test.use({ channel: 'chrome' })
 
 const registerUrl = 'http://localhost:3000/register?returnUrl=%2Fdashboard'
+// Playwright API requests omit browser fetch metadata. Payload requires an
+// allowed Origin to authenticate their session cookies with CSRF enabled.
+const cookieRequestHeaders = { Origin: new URL(registerUrl).origin }
 const securitySuffix = `${Date.now()}`.slice(-9)
 const adminPhone = `09${securitySuffix}`
 const adminEmail = `register-admin-${securitySuffix}@example.invalid`
@@ -216,13 +219,19 @@ test.describe('Register', () => {
     expect(loginResponse.status()).toBe(200)
     await expect(page).toHaveURL('http://localhost:3000/dashboard/requests?status=draft')
 
-    const me = await page.request.get('http://localhost:3000/api/users/me')
+    const me = await page.request.get('http://localhost:3000/api/users/me', {
+      headers: cookieRequestHeaders,
+    })
     expect(me.ok()).toBe(true)
     const meBody = await me.json()
-    expect(meBody.user.role).toBe('applicant')
-    expect(meBody.user.cmsRole).toBeNull()
+    expect(meBody.user).toMatchObject({
+      id: registrationBody.doc.id,
+      role: 'applicant',
+      cmsRole: null,
+    })
 
     const emailLogin = await page.request.post('http://localhost:3000/api/users/login', {
+      headers: cookieRequestHeaders,
       data: { username: email, password: 'password123' },
     })
     expect(emailLogin.status()).toBe(200)
@@ -232,13 +241,20 @@ test.describe('Register', () => {
     page,
   }) => {
     const login = await page.request.post('http://localhost:3000/api/users/login', {
+      headers: cookieRequestHeaders,
       data: { username: adminPhone, password: adminPassword },
     })
     expect(login.ok()).toBe(true)
+    const adminMe = await page.request.get('http://localhost:3000/api/users/me', {
+      headers: cookieRequestHeaders,
+    })
+    expect(adminMe.ok()).toBe(true)
+    expect((await adminMe.json()).user).toMatchObject({ id: adminId, cmsRole: 'admin' })
 
     const suffix = `${Date.now()}`.slice(-9)
     const phone = `09${suffix}`
     const registration = await page.request.post('http://localhost:3000/api/users/self-signup', {
+      headers: cookieRequestHeaders,
       data: {
         email: `admin-session-signup-${suffix}@example.invalid`,
         username: phone,
@@ -258,21 +274,25 @@ test.describe('Register', () => {
     })
     expect(registration.status()).toBe(201)
     const body = await registration.json()
+    registeredUserIds.push(body.doc.id)
     expect(body.doc.role).toBe('applicant')
     expect(body.doc.cmsRole).toBeNull()
     expect(body.doc.roles).toEqual([])
 
-    await page.request.post('http://localhost:3000/api/users/logout')
+    const logout = await page.request.post('http://localhost:3000/api/users/logout', {
+      headers: cookieRequestHeaders,
+    })
+    expect(logout.ok()).toBe(true)
     const applicantLogin = await page.request.post('http://localhost:3000/api/users/login', {
+      headers: cookieRequestHeaders,
       data: { username: phone, password: 'password123' },
     })
     expect(applicantLogin.ok()).toBe(true)
-    const me = await page.request.get('http://localhost:3000/api/users/me')
+    const me = await page.request.get('http://localhost:3000/api/users/me', {
+      headers: cookieRequestHeaders,
+    })
     expect(me.ok()).toBe(true)
     const meBody = await me.json()
-    expect(meBody.user.role).toBe('applicant')
-    expect(meBody.user.cmsRole).toBeNull()
-
-    registeredUserIds.push(body.doc.id)
+    expect(meBody.user).toMatchObject({ id: body.doc.id, role: 'applicant', cmsRole: null })
   })
 })
