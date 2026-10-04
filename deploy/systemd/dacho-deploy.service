@@ -1,7 +1,7 @@
 [Unit]
 Description=Deploy Dacho images after GitHub Actions publishes them
-Wants=network-online.target
-After=network-online.target docker.service
+Wants=network-online.target dacho-maintenance.service
+After=network-online.target docker.service dacho-maintenance.service
 
 [Service]
 Type=oneshot

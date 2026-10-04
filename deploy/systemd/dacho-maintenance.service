@@ -1,0 +1,20 @@
+[Unit]
+Description=Dacho update page and authenticated deployment logs
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+ExecStart=/usr/bin/python3 /usr/local/lib/dacho-maintenance/server.py
+StateDirectory=dacho-maintenance
+StateDirectoryMode=0755
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

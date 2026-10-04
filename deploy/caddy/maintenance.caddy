@@ -1,0 +1,21 @@
+(dacho_maintenance) {
+    @maintenance file {
+        root /var/lib/dacho-maintenance
+        try_files /active
+    }
+    route {
+        @update path /update /update/*
+        handle @update {
+            reverse_proxy 127.0.0.1:9080
+        }
+        handle @maintenance {
+            reverse_proxy 127.0.0.1:9080
+        }
+        handle {
+            reverse_proxy 127.0.0.1:3000
+        }
+    }
+    handle_errors 502 503 {
+        reverse_proxy 127.0.0.1:9080
+    }
+}

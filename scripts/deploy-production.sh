@@ -8,6 +8,7 @@ frontend_image=ghcr.io/dacho-morgh/dacho/frontend
 backend_image=ghcr.io/dacho-morgh/dacho/backend
 installed_script="${HOME}/.local/bin/dacho-deploy-production"
 failure_marker="${HOME}/.dacho-deploy-failed"
+maintenance_dir="${DACHO_MAINTENANCE_DIR:-/var/lib/dacho-maintenance}"
 
 log() { printf '[dacho-cd] %s\n' "$*"; }
 die() { log "$*" >&2; exit 1; }
@@ -37,17 +38,52 @@ wait_for_http() {
   local url="$1" attempt
   for attempt in {1..40}; do
     if curl -fsS --max-time 10 -o /dev/null "$url" 2>/dev/null; then
+      log "Ready: ${url}"
       return 0
+    fi
+    if (( attempt == 1 || attempt % 5 == 0 )); then
+      log "Waiting for ${url} (${attempt}/40)"
     fi
     sleep 3
   done
+  log "Readiness check failed: ${url}; recent container output follows"
+  case "$url" in
+    *:3000/*) docker logs --tail 80 dacho-frontend-1 2>&1 || true ;;
+    *:4000/*) docker logs --tail 80 dacho-backend-1 2>&1 || true ;;
+  esac
   return 1
 }
 
 sync_installed_script() {
   local next="${installed_script}.next"
+  # An installed update page must not be disabled by an older main checkout.
+  if ! grep -Fq 'start_maintenance()' scripts/deploy-production.sh; then
+    log 'Keeping the installed deploy script until main includes maintenance support'
+    return 0
+  fi
   install -m 0755 scripts/deploy-production.sh "$next"
   mv -f -- "$next" "$installed_script"
+}
+
+start_maintenance() {
+  [[ -d "$maintenance_dir" && -w "$maintenance_dir" ]] || die 'Maintenance state directory is unavailable'
+  curl -fsS --max-time 5 -o /dev/null http://127.0.0.1:9080/update/status \
+    || die 'Maintenance server is unavailable; refusing to stop the website'
+  : >"${maintenance_dir}/deploy.log"
+  exec > >(tee -a "${maintenance_dir}/deploy.log") 2>&1
+  touch "${maintenance_dir}/active"
+  log 'Update page enabled; deployment logs are available at /update/logs'
+}
+
+finish_maintenance() {
+  [[ -f "${maintenance_dir}/active" ]] || return 0
+  if curl -fsS --max-time 10 -o /dev/null http://127.0.0.1:3000/ \
+    && curl -fsS --max-time 10 -o /dev/null http://127.0.0.1:4000/health; then
+    rm -f -- "${maintenance_dir}/active"
+    log 'Both services are healthy; the website is available again'
+  else
+    log 'A service is unavailable; keeping the update page visible'
+  fi
 }
 
 [[ -f .env && -f docker-compose.prod.yml ]] || die 'Production configuration is missing'
@@ -89,13 +125,18 @@ if [[ "$old_tag" == "$target_tag" ]] \
   sync_installed_script
   rm -f -- "$failure_marker"
   log "Already running ${target_tag}"
+  finish_maintenance
   exit 0
 fi
 
 if [[ "$old_tag" == "$target_tag" ]]; then
+  start_maintenance
+  trap 'status=$?; finish_maintenance; exit "$status"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   log "Repairing containers for ${target_tag}"
-  docker pull -q "${frontend_image}:${target_tag}" >/dev/null
-  docker pull -q "${backend_image}:${target_tag}" >/dev/null
+  docker pull "${frontend_image}:${target_tag}"
+  docker pull "${backend_image}:${target_tag}"
   git merge --ff-only origin/main >/dev/null
   docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate frontend
   wait_for_http http://127.0.0.1:3000/ || die 'Frontend did not become ready'
@@ -116,6 +157,7 @@ if [[ -f "$failure_marker" ]] \
   && (( $(date +%s) - $(stat -c %Y "$failure_marker") < 1800 )) \
   && curl -fsS --max-time 5 -o /dev/null http://127.0.0.1:3000/ 2>/dev/null; then
   log "Waiting 30 minutes before retrying failed release ${target_tag}"
+  finish_maintenance
   exit 0
 fi
 
@@ -140,22 +182,24 @@ rollback() {
     docker image prune -f >/dev/null 2>&1
     git reset --hard "$old_head" >/dev/null
     write_tag "$old_tag"
-    docker image inspect "$old_frontend" >/dev/null 2>&1 || docker pull -q "$old_frontend"
+    docker image inspect "$old_frontend" >/dev/null 2>&1 || docker pull "$old_frontend"
     docker compose -f docker-compose.prod.yml up -d --no-deps frontend
     wait_for_http http://127.0.0.1:3000/
-    docker image inspect "$old_backend" >/dev/null 2>&1 || docker pull -q "$old_backend"
+    docker image inspect "$old_backend" >/dev/null 2>&1 || docker pull "$old_backend"
     docker compose -f docker-compose.prod.yml up -d --no-deps backend
     wait_for_http http://127.0.0.1:4000/health
     log "Rollback attempted; check the services and journal"
   fi
+  finish_maintenance
   exit "$status"
 }
 trap 'rollback $?' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+start_maintenance
 log "Deploying ${target_tag}"
-docker pull -q "$new_backend" >/dev/null
+docker pull "$new_backend"
 [[ "$(docker image inspect "$new_backend" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" == "$target_sha" ]] \
   || die 'Backend image revision does not match main'
 
@@ -164,18 +208,18 @@ rollback_armed=1
 printf '%s\n' "$target_sha" >"$failure_marker"
 docker compose -f docker-compose.prod.yml config -q
 
-# The VPS cannot hold two 5 GB frontend images. When space is tight, remove
-# the old frontend after verifying that its immutable tag can be pulled again.
-free_bytes="$(df -B1 --output=avail / | tail -n 1 | tr -d ' ')"
-old_size="$(docker image inspect "$old_frontend" --format '{{.Size}}' 2>/dev/null || echo 0)"
-if [[ -n "$old_frontend_id" ]] && (( free_bytes < old_size + 1073741824 )); then
+# Keep the update page visible while making space for the replacement image.
+# Verify the rollback image is available before removing the running frontend.
+if [[ -n "$old_frontend_id" ]]; then
+  docker manifest inspect "$old_frontend" >/dev/null \
+    || die 'Previous frontend image is unavailable for rollback'
   log 'Freeing the old frontend image before pulling the new one'
   docker compose -f docker-compose.prod.yml stop frontend
   docker compose -f docker-compose.prod.yml rm -f frontend
   docker image rm -f "$old_frontend_id" >/dev/null
 fi
 
-docker pull -q "$new_frontend" >/dev/null
+docker pull "$new_frontend"
 [[ "$(docker image inspect "$new_frontend" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" == "$target_sha" ]] \
   || die 'Frontend image revision does not match main'
 
@@ -198,3 +242,4 @@ sync_installed_script
 docker image rm -f "$old_frontend_id" "$old_backend_id" >/dev/null 2>&1 || true
 rm -f -- "$failure_marker"
 log "Deployed ${target_tag}"
+finish_maintenance

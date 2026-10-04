@@ -251,6 +251,7 @@ secret. The host's existing GitHub SSH access and GHCR Docker login are used.
 Install the timer once on the VPS, from the production checkout:
 
 ```bash
+bash scripts/install-maintenance.sh
 mkdir -p ~/.local/bin
 install -m 0755 scripts/deploy-production.sh ~/.local/bin/dacho-deploy-production
 sudo install -m 0644 deploy/systemd/dacho-deploy.service /etc/systemd/system/
@@ -268,8 +269,48 @@ sudo systemctl start dacho-deploy.service
 journalctl -u dacho-deploy.service -n 100 --no-pager
 ```
 
-The VPS has limited disk space, so the deploy script may stop and remove the
-old frontend image before pulling the new one. This causes a short site outage
+### Update page and protected logs
+
+Install the independent Python update server before installing the deploy script
+and service. It does not use a Docker image, so it remains available while the
+frontend is removed or its replacement image is pulled:
+
+```bash
+bash scripts/install-maintenance.sh
+install -m 0755 scripts/deploy-production.sh ~/.local/bin/dacho-deploy-production
+sudo install -m 0644 deploy/systemd/dacho-deploy.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+The installer preserves the existing Caddy configuration, validates the new
+configuration, and adds the maintenance snippet to the existing frontend proxy.
+The Python server listens only on `127.0.0.1:9080`; Caddy serves it over the site's
+existing HTTPS connection. A backup is saved at
+`/etc/caddy/Caddyfile.before-maintenance`.
+
+- `/update` previews the Persian/English “We'll be back soon” page.
+- `/update/logs` requires HTTP Basic authentication with the credentials defined
+  in `deploy/maintenance/server.py`. Its log refreshes every three seconds.
+- `/update/status` reports only whether the update is active and the app is ready.
+
+Deployment creates `/var/lib/dacho-maintenance/active` before image pulls and
+container changes, making Caddy show the update page for normal app requests.
+The old frontend image is removed before its replacement is pulled, after
+checking that the old immutable image remains available for rollback. Deployment
+output is captured in `/var/lib/dacho-maintenance/deploy.log`; image builds still
+run in GitHub Actions, linked from the protected log viewer.
+
+The active marker is removed only when both frontend and backend HTTP checks
+pass, including after rollback. If rollback cannot restore the app, the update
+page stays visible. Visitors' pages check every eight seconds and reload when
+the app is ready. Caddy also shows the update page if the frontend is unreachable.
+
+Re-run the installer after changing the Python server, HTML pages, or Caddy
+snippet. An installed maintenance-enabled deploy script retains itself until
+the server's Git checkout also contains the maintenance hooks.
+
+The VPS has limited disk space, so the deploy script stops and removes the
+old frontend image before pulling the new one. The update page remains available
 during that release. If deployment fails, the script attempts to restore the
 previous SHA image and checkout. Database migrations may require a separate
 rollback plan when they change stored data.
