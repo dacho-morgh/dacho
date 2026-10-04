@@ -45,7 +45,7 @@ export function AdminRequestEvaluation({ id }: { id: string }) {
       </div>
       {notice && <Typography role="status" variant="14/regular" className="rounded-lg bg-brand-50 p-3 text-brand-700">{notice}</Typography>}
       {error && <Typography role="alert" variant="14/regular" className="rounded-lg bg-error-50 p-3 text-error-700">{error}</Typography>}
-      <section className="flex min-h-[912px] flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-4">
+      <section className="flex min-h-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-4 lg:min-h-[912px]">
         <Typography variant="20/bold" color="neutral-900">
           {data?.request.title || 'در حال بارگذاری درخواست'}
         </Typography>
@@ -54,7 +54,7 @@ export function AdminRequestEvaluation({ id }: { id: string }) {
           <div className="order-2 flex max-h-[828px] w-full max-w-[654px] flex-col gap-4 overflow-y-auto lg:order-1">
             <FormCard title="اطلاعات درخواست" answers={data?.request.answers ?? {}} />
           </div>
-          <div className="order-1 flex h-[768px] w-full max-w-[438px] flex-col rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:order-2">
+          <div className="order-1 flex h-[420px] w-full max-w-[438px] flex-col rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:order-2 lg:h-[768px]">
             <Typography variant="20/bold" color="neutral-900">
               فرم ارزیابی
             </Typography>

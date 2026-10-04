@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
+import { getProfileSessionUser, isStaffProfileUser } from '@/utilities/profile-session'
 
-export default function ProfilePage() {
-  redirect('/dashboard/profile/company')
+export default async function ProfilePage() {
+  const user = await getProfileSessionUser()
+  redirect(isStaffProfileUser(user) ? '/dashboard/profile/staff' : '/dashboard/profile/company')
 }

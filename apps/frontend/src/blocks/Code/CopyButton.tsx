@@ -1,6 +1,7 @@
 'use client'
 import { Button } from '@/components/ui/button'
-import { CopyIcon } from '@payloadcms/ui/icons/Copy'
+import { CopyIcon } from '@/components/icons'
+import { Typography } from '@/components/ui/typography'
 import { useState } from 'react'
 
 export function CopyButton({ code }: { code: string }) {
@@ -25,8 +26,8 @@ export function CopyButton({ code }: { code: string }) {
           updateCopyStatus()
         }}
       >
-        <p>{text}</p>
-        <CopyIcon />
+        <Typography as="span" variant="14/regular">{text}</Typography>
+        <CopyIcon aria-hidden="true" className="size-4" />
       </Button>
     </div>
   )

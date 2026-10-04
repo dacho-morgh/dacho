@@ -1,4 +1,3 @@
-import Image from 'next/image'
 import HeroScrollWrapper from '@/components/landing/home/hero-scroll-wrapper'
 import HeroVisual from '@/components/landing/home/hero-visual'
 import ShapeGrid from '@/components/landing/ShapeGrid'
@@ -22,16 +21,18 @@ const HeroSection = () => {
 
       <div className="relative z-10 mx-auto flex w-full flex-col pt-1 lg:h-full lg:flex-row lg:items-center lg:justify-between">
         <HeroVisual>
-          <Image
-            src="/images/dashboard/hero-logo.webp"
+          {/* These prepared files avoid a cold image-optimizer request on the LCP path. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/dashboard/hero-logo-672.webp"
+            srcSet="/images/dashboard/hero-logo-384.webp 384w, /images/dashboard/hero-logo-672.webp 672w, /images/dashboard/hero-logo.webp 1040w"
             alt="نشان صندوق"
             width={500}
-            height={520}
-            priority
+            height={500}
             fetchPriority="high"
             loading="eager"
             decoding="sync"
-            sizes="(max-width: 768px) 350px, (max-width: 1024px) 450px, 640px"
+            sizes="(max-width: 768px) 90vw, (max-width: 1024px) 520px, 640px"
             className="h-auto w-[min(90%,520px)] text-brand-500 lg:w-[min(90%,640px)] lg:will-change-transform lg:transform-3d"
           />
         </HeroVisual>

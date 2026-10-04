@@ -1,8 +1,5 @@
 'use client'
 
-import { useGSAP } from '@gsap/react'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef } from 'react'
@@ -11,44 +8,48 @@ import Brand from './brand'
 import MobileNavigation from './mobile-navigation'
 import NavList from './nav'
 
-gsap.registerPlugin(useGSAP, ScrollTrigger)
-
 const Header = () => {
   const headerRef = useRef<HTMLElement>(null)
   const pathname = usePathname()
 
-  useGSAP(
-    () => {
-      if (pathname?.startsWith('/dashboard')) return
-      if (typeof window === 'undefined' || window.matchMedia('(max-width: 767px)').matches) return
-
-      const media = gsap.matchMedia()
-      media.add('(min-width: 768px)', () => {
-        gsap.to(headerRef.current, {
-          maxWidth: '50rem',
-          paddingLeft: 0,
-          paddingRight: 0,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: document.body,
-            scroller: window,
-            start: 'top top',
-            end: '+=480',
-            scrub: 2,
-          },
-        })
-      })
-
-      return () => media.revert()
-    },
-    { scope: headerRef, dependencies: [pathname], revertOnUpdate: true },
-  )
-
   useEffect(() => {
-    if (pathname?.startsWith('/dashboard') || !headerRef.current) return
+    if (pathname?.startsWith('/dashboard') || window.matchMedia('(max-width: 767px)').matches)
+      return
 
-    ScrollTrigger.refresh()
-    gsap.set(headerRef.current, { clearProps: 'maxWidth,paddingLeft,paddingRight' })
+    let cancelled = false
+    let cleanup = () => {}
+    void Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(
+      ([{ default: gsap }, { ScrollTrigger }]) => {
+        if (cancelled || !headerRef.current) return
+        gsap.registerPlugin(ScrollTrigger)
+        const media = gsap.matchMedia()
+        media.add('(min-width: 768px)', () => {
+          gsap.to(headerRef.current, {
+            maxWidth: '50rem',
+            paddingLeft: 0,
+            paddingRight: 0,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: document.body,
+              scroller: window,
+              start: 'top top',
+              end: '+=480',
+              scrub: 2,
+            },
+          })
+          ScrollTrigger.refresh()
+          return () => {
+            gsap.set(headerRef.current, { clearProps: 'maxWidth,paddingLeft,paddingRight' })
+          }
+        })
+        cleanup = () => media.revert()
+      },
+    )
+
+    return () => {
+      cancelled = true
+      cleanup()
+    }
   }, [pathname])
 
   if (pathname?.startsWith('/dashboard')) return null

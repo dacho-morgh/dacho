@@ -8,8 +8,9 @@ import { siteMetadata, siteViewport } from '@/utilities/siteMetadata'
 import '../(frontend)/globals.css'
 
 const yekanBakh = localFont({
-  src: '../../../public/fonts/YekanBakhFaNum-VF.ttf',
+  src: '../../../public/fonts/YekanBakhFaNum-VF.woff2',
   variable: '--font-yekan-bakh',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {

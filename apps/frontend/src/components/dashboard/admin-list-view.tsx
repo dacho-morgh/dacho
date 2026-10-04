@@ -96,7 +96,7 @@ export function AdminListView<T>({
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-x-auto rounded-xl border border-neutral-200 bg-white lg:min-h-[848px]">
+      <div className="min-w-0 flex-1 overflow-x-auto rounded-xl border border-neutral-200 bg-white lg:min-h-[848px]">
         <table className="w-full min-w-[900px] border-collapse">
           <thead>
             <tr className="h-11 border-b border-neutral-200">

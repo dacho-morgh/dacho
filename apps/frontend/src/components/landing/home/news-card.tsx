@@ -169,7 +169,11 @@ const NewsCard = ({ news, variant, ...props }: NewsCardProps) => {
           variant="ghost"
           className="h-8 self-start rounded-[10px] px-1.5 py-2 transition-colors hover:bg-neutral-200"
         >
-          <Link href={href} className="flex items-center gap-1">
+          <Link
+            href={href}
+            aria-label={`${isArticle ? 'مطالعه مقاله' : 'مطالعه خبر'}: ${news.title}`}
+            className="flex items-center gap-1"
+          >
             <Typography as="span" variant="14/regular" color="neutral-600">
               {isArticle ? 'مطالعه مقاله' : 'مطالعه خبر'}
             </Typography>

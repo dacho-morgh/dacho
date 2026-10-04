@@ -2,6 +2,7 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
+
 @config '../../../tailwind.config.mjs';
 
 @custom-variant sm (@media (width >= theme(--breakpoint-sm)));

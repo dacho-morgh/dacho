@@ -7,16 +7,21 @@ import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
 
-const profileRoutes = [
+const applicantProfileRoutes = [
   { href: '/dashboard/profile/company', label: 'پروفایل شرکت' },
   { href: '/dashboard/profile/resume', label: 'رزومه' },
   { href: '/dashboard/profile/account', label: 'اطلاعات حساب کاربری' },
 ]
 
-export function ProfileNavigation() {
+const staffProfileRoutes = [
+  { href: '/dashboard/profile/staff', label: 'اطلاعات پروفایل' },
+]
+
+export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isLogoutOpen, setIsLogoutOpen] = useState(false)
+  const profileRoutes = staffMode ? staffProfileRoutes : applicantProfileRoutes
 
   const handleLogout = async () => {
     try {

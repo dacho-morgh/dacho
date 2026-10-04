@@ -239,7 +239,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
     setNotice(null)
 
     try {
-      const response = await fetch('/api/users', {
+      const response = await fetch('/api/users/self-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

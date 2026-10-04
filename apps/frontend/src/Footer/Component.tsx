@@ -1,11 +1,15 @@
 import Link from 'next/link'
-import React from 'react'
+import React, { type ComponentType, type SVGProps } from 'react'
 import {
   BrandFooterSandoqLogotype,
   BrandFooterSandoqLogomark,
   FooterCallIcon,
   FooterHouseIcon,
   FooterLocationIcon,
+  SocialAparatIcon,
+  SocialBaleIcon,
+  SocialInstagramIcon,
+  SocialTelegramIcon,
 } from '@/components/icons'
 import { Media } from '@/components/Media'
 import { Typography } from '@/components/ui/typography'
@@ -44,6 +48,13 @@ const DESCRIPTION_FALLBACK =
 const ADDRESS_FALLBACK = 'بوشهر، بهمنی، خیابان ماهینی، سه راه دانشجو...'
 const PHONE_FALLBACK = '077 - 1234 56 78  , 077 - 1234 78 98'
 const COPYRIGHT_FALLBACK = '© تمامی حقوق این سایت مربوط به کارخانه نوآوری صنایع انرژی بوشهر می‌باشد.'
+
+const socialIcons: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
+  aparat: SocialAparatIcon,
+  bale: SocialBaleIcon,
+  instagram: SocialInstagramIcon,
+  telegram: SocialTelegramIcon,
+}
 
 function formatHref(link?: {
   type?: ('reference' | 'custom') | null
@@ -305,6 +316,7 @@ export async function Footer() {
                               ? icon
                               : null
                           const isSvgIcon = mediaIcon?.mimeType === 'image/svg+xml'
+                          const SocialIcon = socialIcons[item.platform.toLowerCase()]
 
                           return (
                             <SocialLinkItem
@@ -312,7 +324,9 @@ export async function Footer() {
                               ariaLabel={item.platform}
                               href={href}
                             >
-                              {isSvgIcon ? (
+                              {SocialIcon ? (
+                                <SocialIcon aria-hidden="true" className="size-8" />
+                              ) : isSvgIcon ? (
                                 <span
                                   aria-hidden="true"
                                   className="size-8 shrink-0 bg-[#a3a3a3] transition-colors group-hover:bg-white"

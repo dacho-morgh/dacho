@@ -76,6 +76,17 @@ const nextConfig: NextConfig = {
 const payloadConfig = withPayload(nextConfig, { devBundleServerPackages: false })
 const colorSchemeHintHeaders = new Set(['accept-ch', 'critical-ch', 'vary'])
 const colorSchemeHint = 'Sec-CH-Prefers-Color-Scheme'
+const securityHeaders = [
+  { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
+  {
+    key: 'Content-Security-Policy',
+    value: "base-uri 'self'; object-src 'none'; frame-ancestors 'self'",
+  },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+]
 
 const withoutColorSchemeHint = (header: { key: string; value: string }) => {
   if (!colorSchemeHintHeaders.has(header.key.toLowerCase())) return header
@@ -125,7 +136,11 @@ const configWithScopedPayloadHeaders: NextConfig = {
       return retained.length > 0 ? [{ ...rule, headers: retained }] : []
     })
 
-    return [...headers, ...adminHeaders]
+    return [
+      ...headers,
+      ...adminHeaders,
+      { source: '/:path*', headers: securityHeaders },
+    ]
   },
 }
 

@@ -53,8 +53,8 @@ describe('ApplicantLettersView', () => {
     render(createElement(ApplicantLettersView, { initialLetters: items }))
     const search = screen.getByPlaceholderText('درخواست خود را جست و جو کنید')
     fireEvent.change(search, { target: { value: 'اطلاعیه' } })
-    expect(screen.queryByText('نامه رسمی')).toBeNull()
-    expect(screen.getByText('اطلاعیه')).toBeTruthy()
+    expect(screen.queryAllByText('نامه رسمی')).toHaveLength(0)
+    expect(screen.getAllByText('اطلاعیه')).toHaveLength(2)
   })
 
   it('keeps support tickets in their own tab and links them to detail', () => {
@@ -63,15 +63,17 @@ describe('ApplicantLettersView', () => {
       { ...items[1], id: 'support:ticket-1', title: 'تیکت من', source: 'ticket', senderName: 'پشتیبانی', senderRole: 'گیرنده' },
     ] }))
 
-    expect(screen.getByRole('link', { name: 'نامه رسمی' }).getAttribute('href')).toBe('/dashboard/letters/letter-1')
-    expect(screen.queryByRole('link', { name: 'تیکت من' })).toBeNull()
+    expect(screen.getAllByRole('link', { name: 'نامه رسمی' }).map((link) => link.getAttribute('href')))
+      .toEqual(['/dashboard/letters/letter-1', '/dashboard/letters/letter-1'])
+    expect(screen.queryAllByRole('link', { name: 'تیکت من' })).toHaveLength(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'نامه‌های ارسالی' }))
-    expect(screen.queryByRole('link', { name: 'نامه رسمی' })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'تیکت من' })).toBeNull()
+    expect(screen.queryAllByRole('link', { name: 'نامه رسمی' })).toHaveLength(0)
+    expect(screen.queryAllByRole('link', { name: 'تیکت من' })).toHaveLength(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'تیکت‌های پشتیبانی' }))
-    expect(screen.getByRole('link', { name: 'تیکت من' }).getAttribute('href')).toBe('/dashboard/letters/support%3Aticket-1')
+    expect(screen.getAllByRole('link', { name: 'تیکت من' }).map((link) => link.getAttribute('href')))
+      .toEqual(['/dashboard/letters/support%3Aticket-1', '/dashboard/letters/support%3Aticket-1'])
     expect(screen.getAllByText('گیرنده').length).toBeGreaterThan(0)
   })
 })
