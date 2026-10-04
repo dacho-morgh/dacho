@@ -1122,6 +1122,185 @@ export interface Event {
   startDate: string;
   endDate: string;
   status: 'upcoming' | 'ongoing' | 'past';
+  /**
+   * Featured events appear first on /events. If several are featured, the earliest start date wins.
+   */
+  showOnEventsPage?: boolean | null;
+  registration?: {
+    enabled?: boolean | null;
+    label?: string | null;
+    href?: string | null;
+  };
+  countdown?: {
+    enabled?: boolean | null;
+    /**
+     * Leave empty to count down to Start Date.
+     */
+    targetDate?: string | null;
+    label?: string | null;
+    daysLabel?: string | null;
+    hoursLabel?: string | null;
+    minutesLabel?: string | null;
+    secondsLabel?: string | null;
+  };
+  metadata?: {
+    enabled?: boolean | null;
+    label?: string | null;
+    dateLabel?: string | null;
+    timeLabel?: string | null;
+    locationLabel?: string | null;
+    typeLabel?: string | null;
+    eventType?: string | null;
+    timeSeparator?: string | null;
+    /**
+     * Optional custom date text; otherwise calculated from start/end dates in Tehran time.
+     */
+    dateText?: string | null;
+    /**
+     * Optional custom time text; otherwise calculated from start/end dates in Tehran time.
+     */
+    timeText?: string | null;
+  };
+  about?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    image?: (number | null) | Media;
+    paragraphs?:
+      | {
+          text: string;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  opportunities?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    image?: (number | null) | Media;
+    items?:
+      | {
+          title?: string | null;
+          description?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  audience?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    items?:
+      | {
+          title?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  steps?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    items?:
+      | {
+          title?: string | null;
+          description?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  guests?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    items?:
+      | {
+          name?: string | null;
+          role?: string | null;
+          image?: (number | null) | Media;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  sponsors?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    items?:
+      | {
+          name?: string | null;
+          logo?: (number | null) | Media;
+          href?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  gallery?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    items?:
+      | {
+          image: number | Media;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  schedule?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    buttons?:
+      | {
+          label?: string | null;
+          href?: string | null;
+          primary?: boolean | null;
+          id?: string | null;
+        }[]
+      | null;
+    items?:
+      | {
+          time?: string | null;
+          title?: string | null;
+          description?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  venue?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    mapImage?: (number | null) | Media;
+    locationLabel?: string | null;
+    addressLabel?: string | null;
+    dateLabel?: string | null;
+    /**
+     * Leave empty to use the event location.
+     */
+    address?: string | null;
+    mapHref?: string | null;
+  };
+  callToAction?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    buttonLabel?: string | null;
+    buttonHref?: string | null;
+    backgroundImage?: (number | null) | Media;
+  };
+  faq?: {
+    enabled?: boolean | null;
+    title?: string | null;
+    description?: string | null;
+    items?:
+      | {
+          question?: string | null;
+          answer?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -2132,6 +2311,198 @@ export interface EventsSelect<T extends boolean = true> {
   startDate?: T;
   endDate?: T;
   status?: T;
+  showOnEventsPage?: T;
+  registration?:
+    | T
+    | {
+        enabled?: T;
+        label?: T;
+        href?: T;
+      };
+  countdown?:
+    | T
+    | {
+        enabled?: T;
+        targetDate?: T;
+        label?: T;
+        daysLabel?: T;
+        hoursLabel?: T;
+        minutesLabel?: T;
+        secondsLabel?: T;
+      };
+  metadata?:
+    | T
+    | {
+        enabled?: T;
+        label?: T;
+        dateLabel?: T;
+        timeLabel?: T;
+        locationLabel?: T;
+        typeLabel?: T;
+        eventType?: T;
+        timeSeparator?: T;
+        dateText?: T;
+        timeText?: T;
+      };
+  about?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        image?: T;
+        paragraphs?:
+          | T
+          | {
+              text?: T;
+              id?: T;
+            };
+      };
+  opportunities?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        image?: T;
+        items?:
+          | T
+          | {
+              title?: T;
+              description?: T;
+              id?: T;
+            };
+      };
+  audience?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        items?:
+          | T
+          | {
+              title?: T;
+              id?: T;
+            };
+      };
+  steps?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        items?:
+          | T
+          | {
+              title?: T;
+              description?: T;
+              id?: T;
+            };
+      };
+  guests?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        items?:
+          | T
+          | {
+              name?: T;
+              role?: T;
+              image?: T;
+              id?: T;
+            };
+      };
+  sponsors?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        items?:
+          | T
+          | {
+              name?: T;
+              logo?: T;
+              href?: T;
+              id?: T;
+            };
+      };
+  gallery?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        items?:
+          | T
+          | {
+              image?: T;
+              id?: T;
+            };
+      };
+  schedule?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        buttons?:
+          | T
+          | {
+              label?: T;
+              href?: T;
+              primary?: T;
+              id?: T;
+            };
+        items?:
+          | T
+          | {
+              time?: T;
+              title?: T;
+              description?: T;
+              id?: T;
+            };
+      };
+  venue?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        mapImage?: T;
+        locationLabel?: T;
+        addressLabel?: T;
+        dateLabel?: T;
+        address?: T;
+        mapHref?: T;
+      };
+  callToAction?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        buttonLabel?: T;
+        buttonHref?: T;
+        backgroundImage?: T;
+      };
+  faq?:
+    | T
+    | {
+        enabled?: T;
+        title?: T;
+        description?: T;
+        items?:
+          | T
+          | {
+              question?: T;
+              answer?: T;
+              id?: T;
+            };
+      };
   updatedAt?: T;
   createdAt?: T;
 }

@@ -27,7 +27,7 @@ export const queryEventDetail = cache(
         limit: 1,
         overrideAccess: false,
         pagination: false,
-        sort: 'startDate',
+        sort: ['-showOnEventsPage', 'startDate'],
         ...(documentId ? { where: { id: { equals: documentId } } } : {}),
       })
 

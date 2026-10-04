@@ -5,7 +5,7 @@ import { Typography } from '@/components/ui/typography'
 
 const navItems = [
   { label: 'خانه', href: '/' },
-  { label: 'رویداد ها', href: '/events' },
+  { label: 'پتروفاند', href: '/events' },
   { label: 'مجله', href: '/mag' },
   { label: 'درباره ما', href: '/about' },
   { label: 'تماس با ما', href: '/connect' },

@@ -12,6 +12,7 @@ import * as migration_20260913_213723_add_about_us_global from "./20260913_21372
 import * as migration_20260914_090000_add_complete_user_profile from "./20260914_090000_add_complete_user_profile";
 import * as migration_20260920_161706_add_mag_cms from "./20260920_161706_add_mag_cms";
 import * as migration_20260920_174206_mag_repeatable_sections from "./20260920_174206_mag_repeatable_sections";
+import * as migration_20261004_104227_events_page_content from "./20261004_104227_events_page_content";
 
 export const migrations = [
   {
@@ -83,5 +84,10 @@ export const migrations = [
     up: migration_20260920_174206_mag_repeatable_sections.up,
     down: migration_20260920_174206_mag_repeatable_sections.down,
     name: "20260920_174206_mag_repeatable_sections",
+  },
+  {
+    up: migration_20261004_104227_events_page_content.up,
+    down: migration_20261004_104227_events_page_content.down,
+    name: "20261004_104227_events_page_content",
   },
 ];
