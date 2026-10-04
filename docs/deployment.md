@@ -149,7 +149,8 @@ curl -s http://localhost:4000/health              # backend
 ## 9. Alternative: run prebuilt GHCR images (no build on the VPS)
 
 CI publishes both services to GHCR on every push, so the VPS can pull instead of
-build — no source checkout, no toolchain, no 5-minute build on a small box. Use
+build — no toolchain or 5-minute build on a small box. Automatic deployment uses
+a small Git checkout to identify the latest commit and track its deploy script. Use
 `docker-compose.prod.yml`, which is **standalone** (do not combine it with
 `docker-compose.yml`; that one builds from source).
 
@@ -214,8 +215,8 @@ least Read.
 
 ### Deploy
 
-The VPS needs only three things in a directory: `docker-compose.prod.yml`,
-`.env`, and `secrets/`.
+To start the images manually, the VPS needs `docker-compose.prod.yml`, `.env`,
+and `secrets/` in one directory.
 
 ```bash
 mkdir -p /srv/dacho/secrets && cd /srv/dacho
@@ -239,16 +240,45 @@ Every one of those five variables is mandatory — compose aborts with
 Migrations run automatically: the frontend entrypoint executes
 `payload migrate` before `next start`, so no host-side `pnpm` is needed.
 
-### Update / roll back
+### Automatic deployment after CI
+
+The production host polls `main` every two minutes. It deploys only after CI has
+published **both** `sha-<commit>` images. It pulls those images from GHCR, updates
+the server checkout and `.env`, and checks the frontend and backend before
+reporting success. It never builds on the VPS and needs no GitHub Actions SSH
+secret. The host's existing GitHub SSH access and GHCR Docker login are used.
+
+Install the timer once on the VPS, from the production checkout:
 
 ```bash
-sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=sha-<new>/' .env
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d      # migrations run on boot
+mkdir -p ~/.local/bin
+install -m 0755 scripts/deploy-production.sh ~/.local/bin/dacho-deploy-production
+sudo install -m 0644 deploy/systemd/dacho-deploy.service /etc/systemd/system/
+sudo install -m 0644 deploy/systemd/dacho-deploy.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now dacho-deploy.timer
 ```
 
-Rolling back is the same command with the previous sha. Uploaded media lives in
-the `media` volume rather than the image, so it survives both directions.
+The timer updates its installed deploy script after a successful checkout
+update. To inspect or trigger deployment:
+
+```bash
+systemctl list-timers dacho-deploy.timer
+sudo systemctl start dacho-deploy.service
+journalctl -u dacho-deploy.service -n 100 --no-pager
+```
+
+The VPS has limited disk space, so the deploy script may stop and remove the
+old frontend image before pulling the new one. This causes a short site outage
+during that release. If deployment fails, the script attempts to restore the
+previous SHA image and checkout. Database migrations may require a separate
+rollback plan when they change stored data.
+
+For a manual rollback, first stop the timer with
+`sudo systemctl disable --now dacho-deploy.timer`, then pin a previous immutable
+SHA tag in `.env`, pull both images, and recreate the services. Re-enable the
+timer after the cause is fixed; otherwise it will deploy the latest `main`
+again. Uploaded media remains in the `media` volume.
 
 ### Caveats
 

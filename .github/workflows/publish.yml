@@ -1,5 +1,9 @@
 name: Publish
 
+# The VPS CD timer deploys only when both images for this SHA are available.
+env:
+  DOCKER_METADATA_SHORT_SHA_LENGTH: '7'
+
 on:
   push:
     branches: [main]
