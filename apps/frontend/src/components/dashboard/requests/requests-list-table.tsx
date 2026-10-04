@@ -30,7 +30,7 @@ export function RequestsListTable({
     <div
       className={`mt-4 flex min-h-100 w-full flex-1 flex-col rounded-2xl border border-neutral-200 bg-white p-4 ${className}`}
     >
-      <div className="relative flex w-full flex-1 flex-col overflow-x-auto">
+      <div className="relative flex min-w-0 w-full flex-1 flex-col overflow-x-auto">
         {/* Loading Skeleton State (Figma Screen 13) - no table headers */}
         {isLoading && <RequestsLoadingSkeleton />}
 

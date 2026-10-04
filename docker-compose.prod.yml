@@ -59,6 +59,7 @@ services:
       BACKEND_JWKS_URL: http://backend:4000/.well-known/jwks.json
       BACKEND_URL: http://backend:4000
       INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET:?INTERNAL_PROXY_SECRET is required}
+      PAYLOAD_MEDIA_DIR: /repo/apps/frontend/public/media
     secrets:
       - payload_secret
     volumes:

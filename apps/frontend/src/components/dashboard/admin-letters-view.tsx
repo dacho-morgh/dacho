@@ -320,7 +320,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
           </DropdownMenu>
 
           {/* Search input — Figma node 30852:17812 */}
-          <div className="flex h-[48px] w-[400px] flex-col gap-[8px]">
+          <div className="flex h-[48px] w-full max-w-[400px] flex-col gap-[8px]">
             <div className="flex h-full w-full flex-1 items-center gap-[8px] overflow-hidden rounded-[8px] border border-neutral-100 bg-white px-[12px] py-[8px] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
               <input
                 type="search"
@@ -359,13 +359,14 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
       )}
 
       {/* Table card — Figma frame 30852:17813 */}
-      <div className="relative flex h-[848px] w-full flex-row-reverse items-start justify-end rounded-[16px] border border-neutral-200 bg-white p-[16px]">
+      <div className="relative min-h-[320px] w-full rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4 lg:flex lg:h-[848px] lg:flex-row-reverse lg:items-start lg:justify-end">
         {isLoading ? (
           <LettersSkeleton />
         ) : isEmpty ? (
           <LettersEmptyState />
         ) : (
           <>
+            <div className="hidden flex-row-reverse items-start justify-end lg:flex">
             {/* Column: عملیات (52px) — Figma frame 30852:17814 */}
             <div className="flex w-[52px] shrink-0 flex-col items-end">
               <div className="h-[44px] w-full border-b border-neutral-100" />
@@ -465,6 +466,51 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
                 <div key={item.id} className="flex h-[72px] w-full items-center justify-end border-b border-neutral-100 p-[16px]">
                   <TypeTag type={item.type} label={item.typeLabel} />
                 </div>
+              ))}
+            </div>
+            </div>
+            <div className="w-full space-y-3 lg:hidden">
+              {filteredLetters.map((item) => (
+                <article key={item.id} className="rounded-xl border border-neutral-100 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <TypeTag type={item.type} label={item.typeLabel} />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="text-gray" size="icon-sm" className="size-10 shrink-0 rounded-lg hover:bg-neutral-100" aria-label={`عملیات نامه ${item.title}`}>
+                          <DashboardMoreIcon className="size-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-[164px]">
+                        {item.source === 'ticket' ? (
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>
+                              <DashboardMessageTextIcon className="size-5" />
+                              <Typography as="span" variant="14/regular">مشاهده و پاسخ</Typography>
+                            </Link>
+                          </DropdownMenuItem>
+                        ) : (
+                          <>
+                            <DropdownMenuItem onSelect={() => handleFeedback(item)}>
+                              <DashboardMessageTextIcon className="size-5" />
+                              <Typography as="span" variant="14/regular">ثبت بازخورد</Typography>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem variant="destructive" onSelect={() => handleDelete(item)}>
+                              <DashboardTrashIcon className="size-5" />
+                              <Typography as="span" variant="14/regular">پاک کردن</Typography>
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <Typography asChild variant="16/regular" className="mt-2 block break-words text-right leading-7 text-neutral-700 hover:text-brand-600">
+                    <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>{item.title}</Link>
+                  </Typography>
+                  <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-neutral-100 pt-3">
+                    <div className="min-w-0 flex-1"><SenderCell item={item} /></div>
+                    <Typography variant="14/regular" className="shrink-0 whitespace-nowrap text-neutral-500">{item.sentDate}</Typography>
+                  </div>
+                </article>
               ))}
             </div>
           </>

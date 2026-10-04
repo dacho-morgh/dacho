@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef } from 'react'
-import { ShapeIcon, ShapeIconDark } from '@/components/icons'
+import Image from 'next/image'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 
@@ -17,16 +17,61 @@ const gradientClasses = {
 
 const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
   const sectionRef = useRef<HTMLElement>(null)
-  const shapeRef = useRef<HTMLDivElement>(null)
+  const animatedShapeRef = useRef<HTMLDivElement>(null)
+  const [shapeReady, setShapeReady] = useState(false)
 
   useEffect(() => {
+    const section = sectionRef.current
+    const animatedShape = animatedShapeRef.current
+    if (
+      !section ||
+      window.matchMedia('(max-width: 768px)').matches ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    )
+      return
+
+    const abortController = new AbortController()
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return
+        observer.disconnect()
+        void fetch(`/icons/partners/shape-${variant === 'gold' ? 'gold' : 'blue'}.svg`, {
+          signal: abortController.signal,
+        })
+          .then(async (response) => {
+            if (!response.ok) return
+            const document = new DOMParser().parseFromString(await response.text(), 'image/svg+xml')
+            if (document.documentElement.localName !== 'svg' || document.querySelector('parsererror'))
+              return
+            if (!animatedShape || abortController.signal.aborted) return
+            const svg = window.document.importNode(document.documentElement, true)
+            svg.setAttribute('class', 'size-full max-w-none')
+            animatedShape.replaceChildren(svg)
+            setShapeReady(true)
+          })
+          .catch(() => {
+            // Keep the static SVG if the optional path animation cannot load.
+          })
+      },
+      { rootMargin: '400px' },
+    )
+    observer.observe(section)
+    return () => {
+      abortController.abort()
+      observer.disconnect()
+      animatedShape?.replaceChildren()
+    }
+  }, [variant])
+
+  useEffect(() => {
+    if (!shapeReady) return
     let cancelled = false
     let cleanup = () => {}
     void Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(
       ([{ default: gsap }, { ScrollTrigger }]) => {
         if (cancelled) return
         const section = sectionRef.current
-        const shape = shapeRef.current
+        const shape = animatedShapeRef.current
 
         if (!section || !shape) return
         gsap.registerPlugin(ScrollTrigger)
@@ -92,7 +137,7 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
       cancelled = true
       cleanup()
     }
-  }, [])
+  }, [shapeReady])
 
   return (
     <section
@@ -102,15 +147,18 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
       className={`relative z-10 mx-auto flex min-h-64 w-[calc(100%-2rem)] max-w-280 items-center overflow-hidden rounded-[40px] px-6 py-10 sm:px-10 md:px-12 xl:h-64 xl:px-20 xl:py-0 ${gradientClasses[variant]}`}
     >
       <div
-        ref={shapeRef}
         aria-hidden="true"
         className="pointer-events-none absolute inset-y-0 left-1/2 h-full w-235.25 -translate-x-1/2 select-none md:left-0 md:translate-x-0"
       >
-        {variant === 'gold' ? (
-          <ShapeIconDark className="size-full max-w-none text-secondary-50" />
-        ) : (
-          <ShapeIcon className="size-full max-w-none text-brand-50" />
-        )}
+        <Image
+          src={variant === 'gold' ? '/icons/partners/shape-gold.svg' : '/icons/partners/shape-blue.svg'}
+          alt=""
+          width={941}
+          height={256}
+          unoptimized
+          className={shapeReady ? 'hidden' : 'size-full max-w-none'}
+        />
+        <div ref={animatedShapeRef} className={shapeReady ? 'size-full max-w-none' : 'hidden'} />
       </div>
 
       <div

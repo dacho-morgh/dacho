@@ -4,6 +4,13 @@ export { default as BrandSandoqLogomark } from './brand-sandoq-logomark'
 export { default as BrandSandoqLogotype } from './brand-sandoq-logotype'
 export { default as CarouselArrowRightIcon } from './carousel-arrow-right-icon'
 export { default as DashboardAddIcon } from './dashboard-add-icon'
+export { default as CopyIcon } from './copy-icon'
+export {
+  SocialAparatIcon,
+  SocialBaleIcon,
+  SocialInstagramIcon,
+  SocialTelegramIcon,
+} from './social-platform-icons'
 export { default as DashboardCloseCircle } from './dashboard-close-circle'
 export { default as DashboardEditIcon } from './dashboard-edit-icon'
 export { default as DashboardEmptyInboxIcon } from './dashboard-empty-inbox-icon'

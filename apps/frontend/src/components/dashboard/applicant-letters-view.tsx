@@ -239,7 +239,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
       )}
 
       {/* Card — Figma node 33:3926: white, grey-200 border, rounded-16, 16px padding, 848px tall */}
-      <div className="relative min-h-[848px] w-full rounded-[16px] border border-neutral-200 bg-white p-[16px]">
+      <div className="relative min-h-[320px] w-full rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4 lg:min-h-[848px]">
         {state === 'loading' ? (
           <LettersSkeleton />
         ) : !showTable ? (
@@ -249,7 +249,8 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
             <LettersEmptyState />
           )
         ) : (
-          <div className="flex flex-row-reverse justify-end overflow-hidden">
+          <>
+          <div className="hidden flex-row-reverse justify-end overflow-hidden lg:flex">
             {/* عملیات — Figma node 33:3927 (52px, kebab dropdown) */}
             <div className="flex w-[52px] shrink-0 flex-col">
               <div className="h-[44px] border-b border-neutral-100" />
@@ -331,6 +332,51 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
               ))}
             </div>
           </div>
+          <div className="space-y-3 lg:hidden">
+            {filteredLetters.map((item) => (
+              <article key={item.id} className="rounded-xl border border-neutral-100 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <StatusTag type={item.type} label={item.typeLabel} />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="text-gray" size="icon-sm" className="size-10 shrink-0 rounded-lg hover:bg-neutral-100" aria-label={`عملیات نامه ${item.title}`}>
+                        <DashboardMoreIcon className="size-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-[164px]">
+                      {item.source === 'ticket' ? (
+                        <DropdownMenuItem asChild>
+                          <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>
+                            <DashboardMessageTextIcon className="size-5" />
+                            <Typography as="span" variant="14/regular">مشاهده و پاسخ</Typography>
+                          </Link>
+                        </DropdownMenuItem>
+                      ) : (
+                        <>
+                          <DropdownMenuItem onSelect={() => setActionNotice('ثبت بازخورد به‌زودی')}>
+                            <DashboardMessageTextIcon className="size-5" />
+                            <Typography as="span" variant="14/regular">ثبت بازخورد</Typography>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem variant="destructive" onSelect={() => handleDelete(item)}>
+                            <DashboardTrashIcon className="size-5" />
+                            <Typography as="span" variant="14/regular">پاک کردن</Typography>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <Typography asChild variant="16/regular" className="mt-2 block break-words text-right leading-7 text-neutral-700 hover:text-brand-600">
+                  <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>{item.title}</Link>
+                </Typography>
+                <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-neutral-100 pt-3">
+                  <div className="min-w-0 flex-1"><SenderCell item={item} /></div>
+                  <Typography variant="14/regular" className="shrink-0 whitespace-nowrap text-neutral-500">{item.sentDate}</Typography>
+                </div>
+              </article>
+            ))}
+          </div>
+          </>
         )}
       </div>
     </div>

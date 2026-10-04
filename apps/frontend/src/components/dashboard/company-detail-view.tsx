@@ -25,7 +25,7 @@ export function CompanyDetailView({ id }: { id: string }) {
             / {user?.companyName || '—'}
         </Typography>
       </div>
-      <div className="flex min-h-[912px] flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:flex-row">
+      <div className="flex min-h-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:min-h-[912px] lg:flex-row">
         <nav className="order-first flex w-full shrink-0 flex-row gap-2 border-b border-neutral-200 pb-4 lg:order-none lg:w-[200px] lg:flex-col lg:border-b-0 lg:border-l lg:pl-5">
           <Typography
             variant="16/semibold"

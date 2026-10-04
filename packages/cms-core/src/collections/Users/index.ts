@@ -54,7 +54,11 @@ export const Users: CollectionConfig = {
         if (operation === 'update' && typeof data.phone === 'string' && data.phone.trim() !== '') {
           data.username = data.phone.trim()
         }
-        if (operation === 'create' && req.user?.cmsRole !== 'admin' && context.allowRoleAssignment !== true) {
+        if (
+          operation === 'create' &&
+          (context.forceApplicantSignup === true ||
+            (req.user?.cmsRole !== 'admin' && context.allowRoleAssignment !== true))
+        ) {
           // Payload authenticates `loginWithUsername` against username/email.
           // Applicants use their unique phone as the username so the public
           // login form can truthfully accept either phone or email.
@@ -69,6 +73,54 @@ export const Users: CollectionConfig = {
       },
     ],
   },
+  endpoints: [
+    {
+      path: '/self-signup',
+      method: 'post',
+      handler: async (req) => {
+        const body = (
+          typeof req.json === 'function' ? await req.json().catch(() => null) : null
+        ) as Record<string, unknown> | null
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+          return Response.json(
+            { errors: [{ message: 'Invalid registration data.' }] },
+            { status: 400 },
+          )
+        }
+
+        // Registration uses an explicit context so it always creates an
+        // applicant, even when this browser already has a CMS admin session.
+        // Do not forward user-controlled role fields to the create operation.
+        const registrationFields = [
+          'email',
+          'username',
+          'password',
+          'phone',
+          'name',
+          'position',
+          'companyName',
+          'companyNationalId',
+          'companyRegistrationNumber',
+          'companyType',
+          'companyProvince',
+          'companyCity',
+        ]
+        const data = Object.fromEntries(
+          registrationFields.filter((field) => field in body).map((field) => [field, body[field]]),
+        )
+
+        const doc = await req.payload.create({
+          collection: 'users',
+          data: data as never,
+          overrideAccess: false,
+          req,
+          context: { ...req.context, forceApplicantSignup: true },
+        })
+
+        return Response.json({ doc }, { status: 201 })
+      },
+    },
+  ],
   admin: {
     defaultColumns: ['name', 'email', 'phone', 'role', 'cmsRole'],
     useAsTitle: 'name',
