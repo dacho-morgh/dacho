@@ -34,6 +34,11 @@ jobs:
       - name: Unit tests (no database)
         run: pnpm test
 
+      - name: Deployment startup and maintenance
+        run: |
+          python3 scripts/test-bundled-media.py
+          python3 deploy/maintenance/test_deployment.py
+
   build-without-database:
     name: Build (without database)
     runs-on: ubuntu-latest
