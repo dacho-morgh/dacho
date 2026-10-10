@@ -44,6 +44,11 @@ export default function HomePage() {
         </Suspense>
       </Reveal>
       <Reveal>
+        <Suspense fallback={<NewsSectionSkeleton />}>
+          <NewsSection />
+        </Suspense>
+      </Reveal>
+      <Reveal>
         <Suspense fallback={<ServicesSectionSkeleton />}>
           <ServicesSection />
         </Suspense>
@@ -51,11 +56,6 @@ export default function HomePage() {
       {/* <Reveal>
         <ServicesDetailSection />
       </Reveal> */}
-      <Reveal>
-        <Suspense fallback={<NewsSectionSkeleton />}>
-          <NewsSection />
-        </Suspense>
-      </Reveal>
       <Reveal className="lg:mt-10">
         <Suspense fallback={<RecruitmentSectionSkeleton />}>
           <RecruitmentSection />

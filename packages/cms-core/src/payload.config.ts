@@ -25,6 +25,7 @@ import { openApiEndpoint } from './endpoints/openapi'
 import { Footer } from './Footer/config'
 import { AboutUs } from './globals/AboutUs'
 import { ContactUs } from './globals/ContactUs'
+import { LogoStrip } from './globals/LogoStrip'
 import { SiteSettings } from './globals/SiteSettings'
 import { Mag } from './globals/Mag'
 import { Header } from './Header/config'
@@ -202,7 +203,7 @@ export default buildConfig({
     ]),
   ).filter(Boolean),
   csrf: Array.from(new Set([getServerSideURL(), ...getLocalNetworkOrigins()])).filter(Boolean),
-  globals: [Header, Footer, AboutUs, ContactUs, SiteSettings, Mag],
+  globals: [Header, Footer, AboutUs, ContactUs, SiteSettings, Mag, LogoStrip],
   endpoints: [openApiEndpoint],
   plugins,
   secret: payloadSecret,

@@ -22,6 +22,8 @@ export default async function NewsPage() {
     const payload = await getPayload({ config: configPromise })
     const { docs } = await payload.find({
       collection: 'news',
+      draft: false,
+      where: { _status: { equals: 'published' } },
       depth: 1,
       overrideAccess: false,
       sort: ['-pinned', '-publishedAt', '-createdAt'],

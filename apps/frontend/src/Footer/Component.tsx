@@ -39,6 +39,7 @@ const PAGES_FALLBACK: FooterLinkItem[] = [
   { label: 'خانه', href: '/' },
   { label: 'رویداد ها و همایش ها', href: '#events' },
   { label: 'مجله', href: '/mag' },
+  { label: 'اخبار', href: '/news' },
   { label: 'درباره ما', href: '/about' },
   { label: 'تماس با ما', href: '/connect' },
 ]
@@ -229,6 +230,16 @@ export async function Footer() {
       },
     ]
   }
+
+  columns = columns.map((column) => {
+    if (!column.links.some((link) => link.href === '/mag')) return column
+    const links = column.links.filter((link) => link.href !== '/news')
+    links.splice(links.findIndex((link) => link.href === '/mag') + 1, 0, {
+      label: 'اخبار',
+      href: '/news',
+    })
+    return { ...column, links }
+  })
 
   return (
     <footer className="bg-neutral-800 py-12 lg:py-20">

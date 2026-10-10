@@ -136,6 +136,7 @@ export interface Config {
     'contact-us': ContactUs;
     'site-settings': SiteSetting;
     mag: Mag;
+    'logo-strip': LogoStrip;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
@@ -144,6 +145,7 @@ export interface Config {
     'contact-us': ContactUsSelect<false> | ContactUsSelect<true>;
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
     mag: MagSelect<false> | MagSelect<true>;
+    'logo-strip': LogoStripSelect<false> | LogoStripSelect<true>;
   };
   locale: null;
   widgets: {
@@ -1123,7 +1125,7 @@ export interface Event {
   endDate: string;
   status: 'upcoming' | 'ongoing' | 'past';
   /**
-   * Featured events appear first on /events. If several are featured, the earliest start date wins.
+   * Featured events appear first in the /events listing. Each item opens its own event details.
    */
   showOnEventsPage?: boolean | null;
   registration?: {
@@ -3130,6 +3132,46 @@ export interface Mag {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "logo-strip".
+ */
+export interface LogoStrip {
+  id: number;
+  enabled?: boolean | null;
+  /**
+   * Add and reorder SVG logos. All logos use the fixed frontend gray color. Leave empty to use the default partners, or uncheck Show logo strip to hide the section.
+   */
+  logos?:
+    | {
+        /**
+         * Accessible label for the logo link.
+         */
+        name: string;
+        /**
+         * SVG only. Uploaded colors are ignored on the frontend.
+         */
+        logo: number | Media;
+        link?: {
+          type?: ('reference' | 'custom') | null;
+          newTab?: boolean | null;
+          reference?:
+            | ({
+                relationTo: 'pages';
+                value: number | Page;
+              } | null)
+            | ({
+                relationTo: 'posts';
+                value: number | Post;
+              } | null);
+          url?: string | null;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "header_select".
  */
 export interface HeaderSelect<T extends boolean = true> {
@@ -3300,6 +3342,31 @@ export interface MagSelect<T extends boolean = true> {
   newsletterTitle?: T;
   newsletterDescription?: T;
   showRecruitment?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "logo-strip_select".
+ */
+export interface LogoStripSelect<T extends boolean = true> {
+  enabled?: T;
+  logos?:
+    | T
+    | {
+        name?: T;
+        logo?: T;
+        link?:
+          | T
+          | {
+              type?: T;
+              newTab?: T;
+              reference?: T;
+              url?: T;
+            };
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

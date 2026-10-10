@@ -7,6 +7,7 @@ const navItems = [
   { label: 'خانه', href: '/' },
   { label: 'پتروفاند', href: '/events' },
   { label: 'مجله', href: '/mag' },
+  { label: 'اخبار', href: '/news' },
   { label: 'درباره ما', href: '/about' },
   { label: 'تماس با ما', href: '/connect' },
 ]

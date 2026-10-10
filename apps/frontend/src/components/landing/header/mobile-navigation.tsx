@@ -105,7 +105,7 @@ const MobileNavigationContent = () => {
           href="/login"
           onClick={closeMenu}
         >
-          ورود
+          ورود | ثبت نام
         </Link>
       </aside>
     </div>

@@ -8,6 +8,7 @@ import { NewsCalendarIcon, NewsTimeIcon } from '@/components/icons'
 import NewsCard from '@/components/landing/home/news-card'
 import RecruitmentSection from '@/components/landing/home/recruitment-section'
 import { NewsBreadcrumb } from '@/components/landing/news/news-page-header'
+import { StoryLead } from '@/components/landing/news/story-lead'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
 import { Media } from '@/components/Media'
 import { PayloadRedirects } from '@/components/PayloadRedirects'
@@ -155,6 +156,7 @@ export default async function Post({ params: paramsPromise }: Args) {
                 </div>
               )}
             </dl>
+            <StoryLead excerpt={post.excerpt} />
           </header>
         </div>
 

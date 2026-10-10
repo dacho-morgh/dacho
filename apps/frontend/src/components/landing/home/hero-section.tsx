@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import HeroScrollWrapper from '@/components/landing/home/hero-scroll-wrapper'
 import HeroVisual from '@/components/landing/home/hero-visual'
 import ShapeGrid from '@/components/landing/ShapeGrid'
@@ -58,15 +59,16 @@ const HeroSection = () => {
 
           <div className="flex w-full flex-col justify-center gap-4 self-start px-20 pb-20 md:flex-row lg:justify-start lg:gap-2 lg:px-0 lg:pb-0">
             <Button variant="primary" size="36" lg="48" className="font-light!">
-              ثبت‌نام در پتروفاند
+              <Link href="/register">ثبت‌نام در پتروفاند</Link>
             </Button>
             <Button
               variant="outline-primary"
               size="36"
               lg="48"
               className="bg-transparent font-light!"
+              asChild
             >
-              نمایش اطلاعات پتروفاند{' '}
+              <Link href="/events">نمایش اطلاعات پتروفاند</Link>
             </Button>
           </div>
         </div>

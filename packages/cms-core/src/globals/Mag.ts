@@ -14,12 +14,17 @@ const selection = (name: string, label: string, relationTo: "news" | "posts", ha
 export const Mag: GlobalConfig = {
   slug: "mag",
   label: "Mag",
-  admin: { group: "Pages" },
+  admin: {
+    group: "Pages",
+    description:
+      "Latest news automatically shows 8 published items, pinned first then newest. Latest articles automatically shows the 3 newest published articles. Other sections can be curated below.",
+  },
   access: { read: () => true, update: authenticated },
   fields: [
     selection("hero", "Hero story", "news", false),
-    selection("latestNews", "Latest news (ordered)", "news"),
-    selection("latestArticles", "Latest articles (ordered)", "posts"),
+    // Preserve legacy saved selections while the public latest lists use collection queries.
+    { ...selection("latestNews", "Latest news (ordered)", "news"), admin: { hidden: true } },
+    { ...selection("latestArticles", "Latest articles (ordered)", "posts"), admin: { hidden: true } },
     {
       name: "hotHashtags",
       label: "Hot hashtags (ordered)",

@@ -73,8 +73,8 @@ const Header = () => {
         </div>
         <div className="hidden flex-1 justify-end md:flex">
           <Link href="/login">
-            <Button size="40" className="w-20 font-[325]!">
-              ورود
+            <Button size="40" className="font-[325]!">
+              ورود | ثبت نام
             </Button>
           </Link>
         </div>

@@ -294,8 +294,6 @@ async function main() {
       context: { disableRevalidate: true },
       data: {
         hero: news[0],
-        latestNews: news.slice(0, 8),
-        latestArticles: posts.slice(0, 3),
         hotHashtags: [
           'هوش مصنوعی',
           'استارتاپ',

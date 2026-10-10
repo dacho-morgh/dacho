@@ -13,6 +13,8 @@ export const revalidatePost: CollectionAfterChangeHook<Post> = ({
     // Draft-only writes do not change the public archive. Payload can create
     // these drafts while rendering the admin form, when Next.js forbids revalidation.
     if (doc._status === 'published' || previousDoc?._status === 'published') {
+      revalidatePath('/posts')
+      revalidatePath('/posts/page/[pageNumber]', 'page')
       revalidatePath('/mag')
     }
     if (doc._status === 'published') {
@@ -39,6 +41,8 @@ export const revalidatePost: CollectionAfterChangeHook<Post> = ({
 
 export const revalidateDelete: CollectionAfterDeleteHook<Post> = ({ doc, req: { context } }) => {
   if (!context.disableRevalidate) {
+    revalidatePath('/posts')
+    revalidatePath('/posts/page/[pageNumber]', 'page')
     revalidatePath('/mag')
     const path = `/posts/${doc?.slug}`
 

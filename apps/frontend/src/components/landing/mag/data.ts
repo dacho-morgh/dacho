@@ -119,7 +119,6 @@ export async function getMagData(hashtag?: string): Promise<MagData> {
   ])
   const selectedNewsIds = [
     mag.hero,
-    ...(mag.latestNews ?? []),
     ...(mag.eventNews ?? []),
     ...sectionReferences.filter((item) => item.relationTo === 'news').map((item) => item.value),
     ...(mag.mostRead ?? []).filter((item) => item.relationTo === 'news').map((item) => item.value),
@@ -131,7 +130,6 @@ export async function getMagData(hashtag?: string): Promise<MagData> {
     .filter((id): id is number => id !== undefined)
   const selectedPostIds = [
     mag.featuredReport,
-    ...(mag.latestArticles ?? []),
     ...sectionReferences.filter((item) => item.relationTo === 'posts').map((item) => item.value),
     ...(mag.mostRead ?? []).filter((item) => item.relationTo === 'posts').map((item) => item.value),
     ...(mag.editorPicks ?? [])
@@ -143,18 +141,20 @@ export async function getMagData(hashtag?: string): Promise<MagData> {
   const [news, posts, selectedNews, selectedPosts, matchedNews, matchedPosts] = await Promise.all([
     payload.find({
       collection: 'news',
+      draft: false,
       where: { _status: { equals: 'published' } },
       depth: 2,
-      limit: 12,
-      sort: '-publishedAt',
+      limit: 8,
+      sort: ['-pinned', '-publishedAt', '-createdAt'],
       overrideAccess: false,
     }),
     payload.find({
       collection: 'posts',
+      draft: false,
       where: { _status: { equals: 'published' } },
       depth: 2,
-      limit: 6,
-      sort: '-publishedAt',
+      limit: 3,
+      sort: ['-publishedAt', '-createdAt'],
       overrideAccess: false,
     }),
     selectedNewsIds.length
@@ -223,12 +223,8 @@ export async function getMagData(hashtag?: string): Promise<MagData> {
 
   return {
     hero: resolveOne(mag.hero, newsById) ?? newsStories[0],
-    latestNews: resolveMany(mag.latestNews, newsById).length
-      ? resolveMany(mag.latestNews, newsById)
-      : newsStories.slice(0, 8),
-    articles: resolveMany(mag.latestArticles, postsById).length
-      ? resolveMany(mag.latestArticles, postsById)
-      : postStories.slice(0, 3),
+    latestNews: newsStories,
+    articles: postStories,
     sections: (mag.sections ?? [])
       .map((section, index) => ({
         id: section.id || String(index + 1),
