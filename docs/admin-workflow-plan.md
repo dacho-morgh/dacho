@@ -2,6 +2,13 @@
 
 Planning only. Prepared 2026-10-09 from the supplied workflow image, the linked Figma file, and the current repository. No application code or Figma designs were changed.
 
+> **Status (2026-10-12): not implemented, and its foundation has moved.** Two client changes landed after this plan was written, and both must be re-based before anything here is built:
+>
+> 1. **The identity model changed** — registration is a *company* signup, the **Company is now a first-class record** (a `companies` collection, `users.company`), and there are exactly two kinds of user (`company`, `internal`, replacing `applicant`, `staff`). So "company verification" is a status on the company record, not a flag on a user, and every authorisation note below that says `staff`/`applicant` means `internal`/`company`. Decided, with open tickets in `.scratch/company-identity/map.md`.
+> 2. **The dynamic message-flow routing was dropped** — the CMS-defined per-service step sequence this plan's triage/assignment/handoff steps rely on is no longer the intended routing model, and its replacement is undecided (see `docs/wayfinder-fog-analysis.md` → **Not yet specified**). The flow below needs re-basing on the replacement before it can be built.
+>
+> Business decision 1 below (the verification gate) has an open ticket recommending *immediate access, no verification in v1* (`08-company-verification-gate`); decisions 2–7 remain open.
+
 ## Evidence and scope
 
 Figma file: [Dashboard — Admin](https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard?node-id=30510-13146).

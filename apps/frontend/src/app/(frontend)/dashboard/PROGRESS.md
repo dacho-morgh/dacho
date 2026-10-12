@@ -13,7 +13,7 @@ Consolidate `/dashboard` and `/dashboard/admin` into a single `/dashboard` route
   - [x] `/dashboard/companies` and `/dashboard/companies/[id]`
   - [x] `/dashboard/employees`
   - [x] `/dashboard/requests`, `/dashboard/requests/[id]`, and `/dashboard/requests/[id]/evaluation`
-  - [x] `/dashboard/letters` and `/dashboard/letters/[id]` (integrated with support tickets for both applicant and admin staff)
+  - [x] `/dashboard/letters` and `/dashboard/letters/[id]` (integrated with support tickets for both company and internal users)
   - [x] Remove `/dashboard/support` route and consolidate support tickets into `/dashboard/letters`
   - [x] Remove `apps/frontend/src/app/(frontend)/dashboard/admin` directory
   - [x] Add redirects in `redirects.ts` for `/dashboard/admin/*` -> `/dashboard/*` and `/dashboard/support` -> `/dashboard/letters?tab=support`

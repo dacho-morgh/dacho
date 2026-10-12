@@ -1,6 +1,12 @@
 # Wayfinder map — Back-end system design (fog analysis)
 
 > Written map only — not charted to a tracker. Source: Linear docs (v1.2, 2026-08-16) + product-definition docs `site-and-system.md`, `services-needed.md`, `contract.md`.
+>
+> **Revised 2026-10-12.** Two client changes landed after this map was drawn; both are marked inline below.
+> 1. **Registration is a company signup** — the Company is the account holder, and there are exactly two kinds of user (`company`, `internal`). Decided, with its own open tickets: `.scratch/company-identity/map.md` (git-ignored local map).
+> 2. **The dynamic message-flow design is dropped** — the CMS-defined, per-service step sequence is no longer the intended routing model and no replacement is decided. Every routing claim below is tagged *under revision*, and the fog it reopens is listed under **Not yet specified**.
+>
+> Domain glossary in `CONTEXT.md`.
 
 ## Destination
 
@@ -17,24 +23,25 @@ Decide the concrete path from Phase 1 (Docker Compose on a single VPS) to the ta
 ## Decisions so far
 
 **Product:**
-- **What dacho is:** website + request-management system for the Bushehr oil/gas/petrochemical Innovation Factory, run by the Bushehr Research & Technology Fund. Companies apply for five services (financing, events, exhibitions, knowledge-based, commercialization); requests flow through multi-department approval workflows.
-- **Workflow engine is the core backend domain** — role-gated state machines (submit → review → approve/return/reject).
-- **Forms are CMS-defined at runtime** — a Service carries a dynamic field schema (rich text + typed fields); editors change fields without code.
-- **Workflows are CMS-defined too** — a Service carries its own role list + step sequence; a new service ships fully formed with zero code.
-- **Step model:** linear role-gated steps. Transitions: forward, return-to-company, return-to-previous, reject-terminal.
-- **Roles:** dynamic CMS `Role` collection; a step points at a Role; Users relate many-to-many; backend queries role membership to gate each step.
+- **What dacho is:** website + request-management system for the Bushehr oil/gas/petrochemical Innovation Factory, run by the Bushehr Research & Technology Fund. Companies register themselves, take part in events, and apply for five services (financing, events, exhibitions, knowledge-based, commercialization); requests reach the roles that act on them. *(Routing model under revision — see below.)*
+- **Company is the account holder** *(2026-10-12)* — a `companies` collection in `cms-core` keyed by national id; `users.company` replaces the flattened `company*` columns; two kinds of user, `company` (self-registered on `/register`) and `internal` (seeded, no app UI). Detail and open tickets: `.scratch/company-identity/map.md`.
+- **Workflow engine** — ~~the core backend domain~~ *(under revision)*. Role-gated state machines exist in the code (`apps/backend/src/dashboard/workflow-engine.ts`), but they serve the dynamic message-flow design the client has dropped, and no replacement is decided.
+- **Forms are CMS-defined at runtime** — a Service carries a dynamic field schema (rich text + typed fields); editors change fields without code. *(Unchanged by either change.)*
+- **Workflows are CMS-defined too** *(under revision)* — a Service carries its own role list + step sequence today; this is the design that was dropped.
+- **Step model** *(under revision)* — linear role-gated steps with `forward` / `return-to-company` / `return-to-previous` / `reject` transitions exist in code; whether they survive the replacement routing model is undecided.
+- **Roles:** a dynamic CMS `Role` collection, many-to-many with users. The collection stands; its consumer (step gating) is under revision with the step model.
 
 **Architecture:**
-- **Definition/instance split:** CMS owns definitions (service/form/workflow/role) in `cms.*`; backend owns instances (requests, history, assignments) in `public.*`, fetching definitions via Payload's API.
+- **Definition/instance split:** CMS owns definitions (service/form/role — and the routing definition, itself under revision) in `cms.*`; backend owns instances (requests, letters, activities, support tickets) in the **`dashboard.*`** schema, fetching definitions via Payload's REST API with a service-account key. *(Revised 2026-10-12: this map previously claimed `public.*`; that split was never implemented.)*
 - **Dynamic form answers stored as JSONB** on the request, validated against the CMS form schema at submission.
-- **cms-core collections:** content (Pages, Media, News, Events, Services, FAQ, Reviews, Sponsors/Partners) + definitional (Service with form+workflow, Role, User).
+- **cms-core collections:** content (Pages, Media, News, Posts, Categories, Events, Exhibitions, Services, FAQ, Reviews, Sponsors, Sliders, NewsletterSubscribers) + definitional (**Companies**, **Roles**, Users) + form-builder (Forms, FormSubmissions).
 - **2-service split + shared package:** fused Front-end + CMS (Next.js + Payload), Node.js backend, React-free `cms-core` package.
 - **Monorepo:** pnpm workspaces + Turborepo — `apps/frontend`, `apps/backend`, `packages/cms-core`. *(implemented)*
 - **`cms-core` is React-free** — no Next.js, no React. *(implemented)*
 - **Fused frontend serves admin + API + site** via a thin `payload.config.ts` wrapper. *(implemented)*
 - **Backend framework: Express** (matches original doc).
-- **Backend owns auth:** backend issues JWT for company/reviewer/staff; Payload admin uses its own users auth for editors; both share the users collection.
-- **Database:** single PostgreSQL on the VPS, two schemas (`cms.*` + `public.*`), self-hosted Docker Compose service.
+- **Auth:** one shared `users` identity store — the application path is Payload username (= phone) or email + password, the backend's OTP + ES256 JWT stack is built but reached by no screen, and Payload keeps email + password for editors. *(Revised 2026-10-12: this map previously claimed the backend owns app auth, OTP-first.)* The credential question for company users is an open ticket (`07-company-auth-mode`).
+- **Database:** single PostgreSQL on the VPS, two schemas (**`cms.*`** + **`dashboard.*`**), self-hosted Docker Compose service. *(Revised: previously `public.*`.)*
 - **API gateway:** Higress (Envoy-based) — TLS, JWT, rate limiting, canary routing *(aspirational)*
 - Cache: Redis (3-node cluster) *(aspirational)*
 - Object storage: Garage (S3-compatible, 3-node) *(aspirational)*
@@ -48,7 +55,9 @@ Decide the concrete path from Phase 1 (Docker Compose on a single VPS) to the ta
 
 ## Not yet specified
 
-*(none — the fog is cleared. Implementation-ready.)*
+- **The routing model that replaces the dropped dynamic message flow** — whether any per-service step sequence survives, what moves a request, and who acts at each point. Undecided and unticketed, and it invalidates the step/transition vocabulary the product decisions above assumed.
+- **Company identity re-model** — decided and in flight; its open tickets live in `.scratch/company-identity/map.md` (company records, membership, ownership, event participation, auth mode, verification gate, sequencing).
+- **Staff acting-surface for driving approvals** — `POST /requests/:id/transition` exists, but only forward and reject are reachable from the UI; the staff-facing surface has no decided shape under the new routing model.
 
 ## Out of scope
 

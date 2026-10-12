@@ -9,7 +9,7 @@ See [`docs/linear/back-end-system-design.md`](docs/linear/back-end-system-design
 | Package | Kind | Stack | Role |
 |---|---|---|---|
 | `apps/frontend` | deployable | Next.js 16 + Payload 3 | Fused CMS + public site — admin panel, REST/GraphQL API, and the public site in one app |
-| `apps/backend` | deployable | Node.js + TypeScript | Application auth (OTP-first, ES256 JWT, `POST /auth/*` + JWKS) and, upcoming, the workflow engine + business-logic APIs (Express) |
+| `apps/backend` | deployable | Node.js + TypeScript | Express: dashboard domain APIs (requests, letters, activities, support tickets, profile) + application auth (OTP, ES256 JWT, `POST /auth/*` + JWKS — implemented, but no screen uses it) |
 | `packages/cms-core` | library | Payload 3 | **React-free** CMS domain: config, collections, globals, fields, hooks, access control, migrations, and generated `payload-types.ts` |
 
 ## Dependency graph
@@ -28,7 +28,7 @@ apps/backend  ──▶ packages/cms-core
 ```
 apps/
   frontend/         # Fused CMS + site (Next.js + Payload)
-  backend/          # Express API — OTP auth (ES256 JWT), future workflow engine
+  backend/          # Express API — dashboard domain + OTP auth (ES256 JWT)
 packages/
   cms-core/         # React-free CMS domain + generated types + migrations
 ```
@@ -122,7 +122,7 @@ pnpm generate:importmap   # writes apps/frontend/src/app/(payload)/admin/importM
 - **The frontend re-exports the CMS config** via a thin `src/payload.config.ts` wrapper. It imports `@dacho/cms-core`, awaits it, and injects its own `admin.importMap.baseDir` so `payload generate:importmap` writes into the frontend, where those components live.
 - **`buildConfig()` is async.** Payload 3's `buildConfig` returns `Promise<SanitizedConfig>`, not a plain object. Any consumer of `@dacho/cms-core`'s default export **must `await` it** before spreading or reading `collections`/`db`/`editor`.
 - **Backend reads CMS data via Payload's API** — no direct table access; it consumes types from `@dacho/cms-core`.
-- **Database schema separation** (target state): `cms.*` for Payload tables, `public.*` for backend tables.
+- **Database schema separation:** `cms.*` for Payload tables, `dashboard.*` for backend tables (Payload migrations in `packages/cms-core/src/migrations`, backend migrations in `apps/backend/migrations`). The `public.*` split in `docs/linear/back-end-system-design.md` is aspirational target state — the implementation uses `dashboard.*`.
 
 ## Deployment strategy
 

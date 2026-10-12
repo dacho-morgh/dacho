@@ -136,6 +136,8 @@ flowchart LR
 | Orchestration | Kubernetes (EKS/AKS/GKE or self-managed) | Container orchestration: auto-scaling, self-healing, service discovery, rolling updates, and canary deployments. |
 | Infrastructure as Code | Terraform | Provisions cloud resources: VPC, subnets, Kubernetes cluster, RDS instance, security groups, and IAM roles. Uses remote state and separate workspaces for staging/production. |
 
+> **Repo note (2026-10-12).** This document is the client-facing *target state*. Two points differ from the running system: backend tables live in the **`dashboard.*`** schema (not `public.*`), and the identity model is changing — the **Company** becomes the account holder (a `companies` collection, `users.company`), with exactly two kinds of user, `company` and `internal`. See `CONTEXT.md` and `docs/linear/authentication.md`.
+
 ## Monorepo & Type Sharing
 
 All service codebases are managed in a single monorepo using pnpm workspaces and Turborepo. A dedicated React-free package, `@dacho/cms-core`, holds the entire CMS domain definition — Payload config, collections, globals, fields, hooks, and access control — plus the generated `payload-types.ts` (`payload generate:types`). It has no Next.js and no React dependency. The fused Front-end app imports this config to serve the admin panel and the REST/GraphQL API, and runs `payload generate:importmap` against it so its own custom admin components stay in the frontend. The Backend and Frontend both consume types from `@dacho/cms-core`, ensuring full TypeScript type safety across all layers without manual duplication.
@@ -480,7 +482,7 @@ All components are open-source, self-hosted, and ready for production at scale.
 
 Detailed specifications live in dedicated documents:
 
-- **[Authentication](https://linear.app/dacho/document/authentication-9ef52b3f5c63)** — identity model (central `users` collection, `companies` as orgs), OTP-first application auth, asymmetric JWT (ES256).
+- **[Authentication](https://linear.app/dacho/document/authentication-9ef52b3f5c63)** — identity model (central `users` collection; `companies` as the account holder), password login in the running app with a built-but-dormant OTP path, asymmetric JWT (ES256).
 - **[Authorization](https://linear.app/dacho/document/authorization-3698cc7f4c72)** — roles as the RBAC permission unit, workflow-step gating.
 
 Repo counterparts: `docs/linear/authentication.md`, `docs/linear/authorization.md`.

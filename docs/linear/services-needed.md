@@ -1,5 +1,7 @@
 # مستند فرآیند خدمات سامانه کارخانه نوآوری تخصصی نفت، گاز و پتروشیمی
 
+> **Repo note (2026-10-12).** This is the client's own flow specification, mirrored from Linear — the text below is untouched. Its per-service approval chains (نهاد تأمین مالی → کارشناس → دبیرخانه, …) describe the routing model the client has since dropped; treat them as the **source requirements** for whichever replacement routing model is decided, not as an implementation spec. See `docs/wayfinder-fog-analysis.md` → **Not yet specified**, and `CONTEXT.md` → **Workflow** (*under revision*).
+
 # داشبورد خدمات مالی
 
 ### افراد مرتبط
