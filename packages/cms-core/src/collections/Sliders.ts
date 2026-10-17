@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { anyone } from '@cms-core/access/anyone'
-import { authenticated } from '@cms-core/access/authenticated'
+import { adminOnly } from '@cms-core/access/adminOnly'
 
 const sliderImageMimeTypes = ['image/jpeg', 'image/webp']
 
@@ -12,10 +12,10 @@ export const Sliders: CollectionConfig = {
     plural: 'Sliders',
   },
   access: {
-    create: authenticated,
-    delete: authenticated,
+    create: adminOnly,
+    delete: adminOnly,
     read: anyone,
-    update: authenticated,
+    update: adminOnly,
   },
   admin: {
     useAsTitle: 'name',

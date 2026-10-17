@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { authenticated } from '@cms-core/access/authenticated'
+import { adminOnly } from '@cms-core/access/adminOnly'
 import { authenticatedOrPublished } from '@cms-core/access/authenticatedOrPublished'
 import { Archive } from '@cms-core/blocks/ArchiveBlock/config'
 import { CallToAction } from '@cms-core/blocks/CallToAction/config'
@@ -31,10 +31,10 @@ import {
 export const Pages: CollectionConfig<'pages'> = {
   slug: 'pages',
   access: {
-    create: authenticated,
-    delete: authenticated,
+    create: adminOnly,
+    delete: adminOnly,
     read: authenticatedOrPublished,
-    update: authenticated,
+    update: adminOnly,
   },
   // This config controls what's populated by default when a page is referenced
   // https://payloadcms.com/docs/queries/select#defaultpopulate-collection-config-property

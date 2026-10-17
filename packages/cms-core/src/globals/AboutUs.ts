@@ -1,4 +1,4 @@
-import { authenticated } from '@cms-core/access/authenticated'
+import { adminOnly } from '@cms-core/access/adminOnly'
 import type { GlobalConfig } from 'payload'
 import { revalidateAboutUs } from './hooks/revalidateAboutUs'
 
@@ -7,7 +7,7 @@ export const AboutUs: GlobalConfig = {
   label: 'About Us',
   access: {
     read: () => true,
-    update: authenticated,
+    update: adminOnly,
   },
   admin: {
     group: 'Pages',

@@ -1,5 +1,6 @@
 import type { Access, CollectionConfig } from 'payload'
 
+import { adminOnly } from '@cms-core/access/adminOnly'
 import { anyone } from '@cms-core/access/anyone'
 import { isInternalAdmin } from '@cms-core/access/roles'
 
@@ -49,7 +50,7 @@ export const Companies: CollectionConfig = {
     // creates one through the `/self-signup` endpoint, which sets the
     // `allowCompanySignup` context flag on the transaction it owns.
     create: canCreateCompany,
-    delete: isInternalAdmin,
+    delete: adminOnly,
     // An internal admin may edit any company; a company user may edit only the
     // company they represent.
     update: canEditCompany,

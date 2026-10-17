@@ -1,6 +1,6 @@
 import type { GlobalConfig } from 'payload'
 
-import { authenticated } from '@cms-core/access/authenticated'
+import { adminOnly } from '@cms-core/access/adminOnly'
 import { link } from '@cms-core/fields/link'
 import { revalidateLogoStrip } from './hooks/revalidateLogoStrip'
 
@@ -9,7 +9,7 @@ export const LogoStrip: GlobalConfig = {
   label: 'Logo Strip',
   access: {
     read: () => true,
-    update: authenticated,
+    update: adminOnly,
   },
   admin: {
     group: 'Pages',

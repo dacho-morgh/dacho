@@ -5,53 +5,65 @@ How the system decides **what** a caller may do. For **who** they are, see
 
 ## Implemented
 
-Four access-control functions in `packages/cms-core/src/access/`:
+Access-control functions in `packages/cms-core/src/access/`:
 
 | Function | Rule |
 |---|---|
 | `anyone` | always `true` |
-| `authenticated` | `Boolean(req.user)` — any logged-in user |
-| `authenticatedOrPublished` | logged-in user, or `_status === 'published'` |
-| `hasCmsRole` | `Boolean(req.user?.cmsRole)` — users with a CMS role (`admin`/`editor`) |
+| `authenticatedOrPublished` | logged-in user, or `_status === 'published'` — reads of drafts |
+| `hasCmsRole` | holds `admin` or `editor` — may reach `/admin` |
+| `hasContentRole` | holds `admin` or `editor` — may write editorial content |
+| `adminOnly` | holds `admin` — everything outside the content desk |
 
-Per collection: `users` is `authenticated` for read/update/delete and **public**
-(`create: () => true`) for self-registration; content (`posts`, `pages`, …) is
-`authenticatedOrPublished` for read and `authenticated` for create/update/delete.
+Every write gate in the config is one of the last two. That invariant is
+asserted by `apps/frontend/tests/int/cms-write-gates.int.spec.ts`, which walks
+the sanitized config and fails if any collection or global write is gated on
+anything else — the point being that no gate can be *absent*, because Payload's
+implicit default for a config with no `update` is `Boolean(req.user)`.
+
+Reads are a separate question and are usually public: only writes are
+restricted. The three collections whose writes are deliberately open are
+`users` (self-signup), `companies` (a company creates itself at signup and its
+own representative edits it) and `form-submissions` (the site's contact forms
+are how a company reaches the Secretariat; only reading and deleting them are
+gated).
+
 Drafts (`versions.drafts`) make `_status` the public/private boundary. Author
 names surface through a sanitized `populatedAuthors` array (id + name), not the
 raw user doc.
 
-### Roles (v1 — two orthogonal fields)
+### Roles (v2 — one axis)
 
-The `users` collection carries **two role fields** that separate the two systems
-they gate. *(`role`'s values are renamed to `company` | `internal` by the
-identity re-model decided 2026-10-12; the code still carries `applicant` |
-`staff` until those slices land — `.scratch/company-identity/map.md`.)*
+The `users` collection carries **one** multi-valued `roles` field, and every
+capability in the system is derived from it. (This supersedes the retired
+`role: applicant|staff` + `cmsRole: admin|editor` pair and the dynamic `roles`
+collection.)
 
-| Field | Values | Meaning |
+| Value | Label in the panel | Means |
 |---|---|---|
-| `role` | `company` \| `internal` (was `applicant` \| `staff`) | dashboard side: a person acting for a company vs the دبیرخانه / operations team |
-| `cmsRole` | `admin` \| `editor` \| null | CMS side: who may reach `/admin` |
+| `admin` | مدیر سامانه | Administers everything: users, companies, services, config. |
+| `editor` | تحریر | The Fund's content desk. Publishes posts, news, categories, media and FAQ, and shapes the `mag` page. |
+| `representative` | نماینده شرکت | Acts for a company in the dashboard panel. |
+| `referee` | داور | Reviews plans. Granted, not yet consumed. |
 
-- `Users.access.admin` is `hasCmsRole`, so only `cmsRole` holders reach the
-  Payload admin panel.
-- `role`/`cmsRole` are `saveToJWT: true`.
-- **Escalation is blocked three ways:** field-level access on `role`/`cmsRole`
-  (`create`/`update` admin-only), `defaultValue: 'company'` (was `'applicant'`)
-  on `role`, and a `beforeChange` hook that forces `role: 'company'` +
-  `cmsRole: null` whenever the requesting user is not a CMS admin. A
-  self-registering visitor can only ever become `company`.
+- `Users.access.admin` is `hasCmsRole`, so `admin` and `editor` reach the
+  Payload panel. `roles` is `saveToJWT: true`.
+- **`editor`'s write scope is declared once**, in
+  `access/editorContent.ts` (`EDITOR_CONTENT_SLUGS`, `EDITOR_CONTENT_GLOBALS`),
+  and wired per collection to `hasContentRole`.
+  `apps/frontend/tests/int/editor-scope.int.spec.ts` asserts the declaration and
+  the wiring have not drifted apart, in both directions.
+- **Escalation is blocked four ways:** field-level access on `roles`
+  (`create`/`update` admin-only), `defaultValue: ['representative']`, a
+  `beforeChange` hook that forces `roles: ['representative']` on any non-admin
+  create, and the self-signup endpoint's own context. A self-registering
+  visitor can only ever become a `representative`.
+- **Values live in a Postgres enum** (`enum_users_role`, read by the
+  `users_roles` join table), inherited from the original single-valued `role`
+  field. Adding a role is therefore a migration, not only a config change —
+  see `20261018_090000_add_editor_role`.
 
 ## Planned (not implemented)
-
-### Dynamic `Role` collection — implemented later than this section
-
-This was written as a future refinement and is **already implemented**: the
-dynamic `roles` collection exists (`packages/cms-core/src/collections/Roles.ts`),
-`users.roles` is the many-to-many, `users.role`/`cmsRole` remain as the flat pair
-above, and the backend's workflow engine queries role membership to gate a step.
-Whether the step-gating consumer survives is open — the dynamic message-flow
-routing was dropped by the client (`CONTEXT.md` → **Workflow**, *under revision*).
 
 ### Role-specific panels
 
@@ -61,10 +73,18 @@ routing was dropped by the client (`CONTEXT.md` → **Workflow**, *under revisio
 
 ## Open questions (implementation detail)
 
-- [x] Where role membership is enforced — v1 enforces in Payload access
-      functions (`hasCmsRole`, field-level access, the `beforeChange` hook).
-      Backend-side enforcement of `role`/`cmsRole` arrives with the staff
-      dashboard, which is deferred.
+- [x] Where role membership is enforced — in Payload access functions
+      (`hasCmsRole`, `hasContentRole`, field-level access, the `beforeChange`
+      hook). The backend consumes the same `roles` values, forwarded by the
+      Next.js proxy as `x-user-roles`; it does not verify tokens on dashboard
+      routes.
+- [x] Content-write scope: `editor` covers posts, news, categories, media, FAQ
+      and `mag`. Everything else — `pages`, `events`, `exhibitions`, `reviews`,
+      `services`, `sponsors`, `sliders`, `newsletter-subscribers`, `redirects`,
+      `forms`, and the site-chrome globals — is `adminOnly`. (Decided
+      2026-10-18; before that every one of these was on a bare `authenticated`
+      gate, so a self-registered representative could rewrite the site.)
+- [ ] `referee` is still stored and never consumed, as `editor` was before it.
 - [x] Company-level scoping: how "a company user sees only their company's data"
       is expressed. **Decided 2026-10-12** — the Company becomes a first-class
       `companies` record, and the instances (requests, letters, support tickets)

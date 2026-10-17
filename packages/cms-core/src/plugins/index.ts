@@ -11,6 +11,8 @@ import { searchFields } from '@cms-core/search/fieldOverrides'
 import { beforeSyncWithSearch } from '@cms-core/search/beforeSync'
 
 import { News, Page, Post } from '@cms-core/payload-types'
+import { adminOnly } from '@cms-core/access/adminOnly'
+import { anyone } from '@cms-core/access/anyone'
 import { hasCmsRole } from '@cms-core/access/hasCmsRole'
 import { getServerSideURL } from '@cms-core/utilities/getURL'
 
@@ -31,6 +33,14 @@ export const plugins: Plugin[] = [
   redirectsPlugin({
     collections: ['pages', 'posts', 'news'],
     overrides: {
+      // Redirects decide where the public site sends visitors, and the plugin
+      // default for an un-overridden collection is "any logged-in user".
+      access: {
+        create: adminOnly,
+        read: anyone,
+        update: adminOnly,
+        delete: adminOnly,
+      },
       // @ts-expect-error - This is a valid override, mapped fields don't resolve to the same type
       fields: ({ defaultFields }) => {
         return defaultFields.map((field) => {
@@ -63,14 +73,26 @@ export const plugins: Plugin[] = [
       payment: false,
     },
     formSubmissionOverrides: {
-      // Submissions stay public to write (the contact forms) but readable only
-      // by CMS staff — matches the roles model; "any logged-in user" (the plugin
-      // default) would let an applicant read every submission via REST.
+      // Submissions stay publicly creatable (the contact forms are the site's
+      // own intake path) but are readable only by the CMS team — the plugin
+      // default, "any logged-in user", would let an applicant read every
+      // submission via REST. Nobody edits or deletes a submission: it is the
+      // record of what a company sent.
       access: {
         read: hasCmsRole,
+        update: adminOnly,
+        delete: adminOnly,
       },
     },
     formOverrides: {
+      // A form definition decides what the public site asks for and where it
+      // posts, so it is admin territory rather than the content desk's.
+      access: {
+        read: anyone,
+        create: adminOnly,
+        update: adminOnly,
+        delete: adminOnly,
+      },
       fields: ({ defaultFields }) => {
         return defaultFields.map((field) => {
           if ('name' in field && field.name === 'confirmationMessage') {

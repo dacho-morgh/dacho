@@ -1,13 +1,13 @@
 import type { GlobalConfig } from 'payload'
 
-import { authenticated } from '@cms-core/access/authenticated'
+import { adminOnly } from '@cms-core/access/adminOnly'
 
 export const SiteSettings: GlobalConfig = {
   slug: 'site-settings',
   label: 'Site Settings',
   access: {
     read: () => true,
-    update: authenticated,
+    update: adminOnly,
   },
   admin: {
     group: 'Globals',

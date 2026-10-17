@@ -1,6 +1,6 @@
 import type { GlobalConfig } from 'payload'
 
-import { authenticated } from '@cms-core/access/authenticated'
+import { adminOnly } from '@cms-core/access/adminOnly'
 import { link } from '@cms-core/fields/link'
 import { revalidateFooter } from './hooks/revalidateFooter'
 
@@ -8,7 +8,7 @@ export const Footer: GlobalConfig = {
   slug: 'footer',
   access: {
     read: () => true,
-    update: authenticated,
+    update: adminOnly,
   },
   admin: {
     group: 'Globals',
