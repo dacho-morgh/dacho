@@ -78,7 +78,7 @@ describe('PayloadUserStore', () => {
   it('update sends a PATCH and returns the updated user', async () => {
     const { fetcher, calls } = mockFetcher((_url, init) =>
       init?.method === 'PATCH'
-        ? { status: 200, body: { doc: { id: 'u1', phone: '0912', name: 'Ali', role: ['representative'] } } }
+        ? { status: 200, body: { doc: { id: 'u1', phone: '0912', name: 'Ali', roles: ['representative'] } } }
         : { status: 404, body: {} },
     )
     const store = new PayloadUserStore({ baseUrl: 'http://cms:3000', apiKey: 'KEY', fetcher })
@@ -86,7 +86,7 @@ describe('PayloadUserStore', () => {
     const user = await store.update('u1', { name: 'Ali' })
 
     expect(user.name).toBe('Ali')
-    expect(user.role).toEqual(['representative'])
+    expect(user.roles).toEqual(['representative'])
     const patch = calls.find((c) => c.method === 'PATCH')!
     expect(patch.url).toBe('http://cms:3000/api/users/u1')
     expect(JSON.parse(patch.body!)).toEqual({ name: 'Ali' })
@@ -95,13 +95,13 @@ describe('PayloadUserStore', () => {
   it('maps the multi-valued role and drops unknown values', async () => {
     const { fetcher } = mockFetcher(() => ({
       status: 200,
-      body: { doc: { id: 'u1', phone: '0912', role: ['representative', 'referee', 'bogus'] } },
+      body: { doc: { id: 'u1', phone: '0912', roles: ['representative', 'referee', 'bogus'] } },
     }))
     const store = new PayloadUserStore({ baseUrl: 'http://cms:3000', apiKey: 'KEY', fetcher })
 
     const user = await store.findById('u1')
 
-    expect(user?.role).toEqual(['representative', 'referee'])
+    expect(user?.roles).toEqual(['representative', 'referee'])
   })
 
   it('lists by role using an array-containment query', async () => {
@@ -111,7 +111,7 @@ describe('PayloadUserStore', () => {
     await store.list({ role: 'representative' })
 
     expect(decodeURIComponent(calls[0]?.url ?? '')).toContain(
-      'where[role][contains]=representative',
+      'where[roles][contains]=representative',
     )
   })
 })

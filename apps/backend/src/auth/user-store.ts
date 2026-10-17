@@ -13,7 +13,8 @@ export interface User {
   email?: string
   /** The representative's job title within the company (سمت). */
   position?: string
-  role?: UserRole[]
+  /** The roles this user holds. A user may hold several at once. */
+  roles?: UserRole[]
   /**
    * The id of the company this user represents, resolved by the store from the
    * `companies.representative` relationship (the FK lives on the company).
@@ -60,8 +61,8 @@ export interface UserStore {
 }
 
 /** True when the user holds the given role. */
-export function hasUserRole(user: Pick<User, 'role'> | null | undefined, role: UserRole): boolean {
-  return Array.isArray(user?.role) && user.role.includes(role)
+export function hasUserRole(user: Pick<User, 'roles'> | null | undefined, role: UserRole): boolean {
+  return Array.isArray(user?.roles) && user.roles.includes(role)
 }
 
 /** In-memory stand-in; the real implementation reads/writes the Payload users collection. */
@@ -73,7 +74,7 @@ export class InMemoryUserStore implements UserStore {
     for (const user of this.users.values()) {
       if (user.phone === phone) return user
     }
-    const user: User = { id: String(this.nextId++), phone, role: ['representative'] }
+    const user: User = { id: String(this.nextId++), phone, roles: ['representative'] }
     this.users.set(user.id, user)
     return user
   }

@@ -22,7 +22,7 @@ describe('buildBackendRequest', () => {
   it('forwards identity headers and rewrites path + query', async () => {
     const req = new NextRequest('http://localhost:3000/api/dashboard/requests?status=draft', { method: 'GET' })
     const { url, init } = await buildBackendRequest(
-      { id: 7, role: ['admin', 'referee'] },
+      { id: 7, roles: ['admin', 'referee'] },
       req,
       ['requests'],
       { backendUrl: 'http://backend:4000/', proxySecret: 'secret' },
@@ -44,7 +44,7 @@ describe('buildBackendRequest', () => {
       body: payload,
     })
     const { init } = await buildBackendRequest(
-      { id: 7, role: [] },
+      { id: 7, roles: [] },
       req,
       ['requests'],
       { backendUrl: 'http://b:4000', proxySecret: 's' },
@@ -60,7 +60,7 @@ describe('buildBackendRequest', () => {
   it('omits the cms-role header when it is null', async () => {
     const req = new NextRequest('http://localhost:3000/api/dashboard/stats', { method: 'GET' })
     const { init } = await buildBackendRequest(
-      { id: 7, role: null },
+      { id: 7, roles: null },
       req,
       ['stats'],
       { backendUrl: 'http://b:4000', proxySecret: 's' },
@@ -73,7 +73,7 @@ describe('buildBackendRequest', () => {
   it('maps a nested path (e.g. /requests/:id/submit)', async () => {
     const req = new NextRequest('http://localhost:3000/api/dashboard/requests/abc/submit', { method: 'POST' })
     const { url } = await buildBackendRequest(
-      { id: 7, role: [] },
+      { id: 7, roles: [] },
       req,
       ['requests', 'abc', 'submit'],
       { backendUrl: 'http://b:4000', proxySecret: 's' },

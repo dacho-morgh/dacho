@@ -73,7 +73,6 @@ export interface Config {
     categories: Category;
     users: User;
     companies: Company;
-    roles: Role;
     faq: Faq;
     reviews: Review;
     news: News;
@@ -106,7 +105,6 @@ export interface Config {
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     companies: CompaniesSelect<false> | CompaniesSelect<true>;
-    roles: RolesSelect<false> | RolesSelect<true>;
     faq: FaqSelect<false> | FaqSelect<true>;
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
     news: NewsSelect<false> | NewsSelect<true>;
@@ -552,7 +550,7 @@ export interface User {
   id: number;
   name?: string | null;
   phone: string;
-  role?: ('admin' | 'representative' | 'referee')[] | null;
+  roles?: ('admin' | 'representative' | 'referee')[] | null;
   position?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -970,28 +968,6 @@ export interface Service {
    * The form-builder form applicants fill to request this service
    */
   form?: (number | null) | Form;
-  /**
-   * Ordered role-gated steps a request traverses
-   */
-  workflow?:
-    | {
-        title: string;
-        role: number | Role;
-        order: number;
-        id?: string | null;
-      }[]
-    | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "roles".
- */
-export interface Role {
-  id: number;
-  name: string;
-  description?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1674,10 +1650,6 @@ export interface PayloadLockedDocument {
         value: number | Company;
       } | null)
     | ({
-        relationTo: 'roles';
-        value: number | Role;
-      } | null)
-    | ({
         relationTo: 'faq';
         value: number | Faq;
       } | null)
@@ -2135,7 +2107,7 @@ export interface CategoriesSelect<T extends boolean = true> {
 export interface UsersSelect<T extends boolean = true> {
   name?: T;
   phone?: T;
-  role?: T;
+  roles?: T;
   position?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2190,16 +2162,6 @@ export interface CompaniesSelect<T extends boolean = true> {
         address?: T;
         id?: T;
       };
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "roles_select".
- */
-export interface RolesSelect<T extends boolean = true> {
-  name?: T;
-  description?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2311,14 +2273,6 @@ export interface ServicesSelect<T extends boolean = true> {
         id?: T;
       };
   form?: T;
-  workflow?:
-    | T
-    | {
-        title?: T;
-        role?: T;
-        order?: T;
-        id?: T;
-      };
   updatedAt?: T;
   createdAt?: T;
 }

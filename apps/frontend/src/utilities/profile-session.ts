@@ -16,6 +16,6 @@ export async function getProfileSessionUser(): Promise<User | null> {
 }
 
 /** True when the user holds the admin role (the internal side of the house). */
-export function isInternalUser(user: Pick<User, 'role'> | null | undefined): boolean {
-  return Array.isArray(user?.role) && user.role.includes('admin')
+export function isInternalUser(user: Pick<User, 'roles'> | null | undefined): boolean {
+  return Array.isArray(user?.roles) && user.roles.includes('admin')
 }

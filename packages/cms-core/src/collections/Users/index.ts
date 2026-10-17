@@ -13,7 +13,7 @@ const isBackendService = (req: { user?: { email?: string | null } | null }): boo
  * this field-level gate, and the `beforeChange` hook below is defense-in-depth
  * against a Local API write that bypassed field access.
  */
-const adminOnly = ({ req }: { req: { user?: { role?: readonly string[] | null } | null } }): boolean =>
+const adminOnly = ({ req }: { req: { user?: { roles?: readonly string[] | null } | null } }): boolean =>
   isInternalAdmin(req.user)
 
 const canUpdateUser: Access = ({ req }) => {
@@ -59,7 +59,7 @@ export const Users: CollectionConfig = {
           context.forceRepresentativeSignup === true ||
           (operation === 'create' && !isInternalAdmin(req.user) && context.allowRoleAssignment !== true)
         if (selfSignup) {
-          data.role = ['representative']
+          data.roles = ['representative']
         }
         return data
       },
@@ -153,9 +153,10 @@ export const Users: CollectionConfig = {
     },
     // The single authorization axis. A person may hold several roles at once
     // (e.g. `representative` + `referee`); it defaults to `representative` for
-    // self-signup and is only ever changed by an internal admin.
+    // self-signup and is only ever changed by an internal admin. Plural because
+    // it is multi-valued — Payload stores it in the `users_roles` join table.
     {
-      name: 'role',
+      name: 'roles',
       type: 'select',
       hasMany: true,
       options: [...USER_ROLES],

@@ -94,7 +94,7 @@ export interface SidebarUser {
   name?: string | null
   email?: string | null
   /** The single authorization axis; a user may hold several roles. */
-  role?: string[] | null
+  roles?: string[] | null
   position?: string | null
   companyName?: string | null
 }
@@ -117,7 +117,7 @@ export function AppSidebar({
 
   // Internal navigation is gated on the admin role alone.
   const isSeniorManager =
-    isSeniorManagerProp ?? (Array.isArray(user?.role) && user.role.includes('admin'))
+    isSeniorManagerProp ?? (Array.isArray(user?.roles) && user.roles.includes('admin'))
 
   const navItems = isSeniorManager ? seniorManagerNavItems : applicantNavItems
   const displayName = isSeniorManager

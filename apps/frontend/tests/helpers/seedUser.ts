@@ -28,7 +28,7 @@ export async function seedTestUser(): Promise<void> {
   // the beforeChange escalation guard is bypassed for this trusted seed).
   await payload.create({
     collection: 'users',
-    data: { ...testUser, role: ['admin'] },
+    data: { ...testUser, roles: ['admin'] },
     context: { allowRoleAssignment: true },
   })
 }

@@ -17,11 +17,11 @@ export type UserRole = (typeof USER_ROLES)[number]
  * structural rather than importing the generated `User` so these checks keep
  * compiling while `payload-types.ts` is regenerated.
  */
-export type RoleCarrier = { role?: readonly string[] | null } | null | undefined
+export type RoleCarrier = { roles?: readonly string[] | null } | null | undefined
 
 /** True when the carrier holds the given role. */
 export function hasRole(user: RoleCarrier, role: UserRole): boolean {
-  return Array.isArray(user?.role) && user.role.includes(role)
+  return Array.isArray(user?.roles) && user.roles.includes(role)
 }
 
 /**

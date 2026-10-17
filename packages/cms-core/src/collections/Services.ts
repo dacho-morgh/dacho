@@ -132,34 +132,5 @@ export const Services: CollectionConfig = {
         description: 'The form-builder form applicants fill to request this service',
       },
     },
-    {
-      name: 'workflow',
-      type: 'array',
-      label: 'Workflow',
-      admin: {
-        description: 'Ordered role-gated steps a request traverses',
-      },
-      fields: [
-        {
-          name: 'title',
-          type: 'text',
-          required: true,
-          label: 'Step title',
-        },
-        {
-          name: 'role',
-          type: 'relationship',
-          relationTo: 'roles',
-          required: true,
-          label: 'Assigned role',
-        },
-        {
-          name: 'order',
-          type: 'number',
-          required: true,
-          label: 'Order',
-        },
-      ],
-    },
   ],
 }

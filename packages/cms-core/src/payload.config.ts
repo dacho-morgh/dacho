@@ -17,7 +17,6 @@ import { NewsletterSubscribers } from './collections/NewsletterSubscribers'
 import { Pages } from './collections/Pages'
 import { Posts } from './collections/Posts'
 import { Reviews } from './collections/Reviews'
-import { Roles } from './collections/Roles'
 import { Services } from './collections/Services'
 import { Sliders } from './collections/Sliders'
 import { Sponsors } from './collections/Sponsors'
@@ -179,7 +178,6 @@ export default buildConfig({
     Categories,
     Users,
     Companies,
-    Roles,
     FAQ,
     Reviews,
     News,

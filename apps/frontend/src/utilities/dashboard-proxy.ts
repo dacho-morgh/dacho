@@ -4,11 +4,11 @@ import type { NextRequest } from 'next/server'
 export interface ProxyUser {
   id: string | number
   /** The single authorization axis: a user may hold several roles. */
-  role?: string[] | null
+  roles?: string[] | null
 }
 
 /** Normalizes the user's roles to a plain string list for the proxy header. */
-export function normalizeRoles(roles: ProxyUser['role']): string[] {
+export function normalizeRoles(roles: ProxyUser['roles']): string[] {
   if (!Array.isArray(roles)) return []
   return roles.map((role) => String(role).trim()).filter((role) => role.length > 0)
 }
@@ -39,7 +39,7 @@ export async function buildBackendRequest(
     'x-user-id': String(user.id),
     // The acting user's roles travel as one comma-separated header; this is the
     // only identity axis the backend needs.
-    'x-user-roles': normalizeRoles(user.role).join(','),
+    'x-user-roles': normalizeRoles(user.roles).join(','),
   }
 
   const contentType = req.headers.get('content-type')

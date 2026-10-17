@@ -26,7 +26,7 @@ test.beforeAll(async () => {
       phone: adminPhone,
       password: adminPassword,
       name: 'Registration security test admin',
-      role: ['admin'],
+      roles: ['admin'],
     },
     context: { allowRoleAssignment: true },
   })
@@ -265,9 +265,8 @@ test.describe('Register', () => {
         companyType: 'سهامی خاص',
         companyProvince: 'بوشهر',
         companyCity: 'بوشهر',
-        role: ['admin'],
-        cmsRole: 'admin',
-        roles: [],
+        // An escalation attempt during signup must be ignored.
+        roles: ['admin'],
       },
     })
     expect(registration.status()).toBe(201)

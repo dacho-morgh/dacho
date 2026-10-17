@@ -57,23 +57,23 @@ describe('isSeniorManagerUser', () => {
   })
 
   it('returns true when the user holds the admin role', async () => {
-    await expect(isSeniorManagerUser(mockPayload, { role: ['admin'] })).resolves.toBe(true)
+    await expect(isSeniorManagerUser(mockPayload, { roles: ['admin'] })).resolves.toBe(true)
   })
 
   it('returns true when admin sits alongside another role', async () => {
     await expect(
-      isSeniorManagerUser(mockPayload, { role: ['representative', 'admin', 'referee'] }),
+      isSeniorManagerUser(mockPayload, { roles: ['representative', 'admin', 'referee'] }),
     ).resolves.toBe(true)
   })
 
   it('returns false for a company representative', async () => {
     await expect(
-      isSeniorManagerUser(mockPayload, { role: ['representative'] }),
+      isSeniorManagerUser(mockPayload, { roles: ['representative'] }),
     ).resolves.toBe(false)
   })
 
   it('returns false for a referee', async () => {
-    await expect(isSeniorManagerUser(mockPayload, { role: ['referee'] })).resolves.toBe(false)
+    await expect(isSeniorManagerUser(mockPayload, { roles: ['referee'] })).resolves.toBe(false)
   })
 
   it('returns false for a user with no roles at all', async () => {

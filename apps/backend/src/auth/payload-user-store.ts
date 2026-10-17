@@ -99,17 +99,17 @@ export class PayloadUserStore implements UserStore {
       ...(typeof d.name === 'string' ? { name: d.name } : {}),
       ...(typeof d.email === 'string' ? { email: d.email } : {}),
       ...(typeof d.position === 'string' ? { position: d.position } : {}),
-      ...(Array.isArray(d.role)
-        ? { role: d.role.filter((role): role is UserRole => (USER_ROLES as readonly string[]).includes(role)) }
+      ...(Array.isArray(d.roles)
+        ? { roles: d.roles.filter((role): role is UserRole => (USER_ROLES as readonly string[]).includes(role)) }
         : {}),
     }
   }
 
   async list(options: { role?: UserRole; search?: string } = {}): Promise<User[]> {
     const params = new URLSearchParams({ depth: '0', limit: '100', sort: '-createdAt' })
-    // `role` is a multi-valued select, so membership is an array-containment
+    // `roles` is a multi-valued select, so membership is an array-containment
     // query rather than an equality match.
-    if (options.role) params.set('where[role][contains]', options.role)
+    if (options.role) params.set('where[roles][contains]', options.role)
     if (options.search) params.set('where[or][0][name][contains]', options.search)
     const res = await this.fetcher(`${this.baseUrl}/api/users?${params.toString()}`, {
       headers: this.headers(),

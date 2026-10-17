@@ -59,7 +59,7 @@ describe('users roles & access control', () => {
       },
     })
 
-    expect(user.role).toEqual(['representative'])
+    expect(user.roles).toEqual(['representative'])
     expect(user.username).toBe(TEST_PHONES[0])
   })
 
@@ -72,11 +72,11 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[1],
         name: 'متقاضی مخرب',
-        role: ['admin'],
+        roles: ['admin'],
       },
     })
 
-    expect(user.role).toEqual(['representative'])
+    expect(user.roles).toEqual(['representative'])
   })
 
   it('forces safe roles through signup even when the request has an admin session', async () => {
@@ -88,7 +88,7 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[4],
         name: 'ادمین تست ثبت‌نام',
-        role: ['admin'],
+        roles: ['admin'],
       },
       context: { allowRoleAssignment: true },
     })
@@ -102,7 +102,7 @@ describe('users roles & access control', () => {
         name: 'نماینده ایجادشده در نشست ادمین',
         companyName: 'شرکت تست',
         companyNationalId: 'int-nid-escalation',
-        role: ['admin'],
+        roles: ['admin'],
       }),
     })
 
@@ -114,11 +114,11 @@ describe('users roles & access control', () => {
     expect(response.status).toBe(201)
 
     const body = (await response.json()) as {
-      user: { role: string[] }
+      user: { roles: string[] }
       company: { representative: { id?: unknown } | number | string }
     }
     // The escalation attempt is discarded...
-    expect(body.user.role).toEqual(['representative'])
+    expect(body.user.roles).toEqual(['representative'])
     // ...and the company is linked to that new user as its representative.
     const representative =
       typeof body.company.representative === 'object'
@@ -135,13 +135,13 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[2],
         name: 'ادمین تست',
-        role: ['admin', 'referee'],
+        roles: ['admin', 'referee'],
       },
       context: { allowRoleAssignment: true },
     })
 
     // A user may hold several roles at once.
-    expect(user.role).toEqual(expect.arrayContaining(['admin', 'referee']))
+    expect(user.roles).toEqual(expect.arrayContaining(['admin', 'referee']))
   })
 
   it('hasCmsRole admits only the admin role', () => {
@@ -149,9 +149,9 @@ describe('users roles & access control', () => {
       hasCmsRole({ req: { user } } as Parameters<typeof hasCmsRole>[0])
 
     expect(admits(null)).toBe(false)
-    expect(admits({ role: [] })).toBe(false)
-    expect(admits({ role: ['representative'] })).toBe(false)
-    expect(admits({ role: ['referee'] })).toBe(false)
-    expect(admits({ role: ['admin'] })).toBe(true)
+    expect(admits({ roles: [] })).toBe(false)
+    expect(admits({ roles: ['representative'] })).toBe(false)
+    expect(admits({ roles: ['referee'] })).toBe(false)
+    expect(admits({ roles: ['admin'] })).toBe(true)
   })
 })

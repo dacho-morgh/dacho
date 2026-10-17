@@ -23,7 +23,7 @@ export default async function StaffProfilePage() {
       initialProfile={profile}
       name={user.name ?? ''}
       position={user.position ?? ''}
-      accessLabel={(user.role ?? []).includes('admin') ? 'مدیر سامانه' : 'کارمند سامانه'}
+      accessLabel={(user.roles ?? []).includes('admin') ? 'مدیر سامانه' : 'کارمند سامانه'}
     />
   )
 }

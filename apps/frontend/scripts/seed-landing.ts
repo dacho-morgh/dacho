@@ -82,7 +82,7 @@ async function main(): Promise<void> {
     where: { email: { equals: ADMIN_EMAIL } },
     limit: 1,
   })
-  const adminRoles: { role: Array<'admin' | 'representative' | 'referee'> } = { role: ['admin'] }
+  const adminRoles: { roles: Array<'admin' | 'representative' | 'referee'> } = { roles: ['admin'] }
   const adminContext = { allowRoleAssignment: true }
 
   if (existingAdmin.docs[0]) {

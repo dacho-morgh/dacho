@@ -34,7 +34,7 @@ export type SeniorManagerCandidate =
   | {
       id?: number | string | null
       position?: string | null
-      role?: string[] | null
+      roles?: string[] | null
     }
 
 /**
@@ -49,5 +49,5 @@ export async function isSeniorManagerUser(
   user: SeniorManagerCandidate | null | undefined,
 ): Promise<boolean> {
   if (!user) return false
-  return Array.isArray(user.role) && user.role.includes('admin')
+  return Array.isArray(user.roles) && user.roles.includes('admin')
 }

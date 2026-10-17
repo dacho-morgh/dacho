@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   // The admin holds both the dashboard staff role and the CMS admin role. The
   // `allowRoleAssignment` context opts out of the beforeChange escalation
   // guard, which otherwise forces every non-admin writer back to `applicant`.
-  const roleData: { role: Array<'admin' | 'representative' | 'referee'> } = { role: ['admin'] }
+  const roleData: { roles: Array<'admin' | 'representative' | 'referee'> } = { roles: ['admin'] }
   const context = { allowRoleAssignment: true }
 
   const existing = await payload.find({
