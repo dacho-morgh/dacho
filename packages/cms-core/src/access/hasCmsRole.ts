@@ -2,15 +2,15 @@ import type { AccessArgs } from 'payload'
 
 import type { User } from '@cms-core/payload-types'
 
+import { isInternalAdmin } from '@cms-core/access/roles'
+
 /**
- * Collection-level access for the Payload admin panel: only users who hold a
- * CMS role (`cmsRole` of `admin` or `editor`) may reach `/admin`.
- *
- * Dashboard roles (`role`) are orthogonal — an `applicant` or `staff` without a
- * `cmsRole` is blocked here.
+ * Collection-level access for the Payload admin panel: only a user holding the
+ * `admin` role may reach `/admin`. This replaces the old `cmsRole` test — the
+ * CMS axis is now folded into the single multi-valued `role` field.
  */
 type HasCmsRole = (args: AccessArgs<User>) => boolean
 
 export const hasCmsRole: HasCmsRole = ({ req: { user } }) => {
-  return Boolean(user?.cmsRole)
+  return isInternalAdmin(user)
 }

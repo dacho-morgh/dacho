@@ -8,8 +8,9 @@ import { ProfileRepository } from './profile-repo.js'
 import { requireProxyAuth } from './proxy-auth.js'
 import { RequestRepository } from './request-repo.js'
 import { StatsRepository } from './stats-repo.js'
-import { WorkflowEngine, type TransitionType } from './workflow-engine.js'
-import type { UserStore } from '../auth/user-store.js'
+import type { CompanyStore } from '../auth/company-store.js'
+import type { UserRole, UserStore } from '../auth/user-store.js'
+import { hasUserRole } from '../auth/user-store.js'
 import { SupportRepository } from './support-repo.js'
 
 export interface DashboardDeps {
@@ -17,9 +18,8 @@ export interface DashboardDeps {
   serviceCatalog: ServiceCatalog
   proxySecret: string
   userStore: UserStore
+  companyStore: CompanyStore
 }
-
-const TRANSITIONS: TransitionType[] = ['forward', 'return-to-company', 'return-to-previous', 'reject']
 
 function parsePositiveInt(value: unknown, fallback: number): number {
   if (typeof value !== 'string') return fallback
@@ -34,12 +34,24 @@ function parseBoolean(value: unknown): boolean | undefined {
   return undefined
 }
 
-function isStaff(res: { locals: Record<string, unknown> }): boolean {
-  return res.locals.userRole === 'staff'
+/** The acting user's roles, forwarded by the Next.js proxy. */
+function actorRoles(res: { locals: Record<string, unknown> }): UserRole[] {
+  const roles = res.locals.userRoles
+  return Array.isArray(roles) ? (roles as UserRole[]) : []
+}
+
+/** Internal side of the house: the admin role. */
+function isInternal(res: { locals: Record<string, unknown> }): boolean {
+  return actorRoles(res).includes('admin')
+}
+
+/** Company side: a user acting as their company's representative. */
+function isRepresentative(res: { locals: Record<string, unknown> }): boolean {
+  return actorRoles(res).includes('representative')
 }
 
 function requesterDisplayName(user: Awaited<ReturnType<UserStore['findById']>>): string {
-  return user?.companyName || user?.name || 'شرکت متقاضی'
+  return user?.name || 'شرکت متقاضی'
 }
 
 async function resolveRequesterNames(userStore: UserStore, requesterIds: string[]): Promise<Map<string, string>> {
@@ -55,7 +67,7 @@ async function resolveRequesterNames(userStore: UserStore, requesterIds: string[
 
   if (users.some(([, user]) => !user)) {
     try {
-      for (const user of await userStore.list({ role: 'applicant' })) {
+      for (const user of await userStore.list({ role: 'representative' })) {
         if (!byId.get(user.id)) byId.set(user.id, user)
       }
     } catch {
@@ -91,14 +103,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const letters = new LetterRepository(deps.pool)
   const activities = new ActivityRepository(deps.pool)
   const stats = new StatsRepository(deps.pool)
-  const profileRepo = new ProfileRepository(deps.userStore)
+  const profileRepo = new ProfileRepository(deps.userStore, deps.companyStore)
   const support = new SupportRepository(deps.pool)
-  const engine = new WorkflowEngine(deps.pool, deps.serviceCatalog)
 
   router.use(requireProxyAuth(deps.proxySecret))
 
   router.post('/requests', async (req, res) => {
-    if (res.locals.userRole !== 'applicant') { res.status(403).json({ error: 'applicant_only' }); return }
+    if (!isRepresentative(res)) { res.status(403).json({ error: 'representative_only' }); return }
     const userId = res.locals.userId as string
     const { serviceId, title, answers } = req.body ?? {}
 
@@ -144,9 +155,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json(result)
   })
 
-  // Staff queue: applicant-owned requests remain isolated from this route.
+  // Internal queue: company-owned requests remain isolated from this route.
   router.get('/admin/requests', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    if (!isInternal(res)) { res.status(403).json({ error: 'forbidden' }); return }
     const status = typeof req.query.status === 'string' ? req.query.status : undefined
     const result = await repo.listAll({ status, page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25) })
     const items = await Promise.all(result.items.map(async (item) => ({ ...item, owner: await deps.userStore.findById(item.ownerId) })))
@@ -154,7 +165,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   })
 
   router.get('/admin/requests/:id', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    if (!isInternal(res)) { res.status(403).json({ error: 'forbidden' }); return }
     const request = await repo.findByIdAny(req.params.id)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     const service = await deps.serviceCatalog.findById(request.serviceId)
@@ -311,115 +322,57 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json({ success: true })
   })
 
-  router.post('/requests/:id/transition', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
-    const actor = {
-      userId: res.locals.userId as string,
-      roles: res.locals.userRoles as string[],
-      cmsRole: res.locals.userCmsRole as string | undefined,
-    }
-    const { transition, note } = req.body ?? {}
-
-    if (!TRANSITIONS.includes(transition as TransitionType)) {
-      res.status(400).json({ error: 'invalid_transition' })
-      return
-    }
-    if (note !== undefined && typeof note !== 'string') {
-      res.status(400).json({ error: 'invalid_note' })
-      return
-    }
-
-    const result = await engine.transition({
-      requestId: req.params.id,
-      actor,
-      transition: transition as TransitionType,
-      note,
-    })
-
-    if ('error' in result) {
-      switch (result.error) {
-        case 'request_not_found':
-          res.status(404).json({ error: 'not_found' })
-          return
-        case 'service_not_found':
-          res.status(404).json({ error: 'service_not_found' })
-          return
-        case 'forbidden':
-          res.status(403).json({ error: 'forbidden' })
-          return
-        case 'invalid_state':
-          res.status(409).json({ error: 'invalid_state' })
-          return
-        case 'invalid_transition':
-          res.status(409).json({ error: 'invalid_transition' })
-          return
-      }
-    }
-
-    res.json({ request: result.request })
-  })
-
   router.delete('/letters/:id', async (req, res) => {
-    const deleted = await letters.delete(req.params.id, res.locals.userId as string, isStaff(res))
+    const deleted = await letters.delete(req.params.id, res.locals.userId as string, isInternal(res))
     if (!deleted) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ success: true })
   })
 
-  router.post('/admin/requests/:id/transition', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
-    const actor = { userId: res.locals.userId as string, roles: res.locals.userRoles as string[], cmsRole: res.locals.userCmsRole as string | undefined }
-    const { transition, note } = req.body ?? {}
-    if (!TRANSITIONS.includes(transition as TransitionType)) { res.status(400).json({ error: 'invalid_transition' }); return }
-    const result = await engine.transition({ requestId: req.params.id, actor, transition, note })
-    if ('error' in result) { res.status(result.error === 'request_not_found' ? 404 : result.error === 'forbidden' ? 403 : 409).json({ error: result.error }); return }
-    res.json(result)
-  })
-
   router.get('/admin/companies', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
-    res.json({ items: await deps.userStore.list({ role: 'applicant', search: typeof req.query.search === 'string' ? req.query.search : undefined }) })
+    if (!isInternal(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    res.json({ items: await deps.userStore.list({ role: 'representative', search: typeof req.query.search === 'string' ? req.query.search : undefined }) })
   })
 
   router.get('/admin/companies/:id', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    if (!isInternal(res)) { res.status(403).json({ error: 'forbidden' }); return }
     const user = await deps.userStore.findById(req.params.id)
-    if (!user || user.role === 'staff') { res.status(404).json({ error: 'not_found' }); return }
+    if (!user || hasUserRole(user, 'admin')) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ user, profile: await profileRepo.getProfile(user.id) })
   })
 
   router.get('/admin/employees', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
-    res.json({ items: await deps.userStore.list({ role: 'staff', search: typeof req.query.search === 'string' ? req.query.search : undefined }) })
+    if (!isInternal(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    res.json({ items: await deps.userStore.list({ role: 'admin', search: typeof req.query.search === 'string' ? req.query.search : undefined }) })
   })
 
   router.get('/admin/letters', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    if (!isInternal(res)) { res.status(403).json({ error: 'forbidden' }); return }
     res.json(await letters.listAll({ page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25), recipientId: typeof req.query.recipientId === 'string' ? req.query.recipientId : undefined }))
   })
 
   router.get('/admin/letters/:id', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    if (!isInternal(res)) { res.status(403).json({ error: 'forbidden' }); return }
     const letter = await letters.findById(req.params.id)
     if (!letter) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ letter })
   })
 
   router.post('/admin/letters', async (req, res) => {
-    if (!isStaff(res)) { res.status(403).json({ error: 'forbidden' }); return }
+    if (!isInternal(res)) { res.status(403).json({ error: 'forbidden' }); return }
     const { title, body, recipientId, type } = req.body ?? {}
     const trimmedTitle = typeof title === 'string' ? title.trim() : ''
     const trimmedBody = typeof body === 'string' ? body.trim() : ''
     const trimmedRecipientId = typeof recipientId === 'string' ? recipientId.trim() : ''
     if (!trimmedTitle || !trimmedBody || !trimmedRecipientId) { res.status(400).json({ error: 'invalid_letter' }); return }
     const recipient = await deps.userStore.findById(trimmedRecipientId)
-    if (!recipient || recipient.role !== 'applicant') { res.status(404).json({ error: 'recipient_not_found' }); return }
+    if (!recipient || !hasUserRole(recipient, 'representative')) { res.status(404).json({ error: 'recipient_not_found' }); return }
     const letterType = type === 'approved' || type === 'needs_fix' || type === 'rejected' || type === 'notification' ? type : 'official'
-    res.status(201).json({ letter: await letters.create({ type: letterType, title: trimmedTitle, body: trimmedBody, recipientId: trimmedRecipientId, senderId: res.locals.userId as string, senderRole: 'staff' }) })
+    res.status(201).json({ letter: await letters.create({ type: letterType, title: trimmedTitle, body: trimmedBody, recipientId: trimmedRecipientId, senderId: res.locals.userId as string, senderRole: 'admin' }) })
   })
 
   router.get('/support', async (req, res) => {
     const userId = res.locals.userId as string
-    const result = isStaff(res)
+    const result = isInternal(res)
       ? await support.list({ page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25), status: typeof req.query.status === 'string' ? req.query.status : undefined })
       : await support.list({ requesterId: userId, page: parsePositiveInt(req.query.page, 1), limit: parsePositiveInt(req.query.limit, 25) })
     const requesterNames = await resolveRequesterNames(deps.userStore, result.items.map((ticket) => ticket.requesterId))
@@ -428,7 +381,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   })
 
   router.post('/support', async (req, res) => {
-    if (res.locals.userRole !== 'applicant') { res.status(403).json({ error: 'applicant_only' }); return }
+    if (!isRepresentative(res)) { res.status(403).json({ error: 'representative_only' }); return }
     const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : ''
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : ''
     if (!subject || !message) { res.status(400).json({ error: 'invalid_ticket' }); return }
@@ -437,7 +390,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.get('/support/:id', async (req, res) => {
     const ticket = await support.findById(req.params.id)
-    if (!ticket || (!isStaff(res) && ticket.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
+    if (!ticket || (!isInternal(res) && ticket.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
     const requesterNames = await resolveRequesterNames(deps.userStore, [ticket.requesterId])
     res.json({ ticket: { ...ticket, requesterName: requesterNames.get(ticket.requesterId) ?? 'شرکت متقاضی' } })
   })
@@ -446,8 +399,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
     if (!body) { res.status(400).json({ error: 'invalid_response' }); return }
     const existing = await support.findById(req.params.id)
-    if (!existing || (!isStaff(res) && existing.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
-    const authorRole = isStaff(res) ? 'staff' : 'applicant'
+    if (!existing || (!isInternal(res) && existing.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
+    const authorRole = isInternal(res) ? 'admin' : 'representative'
     const ticket = await support.respond(req.params.id, res.locals.userId as string, authorRole, body)
     if (!ticket) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ ticket })
@@ -455,8 +408,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.post('/support/:id/close', async (req, res) => {
     const existing = await support.findById(req.params.id)
-    if (!existing || (!isStaff(res) && existing.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
-    const ticket = await support.close(req.params.id, res.locals.userId as string, isStaff(res) ? 'staff' : 'applicant')
+    if (!existing || (!isInternal(res) && existing.requesterId !== res.locals.userId)) { res.status(404).json({ error: 'not_found' }); return }
+    const ticket = await support.close(req.params.id, res.locals.userId as string, isInternal(res) ? 'admin' : 'representative')
     if (!ticket) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ ticket })
   })

@@ -1,7 +1,8 @@
 import type { Pool } from 'pg'
 
 export type TicketStatus = 'open' | 'answered' | 'closed'
-export type SupportAuthorRole = 'applicant' | 'staff'
+/** The author of a ticket message: the company side or the internal side. */
+export type SupportAuthorRole = 'representative' | 'admin'
 export interface SupportMessage {
   id: string
   authorId: string
@@ -35,7 +36,7 @@ export class SupportRepository {
       await client.query('BEGIN')
       const { rows } = await client.query<TicketRow>(`INSERT INTO dashboard.support_tickets (requester_id, subject, message) VALUES ($1, $2, $3) RETURNING ${COLUMNS}`, [input.requesterId, input.subject, input.message])
       if (!rows[0]) throw new Error('INSERT support ticket returned no row')
-      const messageResult = await client.query<MessageRow>(`INSERT INTO dashboard.support_ticket_messages (ticket_id, author_id, author_role, body) VALUES ($1, $2, 'applicant', $3) RETURNING id, author_id, author_role, body, created_at`, [rows[0].id, input.requesterId, input.message])
+      const messageResult = await client.query<MessageRow>(`INSERT INTO dashboard.support_ticket_messages (ticket_id, author_id, author_role, body) VALUES ($1, $2, 'representative', $3) RETURNING id, author_id, author_role, body, created_at`, [rows[0].id, input.requesterId, input.message])
       await client.query('COMMIT')
       return map(rows[0], messageResult.rows.map(mapMessage))
     } catch (error) {
@@ -66,9 +67,9 @@ export class SupportRepository {
     try {
       await client.query('BEGIN')
       const { rows } = await client.query<TicketRow>(`UPDATE dashboard.support_tickets SET
-        response = CASE WHEN $3 = 'staff' THEN $2 ELSE response END,
-        responded_by = CASE WHEN $3 = 'staff' THEN $4 ELSE responded_by END,
-        status = CASE WHEN $3 = 'staff' THEN 'answered'::dashboard.support_ticket_status ELSE 'open'::dashboard.support_ticket_status END,
+        response = CASE WHEN $3 = 'admin' THEN $2 ELSE response END,
+        responded_by = CASE WHEN $3 = 'admin' THEN $4 ELSE responded_by END,
+        status = CASE WHEN $3 = 'admin' THEN 'answered'::dashboard.support_ticket_status ELSE 'open'::dashboard.support_ticket_status END,
         updated_at = now()
         WHERE id = $1 AND status <> 'closed' RETURNING ${COLUMNS}`, [id, response, authorRole, authorId])
       if (!rows[0]) { await client.query('ROLLBACK'); return undefined }
@@ -84,7 +85,7 @@ export class SupportRepository {
     }
   }
   async close(id: string, actorId: string, actorRole: SupportAuthorRole): Promise<SupportTicket | undefined> {
-    const { rows } = await this.pool.query<TicketRow>(`UPDATE dashboard.support_tickets SET status = 'closed', responded_by = CASE WHEN $3 = 'staff' THEN COALESCE(responded_by, $2) ELSE responded_by END, updated_at = now() WHERE id = $1 RETURNING ${COLUMNS}`, [id, actorId, actorRole])
+    const { rows } = await this.pool.query<TicketRow>(`UPDATE dashboard.support_tickets SET status = 'closed', responded_by = CASE WHEN $3 = 'admin' THEN COALESCE(responded_by, $2) ELSE responded_by END, updated_at = now() WHERE id = $1 RETURNING ${COLUMNS}`, [id, actorId, actorRole])
     return rows[0] ? this.findById(id) : undefined
   }
 }

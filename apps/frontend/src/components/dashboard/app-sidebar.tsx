@@ -93,11 +93,10 @@ const seniorManagerNavItems: NavItem[] = [
 export interface SidebarUser {
   name?: string | null
   email?: string | null
-  role?: string | null
-  cmsRole?: string | null
+  /** The single authorization axis; a user may hold several roles. */
+  role?: string[] | null
   position?: string | null
   companyName?: string | null
-  roles?: Array<number | string | { id?: number | string; name?: string | null }> | null
 }
 
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -116,25 +115,14 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname()
 
+  // Internal navigation is gated on the admin role alone.
   const isSeniorManager =
-    isSeniorManagerProp ??
-    Boolean(
-      user?.cmsRole === 'admin' ||
-      user?.role === 'staff' ||
-      user?.position === 'مدیر ارشد' ||
-      (Array.isArray(user?.roles) &&
-        user.roles.some((r) => {
-          if (typeof r === 'object' && r !== null && 'name' in r) {
-            return r.name === 'مدیر ارشد'
-          }
-          return r === 'مدیر ارشد'
-        })),
-    )
+    isSeniorManagerProp ?? (Array.isArray(user?.role) && user.role.includes('admin'))
 
   const navItems = isSeniorManager ? seniorManagerNavItems : applicantNavItems
   const displayName = isSeniorManager
     ? user?.name || user?.email || 'مدیر ارشد'
-    : companyNameProp || user?.companyName || user?.name || 'پروفایل شرکت'
+    : companyNameProp || user?.name || 'پروفایل شرکت'
 
   return (
     <Sidebar

@@ -7,11 +7,14 @@ describe('Dashboard Profile Endpoints', () => {
   async function createProfileTestApp() {
     const testApp = await createTestApp()
     const user = await testApp.userStore.findOrCreateByPhone('۰۹۱۲۳۴۵۶۷۸۹')
+    // The profile's company half reads the company this user represents.
+    await testApp.companyStore.create({ name: 'شرکت پایه', representativeId: user.id })
     return {
       ...testApp,
       headers: {
         'x-internal-proxy-secret': 'test-proxy-secret',
         'x-user-id': user.id,
+        'x-user-roles': 'representative',
       },
     }
   }
@@ -22,7 +25,7 @@ describe('Dashboard Profile Endpoints', () => {
 
     expect(res.status).toBe(200)
     expect(res.body).toHaveProperty('company')
-    expect(res.body.company.name).toBe('')
+    expect(res.body.company.name).toBe('شرکت پایه')
     expect(res.body.company.status).toBe('')
     expect(res.body).toHaveProperty('contacts')
     expect(res.body.contacts.phone).toBe('۰۹۱۲۳۴۵۶۷۸۹')

@@ -4,9 +4,10 @@ import { createLocalReq, getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import config from '@/payload.config'
 
-// Public signup must produce an `applicant` (role) with no CMS role (cmsRole),
-// and must be impossible to self-elevate: any `role`/`cmsRole` supplied by an
-// anonymous visitor is ignored and forced to the safe defaults.
+// Public signup must produce a `representative` and must be impossible to
+// self-elevate: any `role` supplied by an anonymous visitor is ignored and forced
+// to the safe default. The signup endpoint also creates the company the new user
+// represents.
 const TEST_PHONES = [
   '09910000001',
   '09910000002',
@@ -16,9 +17,9 @@ const TEST_PHONES = [
   '09910000006',
 ]
 const TEST_EMAILS = [
-  'int-applicant@example.com',
+  'int-representative@example.com',
   'int-escalation@example.com',
-  'int-applicant-without-company@example.com',
+  'int-internal@example.com',
   'int-registration-admin@example.com',
   'int-registration-result@example.com',
 ]
@@ -26,6 +27,10 @@ const TEST_EMAILS = [
 let payload: Payload
 
 const cleanup = async () => {
+  await payload.delete({
+    collection: 'companies',
+    where: { nationalId: { like: 'int-nid-' } },
+  })
   await payload.delete({
     collection: 'users',
     where: { phone: { in: TEST_PHONES } },
@@ -42,7 +47,7 @@ describe('users roles & access control', () => {
     await cleanup()
   })
 
-  it('creates an applicant account via anonymous signup', async () => {
+  it('creates a representative account via anonymous signup', async () => {
     const user = await payload.create({
       collection: 'users',
       overrideAccess: false,
@@ -50,22 +55,15 @@ describe('users roles & access control', () => {
         email: TEST_EMAILS[0],
         password: 'int-test-password',
         phone: TEST_PHONES[0],
-        name: 'متقاضی تست',
-        companyName: 'شرکت تست',
-        companyNationalId: '12345678901',
-        companyRegistrationNumber: '12345',
-        companyType: 'دانش‌بنیان',
-        companyProvince: 'بوشهر',
-        companyCity: 'بوشهر',
+        name: 'نماینده تست',
       },
     })
 
-    expect(user.role).toBe('applicant')
-    expect(user.cmsRole).toBeNull()
+    expect(user.role).toEqual(['representative'])
     expect(user.username).toBe(TEST_PHONES[0])
   })
 
-  it('ignores role/cmsRole supplied during self-signup', async () => {
+  it('ignores a role supplied during self-signup', async () => {
     const user = await payload.create({
       collection: 'users',
       overrideAccess: false,
@@ -74,19 +72,11 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[1],
         name: 'متقاضی مخرب',
-        companyName: 'شرکت تست',
-        companyNationalId: '12345678901',
-        companyRegistrationNumber: '12345',
-        companyType: 'دانش‌بنیان',
-        companyProvince: 'بوشهر',
-        companyCity: 'بوشهر',
-        role: 'staff',
-        cmsRole: 'admin',
+        role: ['admin'],
       },
     })
 
-    expect(user.role).toBe('applicant')
-    expect(user.cmsRole).toBeNull()
+    expect(user.role).toEqual(['representative'])
   })
 
   it('forces safe roles through signup even when the request has an admin session', async () => {
@@ -98,8 +88,7 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[4],
         name: 'ادمین تست ثبت‌نام',
-        role: 'staff',
-        cmsRole: 'admin',
+        role: ['admin'],
       },
       context: { allowRoleAssignment: true },
     })
@@ -110,15 +99,10 @@ describe('users roles & access control', () => {
         username: TEST_PHONES[5],
         password: 'int-test-password',
         phone: TEST_PHONES[5],
-        name: 'متقاضی ایجادشده در نشست ادمین',
+        name: 'نماینده ایجادشده در نشست ادمین',
         companyName: 'شرکت تست',
-        companyNationalId: '12345678901',
-        companyRegistrationNumber: '12345',
-        companyType: 'دانش‌بنیان',
-        companyProvince: 'بوشهر',
-        companyCity: 'بوشهر',
-        role: 'staff',
-        cmsRole: 'admin',
+        companyNationalId: 'int-nid-escalation',
+        role: ['admin'],
       }),
     })
 
@@ -130,52 +114,44 @@ describe('users roles & access control', () => {
     expect(response.status).toBe(201)
 
     const body = (await response.json()) as {
-      doc: { role: string; cmsRole: string | null; roles: unknown[] }
+      user: { role: string[] }
+      company: { representative: { id?: unknown } | number | string }
     }
-    expect(body.doc.role).toBe('applicant')
-    expect(body.doc.cmsRole).toBeNull()
-    expect(body.doc.roles).toEqual([])
+    // The escalation attempt is discarded...
+    expect(body.user.role).toEqual(['representative'])
+    // ...and the company is linked to that new user as its representative.
+    const representative =
+      typeof body.company.representative === 'object'
+        ? body.company.representative.id
+        : body.company.representative
+    expect(representative).toBeDefined()
   })
 
   it('allows trusted internal writes to assign roles via context', async () => {
     const user = await payload.create({
       collection: 'users',
       data: {
-        username: 'int-staff-user',
+        username: 'int-internal-user',
         password: 'int-test-password',
         phone: TEST_PHONES[2],
         name: 'ادمین تست',
-        role: 'staff',
+        role: ['admin', 'referee'],
       },
       context: { allowRoleAssignment: true },
     })
 
-    expect(user.role).toBe('staff')
-    expect(user.companyName).toBeNull()
+    // A user may hold several roles at once.
+    expect(user.role).toEqual(expect.arrayContaining(['admin', 'referee']))
   })
 
-  it('requires company details for an applicant account', async () => {
-    await expect(
-      payload.create({
-        collection: 'users',
-        overrideAccess: false,
-        data: {
-          email: TEST_EMAILS[2],
-          password: 'int-test-password',
-          phone: TEST_PHONES[3],
-          name: 'متقاضی بدون شرکت',
-        },
-      }),
-    ).rejects.toThrow()
-  })
-
-  it('hasCmsRole only admits editor/admin', () => {
+  it('hasCmsRole admits only the admin role', () => {
     const admits = (user: unknown) =>
       hasCmsRole({ req: { user } } as Parameters<typeof hasCmsRole>[0])
 
     expect(admits(null)).toBe(false)
-    expect(admits({ cmsRole: null })).toBe(false)
-    expect(admits({ cmsRole: 'editor' })).toBe(true)
-    expect(admits({ cmsRole: 'admin' })).toBe(true)
+    expect(admits({ role: [] })).toBe(false)
+    expect(admits({ role: ['representative'] })).toBe(false)
+    expect(admits({ role: ['referee'] })).toBe(false)
+    expect(admits({ role: ['admin'] })).toBe(true)
   })
 })

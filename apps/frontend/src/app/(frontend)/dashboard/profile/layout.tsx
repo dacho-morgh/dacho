@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { ProfileNavigation } from '@/components/dashboard/profile/profile-navigation'
 import { Typography } from '@/components/ui/typography'
-import { getProfileSessionUser, isStaffProfileUser } from '@/utilities/profile-session'
+import { getProfileSessionUser, isInternalUser } from '@/utilities/profile-session'
 
 export const metadata: Metadata = {
   title: 'صفحه پروفایل',
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ProfileLayout({ children }: { children: ReactNode }) {
-  const isStaffProfile = isStaffProfileUser(await getProfileSessionUser())
+  const isStaffProfile = isInternalUser(await getProfileSessionUser())
 
   return (
     <main

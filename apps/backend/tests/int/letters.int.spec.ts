@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import request from 'supertest'
 
+import { InMemoryCompanyStore } from '../../src/auth/company-store.js'
 import { createApp } from '../../src/app.js'
 import { InMemoryServiceCatalog } from '../../src/catalog/service-catalog.js'
 import { InMemoryUserStore } from '../../src/auth/user-store.js'
@@ -60,6 +61,7 @@ async function createAppUnderTest() {
     delivery: new ConsoleOtpDelivery(),
     jwt,
     userStore: new InMemoryUserStore(),
+    companyStore: new InMemoryCompanyStore(),
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret: PROXY_SECRET,

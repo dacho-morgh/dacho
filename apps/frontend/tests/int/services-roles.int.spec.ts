@@ -11,6 +11,9 @@ const ROLE_WORKFLOW = `${TEST_ROLE} ۲`
 const ROLE_M2M = `${TEST_ROLE} ۳`
 const TEST_PHONE = '09910000021'
 const TEST_EMAIL = 'int-roles-m2m@example.com'
+const COMPANY_PHONE = '09910000022'
+const COMPANY_EMAIL = 'int-company-rep@example.com'
+const TEST_COMPANY_NAME = 'شرکت نماینده تست'
 const TEST_SERVICE_TITLE = 'سرویس تست'
 const TEST_FORM_TITLE = 'فرم تست'
 
@@ -22,7 +25,9 @@ const cleanup = async () => {
   // `services_workflow.role_id` + ON DELETE set null constraint.
   await payload.delete({ collection: 'services', where: { title: { equals: TEST_SERVICE_TITLE } } })
   await payload.delete({ collection: 'forms', where: { title: { equals: TEST_FORM_TITLE } } })
-  await payload.delete({ collection: 'users', where: { phone: { equals: TEST_PHONE } } })
+  // Companies reference their representative, so they must go before the users.
+  await payload.delete({ collection: 'companies', where: { name: { equals: TEST_COMPANY_NAME } } })
+  await payload.delete({ collection: 'users', where: { phone: { in: [TEST_PHONE, COMPANY_PHONE] } } })
   await payload.delete({
     collection: 'roles',
     where: { name: { in: [TEST_ROLE, ROLE_WORKFLOW, ROLE_M2M] } },
@@ -125,8 +130,7 @@ describe('dashboard CMS definitions (roles + services)', () => {
     expect(serviceFormId).toBe(form.id)
   })
 
-  it('assigns roles to a user (many-to-many)', async () => {
-    const role = await payload.create({ collection: 'roles', data: { name: ROLE_M2M } })
+  it('assigns multiple roles to a single user', async () => {
     const user = await payload.create({
       collection: 'users',
       data: {
@@ -134,14 +138,36 @@ describe('dashboard CMS definitions (roles + services)', () => {
         password: 'int-test-password',
         phone: TEST_PHONE,
         name: 'کاربر دارای نقش',
-        role: 'staff',
-        roles: [role.id],
+        role: ['representative', 'referee'],
       },
       context: { allowRoleAssignment: true },
     })
 
-    const userRoles = (user.roles ?? []) as ({ id?: unknown } | string)[]
-    const ids = userRoles.map((r) => (typeof r === 'string' ? r : r?.id))
-    expect(ids).toContain(role.id)
+    expect(user.role).toEqual(expect.arrayContaining(['representative', 'referee']))
+  })
+
+  it('creates a company linked to its representative user', async () => {
+    const user = await payload.create({
+      collection: 'users',
+      data: {
+        email: COMPANY_EMAIL,
+        password: 'int-test-password',
+        phone: COMPANY_PHONE,
+        name: 'نماینده شرکت',
+        role: ['representative'],
+      },
+      context: { allowRoleAssignment: true },
+    })
+
+    const company = await payload.create({
+      collection: 'companies',
+      data: {
+        name: TEST_COMPANY_NAME,
+        nationalId: `10${Date.now()}`,
+        representative: user.id,
+      },
+    })
+
+    expect(company.representative).toBeDefined()
   })
 })

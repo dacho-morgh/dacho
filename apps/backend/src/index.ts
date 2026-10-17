@@ -1,3 +1,4 @@
+import { PayloadCompanyStore } from './auth/company-store.js'
 import { PayloadUserStore } from './auth/payload-user-store.js'
 import { createApp } from './app.js'
 import { PayloadServiceCatalog } from './catalog/payload-service-catalog.js'
@@ -26,6 +27,7 @@ const app = createApp({
   delivery,
   jwt,
   userStore: new PayloadUserStore({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
+  companyStore: new PayloadCompanyStore({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
   pool,
   serviceCatalog: new PayloadServiceCatalog({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
   proxySecret: config.internalProxySecret,

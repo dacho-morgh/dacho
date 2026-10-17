@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import request from 'supertest'
 
+import { InMemoryCompanyStore } from '../../src/auth/company-store.js'
 import { createApp } from '../../src/app.js'
 import { InMemoryServiceCatalog, type ServiceDefinition } from '../../src/catalog/service-catalog.js'
 import { InMemoryUserStore } from '../../src/auth/user-store.js'
@@ -18,7 +19,6 @@ const pool = new Pool({ connectionString })
 
 const PROXY_SECRET = 'test-internal-proxy-secret'
 const OWNER = 'user-1'
-const STAFF = 'staff-1'
 
 const service: ServiceDefinition = {
   id: '1',
@@ -35,16 +35,7 @@ function ownerHeaders() {
   return {
     'x-internal-proxy-secret': PROXY_SECRET,
     'x-user-id': OWNER,
-    'x-user-role': 'applicant',
-  }
-}
-
-function staffHeaders(role: string) {
-  return {
-    'x-internal-proxy-secret': PROXY_SECRET,
-    'x-user-id': STAFF,
-    'x-user-role': 'staff',
-    'x-user-roles': role,
+    'x-user-roles': 'representative',
   }
 }
 
@@ -57,6 +48,7 @@ async function createAppUnderTest() {
     delivery: new ConsoleOtpDelivery(),
     jwt,
     userStore: new InMemoryUserStore(),
+    companyStore: new InMemoryCompanyStore(),
     pool,
     serviceCatalog,
     proxySecret: PROXY_SECRET,
@@ -92,15 +84,14 @@ describe('stats & activities API', () => {
       const app = await createAppUnderTest()
 
       await createRequest(app, 'پیش‌نویس') // draft
-      const inReview = await createRequest(app, 'در حال بررسی')
-      await submit(app, inReview)
-      const rejected = await createRequest(app, 'رد شده')
-      await submit(app, rejected)
-      await request(app).post(`/requests/${rejected}/transition`).set(staffHeaders('10')).send({ transition: 'reject' })
+      const first = await createRequest(app, 'در حال بررسی')
+      await submit(app, first)
+      const second = await createRequest(app, 'در حال بررسی دوم')
+      await submit(app, second)
 
       const res = await request(app).get('/stats').set(ownerHeaders())
       expect(res.status).toBe(200)
-      expect(res.body).toEqual({ total: 3, in_review: 1, approved: 0, action_needed: 0, rejected: 1 })
+      expect(res.body).toEqual({ total: 3, in_review: 2, approved: 0, action_needed: 0, rejected: 0 })
     })
 
     it('is owner-scoped', async () => {
@@ -118,23 +109,20 @@ describe('stats & activities API', () => {
   })
 
   describe('GET /activities and the request timeline', () => {
-    it('records a transition activity and surfaces it in the request timeline', async () => {
+    it('returns no activities and an empty timeline', async () => {
+      // Activities were only ever written by the removed workflow engine, so the
+      // surface is now empty until request status changes are recorded.
       const app = await createAppUnderTest()
       const id = await createRequest(app, 'با تایم‌لاین')
       await submit(app, id)
-      await request(app).post(`/requests/${id}/transition`).set(staffHeaders('10')).send({ transition: 'forward' })
 
       const acts = await request(app).get('/activities').set(ownerHeaders())
       expect(acts.status).toBe(200)
-      expect(acts.body.total).toBe(1)
-      expect(acts.body.items[0].type).toBe('transition')
-      expect(acts.body.items[0].title).toBe('انتقال به مرحله بعد')
+      expect(acts.body.total).toBe(0)
 
       const detail = await request(app).get(`/requests/${id}`).set(ownerHeaders())
       expect(detail.status).toBe(200)
-      expect(detail.body.timeline).toHaveLength(1)
-      expect(detail.body.timeline[0].type).toBe('transition')
-      expect(detail.body.timeline[0].requestId).toBe(id)
+      expect(detail.body.timeline).toEqual([])
     })
   })
 })

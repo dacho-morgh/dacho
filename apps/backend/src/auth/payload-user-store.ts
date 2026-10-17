@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 
-import type { ProfileFields, User, UserStore } from './user-store.js'
+import type { ProfileFields, User, UserRole, UserStore } from './user-store.js'
+import { USER_ROLES } from './user-store.js'
 
 export type HttpFetcher = (
   url: string,
@@ -96,32 +97,19 @@ export class PayloadUserStore implements UserStore {
       id: String(d.id),
       phone: String(d.phone ?? ''),
       ...(typeof d.name === 'string' ? { name: d.name } : {}),
-      ...(typeof d.companyId === 'string' ? { companyId: d.companyId } : {}),
       ...(typeof d.email === 'string' ? { email: d.email } : {}),
       ...(typeof d.position === 'string' ? { position: d.position } : {}),
-      ...(d.role === 'applicant' || d.role === 'staff' ? { role: d.role } : {}),
-      ...(d.cmsRole === 'admin' || d.cmsRole === 'editor' || d.cmsRole === null
-        ? { cmsRole: d.cmsRole }
+      ...(Array.isArray(d.role)
+        ? { role: d.role.filter((role): role is UserRole => (USER_ROLES as readonly string[]).includes(role)) }
         : {}),
-      ...mapStringFields(d, [
-        'companyName',
-        'companyNationalId',
-        'companyRegistrationNumber',
-        'companyType',
-        'companyProvince',
-        'companyCity',
-        'companyEstablishmentDate',
-        'companyStatus',
-        'companyEconomicCode',
-      ]),
-      ...(Array.isArray(d.executives) ? { executives: d.executives as User['executives'] } : {}),
-      ...(Array.isArray(d.addresses) ? { addresses: d.addresses as User['addresses'] } : {}),
     }
   }
 
-  async list(options: { role?: User['role']; search?: string } = {}): Promise<User[]> {
+  async list(options: { role?: UserRole; search?: string } = {}): Promise<User[]> {
     const params = new URLSearchParams({ depth: '0', limit: '100', sort: '-createdAt' })
-    if (options.role) params.set('where[role][equals]', options.role)
+    // `role` is a multi-valued select, so membership is an array-containment
+    // query rather than an equality match.
+    if (options.role) params.set('where[role][contains]', options.role)
     if (options.search) params.set('where[or][0][name][contains]', options.search)
     const res = await this.fetcher(`${this.baseUrl}/api/users?${params.toString()}`, {
       headers: this.headers(),

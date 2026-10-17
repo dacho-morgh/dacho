@@ -74,11 +74,10 @@ describe('OTP auth flow', () => {
     const res = await request(app)
       .post('/auth/complete-profile')
       .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'Ali', companyId: 'c1' })
+      .send({ name: 'Ali' })
 
     expect(res.status).toBe(200)
     expect(res.body.user.name).toBe('Ali')
-    expect(res.body.user.companyId).toBe('c1')
     expect(res.body.user.phone).toBe('0912')
   })
 

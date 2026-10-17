@@ -8,8 +8,8 @@ import { buildBackendRequest, normalizeRoles } from '@/utilities/dashboard-proxy
 // headers, and how path/query/method/body pass through unchanged.
 
 describe('normalizeRoles', () => {
-  it('normalizes ids, strings and {id} objects to id strings', () => {
-    expect(normalizeRoles([1, '2', { id: 3 }])).toEqual(['1', '2', '3'])
+  it('normalizes the role list to trimmed strings', () => {
+    expect(normalizeRoles(['admin', ' referee '])).toEqual(['admin', 'referee'])
   })
 
   it('returns an empty array for null/undefined roles', () => {
@@ -22,7 +22,7 @@ describe('buildBackendRequest', () => {
   it('forwards identity headers and rewrites path + query', async () => {
     const req = new NextRequest('http://localhost:3000/api/dashboard/requests?status=draft', { method: 'GET' })
     const { url, init } = await buildBackendRequest(
-      { id: 7, cmsRole: 'admin', roles: [1, 2] },
+      { id: 7, role: ['admin', 'referee'] },
       req,
       ['requests'],
       { backendUrl: 'http://backend:4000/', proxySecret: 'secret' },
@@ -32,8 +32,7 @@ describe('buildBackendRequest', () => {
     expect(init.method).toBe('GET')
     const headers = init.headers as Record<string, string>
     expect(headers['x-user-id']).toBe('7')
-    expect(headers['x-user-roles']).toBe('1,2')
-    expect(headers['x-user-cms-role']).toBe('admin')
+    expect(headers['x-user-roles']).toBe('admin,referee')
     expect(headers['x-internal-proxy-secret']).toBe('secret')
   })
 
@@ -45,7 +44,7 @@ describe('buildBackendRequest', () => {
       body: payload,
     })
     const { init } = await buildBackendRequest(
-      { id: 7, roles: [] },
+      { id: 7, role: [] },
       req,
       ['requests'],
       { backendUrl: 'http://b:4000', proxySecret: 's' },
@@ -61,7 +60,7 @@ describe('buildBackendRequest', () => {
   it('omits the cms-role header when it is null', async () => {
     const req = new NextRequest('http://localhost:3000/api/dashboard/stats', { method: 'GET' })
     const { init } = await buildBackendRequest(
-      { id: 7, cmsRole: null, roles: null },
+      { id: 7, role: null },
       req,
       ['stats'],
       { backendUrl: 'http://b:4000', proxySecret: 's' },
@@ -74,7 +73,7 @@ describe('buildBackendRequest', () => {
   it('maps a nested path (e.g. /requests/:id/submit)', async () => {
     const req = new NextRequest('http://localhost:3000/api/dashboard/requests/abc/submit', { method: 'POST' })
     const { url } = await buildBackendRequest(
-      { id: 7, roles: [] },
+      { id: 7, role: [] },
       req,
       ['requests', 'abc', 'submit'],
       { backendUrl: 'http://b:4000', proxySecret: 's' },

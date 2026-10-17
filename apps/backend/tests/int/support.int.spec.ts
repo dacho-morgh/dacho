@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import request from 'supertest'
 
+import { InMemoryCompanyStore } from '../../src/auth/company-store.js'
 import { createApp } from '../../src/app.js'
 import { InMemoryUserStore } from '../../src/auth/user-store.js'
 import { InMemoryServiceCatalog } from '../../src/catalog/service-catalog.js'
@@ -14,8 +15,10 @@ const connectionString = process.env.DATABASE_URL ?? 'postgres://dacho:dacho@loc
 const pool = new Pool({ connectionString })
 const proxySecret = 'test-internal-proxy-secret'
 
+/** `applicant` is the company side (representative); `staff` is the internal side (admin). */
 function auth(userId: string, role: 'applicant' | 'staff') {
-  return { 'x-internal-proxy-secret': proxySecret, 'x-user-id': userId, 'x-user-role': role }
+  const roles = role === 'staff' ? 'admin' : 'representative'
+  return { 'x-internal-proxy-secret': proxySecret, 'x-user-id': userId, 'x-user-roles': roles }
 }
 
 async function appUnderTest() {
@@ -24,6 +27,7 @@ async function appUnderTest() {
     delivery: new ConsoleOtpDelivery(),
     jwt: await JwtSigner.create('test-kid'),
     userStore: new InMemoryUserStore(),
+    companyStore: new InMemoryCompanyStore(),
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret,
@@ -42,6 +46,7 @@ async function appWithFailingUserLookup() {
     delivery: new ConsoleOtpDelivery(),
     jwt: await JwtSigner.create('test-kid'),
     userStore: new FailingLookupUserStore(),
+    companyStore: new InMemoryCompanyStore(),
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret,

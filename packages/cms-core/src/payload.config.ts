@@ -7,6 +7,7 @@ import { buildConfig, PayloadRequest } from 'payload'
 import sharp from 'sharp'
 import { defaultLexical } from './fields/defaultLexical'
 import { Categories } from './collections/Categories'
+import { Companies } from './collections/Companies'
 import { Events } from './collections/Events'
 import { Exhibitions } from './collections/Exhibitions'
 import { FAQ } from './collections/FAQ'
@@ -177,6 +178,7 @@ export default buildConfig({
     Media,
     Categories,
     Users,
+    Companies,
     Roles,
     FAQ,
     Reviews,

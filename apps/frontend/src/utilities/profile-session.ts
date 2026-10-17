@@ -15,6 +15,7 @@ export async function getProfileSessionUser(): Promise<User | null> {
   }
 }
 
-export function isStaffProfileUser(user: Pick<User, 'role' | 'cmsRole'> | null | undefined): boolean {
-  return user?.role === 'staff' || user?.cmsRole === 'admin'
+/** True when the user holds the admin role (the internal side of the house). */
+export function isInternalUser(user: Pick<User, 'role'> | null | undefined): boolean {
+  return Array.isArray(user?.role) && user.role.includes('admin')
 }

@@ -75,7 +75,7 @@ export function createAuthRouter(deps: AuthDeps): Router {
         return
       }
 
-      const { name, companyId } = req.body ?? {}
+      const { name } = req.body ?? {}
       const fields: ProfileFields = {}
       if (name !== undefined) {
         if (typeof name !== 'string') {
@@ -84,14 +84,6 @@ export function createAuthRouter(deps: AuthDeps): Router {
         }
         fields.name = name
       }
-      if (companyId !== undefined) {
-        if (typeof companyId !== 'string') {
-          res.status(400).json({ error: 'invalid_company' })
-          return
-        }
-        fields.companyId = companyId
-      }
-
       const updated = await deps.userStore.update(userId, fields)
       res.json({ user: updated })
     } catch (err) {

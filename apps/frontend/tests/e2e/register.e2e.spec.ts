@@ -26,8 +26,7 @@ test.beforeAll(async () => {
       phone: adminPhone,
       password: adminPassword,
       name: 'Registration security test admin',
-      role: 'staff',
-      cmsRole: 'admin',
+      role: ['admin'],
     },
     context: { allowRoleAssignment: true },
   })
@@ -225,9 +224,8 @@ test.describe('Register', () => {
     expect(me.ok()).toBe(true)
     const meBody = await me.json()
     expect(meBody.user).toMatchObject({
-      id: registrationBody.doc.id,
-      role: 'applicant',
-      cmsRole: null,
+      id: registrationBody.user.id,
+      role: ['representative'],
     })
 
     const emailLogin = await page.request.post('http://localhost:3000/api/users/login', {
@@ -267,17 +265,18 @@ test.describe('Register', () => {
         companyType: 'سهامی خاص',
         companyProvince: 'بوشهر',
         companyCity: 'بوشهر',
-        role: 'staff',
+        role: ['admin'],
         cmsRole: 'admin',
         roles: [],
       },
     })
     expect(registration.status()).toBe(201)
     const body = await registration.json()
-    registeredUserIds.push(body.doc.id)
-    expect(body.doc.role).toBe('applicant')
-    expect(body.doc.cmsRole).toBeNull()
-    expect(body.doc.roles).toEqual([])
+    registeredUserIds.push(body.user.id)
+    // A self-signup is forced to exactly the representative role, even while an
+    // admin session is active.
+    expect(body.user.role).toEqual(['representative'])
+    expect(body.company.representative).toBe(body.user.id)
 
     const logout = await page.request.post('http://localhost:3000/api/users/logout', {
       headers: cookieRequestHeaders,
@@ -293,6 +292,6 @@ test.describe('Register', () => {
     })
     expect(me.ok()).toBe(true)
     const meBody = await me.json()
-    expect(meBody.user).toMatchObject({ id: body.doc.id, role: 'applicant', cmsRole: null })
+    expect(meBody.user).toMatchObject({ id: body.user.id, role: ['representative'] })
   })
 })

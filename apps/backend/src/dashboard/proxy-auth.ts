@@ -1,5 +1,8 @@
 import type { NextFunction, Request, Response } from 'express'
 
+import type { UserRole } from '../auth/user-store.js'
+import { USER_ROLES } from '../auth/user-store.js'
+
 /**
  * Authenticates dashboard requests that arrive through the same-origin Next.js
  * proxy. The proxy resolves the Payload session server-side and forwards the
@@ -21,20 +24,14 @@ export function requireProxyAuth(proxySecret: string) {
 
     res.locals.userId = userId
 
+    // The acting user's roles, comma-separated. This is the single
+    // authorization axis — the former `x-user-role` (applicant|staff) and
+    // `x-user-cms-role` (admin|editor) headers are gone.
     const rolesHeader = req.headers['x-user-roles']
-    res.locals.userRoles =
-      typeof rolesHeader === 'string'
-        ? rolesHeader
-            .split(',')
-            .map((role) => role.trim())
-            .filter(Boolean)
-        : []
-
-    const cmsRole = req.headers['x-user-cms-role']
-    res.locals.userCmsRole = typeof cmsRole === 'string' ? cmsRole : undefined
-
-    const dashboardRole = req.headers['x-user-role']
-    res.locals.userRole = typeof dashboardRole === 'string' ? dashboardRole : undefined
+    const roles = typeof rolesHeader === 'string' ? rolesHeader.split(',') : []
+    res.locals.userRoles = roles
+      .map((role) => role.trim())
+      .filter((role): role is UserRole => (USER_ROLES as readonly string[]).includes(role))
 
     next()
   }

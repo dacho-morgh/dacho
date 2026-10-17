@@ -59,12 +59,19 @@ test.beforeAll(async () => {
       phone: applicant.phone,
       password,
       name: 'Mobile dashboard applicant test',
-      companyName: 'Mobile dashboard company test',
-      companyNationalId: applicant.companyNationalId,
-      companyRegistrationNumber: applicant.companyRegistrationNumber,
-      companyType: 'سهامی خاص',
-      companyProvince: 'بوشهر',
-      companyCity: 'بوشهر',
+    },
+  })
+  // The company is a separate record linked to the user as its representative.
+  await payload.create({
+    collection: 'companies',
+    data: {
+      name: 'Mobile dashboard company test',
+      nationalId: applicant.companyNationalId,
+      registrationNumber: applicant.companyRegistrationNumber,
+      type: 'سهامی خاص',
+      province: 'بوشهر',
+      city: 'بوشهر',
+      representative: applicantUser.id,
     },
   })
   applicantId = applicantUser.id
@@ -77,8 +84,7 @@ test.beforeAll(async () => {
       phone: manager.phone,
       password,
       name: 'Mobile dashboard manager test',
-      role: 'staff',
-      cmsRole: 'admin',
+      role: ['admin'],
     },
     context: { allowRoleAssignment: true },
   })

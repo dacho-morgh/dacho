@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { StaffProfileView } from '@/components/dashboard/profile/staff-profile-view'
 import type { ProfileDto } from '@/utilities/dashboard-api'
 import { serverDashboardFetch } from '@/utilities/dashboard-server'
-import { getProfileSessionUser, isStaffProfileUser } from '@/utilities/profile-session'
+import { getProfileSessionUser, isInternalUser } from '@/utilities/profile-session'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default async function StaffProfilePage() {
   const user = await getProfileSessionUser()
-  if (!user || !isStaffProfileUser(user)) redirect('/dashboard/profile/company')
+  if (!user || !isInternalUser(user)) redirect('/dashboard/profile/company')
 
   const profile = await serverDashboardFetch<ProfileDto>('/profile')
   if (!profile) throw new Error('profile_load_failed')
@@ -23,7 +23,7 @@ export default async function StaffProfilePage() {
       initialProfile={profile}
       name={user.name ?? ''}
       position={user.position ?? ''}
-      accessLabel={user.cmsRole === 'admin' ? 'مدیر سامانه' : 'کارمند سامانه'}
+      accessLabel={(user.role ?? []).includes('admin') ? 'مدیر سامانه' : 'کارمند سامانه'}
     />
   )
 }

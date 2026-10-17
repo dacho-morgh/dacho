@@ -56,42 +56,27 @@ describe('isSeniorManagerUser', () => {
     await expect(isSeniorManagerUser(mockPayload, undefined)).resolves.toBe(false)
   })
 
-  it('returns true when user has cmsRole admin', async () => {
-    await expect(isSeniorManagerUser(mockPayload, { cmsRole: 'admin' })).resolves.toBe(true)
+  it('returns true when the user holds the admin role', async () => {
+    await expect(isSeniorManagerUser(mockPayload, { role: ['admin'] })).resolves.toBe(true)
   })
 
-  it('returns true when user position is مدیر ارشد', async () => {
-    await expect(isSeniorManagerUser(mockPayload, { position: 'مدیر ارشد' })).resolves.toBe(true)
-  })
-
-  it('returns true when user has role staff', async () => {
-    await expect(isSeniorManagerUser(mockPayload, { role: 'staff' })).resolves.toBe(true)
-  })
-
-  it('returns true when user.roles contains a role object with name مدیر ارشد', async () => {
+  it('returns true when admin sits alongside another role', async () => {
     await expect(
-      isSeniorManagerUser(mockPayload, {
-        role: 'applicant',
-        roles: [{ id: 6, name: 'مدیر ارشد' }],
-      }),
+      isSeniorManagerUser(mockPayload, { role: ['representative', 'admin', 'referee'] }),
     ).resolves.toBe(true)
   })
 
-  it('returns true when user.roles contains role id referencing مدیر ارشد', async () => {
+  it('returns false for a company representative', async () => {
     await expect(
-      isSeniorManagerUser(mockPayload, {
-        role: 'applicant',
-        roles: [6],
-      }),
-    ).resolves.toBe(true)
-  })
-
-  it('returns false for regular applicant without senior manager role', async () => {
-    await expect(
-      isSeniorManagerUser(mockPayload, {
-        role: 'applicant',
-        roles: [1],
-      }),
+      isSeniorManagerUser(mockPayload, { role: ['representative'] }),
     ).resolves.toBe(false)
+  })
+
+  it('returns false for a referee', async () => {
+    await expect(isSeniorManagerUser(mockPayload, { role: ['referee'] })).resolves.toBe(false)
+  })
+
+  it('returns false for a user with no roles at all', async () => {
+    await expect(isSeniorManagerUser(mockPayload, {})).resolves.toBe(false)
   })
 })

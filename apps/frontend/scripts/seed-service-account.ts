@@ -24,7 +24,7 @@ async function main(): Promise<void> {
     await payload.update({
       collection: 'users',
       id: user.id,
-      data: { enableAPIKey: true, apiKey, password, role: 'staff' },
+      data: { enableAPIKey: true, apiKey, password, role: ['admin'] },
       context: { allowRoleAssignment: true },
     })
     console.log(`Updated service account user ${user.id}`)
@@ -35,7 +35,7 @@ async function main(): Promise<void> {
         email: SERVICE_EMAIL,
         name: 'Backend Service',
         phone: SERVICE_PHONE,
-        role: 'staff',
+        role: ['admin'],
         enableAPIKey: true,
         apiKey,
         password,

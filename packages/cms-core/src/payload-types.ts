@@ -72,6 +72,7 @@ export interface Config {
     media: Media;
     categories: Category;
     users: User;
+    companies: Company;
     roles: Role;
     faq: Faq;
     reviews: Review;
@@ -104,6 +105,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
+    companies: CompaniesSelect<false> | CompaniesSelect<true>;
     roles: RolesSelect<false> | RolesSelect<true>;
     faq: FaqSelect<false> | FaqSelect<true>;
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
@@ -550,36 +552,8 @@ export interface User {
   id: number;
   name?: string | null;
   phone: string;
-  role?: ('applicant' | 'staff') | null;
-  cmsRole?: ('admin' | 'editor') | null;
+  role?: ('admin' | 'representative' | 'referee')[] | null;
   position?: string | null;
-  roles?: (number | Role)[] | null;
-  companyName?: string | null;
-  companyNationalId?: string | null;
-  companyRegistrationNumber?: string | null;
-  companyType?: ('سهامی خاص' | 'سهامی عام' | 'مسئولیت محدود' | 'دانش‌بنیان' | 'استارتاپ' | 'سایر') | null;
-  companyProvince?: string | null;
-  companyCity?: string | null;
-  companyEstablishmentDate?: string | null;
-  companyStatus?: string | null;
-  companyEconomicCode?: string | null;
-  executives?:
-    | {
-        role: string;
-        name: string;
-        id?: string | null;
-      }[]
-    | null;
-  addresses?:
-    | {
-        title: string;
-        province?: string | null;
-        city?: string | null;
-        postalCode?: string | null;
-        address: string;
-        id?: string | null;
-      }[]
-    | null;
   updatedAt: string;
   createdAt: string;
   enableAPIKey?: boolean | null;
@@ -602,17 +576,6 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "roles".
- */
-export interface Role {
-  id: number;
-  name: string;
-  description?: string | null;
-  updatedAt: string;
-  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1023,6 +986,17 @@ export interface Service {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roles".
+ */
+export interface Role {
+  id: number;
+  name: string;
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "reviews".
  */
 export interface Review {
@@ -1333,6 +1307,42 @@ export interface Exhibition {
   startDate: string;
   endDate: string;
   status: 'upcoming' | 'ongoing' | 'past';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "companies".
+ */
+export interface Company {
+  id: number;
+  name: string;
+  nationalId: string;
+  registrationNumber?: string | null;
+  type?: ('سهامی خاص' | 'سهامی عام' | 'مسئولیت محدود' | 'دانش‌بنیان' | 'استارتاپ' | 'سایر') | null;
+  province?: string | null;
+  city?: string | null;
+  establishmentDate?: string | null;
+  status?: string | null;
+  economicCode?: string | null;
+  representative: number | User;
+  executives?:
+    | {
+        position: string;
+        name: string;
+        id?: string | null;
+      }[]
+    | null;
+  addresses?:
+    | {
+        title: string;
+        province?: string | null;
+        city?: string | null;
+        postalCode?: string | null;
+        address: string;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1658,6 +1668,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'users';
         value: number | User;
+      } | null)
+    | ({
+        relationTo: 'companies';
+        value: number | Company;
       } | null)
     | ({
         relationTo: 'roles';
@@ -2122,35 +2136,7 @@ export interface UsersSelect<T extends boolean = true> {
   name?: T;
   phone?: T;
   role?: T;
-  cmsRole?: T;
   position?: T;
-  roles?: T;
-  companyName?: T;
-  companyNationalId?: T;
-  companyRegistrationNumber?: T;
-  companyType?: T;
-  companyProvince?: T;
-  companyCity?: T;
-  companyEstablishmentDate?: T;
-  companyStatus?: T;
-  companyEconomicCode?: T;
-  executives?:
-    | T
-    | {
-        role?: T;
-        name?: T;
-        id?: T;
-      };
-  addresses?:
-    | T
-    | {
-        title?: T;
-        province?: T;
-        city?: T;
-        postalCode?: T;
-        address?: T;
-        id?: T;
-      };
   updatedAt?: T;
   createdAt?: T;
   enableAPIKey?: T;
@@ -2171,6 +2157,41 @@ export interface UsersSelect<T extends boolean = true> {
         createdAt?: T;
         expiresAt?: T;
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "companies_select".
+ */
+export interface CompaniesSelect<T extends boolean = true> {
+  name?: T;
+  nationalId?: T;
+  registrationNumber?: T;
+  type?: T;
+  province?: T;
+  city?: T;
+  establishmentDate?: T;
+  status?: T;
+  economicCode?: T;
+  representative?: T;
+  executives?:
+    | T
+    | {
+        position?: T;
+        name?: T;
+        id?: T;
+      };
+  addresses?:
+    | T
+    | {
+        title?: T;
+        province?: T;
+        city?: T;
+        postalCode?: T;
+        address?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -3025,6 +3046,8 @@ export interface SiteSetting {
   createdAt?: string | null;
 }
 /**
+ * Latest news automatically shows 8 published items, pinned first then newest. Latest articles automatically shows the 3 newest published articles. Other sections can be curated below.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "mag".
  */
@@ -3034,13 +3057,7 @@ export interface Mag {
    * Drag selected items to set their display order.
    */
   hero?: (number | null) | News;
-  /**
-   * Drag selected items to set their display order.
-   */
   latestNews?: (number | News)[] | null;
-  /**
-   * Drag selected items to set their display order.
-   */
   latestArticles?: (number | Post)[] | null;
   hotHashtags?:
     | {

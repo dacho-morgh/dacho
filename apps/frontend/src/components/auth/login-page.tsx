@@ -46,12 +46,12 @@ export default function LoginPage({
         return
       }
 
-      const payload = (await response.json().catch(() => null)) as { user?: { role?: string; cmsRole?: string | null } } | null
+      const payload = (await response.json().catch(() => null)) as { user?: { role?: string[] | null } } | null
       const user = payload?.user
       const destination =
         safeReturnUrl && safeReturnUrl !== '/login'
           ? safeReturnUrl
-          : user?.cmsRole === 'admin' || user?.cmsRole === 'editor'
+          : Array.isArray(user?.role) && user.role.includes('admin')
             ? '/admin'
             : '/dashboard'
       // Authentication changes server-visible cookie state. A document-level
