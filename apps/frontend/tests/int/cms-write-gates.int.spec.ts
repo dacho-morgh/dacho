@@ -21,7 +21,10 @@ import config from '@/payload.config'
  * access function returns the right answer.
  */
 
-const PHONES = ['09910000021', '09910000022', '09910000023']
+// Every integration spec picks its own phone numbers, and `users.phone` is
+// unique — two specs sharing a number collide across the parallel run. Check
+// `rg -o "'09[0-9]{9}'" tests` before choosing a range.
+const PHONES = ['09910000031', '09910000032', '09910000033']
 const EMAILS = [
   'int-cmswrite-representative@example.com',
   'int-cmswrite-editor@example.com',
