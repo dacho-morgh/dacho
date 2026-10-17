@@ -31,6 +31,7 @@ const cleanup = async () => {
     collection: 'companies',
     where: { nationalId: { like: 'int-nid-' } },
   })
+  await payload.delete({ collection: 'users', where: { email: { equals: 'int-duplicate@example.com' } } })
   await payload.delete({
     collection: 'users',
     where: { phone: { in: TEST_PHONES } },
@@ -102,6 +103,9 @@ describe('users roles & access control', () => {
         name: 'نماینده ایجادشده در نشست ادمین',
         companyName: 'شرکت تست',
         companyNationalId: 'int-nid-escalation',
+        companyEstablishmentDate: '1375',
+        companyStatus: 'فعال',
+        companyEconomicCode: '1234567890',
         roles: ['admin'],
       }),
     })
@@ -114,17 +118,74 @@ describe('users roles & access control', () => {
     expect(response.status).toBe(201)
 
     const body = (await response.json()) as {
-      user: { roles: string[] }
-      company: { representative: { id?: unknown } | number | string }
+      user: { id: number; roles: string[] }
+      company: {
+        id: number
+        establishmentDate?: string | null
+        status?: string | null
+        economicCode?: string | null
+        representative: { id?: unknown } | number | string
+      }
     }
     // The escalation attempt is discarded...
     expect(body.user.roles).toEqual(['representative'])
-    // ...and the company is linked to that new user as its representative.
+    // ...and the company is linked to that new user as its representative, with
+    // the fields the register form now sends.
     const representative =
       typeof body.company.representative === 'object'
         ? body.company.representative.id
         : body.company.representative
-    expect(representative).toBeDefined()
+    expect(representative).toBe(body.user.id)
+    expect(body.company.establishmentDate).toBe('1375')
+    expect(body.company.status).toBe('فعال')
+    expect(body.company.economicCode).toBe('1234567890')
+  })
+
+  it('rejects a duplicate national id with 409 and creates no user', async () => {
+    // The company created by the previous test owns 'int-nid-escalation'.
+    const before = await payload.count({ collection: 'users' })
+
+    const req = await createLocalReq({}, payload)
+    Object.assign(req, {
+      json: async () => ({
+        email: 'int-duplicate@example.com',
+        password: 'int-test-password',
+        phone: TEST_PHONES[5],
+        name: 'تکراری',
+        companyName: 'شرکت تکراری',
+        companyNationalId: 'int-nid-escalation',
+      }),
+    })
+
+    const endpoint = Array.isArray(Users.endpoints)
+      ? Users.endpoints.find((candidate) => candidate.path === '/self-signup')
+      : undefined
+    const response = await endpoint!.handler(req)
+
+    expect(response.status).toBe(409)
+    const body = (await response.json()) as { errors: Array<{ field?: string }> }
+    expect(body.errors[0]?.field).toBe('companyNationalId')
+
+    // Atomicity: the rejected signup must not leave a person behind.
+    const after = await payload.count({ collection: 'users' })
+    expect(after.totalDocs).toBe(before.totalDocs)
+  })
+
+  it('rejects a signup missing required fields with 400', async () => {
+    const req = await createLocalReq({}, payload)
+    Object.assign(req, { json: async () => ({ phone: TEST_PHONES[5] }) })
+
+    const endpoint = Array.isArray(Users.endpoints)
+      ? Users.endpoints.find((candidate) => candidate.path === '/self-signup')
+      : undefined
+    const response = await endpoint!.handler(req)
+
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { errors: Array<{ message: string }> }
+    const messages = body.errors.map((error) => error.message).join(' ')
+    expect(messages).toContain('password')
+    expect(messages).toContain('companyName')
+    expect(messages).toContain('companyNationalId')
   })
 
   it('allows trusted internal writes to assign roles via context', async () => {

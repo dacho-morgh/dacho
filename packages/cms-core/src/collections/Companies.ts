@@ -1,7 +1,6 @@
 import type { Access, CollectionConfig } from 'payload'
 
 import { anyone } from '@cms-core/access/anyone'
-import { authenticated } from '@cms-core/access/authenticated'
 import { isInternalAdmin } from '@cms-core/access/roles'
 
 /**
@@ -13,6 +12,16 @@ import { isInternalAdmin } from '@cms-core/access/roles'
  * carries the `representative` role. The company owns no credentials, no
  * password and no login of its own.
  */
+/**
+ * An internal admin enrolls any company; public self-signup enrolls one through
+ * the `/self-signup` endpoint, which owns a transaction and sets the
+ * `allowCompanySignup` context flag. Nothing else may create a company.
+ */
+const canCreateCompany: Access = ({ req }) => {
+  if (isInternalAdmin(req.user)) return true
+  return (req.context as { allowCompanySignup?: boolean } | undefined)?.allowCompanySignup === true
+}
+
 /**
  * An internal admin edits any company; a company user edits only the company
  * they represent. Runs as a query constraint so Payload applies it to reads and
@@ -36,9 +45,10 @@ export const Companies: CollectionConfig = {
     // Directory is public (the site lists member companies); the record itself
     // is read by anyone so a company's own representative can load it.
     read: anyone,
-    // Only an internal admin enrolls a company by hand; self-registration
-    // creates one through the `/self-signup` endpoint, which overrides access.
-    create: authenticated,
+    // An internal admin enrolls a company by hand. Public self-registration
+    // creates one through the `/self-signup` endpoint, which sets the
+    // `allowCompanySignup` context flag on the transaction it owns.
+    create: canCreateCompany,
     delete: isInternalAdmin,
     // An internal admin may edit any company; a company user may edit only the
     // company they represent.

@@ -1,8 +1,16 @@
-import type { Access, CollectionConfig } from 'payload'
+import { commitTransaction, initTransaction, type Access, type CollectionConfig } from 'payload'
 
 import { hasCmsRole } from '@cms-core/access/hasCmsRole'
 import { isInternalAdmin, USER_ROLES } from '@cms-core/access/roles'
 import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
+import {
+  isDuplicateNationalId,
+  missingCompanyFields,
+  missingUserFields,
+  pickCompanyFields,
+  pickUserFields,
+  type SelfSignupBody,
+} from '@cms-core/auth/self-signup'
 
 const isBackendService = (req: { user?: { email?: string | null } | null }): boolean =>
   req.user?.email === 'backend@dacho.local'
@@ -72,7 +80,8 @@ export const Users: CollectionConfig = {
       handler: async (req) => {
         const body = (
           typeof req.json === 'function' ? await req.json().catch(() => null) : req.json
-        ) as Record<string, unknown> | null
+        ) as SelfSignupBody | null
+
         if (!body || typeof body !== 'object' || Array.isArray(body)) {
           return Response.json(
             { errors: [{ message: 'Invalid registration data.' }] },
@@ -80,47 +89,97 @@ export const Users: CollectionConfig = {
           )
         }
 
-        // Do not forward user-controlled role fields to the create operation.
-        const userFields = ['email', 'username', 'password', 'phone', 'name', 'position']
-        const userData = Object.fromEntries(
-          userFields.filter((field) => field in body).map((field) => [field, body[field]]),
-        )
+        const missing = [...missingUserFields(body), ...missingCompanyFields(body)]
+        if (missing.length > 0) {
+          return Response.json(
+            { errors: missing.map((field) => ({ message: `Missing required field: ${field}` })) },
+            { status: 400 },
+          )
+        }
 
-        // 1. The person — the central identity store owns this record.
-        const user = await req.payload.create({
-          collection: 'users',
-          data: userData as never,
-          overrideAccess: false,
-          req,
-          context: { ...req.context, forceRepresentativeSignup: true },
-        })
+        const nationalId = String(body.companyNationalId).trim()
 
-        // 2. The company they represent. The register form still posts the
-        // `company`-prefixed field names, so map them onto the company record.
-        const company = await req.payload.create({
+        // Fail fast before creating anything: a national id already enrolled
+        // must not produce a person record we then cannot attach.
+        const existing = await req.payload.find({
           collection: 'companies',
-          data: {
-            name: body.companyName,
-            nationalId: body.companyNationalId,
-            registrationNumber: body.companyRegistrationNumber,
-            type: body.companyType,
-            province: body.companyProvince,
-            city: body.companyCity,
-            representative: user.id,
-          } as never,
-          // The handler picked these fields explicitly from the request body and
-          // role assignment is not among them, so it is safe to create on the
-          // signup's behalf even though `companies.create` requires auth.
+          where: { nationalId: { equals: nationalId } },
+          limit: 1,
+          depth: 0,
           overrideAccess: true,
-          req,
         })
+        if (existing.docs.length > 0) {
+          return Response.json(
+            {
+              errors: [
+                {
+                  message: 'This company is already registered.',
+                  field: 'companyNationalId',
+                },
+              ],
+            },
+            { status: 409 },
+          )
+        }
 
-        return Response.json({ user, company }, { status: 201 })
+        // One transaction: the person and the company they represent are created
+        // together or not at all. Both writes share `req`, so Payload binds them
+        // to the same transaction.
+        await initTransaction(req)
+
+        try {
+          const user = await req.payload.create({
+            collection: 'users',
+            data: pickUserFields(body) as never,
+            overrideAccess: false,
+            req,
+            context: { ...req.context, forceRepresentativeSignup: true },
+          })
+
+          const company = await req.payload.create({
+            collection: 'companies',
+            data: pickCompanyFields(body, user.id) as never,
+            // The handler selected every field explicitly and no role is among
+            // them; `allowCompanySignup` is what the collection's create access
+            // checks, so no access is overridden here.
+            req,
+            context: { ...req.context, allowCompanySignup: true },
+          })
+
+          await commitTransaction(req)
+
+          return Response.json({ user, company }, { status: 201 })
+        } catch (error) {
+          // Nothing is persisted: the person is not left orphaned.
+          if (req.transactionID !== undefined) {
+            await req.payload.db.rollbackTransaction(req.transactionID)
+          }
+
+          if (isDuplicateNationalId(error)) {
+            return Response.json(
+              {
+                errors: [
+                  { message: 'This company is already registered.', field: 'companyNationalId' },
+                ],
+              },
+              { status: 409 },
+            )
+          }
+          console.error('[users] self-signup failed', error)
+          const payloadErrors = (error as { errors?: unknown[] })?.errors
+          if (Array.isArray(payloadErrors) && payloadErrors.length > 0) {
+            return Response.json({ errors: payloadErrors }, { status: 400 })
+          }
+          return Response.json(
+            { errors: [{ message: 'Registration failed. Please try again.' }] },
+            { status: 500 },
+          )
+        }
       },
     },
   ],
   admin: {
-    defaultColumns: ['name', 'email', 'phone', 'role'],
+    defaultColumns: ['name', 'email', 'phone', 'roles'],
     useAsTitle: 'name',
   },
   auth: {

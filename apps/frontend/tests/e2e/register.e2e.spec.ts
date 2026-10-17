@@ -15,6 +15,7 @@ const adminPassword = 'register-admin-test-only'
 let payload: Awaited<ReturnType<typeof getPayload>>
 let adminId: number | string
 const registeredUserIds: Array<number | string> = []
+const registeredCompanyIds: Array<number | string> = []
 
 test.beforeAll(async () => {
   payload = await getPayload({ config })
@@ -34,6 +35,11 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
+  // Companies reference their representative (ON DELETE restrict), so they must
+  // be removed before the users they point at.
+  for (const id of registeredCompanyIds) {
+    await payload.delete({ collection: 'companies', id })
+  }
   for (const id of registeredUserIds) {
     await payload.delete({ collection: 'users', id })
   }
@@ -199,9 +205,11 @@ test.describe('Register', () => {
     ])
     expect(registrationResponse.status()).toBe(201)
     const registrationBody = await registrationResponse.json()
-    registeredUserIds.push(registrationBody.doc.id)
-    expect(registrationBody.doc.role).toBe('applicant')
-    expect(registrationBody.doc.cmsRole).toBeNull()
+    registeredUserIds.push(registrationBody.user.id)
+    registeredCompanyIds.push(registrationBody.company.id)
+    // Self-signup yields the representative and the company they represent.
+    expect(registrationBody.user.roles).toEqual(['representative'])
+    expect(registrationBody.company.representative.id).toBe(registrationBody.user.id)
 
     await page.waitForURL(
       '**/login?registered=1&returnUrl=%2Fdashboard%2Frequests%3Fstatus%3Ddraft',
@@ -225,7 +233,7 @@ test.describe('Register', () => {
     const meBody = await me.json()
     expect(meBody.user).toMatchObject({
       id: registrationBody.user.id,
-      role: ['representative'],
+      roles: ['representative'],
     })
 
     const emailLogin = await page.request.post('http://localhost:3000/api/users/login', {
@@ -247,7 +255,7 @@ test.describe('Register', () => {
       headers: cookieRequestHeaders,
     })
     expect(adminMe.ok()).toBe(true)
-    expect((await adminMe.json()).user).toMatchObject({ id: adminId, cmsRole: 'admin' })
+    expect((await adminMe.json()).user).toMatchObject({ id: adminId, roles: ['admin'] })
 
     const suffix = `${Date.now()}`.slice(-9)
     const phone = `09${suffix}`
@@ -255,7 +263,6 @@ test.describe('Register', () => {
       headers: cookieRequestHeaders,
       data: {
         email: `admin-session-signup-${suffix}@example.invalid`,
-        username: phone,
         phone,
         password: 'password123',
         name: 'Applicant created during admin session',
@@ -272,9 +279,10 @@ test.describe('Register', () => {
     expect(registration.status()).toBe(201)
     const body = await registration.json()
     registeredUserIds.push(body.user.id)
+    registeredCompanyIds.push(body.company.id)
     // A self-signup is forced to exactly the representative role, even while an
     // admin session is active.
-    expect(body.user.role).toEqual(['representative'])
+    expect(body.user.roles).toEqual(['representative'])
     expect(body.company.representative).toBe(body.user.id)
 
     const logout = await page.request.post('http://localhost:3000/api/users/logout', {
@@ -291,6 +299,6 @@ test.describe('Register', () => {
     })
     expect(me.ok()).toBe(true)
     const meBody = await me.json()
-    expect(meBody.user).toMatchObject({ id: body.user.id, role: ['representative'] })
+    expect(meBody.user).toMatchObject({ id: body.user.id, roles: ['representative'] })
   })
 })

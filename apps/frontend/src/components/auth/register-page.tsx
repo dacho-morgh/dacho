@@ -38,6 +38,9 @@ type FormState = {
   companyType: string
   companyProvince: string
   companyCity: string
+  companyEstablishmentDate: string
+  companyStatus: string
+  companyEconomicCode: string
   name: string
   position: string
   phone: string
@@ -53,6 +56,9 @@ const EMPTY_FORM: FormState = {
   companyType: '',
   companyProvince: '',
   companyCity: '',
+  companyEstablishmentDate: '',
+  companyStatus: '',
+  companyEconomicCode: '',
   name: '',
   position: '',
   phone: '',
@@ -100,6 +106,9 @@ const fieldStep: Record<keyof FormState, number> = {
   companyType: 1,
   companyProvince: 1,
   companyCity: 1,
+  companyEstablishmentDate: 1,
+  companyStatus: 1,
+  companyEconomicCode: 1,
   name: 2,
   position: 2,
   phone: 2,
@@ -114,6 +123,9 @@ const fieldElementId: Partial<Record<keyof FormState, string>> = {
   companyRegistrationNumber: 'register-companyRegistrationNumber',
   companyProvince: 'register-companyProvince',
   companyCity: 'register-companyCity',
+  companyEstablishmentDate: 'register-companyEstablishmentDate',
+  companyStatus: 'register-companyStatus',
+  companyEconomicCode: 'register-companyEconomicCode',
   name: 'register-name',
   position: 'register-position',
   phone: 'register-phone',
@@ -244,7 +256,6 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: form.email.trim().toLocaleLowerCase(),
-          username: toEnglishDigits(form.phone.trim()),
           password: form.password,
           phone: toEnglishDigits(form.phone.trim()),
           name: form.name.trim(),
@@ -255,6 +266,9 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
           companyType: form.companyType,
           companyProvince: form.companyProvince.trim(),
           companyCity: form.companyCity.trim(),
+          companyEstablishmentDate: toEnglishDigits(form.companyEstablishmentDate.trim()),
+          companyStatus: form.companyStatus.trim(),
+          companyEconomicCode: toEnglishDigits(form.companyEconomicCode.trim()),
         }),
       })
 
@@ -481,6 +495,39 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 onChange={(event) => setField('companyCity')(event.target.value)}
                 placeholder="شهر محل ثبت را وارد کنید"
                 value={form.companyCity}
+              />
+              <Input
+                {...registerInputClasses}
+                error={errors.companyEstablishmentDate}
+                id="register-companyEstablishmentDate"
+                inputSize="lg"
+                label="تاریخ تأسیس"
+                name="companyEstablishmentDate"
+                onChange={(event) => setField('companyEstablishmentDate')(event.target.value)}
+                placeholder="۱۳۷۵/۰۵/۱۲"
+                value={form.companyEstablishmentDate}
+              />
+              <Input
+                {...registerInputClasses}
+                error={errors.companyStatus}
+                id="register-companyStatus"
+                inputSize="lg"
+                label="وضعیت شرکت"
+                name="companyStatus"
+                onChange={(event) => setField('companyStatus')(event.target.value)}
+                placeholder="فعال"
+                value={form.companyStatus}
+              />
+              <Input
+                {...registerInputClasses}
+                error={errors.companyEconomicCode}
+                id="register-companyEconomicCode"
+                inputSize="lg"
+                label="کد اقتصادی"
+                name="companyEconomicCode"
+                onChange={(event) => setField('companyEconomicCode')(event.target.value)}
+                placeholder="کد اقتصادی شرکت"
+                value={form.companyEconomicCode}
               />
             </>
           )}
