@@ -1,16 +1,16 @@
 import type { CollectionConfig } from 'payload'
 
 import { anyone } from '@cms-core/access/anyone'
-import { authenticated } from '@cms-core/access/authenticated'
+import { hasContentRole } from '@cms-core/access/editorContent'
 import { slugField } from 'payload'
 
 export const Categories: CollectionConfig = {
   slug: 'categories',
   access: {
-    create: authenticated,
-    delete: authenticated,
+    create: hasContentRole,
+    delete: hasContentRole,
     read: anyone,
-    update: authenticated,
+    update: hasContentRole,
   },
   admin: {
     useAsTitle: 'title',

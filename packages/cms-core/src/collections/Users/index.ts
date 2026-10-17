@@ -1,7 +1,13 @@
-import { commitTransaction, initTransaction, type Access, type CollectionConfig } from 'payload'
+import {
+  commitTransaction,
+  initTransaction,
+  type Access,
+  type CollectionConfig,
+  type FieldAccess,
+} from 'payload'
 
 import { hasCmsRole } from '@cms-core/access/hasCmsRole'
-import { isInternalAdmin, USER_ROLES } from '@cms-core/access/roles'
+import { isInternalAdmin, USER_ROLE_LABELS, USER_ROLES } from '@cms-core/access/roles'
 import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
 import {
   isDuplicateNationalId,
@@ -20,9 +26,12 @@ const isBackendService = (req: { user?: { email?: string | null } | null }): boo
  * anonymous self-signup — is forced to the safe default via `defaultValue` +
  * this field-level gate, and the `beforeChange` hook below is defense-in-depth
  * against a Local API write that bypassed field access.
+ *
+ * Distinct from the collection-level `access/adminOnly`: Payload types field
+ * access and collection access on incompatible argument shapes, so the shared
+ * function cannot be reused here.
  */
-const adminOnly = ({ req }: { req: { user?: { roles?: readonly string[] | null } | null } }): boolean =>
-  isInternalAdmin(req.user)
+const adminOnlyField: FieldAccess = ({ req }) => isInternalAdmin(req.user)
 
 const canUpdateUser: Access = ({ req }) => {
   if (isInternalAdmin(req.user) || isBackendService(req)) return true
@@ -43,10 +52,10 @@ const canDeleteUser: Access = ({ req }) => {
 export const Users: CollectionConfig = {
   slug: 'users',
   access: {
-    // Only internal admins reach the /admin panel.
+    // Only the Fund's own team reaches the /admin panel: `admin` or `editor`.
     admin: hasCmsRole,
     // Public self-registration. Escalation is prevented by the `adminOnly`
-    // field-level access on `role` plus the defaults below.
+    // field-level access on `roles` plus the defaults below.
     create: () => true,
     delete: canDeleteUser,
     read: canReadUser,
@@ -229,15 +238,15 @@ export const Users: CollectionConfig = {
       name: 'roles',
       type: 'select',
       hasMany: true,
-      options: [...USER_ROLES],
+      options: USER_ROLES.map((role) => ({ label: USER_ROLE_LABELS[role], value: role })),
       defaultValue: ['representative'],
       saveToJWT: true,
       admin: {
         position: 'sidebar',
       },
       access: {
-        create: adminOnly,
-        update: adminOnly,
+        create: adminOnlyField,
+        update: adminOnlyField,
       },
     },
     // The representative's job title within the company (سمت).

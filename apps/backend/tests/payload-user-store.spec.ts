@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { PayloadUserStore, type HttpFetcher } from '../src/auth/payload-user-store.js'
+import { USER_ROLES } from '../src/auth/user-store.js'
 
 interface Call {
   url: string
@@ -102,6 +103,14 @@ describe('PayloadUserStore', () => {
     const user = await store.findById('u1')
 
     expect(user?.roles).toEqual(['representative', 'referee'])
+  })
+
+  // The backend keeps its own copy of USER_ROLES because it cannot import the
+  // CMS's runtime config. If cms-core issues a role this list lacks, the Next.js
+  // proxy would silently drop it from `x-user-roles` and the backend would treat
+  // the holder as role-less — so pin the two lists to the same values.
+  it('accepts every role the CMS can issue', () => {
+    expect(USER_ROLES).toEqual(['admin', 'editor', 'representative', 'referee'])
   })
 
   it('lists by role using an array-containment query', async () => {

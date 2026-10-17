@@ -48,12 +48,12 @@ export default function LoginPage({
 
       const payload = (await response.json().catch(() => null)) as { user?: { roles?: string[] | null } } | null
       const user = payload?.user
+      const roles = Array.isArray(user?.roles) ? user.roles : []
+      // The Fund's own team works in the Payload panel; an editor has no company
+      // dashboard, so sending them to /dashboard would land them nowhere.
+      const isCmsUser = roles.includes('admin') || roles.includes('editor')
       const destination =
-        safeReturnUrl && safeReturnUrl !== '/login'
-          ? safeReturnUrl
-          : Array.isArray(user?.roles) && user.roles.includes('admin')
-            ? '/admin'
-            : '/dashboard'
+        safeReturnUrl && safeReturnUrl !== '/login' ? safeReturnUrl : isCmsUser ? '/admin' : '/dashboard'
       // Authentication changes server-visible cookie state. A document-level
       // navigation guarantees that the protected route is requested with the
       // newly stored cookie instead of reusing an unauthenticated router cache.

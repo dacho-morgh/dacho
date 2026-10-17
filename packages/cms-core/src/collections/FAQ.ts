@@ -1,15 +1,15 @@
 import type { CollectionConfig } from 'payload'
 
 import { anyone } from '@cms-core/access/anyone'
-import { authenticated } from '@cms-core/access/authenticated'
+import { hasContentRole } from '@cms-core/access/editorContent'
 
 export const FAQ: CollectionConfig = {
   slug: 'faq',
   access: {
-    create: authenticated,
-    delete: authenticated,
+    create: hasContentRole,
+    delete: hasContentRole,
     read: anyone,
-    update: authenticated,
+    update: hasContentRole,
   },
   labels: {
     singular: 'FAQ',

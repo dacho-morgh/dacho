@@ -9,7 +9,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 import { anyone } from '@cms-core/access/anyone'
-import { authenticated } from '@cms-core/access/authenticated'
+import { hasContentRole } from '@cms-core/access/editorContent'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -18,10 +18,10 @@ export const Media: CollectionConfig = {
   slug: 'media',
   folders: true,
   access: {
-    create: authenticated,
-    delete: authenticated,
+    create: hasContentRole,
+    delete: hasContentRole,
     read: anyone,
-    update: authenticated,
+    update: hasContentRole,
   },
   fields: [
     {

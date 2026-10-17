@@ -1,8 +1,13 @@
 /**
  * The authorization axis: a user holds zero or more roles. Collapsed from the
- * former `role: applicant|staff` + `cmsRole: admin|editor` pair.
+ * former `role: applicant|staff` + `cmsRole: admin|editor` pair; `editor` came
+ * back on its own merits as the CMS content desk («تحریر»).
+ *
+ * Mirrors `USER_ROLES` in `@dacho/cms-core` — the backend must accept every
+ * role the CMS can issue, or the Next.js proxy would silently strip it from the
+ * `x-user-roles` header it forwards (see `dashboard/proxy-auth.ts`).
  */
-export const USER_ROLES = ['admin', 'representative', 'referee'] as const
+export const USER_ROLES = ['admin', 'editor', 'representative', 'referee'] as const
 
 export type UserRole = (typeof USER_ROLES)[number]
 

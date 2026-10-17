@@ -550,7 +550,7 @@ export interface User {
   id: number;
   name?: string | null;
   phone: string;
-  roles?: ('admin' | 'representative' | 'referee')[] | null;
+  roles?: ('admin' | 'editor' | 'representative' | 'referee')[] | null;
   position?: string | null;
   updatedAt: string;
   createdAt: string;

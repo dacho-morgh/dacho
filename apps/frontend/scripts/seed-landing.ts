@@ -1,5 +1,6 @@
 import 'dotenv/config'
 
+import type { User } from '@dacho/cms-core'
 import { getPayload } from 'payload'
 
 import config from '../src/payload.config.js'
@@ -88,7 +89,7 @@ async function main(): Promise<void> {
     where: { email: { equals: ADMIN_EMAIL } },
     limit: 1,
   })
-  const adminRoles: { roles: Array<'admin' | 'representative' | 'referee'> } = { roles: ['admin'] }
+  const adminRoles: { roles: NonNullable<User['roles']> } = { roles: ['admin'] }
   const adminContext = { allowRoleAssignment: true }
 
   if (existingAdmin.docs[0]) {

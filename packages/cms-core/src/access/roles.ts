@@ -8,9 +8,21 @@ import type { User } from '@cms-core/payload-types'
  * capability in the system — CMS panel access, the internal dashboard, acting
  * for a company, reviewing plans — is derived from membership in this set.
  */
-export const USER_ROLES = ['admin', 'representative', 'referee'] as const
+export const USER_ROLES = ['admin', 'editor', 'representative', 'referee'] as const
 
 export type UserRole = (typeof USER_ROLES)[number]
+
+/**
+ * Persian labels for the admin panel, which otherwise renders the raw English
+ * keys. The wording follows `CONTEXT.md`'s language section: نقش is the axis,
+ * داور the reviewer, نماینده شرکت the person who acts for a company.
+ */
+export const USER_ROLE_LABELS: Record<UserRole, string> = {
+  admin: 'مدیر سامانه',
+  editor: 'تحریر',
+  representative: 'نماینده شرکت',
+  referee: 'داور',
+}
 
 /**
  * A user document narrowed to just the fields authorization reads. Kept
@@ -34,6 +46,15 @@ export function hasRole(user: RoleCarrier, role: UserRole): boolean {
  */
 export function isInternalAdmin(user: unknown): boolean {
   return hasRole(user as RoleCarrier, 'admin')
+}
+
+/**
+ * True when the user may write editorial content — reach the Payload panel and
+ * publish. `admin` holds this implicitly (an admin administers everything);
+ * `editor` («تحریر») holds it as their job.
+ */
+export function isContentEditor(user: unknown): boolean {
+  return hasRole(user as RoleCarrier, 'admin') || hasRole(user as RoleCarrier, 'editor')
 }
 
 /** Convenience: the Payload-generated user type re-exported for callers. */

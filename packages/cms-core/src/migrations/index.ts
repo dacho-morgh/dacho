@@ -16,6 +16,7 @@ import * as migration_20261004_104227_events_page_content from "./20261004_10422
 import * as migration_20261010_215200_add_logo_strip from "./20261010_215200_add_logo_strip";
 import * as migration_20261017_210000_company_and_collapsed_roles from "./20261017_210000_company_and_collapsed_roles";
 import * as migration_20261017_223000_rename_user_role_and_drop_roles_collection from "./20261017_223000_rename_user_role_and_drop_roles_collection";
+import * as migration_20261018_090000_add_editor_role from "./20261018_090000_add_editor_role";
 
 export const migrations = [
   {
@@ -107,5 +108,10 @@ export const migrations = [
     up: migration_20261017_223000_rename_user_role_and_drop_roles_collection.up,
     down: migration_20261017_223000_rename_user_role_and_drop_roles_collection.down,
     name: "20261017_223000_rename_user_role_and_drop_roles_collection",
+  },
+  {
+    up: migration_20261018_090000_add_editor_role.up,
+    down: migration_20261018_090000_add_editor_role.down,
+    name: "20261018_090000_add_editor_role",
   },
 ];

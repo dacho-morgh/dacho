@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { randomBytes } from 'node:crypto'
 
+import type { User } from '@dacho/cms-core'
 import { getPayload } from 'payload'
 
 import config from '../src/payload.config.js'
@@ -21,7 +22,7 @@ async function main(): Promise<void> {
   // `allowRoleAssignment` context opts out of the beforeChange escalation
   // guard, which otherwise forces every non-admin writer back to `applicant`.
   const roleData: {
-    roles: Array<'admin' | 'representative' | 'referee'>
+    roles: NonNullable<User['roles']>
     loginAttempts: number
     lockUntil: null
   } = { roles: ['admin'], loginAttempts: 0, lockUntil: null }

@@ -1,6 +1,6 @@
 import type { GlobalConfig } from "payload";
 import { revalidatePath } from "next/cache";
-import { authenticated } from "@cms-core/access/authenticated";
+import { hasContentRole } from "@cms-core/access/editorContent";
 
 const selection = (name: string, label: string, relationTo: "news" | "posts", hasMany = true) => ({
   name,
@@ -19,7 +19,7 @@ export const Mag: GlobalConfig = {
     description:
       "Latest news automatically shows 8 published items, pinned first then newest. Latest articles automatically shows the 3 newest published articles. Other sections can be curated below.",
   },
-  access: { read: () => true, update: authenticated },
+  access: { read: () => true, update: hasContentRole },
   fields: [
     selection("hero", "Hero story", "news", false),
     // Preserve legacy saved selections while the public latest lists use collection queries.
