@@ -92,7 +92,13 @@ export const Users: CollectionConfig = {
         const missing = [...missingUserFields(body), ...missingCompanyFields(body)]
         if (missing.length > 0) {
           return Response.json(
-            { errors: missing.map((field) => ({ message: `Missing required field: ${field}` })) },
+            {
+              errors: missing.map((field) => ({
+                code: 'missing_field',
+                field,
+                message: `Missing required field: ${field}`,
+              })),
+            },
             { status: 400 },
           )
         }
@@ -113,8 +119,9 @@ export const Users: CollectionConfig = {
             {
               errors: [
                 {
-                  message: 'This company is already registered.',
+                  code: 'duplicate_national_id',
                   field: 'companyNationalId',
+                  message: 'This company is already registered.',
                 },
               ],
             },
@@ -159,7 +166,11 @@ export const Users: CollectionConfig = {
             return Response.json(
               {
                 errors: [
-                  { message: 'This company is already registered.', field: 'companyNationalId' },
+                  {
+                    code: 'duplicate_national_id',
+                    field: 'companyNationalId',
+                    message: 'This company is already registered.',
+                  },
                 ],
               },
               { status: 409 },

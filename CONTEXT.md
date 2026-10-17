@@ -65,9 +65,11 @@ _Avoid_: dashboard, console
 - **CMS owns definitions** (service, form schema, roles — and the routing definition, itself under revision) in `cms.*`.
 - **Backend owns instances** (requests, letters, activities, support tickets) in the `dashboard.*` schema; it reads definitions through Payload's REST API with a service-account key. The `public.*` split in earlier prose was never implemented — do not move tables on its account.
 - **Dynamic form answers are stored as JSONB** on the request, validated against the CMS form schema at submission.
-- **Identity** (decided 2026-10-12; open tickets live in `.scratch/company-identity/map.md`, a git-ignored local map): the **Company is the account holder** — a first-class `companies` collection in `cms-core`, keyed by national id. `users` gains a `company` relation and loses the flattened `company*` columns. Two kinds of user: **`company`** (self-registered on `/register`, acting for one company) and **`internal`** (seeded; no app UI creates them). The `role` values `applicant` and `staff` are retired by that rename — the code still carries them until the identity slices land.
+- **Identity** (built 2026-10-17; supersedes the 2026-10-12 plan in `.scratch/company-identity/map.md`, a git-ignored local map): the **Company is the account holder** — a first-class `companies` collection in `cms-core`, keyed by a unique national id. A company holds exactly one `representative` (نماینده), a required relation to `users`; the flattened `company*` columns are gone. **Users stay the central identity store** — a company owns no credentials and cannot sign in.
+- **Roles** (decided 2026-10-17): authorization is a **single axis** — `users.roles`, a multi-valued select of **`admin`** (CMS panel + internal dashboard), **`representative`** (acts for their company) and **`referee`** (reviews; granted but not yet consumed). A user may hold any number of them at once; Payload stores them in the `users_roles` join table. This replaces the retired `role: applicant | staff`, `cmsRole: admin | editor` and the dynamic `roles` m2m — the latter and `services.workflow` were deleted with the dropped message-flow design.
+- **Registration** (decided 2026-10-17): `/self-signup` is **one atomic act** — the person and the company they represent are created in a single transaction, so a rejected company never leaves a locked-out person behind. **One company, one representative**: a national id that already belongs to a company is rejected with `409 duplicate_national_id`; there is no create-or-claim path, and adding a second person to a company is not supported.
 - **Authentication** (→ `docs/linear/authentication.md`): one central `users` collection is the identity store, shared with the CMS. The live application path is Payload **username (= phone) or email + password** via `/api/users/login`; the backend's OTP + ES256 JWT stack is implemented but reached by no screen. Credentials are progressive — `phone` required, `email`/`username`/`password` optional. Payload keeps email + password auth for editors.
-- **Authorization** (→ `docs/linear/authorization.md`): three separate axes, one permission mechanism — `role` (`company | internal`), `cmsRole` (`admin | editor`, CMS panel access), and the dynamic `roles` m2m (workflow-step membership).
+- **Authorization** (→ `docs/linear/authorization.md`): one axis — `users.roles` (see **Roles** above). The former three-axis model is retired.
 - **Backend framework: Express.**
 - **Database:** single PostgreSQL, two schemas (`cms.*` for Payload, `dashboard.*` for backend tables), self-hosted.
 - **Domain names:** working subdomains until the client provides real ones.
@@ -77,5 +79,5 @@ _Avoid_: dashboard, console
 ## cms-core collections
 
 Content: Pages, Media, News, Posts, Categories, Events, Exhibitions, Services, FAQ, Reviews, Sponsors, Sliders, NewsletterSubscribers.
-Definitional: Companies, Roles, Users.
+Definitional: Companies, Users.
 Form-builder forms (the `forms` collection) back the per-service request forms and the `/connect` + `/cooperation` pages.

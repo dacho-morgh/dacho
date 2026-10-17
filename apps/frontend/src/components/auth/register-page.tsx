@@ -70,6 +70,7 @@ const EMPTY_FORM: FormState = {
 type FormErrors = Partial<Record<keyof FormState, string>>
 
 type PayloadError = {
+  code?: unknown
   field?: unknown
   path?: unknown
   message?: unknown
@@ -286,9 +287,17 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
           const field = payloadErrorField(error)
           if (!field) continue
           const message = typeof error.message === 'string' ? error.message : ''
+          const code = typeof error.code === 'string' ? error.code : ''
           const payloadInvalidUniqueField = /field is invalid:\s*(username|phone|email)/i.test(message)
 
-          if ((isDuplicateError(error) || payloadInvalidUniqueField) && field === 'phone') {
+          // One company, one representative: a national id that already belongs
+          // to a company cannot register a second person.
+          if (code === 'duplicate_national_id' && field === 'companyNationalId') {
+            serverErrors.companyNationalId =
+              'این شناسه ملی قبلاً ثبت شده است. هر شرکت تنها یک نماینده دارد؛ برای افزودن نماینده جدید با دبیرخانه تماس بگیرید.'
+          } else if (code === 'missing_field') {
+            serverErrors[field] = 'این فیلد الزامی است.'
+          } else if ((isDuplicateError(error) || payloadInvalidUniqueField) && field === 'phone') {
             serverErrors.phone = 'این شماره موبایل قبلاً ثبت شده است.'
           } else if ((isDuplicateError(error) || payloadInvalidUniqueField) && field === 'email') {
             serverErrors.email = 'این ایمیل قبلاً ثبت شده است.'

@@ -163,7 +163,10 @@ describe('users roles & access control', () => {
     const response = await endpoint!.handler(req)
 
     expect(response.status).toBe(409)
-    const body = (await response.json()) as { errors: Array<{ field?: string }> }
+    const body = (await response.json()) as { errors: Array<{ code?: string; field?: string }> }
+    // The stable code lets the client render a localised message instead of
+    // matching English prose.
+    expect(body.errors[0]?.code).toBe('duplicate_national_id')
     expect(body.errors[0]?.field).toBe('companyNationalId')
 
     // Atomicity: the rejected signup must not leave a person behind.
@@ -181,8 +184,10 @@ describe('users roles & access control', () => {
     const response = await endpoint!.handler(req)
 
     expect(response.status).toBe(400)
-    const body = (await response.json()) as { errors: Array<{ message: string }> }
-    const messages = body.errors.map((error) => error.message).join(' ')
+    const body = (await response.json()) as { errors: Array<{ code?: string; field?: string }> }
+    const fields = body.errors.map((error) => error.field).join(' ')
+    expect(body.errors.every((error) => error.code === 'missing_field')).toBe(true)
+    const messages = fields
     expect(messages).toContain('password')
     expect(messages).toContain('companyName')
     expect(messages).toContain('companyNationalId')
