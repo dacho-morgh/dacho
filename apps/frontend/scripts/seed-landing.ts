@@ -3,6 +3,7 @@ import 'dotenv/config'
 import { getPayload } from 'payload'
 
 import config from '../src/payload.config.js'
+import { readOption } from './args.js'
 
 // ---------------------------------------------------------------------------
 // Lexical richText helpers (RTL Persian). Payload's richText field stores a
@@ -65,10 +66,15 @@ const customLink = (label: string, url: string, appearance?: 'default' | 'outlin
 const EXHIBITION_START = '2027-02-01T00:00:00.000Z'
 const EXHIBITION_END = '2027-02-04T00:00:00.000Z'
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'sajjaddg@gmail.com'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'sajjaddg'
-const ADMIN_NAME = process.env.ADMIN_NAME ?? 'Sajjad'
-const ADMIN_PHONE = process.env.ADMIN_PHONE ?? '09120000000'
+// Credentials may be overridden per run:
+//   pnpm seed:landing --password='…'
+//   ADMIN_PASSWORD='…' pnpm seed:landing
+const ADMIN_EMAIL = readOption('email', 'ADMIN_EMAIL', 'sajjaddg@gmail.com')
+// The default mirrors the email's local part so the printed credentials below
+// are the obvious ones rather than a near-miss like `sajjadg`.
+const ADMIN_PASSWORD = readOption('password', 'ADMIN_PASSWORD', 'sajjaddg')
+const ADMIN_NAME = readOption('name', 'ADMIN_NAME', 'Sajjad')
+const ADMIN_PHONE = readOption('phone', 'ADMIN_PHONE', '09120000000')
 
 async function main(): Promise<void> {
   const payload = await getPayload({ config })
@@ -95,6 +101,10 @@ async function main(): Promise<void> {
         password: ADMIN_PASSWORD,
         phone: ADMIN_PHONE,
         ...adminRoles,
+        // Payload locks an account for a period after repeated failed logins.
+        // Seeding is the recovery path for a locked-out operator, so clear it.
+        loginAttempts: 0,
+        lockUntil: null,
       },
       context: adminContext,
     })

@@ -4,21 +4,27 @@ import { randomBytes } from 'node:crypto'
 import { getPayload } from 'payload'
 
 import config from '../src/payload.config.js'
+import { readOption } from './args.js'
 
 async function main(): Promise<void> {
-  const email = process.env.ADMIN_EMAIL ?? 'admin@dacho.local'
-  const phone = process.env.ADMIN_PHONE ?? '09120000999'
-  const name = process.env.ADMIN_NAME ?? 'Admin'
-  // Optional. Only reset the password when explicitly provided, so re-running
-  // the script to (re)grant roles never clobbers an existing password.
-  const providedPassword = process.env.ADMIN_PASSWORD ?? 'admin'
+  const email = readOption('email', 'ADMIN_EMAIL', 'admin@dacho.local')
+  const phone = readOption('phone', 'ADMIN_PHONE', '09120000999')
+  const name = readOption('name', 'ADMIN_NAME', 'Admin')
+  // No default: only reset the password when one is explicitly given, so
+  // re-running the script to (re)grant roles never clobbers a live password.
+  //   pnpm create:admin --password='…'
+  const providedPassword = readOption('password', 'ADMIN_PASSWORD')
 
   const payload = await getPayload({ config })
 
   // The admin holds both the dashboard staff role and the CMS admin role. The
   // `allowRoleAssignment` context opts out of the beforeChange escalation
   // guard, which otherwise forces every non-admin writer back to `applicant`.
-  const roleData: { roles: Array<'admin' | 'representative' | 'referee'> } = { roles: ['admin'] }
+  const roleData: {
+    roles: Array<'admin' | 'representative' | 'referee'>
+    loginAttempts: number
+    lockUntil: null
+  } = { roles: ['admin'], loginAttempts: 0, lockUntil: null }
   const context = { allowRoleAssignment: true }
 
   const existing = await payload.find({
@@ -35,7 +41,11 @@ async function main(): Promise<void> {
       data: { ...roleData, ...(providedPassword ? { password: providedPassword } : {}) },
       context,
     })
-    console.log(`Updated admin user ${user.id} — granted role=admin`)
+    console.log(
+      providedPassword
+        ? `Updated admin user ${user.id} — granted role=admin, password reset`
+        : `Updated admin user ${user.id} — granted role=admin (password left unchanged)`,
+    )
   } else {
     const password = providedPassword ?? randomBytes(16).toString('hex')
     await payload.create({
