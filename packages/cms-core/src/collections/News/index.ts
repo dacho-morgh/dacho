@@ -48,6 +48,7 @@ export const News: CollectionConfig<'news'> = {
     _status: true,
     title: true,
     slug: true,
+    heroImage: true,
     categories: true,
     meta: {
       image: true,
