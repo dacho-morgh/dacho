@@ -1,5 +1,27 @@
 import { expect, test } from '@playwright/test'
 
+for (const collection of ['posts', 'news'] as const) {
+  test(`related ${collection} include their actual cover images`, async ({ request }) => {
+    const slug = collection === 'posts' ? 'mag-sample-post-1' : 'mag-sample-news-1'
+    const response = await request.get(
+      `http://localhost:3000/api/${collection}?where[slug][equals]=${slug}&depth=2`,
+    )
+    expect(response.ok()).toBeTruthy()
+    const { docs } = await response.json()
+    const related = docs[0][collection === 'posts' ? 'relatedPosts' : 'relatedNews']
+    expect(related.length).toBeGreaterThan(0)
+    for (const item of related) {
+      const directResponse = await request.get(
+        `http://localhost:3000/api/${collection}/${item.id}?depth=1`,
+      )
+      expect(directResponse.ok()).toBeTruthy()
+      const direct = await directResponse.json()
+      expect(direct.heroImage?.url).toBeTruthy()
+      expect(item.heroImage?.url).toBe(direct.heroImage.url)
+    }
+  })
+}
+
 test('Mag renders seeded CMS stories, ordered sections, and real detail links', async ({
   page,
 }) => {
