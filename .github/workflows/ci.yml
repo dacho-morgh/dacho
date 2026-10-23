@@ -184,6 +184,14 @@ jobs:
           DATABASE_URL: postgres://dacho:dacho@127.0.0.1:5432/dacho-cms
           PAYLOAD_SECRET: ci-placeholder
 
+      - name: Use Ubuntu archive mirror for browser dependencies
+        run: |
+          for source in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+            if [[ -f "$source" ]]; then
+              sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' "$source"
+            fi
+          done
+
       - name: Install Playwright Chromium
         run: pnpm --filter @dacho/frontend exec playwright install --with-deps chromium
 

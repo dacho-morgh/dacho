@@ -132,6 +132,14 @@ class CIIsolationContract(unittest.TestCase):
         ):
             self.assertIn(tag + ",enable=${{ github.ref_name == 'staging' }}", publish)
 
+    def test_browser_dependencies_use_the_primary_ubuntu_mirror(self):
+        e2e = block(block(CI, "jobs", 0), "e2e", 2)
+        mirror = step(e2e, "Use Ubuntu archive mirror for browser dependencies")
+        install = step(e2e, "Install Playwright Chromium")
+        self.assertIn("s|azure.archive.ubuntu.com|archive.ubuntu.com|g", mirror)
+        self.assertLess(e2e.index(mirror), e2e.index(install))
+        self.assertIn("playwright install --with-deps chromium", install)
+
 
 if __name__ == "__main__":
     unittest.main()
