@@ -207,9 +207,9 @@ test.describe('Register', () => {
     const registrationBody = await registrationResponse.json()
     registeredUserIds.push(registrationBody.user.id)
     registeredCompanyIds.push(registrationBody.company.id)
-    // Self-signup yields the representative and the company they represent.
+    // Company relationships expose IDs without hydrating authentication records.
     expect(registrationBody.user.roles).toEqual(['representative'])
-    expect(registrationBody.company.representative.id).toBe(registrationBody.user.id)
+    expect(registrationBody.company.representative).toBe(registrationBody.user.id)
 
     await page.waitForURL(
       '**/login?registered=1&returnUrl=%2Fdashboard%2Frequests%3Fstatus%3Ddraft',
@@ -283,7 +283,7 @@ test.describe('Register', () => {
     // A self-signup is forced to exactly the representative role, even while an
     // admin session is active.
     expect(body.user.roles).toEqual(['representative'])
-    expect(body.company.representative.id).toBe(body.user.id)
+    expect(body.company.representative).toBe(body.user.id)
 
     const logout = await page.request.post('http://localhost:3000/api/users/logout', {
       headers: cookieRequestHeaders,
