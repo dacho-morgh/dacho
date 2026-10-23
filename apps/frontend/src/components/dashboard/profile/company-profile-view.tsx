@@ -229,9 +229,9 @@ export function CompanyProfileView({ initialProfile }: { initialProfile: Profile
             <InlineProfileField
               label="شناسه ملی"
               value={basicForm.nationalId}
-              editing={isEditingBasic}
+              editing={false}
               dir="ltr"
-              onChange={(nationalId) => setBasicForm({ ...basicForm, nationalId })}
+              onChange={() => {}}
             />
           </div>
           <div className="flex flex-col gap-4">

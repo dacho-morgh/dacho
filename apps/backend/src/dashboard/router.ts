@@ -108,6 +108,26 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.use(requireProxyAuth(deps.proxySecret))
 
+  // Profile operations use a privileged CMS adapter. Recheck the current actor
+  // here so forged/stale role headers cannot authorize private company reads.
+  router.use(['/profile', '/admin/companies'], async (req, res, next) => {
+    try {
+      const userId = res.locals.userId as string
+      const actor = await deps.userStore.findById(userId)
+      if (!actor) { res.status(403).json({ error: 'forbidden' }); return }
+      res.locals.userRoles = actor.roles ?? []
+      if (req.baseUrl.endsWith('/admin/companies')) {
+        if (!hasUserRole(actor, 'admin')) { res.status(403).json({ error: 'forbidden' }); return }
+      } else {
+        if (!hasUserRole(actor, 'representative')) { res.status(403).json({ error: 'forbidden' }); return }
+        if (!await deps.companyStore.findByRepresentative(userId)) {
+          res.status(404).json({ error: 'company_not_found' }); return
+        }
+      }
+      next()
+    } catch (error) { next(error) }
+  })
+
   router.post('/requests', async (req, res) => {
     if (!isRepresentative(res)) { res.status(403).json({ error: 'representative_only' }); return }
     const userId = res.locals.userId as string
@@ -266,6 +286,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const userId = res.locals.userId as string
     const { company, contacts } = req.body ?? {}
     let profile = await profileRepo.getProfile(userId)
+    if (company?.nationalId !== undefined && company.nationalId !== profile.company.nationalId) {
+      res.status(403).json({ error: 'protected_company_identity' })
+      return
+    }
     if (company && typeof company === 'object') {
       profile = await profileRepo.updateBasicInfo(userId, company)
     }

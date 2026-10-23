@@ -57,10 +57,16 @@ export class PayloadCompanyStore implements CompanyStore {
   }
 
   async create(fields: CompanyFields & { representativeId: string }): Promise<Company> {
+    // The app uses string IDs; Payload's numeric relationship validator expects
+    // a JSON number for Postgres IDs (UUID/string-ID collections stay strings).
+    const numericId = Number(fields.representativeId)
+    const representative = Number.isSafeInteger(numericId) && String(numericId) === fields.representativeId
+      ? numericId
+      : fields.representativeId
     const res = await this.fetcher(`${this.baseUrl}/api/companies`, {
       method: 'POST',
       headers: this.headers(),
-      body: JSON.stringify({ ...mapFields(fields), representative: fields.representativeId }),
+      body: JSON.stringify({ ...mapFields(fields), representative }),
     })
     const data = await this.ok(res)
     return this.toCompany(unwrap(data))
@@ -138,7 +144,20 @@ const COMPANY_FIELDS = [
 
 /** Keeps only the fields actually present, so PATCHes stay partial. */
 function mapFields(fields: CompanyFields): Partial<CompanyFields> {
-  return pickStrings(fields as Record<string, unknown>, [...COMPANY_FIELDS]) as Partial<CompanyFields>
+  return {
+    ...pickStrings(fields as Record<string, unknown>, COMPANY_FIELDS),
+    ...(fields.executives !== undefined
+      ? { executives: fields.executives.map(({ position, name }) => ({ position, name })) }
+      : {}),
+    ...(fields.addresses !== undefined
+      ? {
+          addresses: fields.addresses.map(({ id, title, province, city, postalCode, address }) => ({
+            ...(id !== undefined ? { id } : {}),
+            title, province, city, postalCode, address,
+          })),
+        }
+      : {}),
+  }
 }
 
 function pickStrings(data: Record<string, unknown>, names: readonly string[]): Partial<Company> {

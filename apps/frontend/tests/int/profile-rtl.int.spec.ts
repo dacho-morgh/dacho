@@ -76,6 +76,7 @@ describe('company profile view', () => {
     expect(input.readOnly).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'ویرایش' }))
     expect(input.readOnly).toBe(false)
+    expect((screen.getByRole('textbox', { name: 'شناسه ملی' }) as HTMLInputElement).readOnly).toBe(true)
     expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.change(input, { target: { value: 'شرکت ویرایش‌شده' } })
     fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }))

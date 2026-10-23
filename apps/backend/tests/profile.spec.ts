@@ -98,4 +98,53 @@ describe('Dashboard Profile Endpoints', () => {
     const exists = getRes.body.addresses.some((a: { id: string }) => a.id === addressId)
     expect(exists).toBe(false)
   })
+
+  it('rejects identity changes before applying any profile/contact edits', async () => {
+    const { app, headers } = await createProfileTestApp()
+    const response = await request(app).patch('/profile').set(headers).send({
+      company: { nationalId: 'new-identity', name: 'نام نامعتبر' },
+      contacts: { email: 'changed@example.invalid' },
+    })
+    expect(response.status).toBe(403)
+    expect(response.body.error).toBe('protected_company_identity')
+    const profile = await request(app).get('/profile').set(headers)
+    expect(profile.body.company.name).toBe('شرکت پایه')
+    expect(profile.body.contacts.email).toBe('')
+  })
+
+  it('ignores client-selected company and representative identifiers', async () => {
+    const { app, headers, userStore, companyStore } = await createProfileTestApp()
+    const otherUser = await userStore.findOrCreateByPhone('09910000099')
+    const otherCompany = await companyStore.create({ name: 'شرکت دیگر', representativeId: otherUser.id })
+    const response = await request(app).patch('/profile').set(headers).send({
+      company: { id: otherCompany.id, representativeId: otherUser.id, representative: otherUser.id, name: 'شرکت خودم' },
+    })
+    expect(response.status).toBe(200)
+    expect(response.body.company.name).toBe('شرکت خودم')
+    expect((await companyStore.findById(otherCompany.id))?.name).toBe('شرکت دیگر')
+    expect((await companyStore.findByRepresentative(headers['x-user-id']))?.representativeId).toBe(headers['x-user-id'])
+  })
+
+  it('rechecks current roles for profile and admin company reads', async () => {
+    const { app, headers, userStore } = await createProfileTestApp()
+    const spoofed = { ...headers, 'x-user-roles': 'admin' }
+    expect((await request(app).get('/admin/companies').set(spoofed)).status).toBe(403)
+    expect((await request(app).get('/admin/companies/1').set(spoofed)).status).toBe(403)
+
+    const actor = await userStore.findById(headers['x-user-id'])
+    actor!.roles = ['referee']
+    expect((await request(app).get('/profile').set(headers)).status).toBe(403)
+    expect((await request(app).patch('/profile').set(headers).send({ executives: [] })).status).toBe(403)
+    expect((await request(app).post('/profile/addresses').set(headers).send({ title: 'x', address: 'y' })).status).toBe(403)
+  })
+
+  it('returns an error instead of acknowledging a write for a missing company', async () => {
+    const { app, userStore } = await createTestApp()
+    const actor = await userStore.findOrCreateByPhone('09910000098')
+    const response = await request(app).post('/profile/addresses').set({
+      'x-internal-proxy-secret': 'test-proxy-secret', 'x-user-id': actor.id, 'x-user-roles': 'representative',
+    }).send({ title: 'x', address: 'y' })
+    expect(response.status).toBe(404)
+    expect(response.body.error).toBe('company_not_found')
+  })
 })

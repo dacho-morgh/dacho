@@ -18,9 +18,6 @@ import {
   type SelfSignupBody,
 } from '@cms-core/auth/self-signup'
 
-const isBackendService = (req: { user?: { email?: string | null } | null }): boolean =>
-  req.user?.email === 'backend@dacho.local'
-
 /**
  * Only an internal admin may grant or revoke roles. Everyone else — including
  * anonymous self-signup — is forced to the safe default via `defaultValue` +
@@ -34,17 +31,17 @@ const isBackendService = (req: { user?: { email?: string | null } | null }): boo
 const adminOnlyField: FieldAccess = ({ req }) => isInternalAdmin(req.user)
 
 const canUpdateUser: Access = ({ req }) => {
-  if (isInternalAdmin(req.user) || isBackendService(req)) return true
+  if (isInternalAdmin(req.user)) return true
   if (!req.user?.id) return false
   return { id: { equals: req.user.id } }
 }
 const canReadUser: Access = ({ req }) => {
-  if (isInternalAdmin(req.user) || isBackendService(req)) return true
+  if (isInternalAdmin(req.user)) return true
   if (!req.user?.id) return false
   return { id: { equals: req.user.id } }
 }
 const canDeleteUser: Access = ({ req }) => {
-  if (isInternalAdmin(req.user) || isBackendService(req)) return true
+  if (isInternalAdmin(req.user)) return true
   if (!req.user?.id) return false
   return { id: { equals: req.user.id } }
 }
