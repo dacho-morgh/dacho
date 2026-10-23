@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import { availableParallelism } from 'node:os'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from 'vite-tsconfig-paths'
 
@@ -19,7 +20,9 @@ export default defineConfig({
     // violations and slow-test timeouts in files that pass in isolation. The
     // backend's int config solves this outright with `fileParallelism: false`;
     // this suite is large enough that serialising it is wasteful, so cap the
-    // workers instead.
-    maxWorkers: 4,
+    // workers instead. Small CI runners must not be oversubscribed: even the
+    // mocked DOM tests can hit their normal timeout when four workers compete
+    // for two CPUs.
+    maxWorkers: Math.min(4, availableParallelism()),
   },
 })
