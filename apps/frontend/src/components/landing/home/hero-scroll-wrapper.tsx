@@ -1,43 +1,40 @@
 'use client'
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useGSAP } from '@gsap/react'
+import gsap from 'gsap'
+import { useRef, type ReactNode } from 'react'
+import { HOME_EASE_OUT, HOME_REVEAL_DURATION, HOME_STAGGER } from './home-motion'
 
 export default function HeroScrollWrapper({ children }: { children: ReactNode }) {
   const sectionRef = useRef<HTMLElement>(null)
 
-  useEffect(() => {
-      if (typeof window === 'undefined' || window.matchMedia('(max-width: 1023px)').matches) return
-      const section = sectionRef.current
-      if (!section) return
-
-      let cancelled = false
-      let cleanup = () => {}
-      void Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(([{ default: gsap }, { ScrollTrigger }]) => {
-        if (cancelled) return
-        gsap.registerPlugin(ScrollTrigger)
-        const media = gsap.matchMedia()
-        media.add('(min-width: 1024px) and (prefers-reduced-motion: no-preference)', () => {
-          gsap.to(section, {
-          paddingLeft: 'clamp(1rem, 6vw, 6rem)',
-          paddingRight: 'clamp(1rem, 6vw, 6rem)',
-          ease: 'none',
-          scrollTrigger: {
-            trigger: document.body,
-            start: 'top top',
-            end: '+=480',
-            scrub: 2,
-          },
+  useGSAP(
+    () => {
+      const media = gsap.matchMedia()
+      media.add(
+        { reduce: '(prefers-reduced-motion: reduce)', always: '(min-width: 0px)' },
+        (context) => {
+          const reduce = context.conditions!.reduce
+          // The headline and hero image stay visible for the initial paint.
+          gsap.from('[data-hero-enter]', {
+            opacity: 0.65,
+            ...(reduce ? {} : { transform: 'translate3d(0, 8px, 0)' }),
+            duration: reduce ? 0.2 : HOME_REVEAL_DURATION,
+            stagger: reduce ? 0 : HOME_STAGGER,
+            ease: HOME_EASE_OUT,
+            clearProps: 'opacity,transform',
           })
-        })
-        cleanup = () => media.revert()
-      })
-      return () => { cancelled = true; cleanup() }
-  }, [])
+        },
+      )
+      return () => media.revert()
+    },
+    { scope: sectionRef },
+  )
 
   return (
     <section
       ref={sectionRef}
-      className="relative mx-auto w-full max-w-[1600px] overflow-hidden pt-25 lg:will-change-[padding-left,padding-right] lg:h-200 lg:pt-0"
+      className="relative mx-auto w-full max-w-[1600px] overflow-hidden pt-25 lg:h-200 lg:pt-0"
     >
       {children}
     </section>

@@ -909,11 +909,14 @@ export interface Form {
   createdAt: string;
 }
 /**
+ * Drag rows using their handles to set the homepage grid order. Cards flow right to left, then onto the next row. New services appear at the end.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "services".
  */
 export interface Service {
   id: number;
+  _order?: string | null;
   title: string;
   /**
    * Stable machine key mapping the service to the dashboard quick-access cards
@@ -932,11 +935,11 @@ export interface Service {
    */
   gradient?: ('blue-cyan' | 'indigo-purple' | 'fuchsia-rose' | 'emerald-teal' | 'amber-orange') | null;
   /**
-   * Short summary for listings and previews
+   * Description shown on the homepage service card and in listings.
    */
   excerpt?: string | null;
   /**
-   * Thumbnail shown on landing page listings
+   * SVG or WebP illustration shown on the homepage service card.
    */
   featuredImage?: (number | null) | Media;
   /**
@@ -2257,6 +2260,7 @@ export interface SponsorsSelect<T extends boolean = true> {
  * via the `definition` "services_select".
  */
 export interface ServicesSelect<T extends boolean = true> {
+  _order?: T;
   title?: T;
   key?: T;
   icon?: T;

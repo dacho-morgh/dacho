@@ -205,8 +205,10 @@ test.describe('Frontend', () => {
   }) => {
     await page.goto('http://localhost:3000')
 
-    const lastReveal = page.locator('main > div').last()
-    await expect(lastReveal).toHaveCSS('transform', /48/)
+    const lastReveal = page.locator('main [data-home-reveal]').last()
+    await expect(lastReveal).toHaveCSS('opacity', '0')
+    await expect(lastReveal).toHaveCSS('transform', /8\)/)
+    await expect(page.locator('main > div').last()).toHaveCSS('transform', 'none')
 
     const hasNestedVerticalScrollbar = await page.locator('main').evaluate((main) => {
       const { overflowY } = getComputedStyle(main)

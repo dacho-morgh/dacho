@@ -1,0 +1,870 @@
+[
+  {
+    "id": "FE01",
+    "title": "Seven-role dashboard shell and protected navigation",
+    "implementationTasks": [
+      "T08",
+      "T09",
+      "T38",
+      "T39"
+    ],
+    "frontendDependencies": [],
+    "manualGates": [
+      "UAT03",
+      "UAT15",
+      "UAT29"
+    ],
+    "figma": "31411:7579;30510:13146;5:5018",
+    "source": "app-sidebar.tsx; sidebar-shell.tsx; dashboard/layout.tsx",
+    "criteria": [
+      "Replace admin-versus-company branching with the seven approved single operational roles.",
+      "Use server-authorized capabilities and event responsibility for destinations and actions; never trust hidden menu items as authorization.",
+      "Direct navigation, expired session, denied access and empty queues have distinct usable states.",
+      "Retain Persian RTL and keyboard/mobile navigation; no role switcher granting extra roles."
+    ],
+    "issueNumber": 70,
+    "body": "Frontend implementation work package **FE01**: Seven-role dashboard shell and protected navigation.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T08 — #22](https://github.com/dacho-morgh/dacho/issues/22)\n- [T09 — #23](https://github.com/dacho-morgh/dacho/issues/23)\n- [T38 — #52](https://github.com/dacho-morgh/dacho/issues/52)\n- [T39 — #53](https://github.com/dacho-morgh/dacho/issues/53)\n\n## Frontend sequence\n- Shared primitives can begin independently.\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 31411:7579;30510:13146;5:5018.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: app-sidebar.tsx; sidebar-shell.tsx; dashboard/layout.tsx.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Replace admin-versus-company branching with the seven approved single operational roles.\n- [ ] Use server-authorized capabilities and event responsibility for destinations and actions; never trust hidden menu items as authorization.\n- [ ] Direct navigation, expired session, denied access and empty queues have distinct usable states.\n- [ ] Retain Persian RTL and keyboard/mobile navigation; no role switcher granting extra roles.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT03, UAT15, UAT29. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE01 -->\n"
+  },
+  {
+    "id": "FE02",
+    "title": "Password login, logout and session return journeys",
+    "implementationTasks": [
+      "T11"
+    ],
+    "frontendDependencies": [
+      "FE01"
+    ],
+    "manualGates": [
+      "UAT01"
+    ],
+    "figma": "242:11653",
+    "source": "auth/login-page.tsx; utilities/auth-return-url.ts",
+    "criteria": [
+      "Keep mobile/email plus password login and safe internal return URLs.",
+      "After login and logout refresh server-visible session and land at a role-appropriate operational page.",
+      "Display incorrect credentials, network failure and expired session without discarding safe input or looping redirects.",
+      "Do not represent placeholder password recovery as a working feature; agree recovery scope separately."
+    ],
+    "issueNumber": 72,
+    "body": "Frontend implementation work package **FE02**: Password login, logout and session return journeys.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T11 — #25](https://github.com/dacho-morgh/dacho/issues/25)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 242:11653.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: auth/login-page.tsx; utilities/auth-return-url.ts.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Keep mobile/email plus password login and safe internal return URLs.\n- [ ] After login and logout refresh server-visible session and land at a role-appropriate operational page.\n- [ ] Display incorrect credentials, network failure and expired session without discarding safe input or looping redirects.\n- [ ] Do not represent placeholder password recovery as a working feature; agree recovery scope separately.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT01. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE02 -->\n"
+  },
+  {
+    "id": "FE03",
+    "title": "Initial company signup and duplicate recovery",
+    "implementationTasks": [
+      "T11"
+    ],
+    "frontendDependencies": [
+      "FE02"
+    ],
+    "manualGates": [
+      "UAT02"
+    ],
+    "figma": "242:12192",
+    "source": "auth/register-page.tsx",
+    "criteria": [
+      "Collect legal company name, national ID, activity, representative name/position/phone, email and password with clear validation.",
+      "Handle duplicate national ID/contact and partial/network failures without claiming a second company was created.",
+      "Successful signup grants dashboard access but no verified participation rights.",
+      "Keep field-level Persian errors, loading lock and login link usable on mobile."
+    ],
+    "issueNumber": 80,
+    "body": "Frontend implementation work package **FE03**: Initial company signup and duplicate recovery.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T11 — #25](https://github.com/dacho-morgh/dacho/issues/25)\n\n## Frontend sequence\n- [FE02 — #72](https://github.com/dacho-morgh/dacho/issues/72)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 242:12192.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: auth/register-page.tsx.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Collect legal company name, national ID, activity, representative name/position/phone, email and password with clear validation.\n- [ ] Handle duplicate national ID/contact and partial/network failures without claiming a second company was created.\n- [ ] Successful signup grants dashboard access but no verified participation rights.\n- [ ] Keep field-level Persian errors, loading lock and login link usable on mobile.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT02. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE03 -->\n"
+  },
+  {
+    "id": "FE04",
+    "title": "Complete company profile, resume and verification submission",
+    "implementationTasks": [
+      "T05",
+      "T10",
+      "T13",
+      "T14"
+    ],
+    "frontendDependencies": [
+      "FE03",
+      "FE07"
+    ],
+    "manualGates": [
+      "UAT04",
+      "UAT05",
+      "UAT06"
+    ],
+    "figma": "30510:12186;30537:19416",
+    "source": "profile/company-profile-view.tsx; profile/resume-profile-view.tsx; utilities/dashboard-api.ts",
+    "criteria": [
+      "Implement all approved second-stage fields, repeatable key members/projects and private registration/catalogue/certificate uploads.",
+      "Separate legal entity type, company classification and research-center residency; provide does-not-have for legitimately optional items.",
+      "Persist edits, addresses, arrays and documents across refresh; show missing requirements before verification submission.",
+      "Show pending, returned with reason and resubmission on the same company profile; keep approved historical snapshot distinct from current edits."
+    ],
+    "issueNumber": 82,
+    "body": "Frontend implementation work package **FE04**: Complete company profile, resume and verification submission.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T05 — #19](https://github.com/dacho-morgh/dacho/issues/19)\n- [T10 — #24](https://github.com/dacho-morgh/dacho/issues/24)\n- [T13 — #27](https://github.com/dacho-morgh/dacho/issues/27)\n- [T14 — #33](https://github.com/dacho-morgh/dacho/issues/33)\n\n## Frontend sequence\n- [FE03 — #80](https://github.com/dacho-morgh/dacho/issues/80)\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 30510:12186;30537:19416.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: profile/company-profile-view.tsx; profile/resume-profile-view.tsx; utilities/dashboard-api.ts.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Implement all approved second-stage fields, repeatable key members/projects and private registration/catalogue/certificate uploads.\n- [ ] Separate legal entity type, company classification and research-center residency; provide does-not-have for legitimately optional items.\n- [ ] Persist edits, addresses, arrays and documents across refresh; show missing requirements before verification submission.\n- [ ] Show pending, returned with reason and resubmission on the same company profile; keep approved historical snapshot distinct from current edits.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT04, UAT05, UAT06. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE04 -->\n"
+  },
+  {
+    "id": "FE05",
+    "title": "Secretariat company verification workbench",
+    "implementationTasks": [
+      "T14",
+      "T15"
+    ],
+    "frontendDependencies": [
+      "FE01",
+      "FE04"
+    ],
+    "manualGates": [
+      "UAT06",
+      "UAT07"
+    ],
+    "figma": "30535:17763;30537:19416; new verification states",
+    "source": "company-list.tsx; company-detail.tsx",
+    "criteria": [
+      "Provide pending/returned/approved queues and exact submitted company revision with authorized document downloads.",
+      "Secretariat approves or returns/rejects with a required reason; no self-approval or automatic account suspension.",
+      "Protect unsaved decision text and handle a stale company revision by refreshing before another decision.",
+      "Show identity edits awaiting re-verification while old submitted cases retain their approved snapshots."
+    ],
+    "issueNumber": 84,
+    "body": "Frontend implementation work package **FE05**: Secretariat company verification workbench.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T14 — #33](https://github.com/dacho-morgh/dacho/issues/33)\n- [T15 — #34](https://github.com/dacho-morgh/dacho/issues/34)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE04 — #82](https://github.com/dacho-morgh/dacho/issues/82)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 30535:17763;30537:19416; new verification states.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: company-list.tsx; company-detail.tsx.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Provide pending/returned/approved queues and exact submitted company revision with authorized document downloads.\n- [ ] Secretariat approves or returns/rejects with a required reason; no self-approval or automatic account suspension.\n- [ ] Protect unsaved decision text and handle a stale company revision by refreshing before another decision.\n- [ ] Show identity edits awaiting re-verification while old submitted cases retain their approved snapshots.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT06, UAT07. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE05 -->\n"
+  },
+  {
+    "id": "FE06",
+    "title": "Participation eligibility and return-to-registration flow",
+    "implementationTasks": [
+      "T15",
+      "T19",
+      "T55"
+    ],
+    "frontendDependencies": [
+      "FE04",
+      "FE05",
+      "FE11"
+    ],
+    "manualGates": [
+      "UAT07",
+      "UAT10",
+      "UAT33"
+    ],
+    "figma": "30599:21935",
+    "source": "events-view.tsx; new-request-form.tsx",
+    "criteria": [
+      "Explain incomplete, pending, returned and approved verification states at event/exhibition entry.",
+      "Link to the precise missing profile sections and preserve intended event/subtopic or booth destination.",
+      "Re-check eligibility at final submit and handle server denial when verification changes mid-form.",
+      "Distinguish company verification from exhibition attendance approval and payment permission."
+    ],
+    "issueNumber": 85,
+    "body": "Frontend implementation work package **FE06**: Participation eligibility and return-to-registration flow.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T15 — #34](https://github.com/dacho-morgh/dacho/issues/34)\n- [T19 — #35](https://github.com/dacho-morgh/dacho/issues/35)\n- [T55 — #63](https://github.com/dacho-morgh/dacho/issues/63)\n\n## Frontend sequence\n- [FE04 — #82](https://github.com/dacho-morgh/dacho/issues/82)\n- [FE05 — #84](https://github.com/dacho-morgh/dacho/issues/84)\n- [FE11 — #74](https://github.com/dacho-morgh/dacho/issues/74)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 30599:21935.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: events-view.tsx; new-request-form.tsx.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Explain incomplete, pending, returned and approved verification states at event/exhibition entry.\n- [ ] Link to the precise missing profile sections and preserve intended event/subtopic or booth destination.\n- [ ] Re-check eligibility at final submit and handle server denial when verification changes mid-form.\n- [ ] Distinguish company verification from exhibition attendance approval and payment permission.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT07, UAT10, UAT33. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE06 -->\n"
+  },
+  {
+    "id": "FE07",
+    "title": "Private file upload and authorized download components",
+    "implementationTasks": [
+      "T06",
+      "T10",
+      "T18",
+      "T30",
+      "T35",
+      "T50"
+    ],
+    "frontendDependencies": [],
+    "manualGates": [
+      "UAT05",
+      "UAT09",
+      "UAT11",
+      "UAT22",
+      "UAT25",
+      "UAT35"
+    ],
+    "figma": "30599:21935;53:12475; new financial/receipt variants",
+    "source": "new-letter-form.tsx; utilities/dashboard-api.ts",
+    "criteria": [
+      "Share accessible upload/download controls for RFP, proposal, company, finance, correspondence and receipt categories.",
+      "Show category-specific allowed formats/size/count from approved policy; Q39 is unresolved, never hard-code universal 12 MB.",
+      "Handle upload progress, invalid type/size, failed retry, replacement and pending upload before form submit.",
+      "Use authorized document IDs/URLs; denied downloads and expired sessions must not fall back to public media links.",
+      "Do not claim resumable upload unless the backend contract supports it."
+    ],
+    "issueNumber": 71,
+    "body": "Frontend implementation work package **FE07**: Private file upload and authorized download components.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T06 — #20](https://github.com/dacho-morgh/dacho/issues/20)\n- [T10 — #24](https://github.com/dacho-morgh/dacho/issues/24)\n- [T18 — #30](https://github.com/dacho-morgh/dacho/issues/30)\n- [T30 — #46](https://github.com/dacho-morgh/dacho/issues/46)\n- [T35 — #50](https://github.com/dacho-morgh/dacho/issues/50)\n- [T50 — #65](https://github.com/dacho-morgh/dacho/issues/65)\n\n## Frontend sequence\n- Shared primitives can begin independently.\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 30599:21935;53:12475; new financial/receipt variants.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new-letter-form.tsx; utilities/dashboard-api.ts.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Share accessible upload/download controls for RFP, proposal, company, finance, correspondence and receipt categories.\n- [ ] Show category-specific allowed formats/size/count from approved policy; Q39 is unresolved, never hard-code universal 12 MB.\n- [ ] Handle upload progress, invalid type/size, failed retry, replacement and pending upload before form submit.\n- [ ] Use authorized document IDs/URLs; denied downloads and expired sessions must not fall back to public media links.\n- [ ] Do not claim resumable upload unless the backend contract supports it.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT05, UAT09, UAT11, UAT22, UAT25, UAT35. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE07 -->\n"
+  },
+  {
+    "id": "FE08",
+    "title": "Owner personnel creation and event-role assignment UI",
+    "implementationTasks": [
+      "T08",
+      "T09",
+      "T16"
+    ],
+    "frontendDependencies": [
+      "FE01"
+    ],
+    "manualGates": [
+      "UAT03",
+      "UAT08"
+    ],
+    "figma": "30722:2394;31070:14855;31934:59524",
+    "source": "employee-list.tsx; admin-list-view.tsx; profile/staff-profile-view.tsx",
+    "criteria": [
+      "Enable owner personnel create/edit with exactly one operational role per person.",
+      "Show event-specific chief and single investment-person assignments with eligible account selectors.",
+      "Keep employer a person with a reviewer account; no employer organization or multi-role selector.",
+      "Unauthorized roles see no management controls and direct requests remain server-denied."
+    ],
+    "issueNumber": 73,
+    "body": "Frontend implementation work package **FE08**: Owner personnel creation and event-role assignment UI.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T08 — #22](https://github.com/dacho-morgh/dacho/issues/22)\n- [T09 — #23](https://github.com/dacho-morgh/dacho/issues/23)\n- [T16 — #28](https://github.com/dacho-morgh/dacho/issues/28)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 30722:2394;31070:14855;31934:59524.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: employee-list.tsx; admin-list-view.tsx; profile/staff-profile-view.tsx.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Enable owner personnel create/edit with exactly one operational role per person.\n- [ ] Show event-specific chief and single investment-person assignments with eligible account selectors.\n- [ ] Keep employer a person with a reviewer account; no employer organization or multi-role selector.\n- [ ] Unauthorized roles see no management controls and direct requests remain server-denied.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT03, UAT08. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE08 -->\n"
+  },
+  {
+    "id": "FE09",
+    "title": "Owner event configuration and responsible teams",
+    "implementationTasks": [
+      "T16"
+    ],
+    "frontendDependencies": [
+      "FE08"
+    ],
+    "manualGates": [
+      "UAT08"
+    ],
+    "figma": "56:14018; administration extension required",
+    "source": "events-view.tsx; event CMS integration",
+    "criteria": [
+      "Provide usable event create/edit or documented authorized CMS entry for title, description, dates and registration window.",
+      "Select responsible chief and one investment person for each event; distinguish E1 and E2.",
+      "Validate dates/required fields and present server errors, unpublished/closed states and saved state.",
+      "Use fixed system forms; do not add per-event form builder controls."
+    ],
+    "issueNumber": 81,
+    "body": "Frontend implementation work package **FE09**: Owner event configuration and responsible teams.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T16 — #28](https://github.com/dacho-morgh/dacho/issues/28)\n\n## Frontend sequence\n- [FE08 — #73](https://github.com/dacho-morgh/dacho/issues/73)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 56:14018; administration extension required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: events-view.tsx; event CMS integration.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Provide usable event create/edit or documented authorized CMS entry for title, description, dates and registration window.\n- [ ] Select responsible chief and one investment person for each event; distinguish E1 and E2.\n- [ ] Validate dates/required fields and present server errors, unpublished/closed states and saved state.\n- [ ] Use fixed system forms; do not add per-event form builder controls.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT08. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE09 -->\n"
+  },
+  {
+    "id": "FE10",
+    "title": "Category, subtopic, employer and RFP administration",
+    "implementationTasks": [
+      "T17",
+      "T18"
+    ],
+    "frontendDependencies": [
+      "FE09",
+      "FE07"
+    ],
+    "manualGates": [
+      "UAT09"
+    ],
+    "figma": "49:7968;30599:21935; authoring extension required",
+    "source": "events-view.tsx; owner event administration",
+    "criteria": [
+      "Owner creates categories and nested subtopics within the correct event.",
+      "Assign exactly one eligible employer person and the subtopic RFP file; edit/download correct versions.",
+      "Prevent invalid parent/event combinations and show server validation without losing edits.",
+      "Warn that edits apply according to backend version rules and cannot silently rewrite submitted cases."
+    ],
+    "issueNumber": 83,
+    "body": "Frontend implementation work package **FE10**: Category, subtopic, employer and RFP administration.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T17 — #29](https://github.com/dacho-morgh/dacho/issues/29)\n- [T18 — #30](https://github.com/dacho-morgh/dacho/issues/30)\n\n## Frontend sequence\n- [FE09 — #81](https://github.com/dacho-morgh/dacho/issues/81)\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 49:7968;30599:21935; authoring extension required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: events-view.tsx; owner event administration.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Owner creates categories and nested subtopics within the correct event.\n- [ ] Assign exactly one eligible employer person and the subtopic RFP file; edit/download correct versions.\n- [ ] Prevent invalid parent/event combinations and show server validation without losing edits.\n- [ ] Warn that edits apply according to backend version rules and cannot silently rewrite submitted cases.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT09. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE10 -->\n"
+  },
+  {
+    "id": "FE11",
+    "title": "Event discovery, subtopic selection and RFP reading",
+    "implementationTasks": [
+      "T16",
+      "T17",
+      "T18"
+    ],
+    "frontendDependencies": [
+      "FE01",
+      "FE07"
+    ],
+    "manualGates": [
+      "UAT08",
+      "UAT09",
+      "UAT10"
+    ],
+    "figma": "56:14018;49:7968",
+    "source": "events-view.tsx; dashboard/events/page.tsx",
+    "criteria": [
+      "Render real published events and registration states with category/subtopic hierarchy.",
+      "Download each selected subtopic RFP and show employer identity where authorized.",
+      "Allow selection of several subtopics while clearly stating each becomes a separate application.",
+      "Use actual IDs and server state; URL title/event text must not become authoritative application data."
+    ],
+    "issueNumber": 74,
+    "body": "Frontend implementation work package **FE11**: Event discovery, subtopic selection and RFP reading.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T16 — #28](https://github.com/dacho-morgh/dacho/issues/28)\n- [T17 — #29](https://github.com/dacho-morgh/dacho/issues/29)\n- [T18 — #30](https://github.com/dacho-morgh/dacho/issues/30)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 56:14018;49:7968.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: events-view.tsx; dashboard/events/page.tsx.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Render real published events and registration states with category/subtopic hierarchy.\n- [ ] Download each selected subtopic RFP and show employer identity where authorized.\n- [ ] Allow selection of several subtopics while clearly stating each becomes a separate application.\n- [ ] Use actual IDs and server state; URL title/event text must not become authoritative application data.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT08, UAT09, UAT10. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE11 -->\n"
+  },
+  {
+    "id": "FE12",
+    "title": "Independent event application drafts and proposal submission",
+    "implementationTasks": [
+      "T03",
+      "T12",
+      "T19",
+      "T20"
+    ],
+    "frontendDependencies": [
+      "FE06",
+      "FE07",
+      "FE11"
+    ],
+    "manualGates": [
+      "UAT10",
+      "UAT11"
+    ],
+    "figma": "30599:21935",
+    "source": "new-request-form.tsx; dashboard/new-request/page.tsx",
+    "criteria": [
+      "Use the fixed approved registration fields, key team, non-compete/rules acknowledgements and proposal upload.",
+      "Create/save/resume one independent draft per subtopic and show independent tracking IDs/results after submission.",
+      "Record correct agreement/RFP/form/proposal versions through the API; final agreement text and Q39 remain product inputs.",
+      "Preserve input on validation/network failure and recover after draft-create succeeds but final submit fails without creating a duplicate."
+    ],
+    "issueNumber": 86,
+    "body": "Frontend implementation work package **FE12**: Independent event application drafts and proposal submission.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T03 — #17](https://github.com/dacho-morgh/dacho/issues/17)\n- [T12 — #26](https://github.com/dacho-morgh/dacho/issues/26)\n- [T19 — #35](https://github.com/dacho-morgh/dacho/issues/35)\n- [T20 — #36](https://github.com/dacho-morgh/dacho/issues/36)\n\n## Frontend sequence\n- [FE06 — #85](https://github.com/dacho-morgh/dacho/issues/85)\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n- [FE11 — #74](https://github.com/dacho-morgh/dacho/issues/74)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 30599:21935.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new-request-form.tsx; dashboard/new-request/page.tsx.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Use the fixed approved registration fields, key team, non-compete/rules acknowledgements and proposal upload.\n- [ ] Create/save/resume one independent draft per subtopic and show independent tracking IDs/results after submission.\n- [ ] Record correct agreement/RFP/form/proposal versions through the API; final agreement text and Q39 remain product inputs.\n- [ ] Preserve input on validation/network failure and recover after draft-create succeeds but final submit fails without creating a duplicate.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT10, UAT11. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE12 -->\n"
+  },
+  {
+    "id": "FE13",
+    "title": "Company request tracking, correction and published result",
+    "implementationTasks": [
+      "T19",
+      "T21",
+      "T28",
+      "T33",
+      "T39"
+    ],
+    "frontendDependencies": [
+      "FE12"
+    ],
+    "manualGates": [
+      "UAT10",
+      "UAT12",
+      "UAT13",
+      "UAT20",
+      "UAT26"
+    ],
+    "figma": "50:9221;49:7968",
+    "source": "requests/; admin-request-detail.tsx",
+    "criteria": [
+      "Show own independent requests, accurate stage, required next action and submitted revision.",
+      "Correction edits the same case and resubmits a new proposal revision; explain new review round when applicable.",
+      "Final rejection blocks only that event/subtopic and shows reason/reopen state returned by server.",
+      "Render only released result text; never raw internal memo, other companies, scores or hidden financial data."
+    ],
+    "issueNumber": 88,
+    "body": "Frontend implementation work package **FE13**: Company request tracking, correction and published result.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T19 — #35](https://github.com/dacho-morgh/dacho/issues/35)\n- [T21 — #37](https://github.com/dacho-morgh/dacho/issues/37)\n- [T28 — #44](https://github.com/dacho-morgh/dacho/issues/44)\n- [T33 — #51](https://github.com/dacho-morgh/dacho/issues/51)\n- [T39 — #53](https://github.com/dacho-morgh/dacho/issues/53)\n\n## Frontend sequence\n- [FE12 — #86](https://github.com/dacho-morgh/dacho/issues/86)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 50:9221;49:7968.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: requests/; admin-request-detail.tsx.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Show own independent requests, accurate stage, required next action and submitted revision.\n- [ ] Correction edits the same case and resubmits a new proposal revision; explain new review round when applicable.\n- [ ] Final rejection blocks only that event/subtopic and shows reason/reopen state returned by server.\n- [ ] Render only released result text; never raw internal memo, other companies, scores or hidden financial data.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT10, UAT12, UAT13, UAT20, UAT26. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE13 -->\n"
+  },
+  {
+    "id": "FE14",
+    "title": "Chief triage and owner reopen actions",
+    "implementationTasks": [
+      "T21",
+      "T28"
+    ],
+    "frontendDependencies": [
+      "FE01",
+      "FE13"
+    ],
+    "manualGates": [
+      "UAT12",
+      "UAT13",
+      "UAT20"
+    ],
+    "figma": "31885:6566;31885:6681",
+    "source": "admin-request-list.tsx; admin-request-detail.tsx; admin-request-evaluation.tsx",
+    "criteria": [
+      "Chief sees responsible-event intake and submitted profile/proposal snapshots.",
+      "Provide return-for-correction and final rejection with distinct consequences and required reasons.",
+      "Only owner gets audited reopen action; do not reuse a generic approve endpoint for all transitions.",
+      "Display pending/stale/failed decisions accurately and refresh queue/detail after success."
+    ],
+    "issueNumber": 90,
+    "body": "Frontend implementation work package **FE14**: Chief triage and owner reopen actions.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T21 — #37](https://github.com/dacho-morgh/dacho/issues/37)\n- [T28 — #44](https://github.com/dacho-morgh/dacho/issues/44)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE13 — #88](https://github.com/dacho-morgh/dacho/issues/88)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 31885:6566;31885:6681.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: admin-request-list.tsx; admin-request-detail.tsx; admin-request-evaluation.tsx.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Chief sees responsible-event intake and submitted profile/proposal snapshots.\n- [ ] Provide return-for-correction and final rejection with distinct consequences and required reasons.\n- [ ] Only owner gets audited reopen action; do not reuse a generic approve endpoint for all transitions.\n- [ ] Display pending/stale/failed decisions accurately and refresh queue/detail after success.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT12, UAT13, UAT20. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE14 -->\n"
+  },
+  {
+    "id": "FE15",
+    "title": "Four-reviewer assignment and controlled replacement",
+    "implementationTasks": [
+      "T22",
+      "T26",
+      "T27"
+    ],
+    "frontendDependencies": [
+      "FE14",
+      "FE08"
+    ],
+    "manualGates": [
+      "UAT14",
+      "UAT18",
+      "UAT19"
+    ],
+    "figma": "31885:20781;31885:6681",
+    "source": "new chief assignment dialog",
+    "criteria": [
+      "Show the fixed employer plus three distinct ordinary reviewer selectors for the active round.",
+      "Reject duplicates and ineligible accounts; display exact proposal revision and assignment status.",
+      "Chief can replace unfinished ordinary reviewer only; employer replacement is owner-only with reason.",
+      "Retain replacement history and refresh revoked assignment state; show 0/4 through 4/4 based on finalized evaluations."
+    ],
+    "issueNumber": 92,
+    "body": "Frontend implementation work package **FE15**: Four-reviewer assignment and controlled replacement.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T22 — #38](https://github.com/dacho-morgh/dacho/issues/38)\n- [T26 — #42](https://github.com/dacho-morgh/dacho/issues/42)\n- [T27 — #43](https://github.com/dacho-morgh/dacho/issues/43)\n\n## Frontend sequence\n- [FE14 — #90](https://github.com/dacho-morgh/dacho/issues/90)\n- [FE08 — #73](https://github.com/dacho-morgh/dacho/issues/73)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 31885:20781;31885:6681.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new chief assignment dialog.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Show the fixed employer plus three distinct ordinary reviewer selectors for the active round.\n- [ ] Reject duplicates and ineligible accounts; display exact proposal revision and assignment status.\n- [ ] Chief can replace unfinished ordinary reviewer only; employer replacement is owner-only with reason.\n- [ ] Retain replacement history and refresh revoked assignment state; show 0/4 through 4/4 based on finalized evaluations.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT14, UAT18, UAT19. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE15 -->\n"
+  },
+  {
+    "id": "FE16",
+    "title": "Assigned reviewer and employer queue and dossier",
+    "implementationTasks": [
+      "T09",
+      "T23",
+      "T27"
+    ],
+    "frontendDependencies": [
+      "FE01",
+      "FE15"
+    ],
+    "manualGates": [
+      "UAT15",
+      "UAT19"
+    ],
+    "figma": "31422:20716;31881:36043",
+    "source": "requests/; new reviewer dossier",
+    "criteria": [
+      "Show only cases assigned to the authenticated reviewer/employer and necessary company snapshot/proposal/RFP.",
+      "Each reviewer sees only their own evaluation and required documents, never other scores or financial files.",
+      "Handle reassignment/revoked access while a page is open; do not keep exposing cached sensitive data.",
+      "Unassigned, cross-event and direct-URL paths have clear denied states backed by server enforcement."
+    ],
+    "issueNumber": 94,
+    "body": "Frontend implementation work package **FE16**: Assigned reviewer and employer queue and dossier.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T09 — #23](https://github.com/dacho-morgh/dacho/issues/23)\n- [T23 — #39](https://github.com/dacho-morgh/dacho/issues/39)\n- [T27 — #43](https://github.com/dacho-morgh/dacho/issues/43)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE15 — #92](https://github.com/dacho-morgh/dacho/issues/92)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 31422:20716;31881:36043.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: requests/; new reviewer dossier.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Show only cases assigned to the authenticated reviewer/employer and necessary company snapshot/proposal/RFP.\n- [ ] Each reviewer sees only their own evaluation and required documents, never other scores or financial files.\n- [ ] Handle reassignment/revoked access while a page is open; do not keep exposing cached sensitive data.\n- [ ] Unassigned, cross-event and direct-URL paths have clear denied states backed by server enforcement.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT15, UAT19. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE16 -->\n"
+  },
+  {
+    "id": "FE17",
+    "title": "Fixed review forms, draft saving and finalization",
+    "implementationTasks": [
+      "T24",
+      "T25"
+    ],
+    "frontendDependencies": [
+      "FE16"
+    ],
+    "manualGates": [
+      "UAT16",
+      "UAT17"
+    ],
+    "figma": "31881:33737;31881:34265",
+    "source": "new review form components",
+    "criteria": [
+      "Render the final approved system-wide questions, bounds and scoring description; rubric is currently unresolved.",
+      "Save and reopen drafts for the active round; show server field errors and persisted state.",
+      "Require explicit final confirmation and lock finalized evaluations against normal editing.",
+      "Show authoritative server score and applicable rubric version; never use unapproved 45/40/15 or trigger automatic advancement."
+    ],
+    "issueNumber": 96,
+    "body": "Frontend implementation work package **FE17**: Fixed review forms, draft saving and finalization.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T24 — #40](https://github.com/dacho-morgh/dacho/issues/40)\n- [T25 — #41](https://github.com/dacho-morgh/dacho/issues/41)\n\n## Frontend sequence\n- [FE16 — #94](https://github.com/dacho-morgh/dacho/issues/94)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 31881:33737;31881:34265.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new review form components.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Render the final approved system-wide questions, bounds and scoring description; rubric is currently unresolved.\n- [ ] Save and reopen drafts for the active round; show server field errors and persisted state.\n- [ ] Require explicit final confirmation and lock finalized evaluations against normal editing.\n- [ ] Show authoritative server score and applicable rubric version; never use unapproved 45/40/15 or trigger automatic advancement.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT16, UAT17. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE17 -->\n"
+  },
+  {
+    "id": "FE18",
+    "title": "Chief four-review summary and explicit next-stage decision",
+    "implementationTasks": [
+      "T27",
+      "T28",
+      "T29"
+    ],
+    "frontendDependencies": [
+      "FE15",
+      "FE17"
+    ],
+    "manualGates": [
+      "UAT19",
+      "UAT20",
+      "UAT21"
+    ],
+    "figma": "31885:6783;31937:64489",
+    "source": "new chief result summary",
+    "criteria": [
+      "Show four finalized current-round evaluations with authorized summaries and separate historical rounds.",
+      "Keep next-stage advancement unavailable until 4/4 and require explicit chief action even at high scores.",
+      "Return-for-correction explains that previous scores stay historical and a new round is required.",
+      "Handle a simultaneous fourth review/stale decision by refreshing authoritative state without duplicate transition."
+    ],
+    "issueNumber": 97,
+    "body": "Frontend implementation work package **FE18**: Chief four-review summary and explicit next-stage decision.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T27 — #43](https://github.com/dacho-morgh/dacho/issues/43)\n- [T28 — #44](https://github.com/dacho-morgh/dacho/issues/44)\n- [T29 — #45](https://github.com/dacho-morgh/dacho/issues/45)\n\n## Frontend sequence\n- [FE15 — #92](https://github.com/dacho-morgh/dacho/issues/92)\n- [FE17 — #96](https://github.com/dacho-morgh/dacho/issues/96)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 31885:6783;31937:64489.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new chief result summary.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Show four finalized current-round evaluations with authorized summaries and separate historical rounds.\n- [ ] Keep next-stage advancement unavailable until 4/4 and require explicit chief action even at high scores.\n- [ ] Return-for-correction explains that previous scores stay historical and a new round is required.\n- [ ] Handle a simultaneous fourth review/stale decision by refreshing authoritative state without duplicate transition.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT19, UAT20, UAT21. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE18 -->\n"
+  },
+  {
+    "id": "FE19",
+    "title": "Company financial package and supplementary documents",
+    "implementationTasks": [
+      "T29",
+      "T30",
+      "T31",
+      "T35"
+    ],
+    "frontendDependencies": [
+      "FE07",
+      "FE13",
+      "FE18"
+    ],
+    "manualGates": [
+      "UAT21",
+      "UAT22",
+      "UAT23",
+      "UAT25"
+    ],
+    "figma": "new financial package screens required",
+    "source": "new company investment package components",
+    "criteria": [
+      "Open financial upload only after chief invitation and show all seven approved document categories.",
+      "Support financials since establishment for younger companies and multi-file categories where policy permits.",
+      "Save draft, show incomplete requirements and submit a versioned complete package with retry-safe behavior.",
+      "Supplementary financial documents travel through Secretariat case correspondence and retain the same restricted visibility."
+    ],
+    "issueNumber": 98,
+    "body": "Frontend implementation work package **FE19**: Company financial package and supplementary documents.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T29 — #45](https://github.com/dacho-morgh/dacho/issues/45)\n- [T30 — #46](https://github.com/dacho-morgh/dacho/issues/46)\n- [T31 — #47](https://github.com/dacho-morgh/dacho/issues/47)\n- [T35 — #50](https://github.com/dacho-morgh/dacho/issues/50)\n\n## Frontend sequence\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n- [FE13 — #88](https://github.com/dacho-morgh/dacho/issues/88)\n- [FE18 — #97](https://github.com/dacho-morgh/dacho/issues/97)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: new financial package screens required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new company investment package components.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Open financial upload only after chief invitation and show all seven approved document categories.\n- [ ] Support financials since establishment for younger companies and multi-file categories where policy permits.\n- [ ] Save draft, show incomplete requirements and submit a versioned complete package with retry-safe behavior.\n- [ ] Supplementary financial documents travel through Secretariat case correspondence and retain the same restricted visibility.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT21, UAT22, UAT23, UAT25. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE19 -->\n"
+  },
+  {
+    "id": "FE20",
+    "title": "Single investment reviewer dossier and memo submission",
+    "implementationTasks": [
+      "T31",
+      "T32"
+    ],
+    "frontendDependencies": [
+      "FE01",
+      "FE19"
+    ],
+    "manualGates": [
+      "UAT23",
+      "UAT24"
+    ],
+    "figma": "31964:72696 sidebar only; dossier design required",
+    "source": "new investment workspace",
+    "criteria": [
+      "Assigned investment person sees only assigned case profiles, authorized evaluations and private financial package.",
+      "Provide memo draft/save/send to Secretariat with clear submitted/failed states and history.",
+      "Do not add committee voting, independent approval, rejection or return actions.",
+      "Supplementary needs are written in memo for Secretariat follow-up; a sent memo does not publish a company result."
+    ],
+    "issueNumber": 99,
+    "body": "Frontend implementation work package **FE20**: Single investment reviewer dossier and memo submission.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T31 — #47](https://github.com/dacho-morgh/dacho/issues/47)\n- [T32 — #48](https://github.com/dacho-morgh/dacho/issues/48)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE19 — #98](https://github.com/dacho-morgh/dacho/issues/98)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 31964:72696 sidebar only; dossier design required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new investment workspace.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Assigned investment person sees only assigned case profiles, authorized evaluations and private financial package.\n- [ ] Provide memo draft/save/send to Secretariat with clear submitted/failed states and history.\n- [ ] Do not add committee voting, independent approval, rejection or return actions.\n- [ ] Supplementary needs are written in memo for Secretariat follow-up; a sent memo does not publish a company result.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT23, UAT24. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE20 -->\n"
+  },
+  {
+    "id": "FE21",
+    "title": "Secretariat financial follow-up and result publication",
+    "implementationTasks": [
+      "T33",
+      "T35"
+    ],
+    "frontendDependencies": [
+      "FE20",
+      "FE22"
+    ],
+    "manualGates": [
+      "UAT25",
+      "UAT26"
+    ],
+    "figma": "30851:15780; publication design extension required",
+    "source": "new publication/follow-up components",
+    "criteria": [
+      "Secretariat sees incoming investment memo and can request supplementary documents in case-linked correspondence.",
+      "Provide a separate company-facing result text editor and explicit publish action.",
+      "Preview exactly what company will see and keep internal memo/reviewer scores/private files out of published content.",
+      "Show unpublished/published history and protect duplicate/stale publish submissions."
+    ],
+    "issueNumber": 100,
+    "body": "Frontend implementation work package **FE21**: Secretariat financial follow-up and result publication.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T33 — #51](https://github.com/dacho-morgh/dacho/issues/51)\n- [T35 — #50](https://github.com/dacho-morgh/dacho/issues/50)\n\n## Frontend sequence\n- [FE20 — #99](https://github.com/dacho-morgh/dacho/issues/99)\n- [FE22 — #75](https://github.com/dacho-morgh/dacho/issues/75)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 30851:15780; publication design extension required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new publication/follow-up components.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Secretariat sees incoming investment memo and can request supplementary documents in case-linked correspondence.\n- [ ] Provide a separate company-facing result text editor and explicit publish action.\n- [ ] Preview exactly what company will see and keep internal memo/reviewer scores/private files out of published content.\n- [ ] Show unpublished/published history and protect duplicate/stale publish submissions.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT25, UAT26. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE21 -->\n"
+  },
+  {
+    "id": "FE22",
+    "title": "Role-scoped correspondence, support and private attachments",
+    "implementationTasks": [
+      "T34",
+      "T35"
+    ],
+    "frontendDependencies": [
+      "FE01",
+      "FE07"
+    ],
+    "manualGates": [
+      "UAT25",
+      "UAT27"
+    ],
+    "figma": "53:12475;56:13200;30851:15785;31881:42165",
+    "source": "new-letter-form.tsx; mail-detail-view.tsx; support views; utilities/dashboard-api.ts",
+    "criteria": [
+      "Use authorized recipient lists: company to Secretariat, reviewer/employer to event chief, investment to assigned-case participants, owner/chief general messaging.",
+      "Keep case scope and attachment classification when composing/replying; render real attachments instead of dropping them in mapping.",
+      "Provide sent/inbox/thread/read states and send retry without accidental duplication.",
+      "Deleting an inbox item cannot erase case history; message permission does not grant new dossier or financial access."
+    ],
+    "issueNumber": 75,
+    "body": "Frontend implementation work package **FE22**: Role-scoped correspondence, support and private attachments.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T34 — #49](https://github.com/dacho-morgh/dacho/issues/49)\n- [T35 — #50](https://github.com/dacho-morgh/dacho/issues/50)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 53:12475;56:13200;30851:15785;31881:42165.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new-letter-form.tsx; mail-detail-view.tsx; support views; utilities/dashboard-api.ts.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Use authorized recipient lists: company to Secretariat, reviewer/employer to event chief, investment to assigned-case participants, owner/chief general messaging.\n- [ ] Keep case scope and attachment classification when composing/replying; render real attachments instead of dropping them in mapping.\n- [ ] Provide sent/inbox/thread/read states and send retry without accidental duplication.\n- [ ] Deleting an inbox item cannot erase case history; message permission does not grant new dossier or financial access.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT25, UAT27. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE22 -->\n"
+  },
+  {
+    "id": "FE23",
+    "title": "Scoped queues, filters, history and actionable notifications",
+    "implementationTasks": [
+      "T36",
+      "T37",
+      "T38",
+      "T39"
+    ],
+    "frontendDependencies": [
+      "FE01"
+    ],
+    "manualGates": [
+      "UAT28",
+      "UAT29"
+    ],
+    "figma": "50:9221;30812:3389;31422:20716",
+    "source": "stat-cards.tsx; recent-activities.tsx; request and inbox tables",
+    "criteria": [
+      "Display live counts matching authorized lists, event/stage filters, search and pagination.",
+      "Preserve filters on back navigation and distinguish empty results from unavailable API.",
+      "Show actor/time/action/reason/revision and permitted document links from real workflow history.",
+      "Notifications link to a permitted next action and tolerate delayed/retried delivery without pretending the business transition failed."
+    ],
+    "issueNumber": 76,
+    "body": "Frontend implementation work package **FE23**: Scoped queues, filters, history and actionable notifications.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T36 — #31](https://github.com/dacho-morgh/dacho/issues/31)\n- [T37 — #32](https://github.com/dacho-morgh/dacho/issues/32)\n- [T38 — #52](https://github.com/dacho-morgh/dacho/issues/52)\n- [T39 — #53](https://github.com/dacho-morgh/dacho/issues/53)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: 50:9221;30812:3389;31422:20716.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: stat-cards.tsx; recent-activities.tsx; request and inbox tables.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Display live counts matching authorized lists, event/stage filters, search and pagination.\n- [ ] Preserve filters on back navigation and distinguish empty results from unavailable API.\n- [ ] Show actor/time/action/reason/revision and permitted document links from real workflow history.\n- [ ] Notifications link to a permitted next action and tolerate delayed/retried delivery without pretending the business transition failed.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT28, UAT29. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE23 -->\n"
+  },
+  {
+    "id": "FE24",
+    "title": "Owner exhibition and booth catalogue administration",
+    "implementationTasks": [
+      "T47"
+    ],
+    "frontendDependencies": [
+      "FE01",
+      "FE07"
+    ],
+    "manualGates": [
+      "UAT31"
+    ],
+    "figma": "new exhibition administration designs required",
+    "source": "new exhibition/booth management components",
+    "criteria": [
+      "Create/edit exhibition, guide map, numbered booths/specifications and fixed final price in explicit toman.",
+      "Set per-company booth cap and show availability/reserved/confirmed states from server.",
+      "Separate event and exhibition configuration; no interactive map, extra services or gateway controls required.",
+      "Show saved/server conflict states and do not silently overwrite price already captured by an application."
+    ],
+    "issueNumber": 77,
+    "body": "Frontend implementation work package **FE24**: Owner exhibition and booth catalogue administration.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T47 — #61](https://github.com/dacho-morgh/dacho/issues/61)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: new exhibition administration designs required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new exhibition/booth management components.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Create/edit exhibition, guide map, numbered booths/specifications and fixed final price in explicit toman.\n- [ ] Set per-company booth cap and show availability/reserved/confirmed states from server.\n- [ ] Separate event and exhibition configuration; no interactive map, extra services or gateway controls required.\n- [ ] Show saved/server conflict states and do not silently overwrite price already captured by an application.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT31. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE24 -->\n"
+  },
+  {
+    "id": "FE25",
+    "title": "Company booth selection and independent reservations",
+    "implementationTasks": [
+      "T48",
+      "T49",
+      "T53"
+    ],
+    "frontendDependencies": [
+      "FE06",
+      "FE24"
+    ],
+    "manualGates": [
+      "UAT32",
+      "UAT34"
+    ],
+    "figma": "new booth list and reservation designs required",
+    "source": "new company exhibition catalogue",
+    "criteria": [
+      "List available specific booths with guide map, dimensions/status and final toman price.",
+      "Selecting several booths creates independent applications with independent tracking, amount and subsequent receipts.",
+      "Show company cap and resolve one booth lost to concurrent reservation without claiming successful reservation.",
+      "State that reservations persist until manual decision; no invented expiry countdown or shared invoice."
+    ],
+    "issueNumber": 87,
+    "body": "Frontend implementation work package **FE25**: Company booth selection and independent reservations.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T48 — #62](https://github.com/dacho-morgh/dacho/issues/62)\n- [T49 — #64](https://github.com/dacho-morgh/dacho/issues/64)\n- [T53 — #68](https://github.com/dacho-morgh/dacho/issues/68)\n\n## Frontend sequence\n- [FE06 — #85](https://github.com/dacho-morgh/dacho/issues/85)\n- [FE24 — #77](https://github.com/dacho-morgh/dacho/issues/77)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: new booth list and reservation designs required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new company exhibition catalogue.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] List available specific booths with guide map, dimensions/status and final toman price.\n- [ ] Selecting several booths creates independent applications with independent tracking, amount and subsequent receipts.\n- [ ] Show company cap and resolve one booth lost to concurrent reservation without claiming successful reservation.\n- [ ] State that reservations persist until manual decision; no invented expiry countdown or shared invoice.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT32, UAT34. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE25 -->\n"
+  },
+  {
+    "id": "FE26",
+    "title": "Secretariat attendance approval before payment",
+    "implementationTasks": [
+      "T55",
+      "T53"
+    ],
+    "frontendDependencies": [
+      "FE25"
+    ],
+    "manualGates": [
+      "UAT33"
+    ],
+    "figma": "new attendance workbench required",
+    "source": "new Secretariat exhibition queue",
+    "criteria": [
+      "Review each reserved-booth application independently and approve/reject attendance with recorded reason.",
+      "Payment upload is unavailable until attendance approval even for an already verified company.",
+      "Show pending attendance distinctly from pending receipt or confirmed payment.",
+      "Rejected attendance refreshes the correct booth availability and preserves unrelated booth applications."
+    ],
+    "issueNumber": 89,
+    "body": "Frontend implementation work package **FE26**: Secretariat attendance approval before payment.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T55 — #63](https://github.com/dacho-morgh/dacho/issues/63)\n- [T53 — #68](https://github.com/dacho-morgh/dacho/issues/68)\n\n## Frontend sequence\n- [FE25 — #87](https://github.com/dacho-morgh/dacho/issues/87)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: new attendance workbench required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new Secretariat exhibition queue.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Review each reserved-booth application independently and approve/reject attendance with recorded reason.\n- [ ] Payment upload is unavailable until attendance approval even for an already verified company.\n- [ ] Show pending attendance distinctly from pending receipt or confirmed payment.\n- [ ] Rejected attendance refreshes the correct booth availability and preserves unrelated booth applications.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT33. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE26 -->\n"
+  },
+  {
+    "id": "FE27",
+    "title": "Independent payment receipt submission and verification",
+    "implementationTasks": [
+      "T50",
+      "T51",
+      "T49"
+    ],
+    "frontendDependencies": [
+      "FE07",
+      "FE26"
+    ],
+    "manualGates": [
+      "UAT34",
+      "UAT35",
+      "UAT36"
+    ],
+    "figma": "new receipt submission/review designs required",
+    "source": "new company/Secretariat receipt components",
+    "criteria": [
+      "Show one application/one amount/one receipt version history for the selected booth.",
+      "Company uploads only after attendance approval; Secretariat confirms or returns receipt with reason.",
+      "Returned receipt preserves reservation and enables replacement upload on the same application.",
+      "Handle duplicate receipt/submit/confirmation responses without representing the same receipt as payment for multiple booths; display explicit toman unit."
+    ],
+    "issueNumber": 91,
+    "body": "Frontend implementation work package **FE27**: Independent payment receipt submission and verification.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T50 — #65](https://github.com/dacho-morgh/dacho/issues/65)\n- [T51 — #66](https://github.com/dacho-morgh/dacho/issues/66)\n- [T49 — #64](https://github.com/dacho-morgh/dacho/issues/64)\n\n## Frontend sequence\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n- [FE26 — #89](https://github.com/dacho-morgh/dacho/issues/89)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: new receipt submission/review designs required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new company/Secretariat receipt components.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Show one application/one amount/one receipt version history for the selected booth.\n- [ ] Company uploads only after attendance approval; Secretariat confirms or returns receipt with reason.\n- [ ] Returned receipt preserves reservation and enables replacement upload on the same application.\n- [ ] Handle duplicate receipt/submit/confirmation responses without representing the same receipt as payment for multiple booths; display explicit toman unit.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT34, UAT35, UAT36. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE27 -->\n"
+  },
+  {
+    "id": "FE28",
+    "title": "Booth cancellation, manual release and refund visibility",
+    "implementationTasks": [
+      "T52",
+      "T53"
+    ],
+    "frontendDependencies": [
+      "FE27"
+    ],
+    "manualGates": [
+      "UAT37"
+    ],
+    "figma": "new cancellation states required",
+    "source": "new exhibition cancellation dialog/history",
+    "criteria": [
+      "Company can cancel directly only before receipt upload; after receipt/payment submit a cancellation request to Secretariat.",
+      "Show reason, request pending state, manual resolution and relevant recorded refund status.",
+      "Release only the affected booth after authorized decision; other independent booth applications stay intact.",
+      "No automatic expiry or online refund promise; preserve receipt/payment/cancellation history."
+    ],
+    "issueNumber": 93,
+    "body": "Frontend implementation work package **FE28**: Booth cancellation, manual release and refund visibility.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T52 — #67](https://github.com/dacho-morgh/dacho/issues/67)\n- [T53 — #68](https://github.com/dacho-morgh/dacho/issues/68)\n\n## Frontend sequence\n- [FE27 — #91](https://github.com/dacho-morgh/dacho/issues/91)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: new cancellation states required.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: new exhibition cancellation dialog/history.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Company can cancel directly only before receipt upload; after receipt/payment submit a cancellation request to Secretariat.\n- [ ] Show reason, request pending state, manual resolution and relevant recorded refund status.\n- [ ] Release only the affected booth after authorized decision; other independent booth applications stay intact.\n- [ ] No automatic expiry or online refund promise; preserve receipt/payment/cancellation history.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT37. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE28 -->\n"
+  },
+  {
+    "id": "FE29",
+    "title": "Shared Persian RTL, responsive and failure states",
+    "implementationTasks": [
+      "T40"
+    ],
+    "frontendDependencies": [
+      "FE01",
+      "FE07"
+    ],
+    "manualGates": [
+      "UAT30"
+    ],
+    "figma": "loading/empty variants across all three design pages",
+    "source": "dashboard shared components and route error/loading boundaries",
+    "criteria": [
+      "Define and apply loading, empty, validation, saved, network error, denied, expired and stale states across the new journeys.",
+      "Use existing Typography/Button, Tailwind utilities, theme tokens and generated icons under frontend AGENTS.md.",
+      "Verify phone-width primary journeys, long Persian names, keyboard/focus, modal return focus and readable upload errors.",
+      "Distinguish service failure from no records; do not claim error-free visual parity for frames without approved design."
+    ],
+    "issueNumber": 78,
+    "body": "Frontend implementation work package **FE29**: Shared Persian RTL, responsive and failure states.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T40 — #54](https://github.com/dacho-morgh/dacho/issues/54)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: loading/empty variants across all three design pages.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: dashboard shared components and route error/loading boundaries.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Define and apply loading, empty, validation, saved, network error, denied, expired and stale states across the new journeys.\n- [ ] Use existing Typography/Button, Tailwind utilities, theme tokens and generated icons under frontend AGENTS.md.\n- [ ] Verify phone-width primary journeys, long Persian names, keyboard/focus, modal return focus and readable upload errors.\n- [ ] Distinguish service failure from no records; do not claim error-free visual parity for frames without approved design.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT30. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE29 -->\n"
+  },
+  {
+    "id": "FE30",
+    "title": "Frontend API contracts and permission regression coverage",
+    "implementationTasks": [
+      "T02",
+      "T04",
+      "T42",
+      "T43",
+      "T44"
+    ],
+    "frontendDependencies": [
+      "FE01",
+      "FE07"
+    ],
+    "manualGates": [
+      "UAT15",
+      "UAT23",
+      "UAT38",
+      "UAT42"
+    ],
+    "figma": "cross-cutting engineering coverage",
+    "source": "utilities/dashboard-api.ts; utilities/dashboard-server.ts; tests/int",
+    "criteria": [
+      "Add meaningful contract tests for typed stages/actions, denied vs empty responses, document mapping and permission-aware rendering.",
+      "Exercise seven-role direct navigation, financial redaction, revoked assignment, stale mutation and create-success/submit-failure recovery.",
+      "Use isolated fixtures; browser hiding tests do not replace server/CMS/proxy authorization checks.",
+      "Record supported DTOs and errors in frontend-design.md; mocks are labelled and never accepted as release evidence."
+    ],
+    "issueNumber": 79,
+    "body": "Frontend implementation work package **FE30**: Frontend API contracts and permission regression coverage.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T02 — #16](https://github.com/dacho-morgh/dacho/issues/16)\n- [T04 — #18](https://github.com/dacho-morgh/dacho/issues/18)\n- [T42 — #56](https://github.com/dacho-morgh/dacho/issues/56)\n- [T43 — #57](https://github.com/dacho-morgh/dacho/issues/57)\n- [T44 — #58](https://github.com/dacho-morgh/dacho/issues/58)\n\n## Frontend sequence\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: cross-cutting engineering coverage.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: utilities/dashboard-api.ts; utilities/dashboard-server.ts; tests/int.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Add meaningful contract tests for typed stages/actions, denied vs empty responses, document mapping and permission-aware rendering.\n- [ ] Exercise seven-role direct navigation, financial redaction, revoked assignment, stale mutation and create-success/submit-failure recovery.\n- [ ] Use isolated fixtures; browser hiding tests do not replace server/CMS/proxy authorization checks.\n- [ ] Record supported DTOs and errors in frontend-design.md; mocks are labelled and never accepted as release evidence.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT15, UAT23, UAT38, UAT42. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE30 -->\n"
+  },
+  {
+    "id": "FE31",
+    "title": "Full event journey frontend E2E and human handoff",
+    "implementationTasks": [
+      "T45",
+      "T46"
+    ],
+    "frontendDependencies": [
+      "FE03",
+      "FE05",
+      "FE12",
+      "FE18",
+      "FE19",
+      "FE20",
+      "FE21",
+      "FE22",
+      "FE23",
+      "FE29",
+      "FE30"
+    ],
+    "manualGates": [
+      "UAT39"
+    ],
+    "figma": "all approved event reference screens plus extensions",
+    "source": "tests/e2e; docs/system/manual-acceptance-tests.md",
+    "criteria": [
+      "Run isolated real-backed multi-account signup, verification, subtopic submission, four reviews, explicit chief advance, finance, memo and publication.",
+      "Include correction/new round, rejection/reopen and restricted visibility branches using separate role sessions.",
+      "Record build, fixtures and failures and make independent slices available to human testing as soon as usable.",
+      "UAT39 is performed by a human; automated success alone cannot close it."
+    ],
+    "issueNumber": 101,
+    "body": "Frontend implementation work package **FE31**: Full event journey frontend E2E and human handoff.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T45 — #59](https://github.com/dacho-morgh/dacho/issues/59)\n- [T46 — #60](https://github.com/dacho-morgh/dacho/issues/60)\n\n## Frontend sequence\n- [FE03 — #80](https://github.com/dacho-morgh/dacho/issues/80)\n- [FE05 — #84](https://github.com/dacho-morgh/dacho/issues/84)\n- [FE12 — #86](https://github.com/dacho-morgh/dacho/issues/86)\n- [FE18 — #97](https://github.com/dacho-morgh/dacho/issues/97)\n- [FE19 — #98](https://github.com/dacho-morgh/dacho/issues/98)\n- [FE20 — #99](https://github.com/dacho-morgh/dacho/issues/99)\n- [FE21 — #100](https://github.com/dacho-morgh/dacho/issues/100)\n- [FE22 — #75](https://github.com/dacho-morgh/dacho/issues/75)\n- [FE23 — #76](https://github.com/dacho-morgh/dacho/issues/76)\n- [FE29 — #78](https://github.com/dacho-morgh/dacho/issues/78)\n- [FE30 — #79](https://github.com/dacho-morgh/dacho/issues/79)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: all approved event reference screens plus extensions.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: tests/e2e; docs/system/manual-acceptance-tests.md.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Run isolated real-backed multi-account signup, verification, subtopic submission, four reviews, explicit chief advance, finance, memo and publication.\n- [ ] Include correction/new round, rejection/reopen and restricted visibility branches using separate role sessions.\n- [ ] Record build, fixtures and failures and make independent slices available to human testing as soon as usable.\n- [ ] UAT39 is performed by a human; automated success alone cannot close it.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT39. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE31 -->\n"
+  },
+  {
+    "id": "FE32",
+    "title": "Full exhibition frontend E2E and human handoff",
+    "implementationTasks": [
+      "T53",
+      "T54",
+      "T46"
+    ],
+    "frontendDependencies": [
+      "FE24",
+      "FE25",
+      "FE26",
+      "FE27",
+      "FE28",
+      "FE29",
+      "FE30"
+    ],
+    "manualGates": [
+      "UAT40"
+    ],
+    "figma": "new exhibition screen family",
+    "source": "tests/e2e; docs/system/manual-acceptance-tests.md",
+    "criteria": [
+      "Run real-backed independent booth reservations, cap/conflict, attendance approval, receipt correction/confirmation and cancellation.",
+      "Prove no combined application/receipt, no automatic expiry and no payment before attendance approval.",
+      "Record independent amounts/statuses and provide reconciliation evidence to Secretariat.",
+      "UAT40 requires recorded human execution on the deployed test build."
+    ],
+    "issueNumber": 95,
+    "body": "Frontend implementation work package **FE32**: Full exhibition frontend E2E and human handoff.\n\nThis refines the existing system backlog; the linked original tasks retain ownership of their backend/CMS or cross-layer contracts. Do not implement duplicate workflow rules in the browser. Product decisions through Q38 override conflicting Figma copy.\n\n## Backend / original implementation links\n- [T53 — #68](https://github.com/dacho-morgh/dacho/issues/68)\n- [T54 — #69](https://github.com/dacho-morgh/dacho/issues/69)\n- [T46 — #60](https://github.com/dacho-morgh/dacho/issues/60)\n\n## Frontend sequence\n- [FE24 — #77](https://github.com/dacho-morgh/dacho/issues/77)\n- [FE25 — #87](https://github.com/dacho-morgh/dacho/issues/87)\n- [FE26 — #89](https://github.com/dacho-morgh/dacho/issues/89)\n- [FE27 — #91](https://github.com/dacho-morgh/dacho/issues/91)\n- [FE28 — #93](https://github.com/dacho-morgh/dacho/issues/93)\n- [FE29 — #78](https://github.com/dacho-morgh/dacho/issues/78)\n- [FE30 — #79](https://github.com/dacho-morgh/dacho/issues/79)\n\n## Design and current code\nFigma file: https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard\nNodes/coverage: new exhibition screen family.\nSource entry points under `apps/frontend/src/components/dashboard/` unless a different path is stated: tests/e2e; docs/system/manual-acceptance-tests.md.\nSource review is not a runtime pass. Missing screen families require design completion against the approved workflow.\n\n## Deliverable and acceptance\n- [ ] Run real-backed independent booth reservations, cap/conflict, attendance approval, receipt correction/confirmation and cancellation.\n- [ ] Prove no combined application/receipt, no automatic expiry and no payment before attendance approval.\n- [ ] Record independent amounts/statuses and provide reconciliation evidence to Secretariat.\n- [ ] UAT40 requires recorded human execution on the deployed test build.\n- [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.\n- [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.\n\n## Verification and handoff\nHuman gates: UAT40. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.\n\n<!-- dacho-frontend-plan:FE32 -->\n"
+  }
+]

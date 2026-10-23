@@ -154,9 +154,9 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="مورد قبلی"
+                aria-label="مورد بعدی"
                 onClick={onNext}
-                className="size-12 rounded-xl bg-neutral-100 p-0 text-[#525252] hover:bg-neutral-200 hover:text-[#525252]"
+                className="size-12 rounded-xl bg-neutral-100 p-0 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-600"
               >
                 <ArrowLeftIcon
                   aria-hidden="true"
@@ -169,7 +169,7 @@ const EventCard = ({ event, hasNavigation, onNext, onPrevious }: EventCardProps)
                 size="icon"
                 aria-label="مورد قبلی"
                 onClick={onPrevious}
-                className="size-12 rounded-xl bg-neutral-100 p-0 text-[#525252] hover:bg-neutral-200 hover:text-[#525252]"
+                className="size-12 rounded-xl bg-neutral-100 p-0 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-600"
               >
                 <ArrowLeftIcon
                   aria-hidden="true"

@@ -11,6 +11,7 @@ const seedScripts = [
   'seed-landing.ts',
   'seed-mag.ts',
   'seed-dashboard.ts',
+  'seed-service-media.ts',
   'seed-forms.ts',
   'seed-service-account.ts',
   'create-admin.ts',

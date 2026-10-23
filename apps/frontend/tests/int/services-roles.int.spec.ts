@@ -16,7 +16,11 @@ const TEST_FORM_TITLE = 'فرم تست'
 let payload: Payload
 
 const cleanup = async () => {
-  await payload.delete({ collection: 'services', where: { title: { equals: TEST_SERVICE_TITLE } } })
+  await payload.delete({
+    collection: 'services',
+    where: { title: { equals: TEST_SERVICE_TITLE } },
+    context: { disableRevalidate: true },
+  })
   await payload.delete({ collection: 'forms', where: { title: { equals: TEST_FORM_TITLE } } })
   // Companies reference their representative, so they must go before the users.
   await payload.delete({ collection: 'companies', where: { name: { equals: TEST_COMPANY_NAME } } })
@@ -43,6 +47,7 @@ describe('dashboard CMS definitions (services + user roles)', () => {
         tag: 'سرمایه‌گذاری',
         gradient: 'blue-cyan',
       },
+      context: { disableRevalidate: true },
     })
 
     expect(service.key).toBe('financing')

@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
@@ -41,7 +41,10 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
           .then(async (response) => {
             if (!response.ok) return
             const document = new DOMParser().parseFromString(await response.text(), 'image/svg+xml')
-            if (document.documentElement.localName !== 'svg' || document.querySelector('parsererror'))
+            if (
+              document.documentElement.localName !== 'svg' ||
+              document.querySelector('parsererror')
+            )
               return
             if (!animatedShape || abortController.signal.aborted) return
             const svg = window.document.importNode(document.documentElement, true)
@@ -151,7 +154,9 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
         className="pointer-events-none absolute inset-y-0 left-1/2 h-full w-235.25 -translate-x-1/2 select-none md:left-0 md:translate-x-0"
       >
         <Image
-          src={variant === 'gold' ? '/icons/partners/shape-gold.svg' : '/icons/partners/shape-blue.svg'}
+          src={
+            variant === 'gold' ? '/icons/partners/shape-gold.svg' : '/icons/partners/shape-blue.svg'
+          }
           alt=""
           width={941}
           height={256}
@@ -162,6 +167,7 @@ const RecruitmentSection = ({ variant = 'blue' }: RecruitmentSectionProps) => {
       </div>
 
       <div
+        data-home-reveal
         dir="ltr"
         className="relative z-10 grid w-full items-center gap-8 md:grid-cols-[160px_minmax(0,1fr)] md:gap-12 xl:grid-cols-[160px_minmax(0,702px)] xl:gap-24.5"
       >

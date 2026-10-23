@@ -13,6 +13,7 @@ import {
   revalidatePost,
   revalidateDelete as deletePost,
 } from '../../../../packages/cms-core/src/collections/Posts/hooks/revalidatePost'
+import { Services } from '../../../../packages/cms-core/src/collections/Services'
 
 describe.each([
   { collection: 'news', change: revalidateNews, remove: deleteNews, paths: ['/', '/news', '/mag'] },
@@ -55,6 +56,23 @@ describe.each([
     remove({ ...args, req: { context: { disableRevalidate: true } } } as unknown as Parameters<
       typeof remove
     >[0])
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe('service homepage freshness', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it.each(['afterChange', 'afterDelete'] as const)('refreshes the homepage on %s', (event) => {
+    const hook = Services.hooks?.[event]?.[0]
+    const doc = { title: 'Updated service' }
+    const run = (disableRevalidate = false) =>
+      hook?.({ doc, req: { context: { disableRevalidate } } } as never)
+
+    expect(run()).toBe(doc)
+    expect(revalidatePath).toHaveBeenCalledWith('/')
+    vi.clearAllMocks()
+    run(true)
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

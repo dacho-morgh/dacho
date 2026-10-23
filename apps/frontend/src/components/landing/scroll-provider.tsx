@@ -4,23 +4,29 @@ import { useEffect } from 'react'
 
 export default function ScrollProvider() {
   useEffect(() => {
-    if (typeof window === 'undefined' || window.matchMedia('(max-width: 768px)').matches) return
-
-    let smoother: { kill: () => void } | null = null
+    let cancelled = false
+    let cleanup = () => {}
 
     Promise.all([import('gsap'), import('gsap/ScrollTrigger'), import('gsap/ScrollSmoother')]).then(
       ([{ default: gsap }, { ScrollTrigger }, { ScrollSmoother }]) => {
+        if (cancelled) return
         gsap.registerPlugin(ScrollTrigger, ScrollSmoother)
-        smoother = ScrollSmoother.create({
-          smooth: 1.2,
-          effects: true,
-          smoothTouch: 0.1,
+        const media = gsap.matchMedia()
+        media.add('(min-width: 769px) and (prefers-reduced-motion: no-preference)', () => {
+          const smoother = ScrollSmoother.create({
+            smooth: 1.2,
+            effects: true,
+            smoothTouch: 0.1,
+          })
+          return () => smoother.kill()
         })
+        cleanup = () => media.revert()
       },
     )
 
     return () => {
-      smoother?.kill()
+      cancelled = true
+      cleanup()
     }
   }, [])
 

@@ -4,11 +4,11 @@ import { Suspense } from 'react'
 import EventsSectionSkeleton from '@/components/landing/home/events-section-skeleton'
 import FaqSectionSkeleton from '@/components/landing/home/faq-section-skeleton'
 import HeroSectionSkeleton from '@/components/landing/home/hero-section-skeleton'
+import HomeReveal from '@/components/landing/home/home-reveal'
 import LogoStripSectionSkeleton from '@/components/landing/home/logo-strip-section-skeleton'
 import NewsSectionSkeleton from '@/components/landing/home/news-section-skeleton'
 import RecruitmentSectionSkeleton from '@/components/landing/home/recruitment-section-skeleton'
 import ServicesSectionSkeleton from '@/components/landing/home/services-section-skeleton'
-import Reveal from '@/components/landing/reveal'
 import { createPageMetadata } from '@/utilities/siteMetadata'
 
 const ScrollProvider = dynamic(() => import('@/components/landing/scroll-provider'))
@@ -38,37 +38,37 @@ export default function HomePage() {
       <Suspense fallback={<LogoStripSectionSkeleton />}>
         <LogoStripSection />
       </Suspense>
-      <Reveal>
-        <Suspense fallback={<EventsSectionSkeleton />}>
+      <Suspense fallback={<EventsSectionSkeleton />}>
+        <HomeReveal>
           <EventsSection />
-        </Suspense>
-      </Reveal>
-      <Reveal>
-        <Suspense fallback={<NewsSectionSkeleton />}>
+        </HomeReveal>
+      </Suspense>
+      <Suspense fallback={<NewsSectionSkeleton />}>
+        <HomeReveal>
           <NewsSection />
-        </Suspense>
-      </Reveal>
-      <Reveal>
-        <Suspense fallback={<ServicesSectionSkeleton />}>
+        </HomeReveal>
+      </Suspense>
+      <Suspense fallback={<ServicesSectionSkeleton />}>
+        <HomeReveal>
           <ServicesSection />
-        </Suspense>
-      </Reveal>
+        </HomeReveal>
+      </Suspense>
       {/* <Reveal>
         <ServicesDetailSection />
       </Reveal> */}
-      <Reveal className="lg:mt-10">
-        <Suspense fallback={<RecruitmentSectionSkeleton />}>
+      <Suspense fallback={<RecruitmentSectionSkeleton />}>
+        <HomeReveal className="lg:mt-10">
           <RecruitmentSection />
-        </Suspense>
-      </Reveal>
+        </HomeReveal>
+      </Suspense>
       {/* <Reveal>
         <CommentsSection />
       </Reveal> */}
-      <Reveal>
-        <Suspense fallback={<FaqSectionSkeleton />}>
+      <Suspense fallback={<FaqSectionSkeleton />}>
+        <HomeReveal>
           <FaqSection />
-        </Suspense>
-      </Reveal>
+        </HomeReveal>
+      </Suspense>
     </main>
   )
 }
