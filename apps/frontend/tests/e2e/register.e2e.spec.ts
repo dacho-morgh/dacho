@@ -283,7 +283,7 @@ test.describe('Register', () => {
     // A self-signup is forced to exactly the representative role, even while an
     // admin session is active.
     expect(body.user.roles).toEqual(['representative'])
-    expect(body.company.representative).toBe(body.user.id)
+    expect(body.company.representative.id).toBe(body.user.id)
 
     const logout = await page.request.post('http://localhost:3000/api/users/logout', {
       headers: cookieRequestHeaders,
