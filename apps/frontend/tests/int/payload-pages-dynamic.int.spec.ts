@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { getPayload } from 'payload'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Route configuration checks do not need to bootstrap the real CMS config.
+vi.mock('@payload-config', () => ({ default: {} }))
+vi.mock('payload', () => ({ getPayload: vi.fn() }))
 
 vi.mock('@/utilities/getFormId', () => ({ getFormIdByTitle: vi.fn() }))
 vi.mock('@/components/landing/contact/message-form', () => ({ MessageForm: vi.fn() }))
@@ -16,6 +21,8 @@ vi.mock('@/components/landing/event-detail/event-detail-route', () => ({
 }))
 
 describe('Payload-backed pages', () => {
+  beforeEach(() => vi.clearAllMocks())
+
   it.each([
     ['connect', () => import('@/app/(frontend)/connect/page')],
     ['cooperation', () => import('@/app/(frontend)/cooperation/page')],
@@ -25,5 +32,6 @@ describe('Payload-backed pages', () => {
     const page = await loadPage()
 
     expect(page.dynamic).toBe('force-dynamic')
+    expect(getPayload).not.toHaveBeenCalled()
   })
 })
