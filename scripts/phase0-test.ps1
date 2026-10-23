@@ -24,7 +24,8 @@ function Set-IsolatedEnvironment {
   $env:PAYLOAD_MEDIA_DIR = $files
   $env:PAYLOAD_SECRET = 'phase0-test-only-payload-secret-do-not-reuse'
   $env:PAYLOAD_SECRET_FILE = ''
-  $env:DOTENV_CONFIG_OVERRIDE = 'false'
+  # dotenv 16 coerces the string 'false' to true; an empty value disables override.
+  $env:DOTENV_CONFIG_OVERRIDE = ''
   $env:NODE_ENV = 'test'
 }
 

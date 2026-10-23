@@ -3,12 +3,23 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, staging]
 
 permissions:
   contents: read
 
 jobs:
+  branch-policy:
+    name: PR base must be staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject pull requests outside staging
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" && "$GITHUB_BASE_REF" != "staging" ]]; then
+            echo "::error::Pull requests must target staging. A production release to main requires an explicit user instruction."
+            exit 1
+          fi
+
   quality:
     name: Lint + typecheck + unit tests
     runs-on: ubuntu-latest
@@ -22,6 +33,9 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - name: CI isolation contract
+        run: python3 scripts/test-ci-isolation.py
 
       - name: Lint
         run: pnpm lint
@@ -38,6 +52,7 @@ jobs:
         run: |
           python3 scripts/test-bundled-media.py
           python3 deploy/maintenance/test_deployment.py
+          python3 scripts/test-staging-deployment.py
 
   build-without-database:
     name: Build (without database)
@@ -68,17 +83,26 @@ jobs:
     name: Integration tests (Postgres)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PHASE0_ISOLATED_TEST: '1'
+      DATABASE_URL: postgres://phase0_test:phase0_test_only@127.0.0.1:55439/dacho_phase0_test
+      PAYLOAD_MEDIA_DIR: ${{ github.workspace }}/.phase0-test-files
+      PAYLOAD_SECRET: phase0-test-only-payload-secret-do-not-reuse
+      PAYLOAD_SECRET_FILE: ''
+      # dotenv 16 treats a nonempty 'false' string as true.
+      DOTENV_CONFIG_OVERRIDE: ''
+      NODE_ENV: test
     services:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: dacho
-          POSTGRES_PASSWORD: dacho
-          POSTGRES_DB: dacho-cms
+          POSTGRES_USER: phase0_test
+          POSTGRES_PASSWORD: phase0_test_only
+          POSTGRES_DB: dacho_phase0_test
         ports:
-          - 5432:5432
+          - 55439:5432
         options: >-
-          --health-cmd "pg_isready -U dacho"
+          --health-cmd "pg_isready -U phase0_test -d dacho_phase0_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -93,24 +117,22 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Initialize isolated test environment
+        run: |
+          mkdir -p "$PAYLOAD_MEDIA_DIR"
+          printf '%s' 'dacho-phase0-disposable-v1' > "$PAYLOAD_MEDIA_DIR/phase0-test-marker.txt"
+          docker exec -i "${{ job.services.postgres.id }}" psql -U phase0_test -d dacho_phase0_test -v ON_ERROR_STOP=1 < scripts/phase0-test-db-init.sql
+
       # Fresh DB in CI has no dev-pushed schema, so migrate applies cleanly
       # without the interactive "data loss" prompt; pipe "n" defensively.
       - name: Migrate
         run: echo "n" | pnpm --filter @dacho/frontend payload migrate
-        env:
-          DATABASE_URL: postgres://dacho:dacho@127.0.0.1:5432/dacho-cms
-          PAYLOAD_SECRET: ci-placeholder
 
       - name: Backend integration tests
         run: pnpm --filter @dacho/backend test:int
-        env:
-          DATABASE_URL: postgres://dacho:dacho@127.0.0.1:5432/dacho-cms
 
       - name: Frontend integration tests
         run: pnpm --filter @dacho/frontend test:int
-        env:
-          DATABASE_URL: postgres://dacho:dacho@127.0.0.1:5432/dacho-cms
-          PAYLOAD_SECRET: ci-placeholder
 
   e2e:
     name: E2E (prod build + seeded DB)
@@ -181,3 +203,12 @@ jobs:
           name: playwright-report
           path: apps/frontend/playwright-report/
           retention-days: 14
+
+  publish-images:
+    name: Publish images after checks
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    needs: [branch-policy, quality, build-without-database, integration, e2e]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish.yml

@@ -12,6 +12,14 @@ The guard is a test harness safety net, not a migration deployment gate: direct 
 
 ## Local commands (PowerShell from repository root)
 
+GitHub Actions uses the same isolation contract: the integration job creates
+its ephemeral Postgres service with the Phase 0 credentials/database and port
+55439, sets the opt-in flag and checkout-local media directory at job scope,
+and initializes both markers before migrations or either suite. The initial
+CI failure came from leaving its old `5432/dacho-cms` service/env in place
+after introducing the guard. See `.github/workflows/ci.yml` and the regression
+check `python scripts/test-ci-isolation.py`; the guard itself remains active.
+
 ```powershell
 ./scripts/phase0-test.ps1 Start
 ./scripts/phase0-test.ps1 Migrate

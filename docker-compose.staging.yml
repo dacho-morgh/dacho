@@ -1,0 +1,73 @@
+# Standalone prebuilt-image stack. Do not combine with another Compose file.
+# The literal staging prefix on both image tags prevents a production tag from
+# being selected, even if STAGING_IMAGE_SUFFIX is set incorrectly.
+name: dacho-staging
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dacho_staging
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:?STAGING_POSTGRES_PASSWORD is required}
+      POSTGRES_DB: dacho_staging
+    volumes:
+      - staging_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'dacho_staging', '-d', 'dacho_staging']
+      interval: 5s
+      retries: 5
+
+  frontend:
+    image: ghcr.io/dacho-morgh/dacho/frontend:staging${STAGING_IMAGE_SUFFIX:-}
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3300:3000'
+    environment:
+      DATABASE_URL: postgres://dacho_staging:${STAGING_POSTGRES_PASSWORD:?STAGING_POSTGRES_PASSWORD is required}@postgres:5432/dacho_staging
+      PAYLOAD_SECRET_FILE: /run/secrets/staging_payload_secret
+      NEXT_PUBLIC_SERVER_URL: ${STAGING_PUBLIC_URL:?STAGING_PUBLIC_URL is required}
+      BACKEND_JWKS_URL: http://backend:4000/.well-known/jwks.json
+      BACKEND_URL: http://backend:4000
+      INTERNAL_PROXY_SECRET: ${STAGING_INTERNAL_PROXY_SECRET:?STAGING_INTERNAL_PROXY_SECRET is required}
+      PAYLOAD_MEDIA_DIR: /repo/apps/frontend/public/media
+    secrets:
+      - staging_payload_secret
+    volumes:
+      - staging_media:/repo/apps/frontend/public/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    image: ghcr.io/dacho-morgh/dacho/backend:staging${STAGING_IMAGE_SUFFIX:-}
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:4400:4000'
+    secrets:
+      - staging_jwt_private_key
+    environment:
+      PORT: '4000'
+      DATABASE_URL: postgres://dacho_staging:${STAGING_POSTGRES_PASSWORD:?STAGING_POSTGRES_PASSWORD is required}@postgres:5432/dacho_staging
+      JWT_PRIVATE_KEY_FILE: /run/secrets/staging_jwt_private_key
+      PAYLOAD_URL: http://frontend:3000
+      PAYLOAD_API_KEY: ${STAGING_PAYLOAD_API_KEY:?STAGING_PAYLOAD_API_KEY is required}
+      INTERNAL_PROXY_SECRET: ${STAGING_INTERNAL_PROXY_SECRET:?STAGING_INTERNAL_PROXY_SECRET is required}
+      OTP_DELIVERY: ${STAGING_OTP_DELIVERY:-console}
+      KAVENEGAR_API_KEY: ${STAGING_KAVENEGAR_API_KEY:-}
+      KAVENEGAR_TEMPLATE: ${STAGING_KAVENEGAR_TEMPLATE:-testtemplate}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+volumes:
+  staging_pgdata:
+  staging_media:
+
+secrets:
+  staging_jwt_private_key:
+    file: ./secrets/staging/jwt-private.pem
+  staging_payload_secret:
+    file: ./secrets/staging/payload-secret

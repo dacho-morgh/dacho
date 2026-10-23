@@ -39,3 +39,4 @@ packages/cms-core/public/media
 apps/backend/.support-test-postgres/
 .phase0-test-files/
 .phase0-test-backups/
+__pycache__/
