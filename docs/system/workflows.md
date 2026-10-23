@@ -64,6 +64,8 @@ flowchart TD
 
 Chief and employer assignments are captured for the relevant event/case. Changing a live subtopic RFP or personnel configuration must not retroactively rewrite an already submitted application. Technical handling of deactivated personnel must preserve history and remove active access.
 
+The [supplied ordinary/employer rubric](review-rubric.md) versions both role-specific question sets and their common per-review scoring formula. A score out of 55.05 is separate from round completion and the chief decision; four-review averaging, ranking and top-five selection are not implied by the forms. The one-week instruction does not authorize automatic assignment expiry.
+
 ## 3. Investment package, supplementary files and publication
 
 ```mermaid

@@ -1,5 +1,7 @@
 # Frontend implementation and Figma audit
 
+Phase 0 follow-up, 2026-10-23: the user subsequently supplied ordinary/employer review forms. Their questions, 45/40/15 weights and per-review formula now have a user-provided source in [review-rubric.md](review-rubric.md), rather than Figma authority. The observations below describe the earlier inspection; remaining interpretation questions are recorded in that contract. No runtime implementation or acceptance is implied.
+
 Inspected 2026-10-23. This is a source/design audit, not a deployed acceptance result. Existing unrelated landing-page edits were left untouched. No production data, database migration, product implementation or human acceptance test was run for this planning task.
 
 ## Conclusion

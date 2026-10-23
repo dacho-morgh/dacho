@@ -10,7 +10,7 @@ export default defineConfig({
     // Node environment, not jsdom. Component tests can opt back into jsdom
     // per-file with `// @vitest-environment jsdom`.
     environment: 'node',
-    setupFiles: ['./vitest.setup.ts'],
+    setupFiles: ['./vitest.setup.ts', './tests/int/isolation.setup.ts'],
     include: ['tests/int/**/*.int.spec.ts'],
     // Every spec here bootstraps the full Payload config against one real
     // Postgres, and the fixtures are hand-picked unique rows (user phone

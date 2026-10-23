@@ -47,7 +47,7 @@ Each booth has its own application, fixed toman price, receipt, state and cancel
 
 ## Backlog
 
-BE = backend/data; CMS = Payload; FE = panel; QA = verification. Dependency links determine execution order, not numbering. T03 means readiness of the corresponding stage's form contract: an unfinished rubric blocks T24, not login/verification. Start T36/T37 early enough for the first business transition to have history and reliable notifications.
+BE = backend/data; CMS = Payload; FE = panel; QA = verification. Dependency links determine execution order, not numbering. T03 means readiness of the corresponding stage's form contract: remaining review-form interpretations block corresponding T24 assertions, not login/verification. Start T36/T37 early enough for the first business transition to have history and reliable notifications.
 
 
 ### Phase 0: Contracts and safe test environment
@@ -56,7 +56,7 @@ BE = backend/data; CMS = Payload; FE = panel; QA = verification. Dependency link
 | --- | --- | --- | --- |
 | [T01 / #15](https://github.com/dacho-morgh/dacho/issues/15) | Record approved scope and open inputs / Product | None | Record both workflows, decisions, decision owners and affected tasks; keep unresolved values explicit. |
 | [T02 / #16](https://github.com/dacho-morgh/dacho/issues/16) | Seven-role permission and scope matrix / BE,CMS | [T01](https://github.com/dacho-morgh/dacho/issues/15) | Specify own/other/unassigned visibility and operations, including CMS, API, populated fields, files, search and counts. |
-| [T03 / #17](https://github.com/dacho-morgh/dacho/issues/17) | Fixed form and document specifications / Product,BE,FE | [T01](https://github.com/dacho-morgh/dacho/issues/15) | Define field types/requirements/absence semantics/conditions/versions; obtain final rubric, file policy and agreement text; no form builder. |
+| [T03 / #17](https://github.com/dacho-morgh/dacho/issues/17) | Fixed form and document specifications / Product,BE,FE | [T01](https://github.com/dacho-morgh/dacho/issues/15) | Define field types/requirements/absence semantics/conditions/versions; capture supplied ordinary/employer rubric and resolve remaining interpretations, file policy and agreement text; no form builder. |
 | [T04 / #18](https://github.com/dacho-morgh/dacho/issues/18) | Isolated test environment and migration inventory / QA,Data | None | Separate test database/files from live data; inventory existing migrations/data and rehearse recovery. |
 
 ### Phase 1: Fixes and shared foundation
@@ -97,7 +97,7 @@ BE = backend/data; CMS = Payload; FE = panel; QA = verification. Dependency link
 | --- | --- | --- | --- |
 | [T22 / #38](https://github.com/dacho-morgh/dacho/issues/38) | Review rounds and four distinct assignments / BE,FE | [T17](https://github.com/dacho-morgh/dacho/issues/29), [T21](https://github.com/dacho-morgh/dacho/issues/37) | Capture fixed employer plus three distinct ordinary reviewers; round references exact proposal revision. |
 | [T23 / #39](https://github.com/dacho-morgh/dacho/issues/39) | Assigned reviewer queue and dossier / BE,FE | [T09](https://github.com/dacho-morgh/dacho/issues/23), [T22](https://github.com/dacho-morgh/dacho/issues/38) | Reviewer/employer sees assigned cases and necessary company profiles only; financial files and other evaluations are excluded. |
-| [T24 / #40](https://github.com/dacho-morgh/dacho/issues/40) | Fixed review rubric and score calculation / BE,FE | [T03](https://github.com/dacho-morgh/dacho/issues/17), [T23](https://github.com/dacho-morgh/dacho/issues/39) | Use approved questions/ceilings/formula; reject missing/out-of-range/tampered values; no invented weights or automatic advancement. |
+| [T24 / #40](https://github.com/dacho-morgh/dacho/issues/40) | Fixed review rubric and score calculation / BE,FE | [T03](https://github.com/dacho-morgh/dacho/issues/17), [T23](https://github.com/dacho-morgh/dacho/issues/39) | Use supplied ordinary/employer questions, ceilings and 0.45*A+0.40*B+0.15*C (max 55.05); resolve rounding/requiredness; reject invalid/tampered values; no invented aggregation or automatic advancement. |
 | [T25 / #41](https://github.com/dacho-morgh/dacho/issues/41) | Draft, finalization and locked evaluations / BE,FE | [T24](https://github.com/dacho-morgh/dacho/issues/40) | Drafts do not count; complete required review forms before finalizing; no normal edits to finalized evaluations or impersonation. |
 | [T26 / #42](https://github.com/dacho-morgh/dacho/issues/42) | Reviewer replacement and assignment history / BE,FE | [T22](https://github.com/dacho-morgh/dacho/issues/38), [T25](https://github.com/dacho-morgh/dacho/issues/41) | Chief replaces unfinished ordinary reviewer; owner alone replaces employer with reason; revoke old access and preserve history. |
 | [T27 / #43](https://github.com/dacho-morgh/dacho/issues/43) | Atomic 4/4 completion and confidentiality / BE,FE | [T25](https://github.com/dacho-morgh/dacho/issues/41), [T26](https://github.com/dacho-morgh/dacho/issues/42) | 1–3 evaluations stay incomplete; concurrent finalization produces one completion; every reviewer sees only own evaluation. |
@@ -154,5 +154,5 @@ BE = backend/data; CMS = Payload; FE = panel; QA = verification. Dependency link
 
 The October 22 backend unit run passed 9 files/42 tests. Destructive integration/frontend fixture suites were not run on the shared environment. This historical result is not acceptance of missing business behavior or a fresh certification of the current build.
 
-Q39 file formats/sizes/counts, final reviewer questions/ceilings/formula and approved agreement/rules text remain open. Do not silently adopt the Figma examples. Backend record/API names are proposed technical contracts; the business rules above are confirmed scope. Team capacity and calendar commitments remain unspecified.
+The user supplied ordinary/employer reviewer forms and the per-review formula (maximum 55.05) on 2026-10-23; see [review rubric](system/review-rubric.md). Q39 file formats/sizes/counts, approved agreement/rules text and remaining rubric interpretations remain open. Do not derive authority from Figma examples or invent four-review aggregation. Backend record/API names are proposed technical contracts; the business rules above are confirmed scope. Team capacity and calendar commitments remain unspecified.
 

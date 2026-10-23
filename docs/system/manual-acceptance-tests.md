@@ -7,7 +7,7 @@ Updated 2026-10-23. **42 manual gates; none executed by writing this catalogue.*
 1. Product Owner and QA review scope and open inputs (UAT42). Operator confirms an isolated staging URL, database and document area. Never use real company documents or real bank transfers.
 2. Engineering deploys a coherent slice and records build/commit. A login gate can run as soon as T11 is ready; it does not wait for the entire event system.
 3. A human tester uses the stated role accounts and performs each Action. Compare actual behavior with each Expected result; do not infer results from code or issue status.
-4. Record Pass, Fail or Blocked with evidence. Missing build, final rubric, approved agreement text, file policy or fixture is Blocked, never Pass.
+4. Record Pass, Fail or Blocked with evidence. Missing build, required rubric interpretation, approved agreement text, file policy or fixture is Blocked, never Pass. Supplied reviewer questions and per-review scoring are recorded in review-rubric.md.
 5. Keep failed/blocked test issues open, link defects, fix and rerun against a recorded build. Close a gate only after all expected results pass. Independent slice gates do not replace the full event/exhibition walkthrough.
 
 ## Shared synthetic fixture pack
@@ -17,7 +17,7 @@ Updated 2026-10-23. **42 manual gates; none executed by writing this catalogue.*
 - Events E1/E2 with separate responsible teams; at least two subtopics in E1 with distinct RFP files and different employers where needed.
 - Exhibition X1 with at least three distinguishable booths/prices and configurable company limit (use two for cap tests).
 - Distinguishable valid company/proposal/financial/receipt files and controlled invalid fixtures, prepared only after approved category policies are supplied.
-- Known expected list counts, application revisions and review rounds. Final rubric includes independently calculated expected values once product-approved.
+- Known expected list counts, application revisions and review rounds. Use the supplied ordinary/employer forms and independently calculated expected values (all maxima yield 55.05); resolve remaining rounding/requiredness before those assertions.
 - Operator-assisted notification failure and disposable migration/restore fixtures. Human concurrency smoke requires two testers/sessions and companion automated evidence.
 
 ## Evidence template
@@ -811,13 +811,13 @@ Frontend implementation slices:
 
 **Actors:** Assigned reviewer; QA.
 
-**Fixture/precondition:** Final product-approved rubric, ceilings and formula. Blocked until supplied.
+**Fixture/precondition:** User-supplied ordinary/employer rubric in docs/system/review-rubric.md; deployed scoring slice, approved fractional/rounding and requiredness decisions for exercised fields. Block only assertions whose inputs remain missing.
 
 Use separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.
 
 ## Procedure and expected results
-1. **Action:** Enter a known valid answer set with independently calculated expected score
-   **Expected:** Displayed/server-returned totals match the approved formula.
+1. **Action:** Test both role forms with A=64, B=51, C=39 and all-zero answers, then a known mixed answer set
+   **Expected:** Scores match 0.45*A+0.40*B+0.15*C: maximum 55.05, zero 0; ordinary qualitative questions and employer risk checklist remain distinct.
 2. **Action:** Try missing required answers and values below/above approved ranges
    **Expected:** Final submission is refused with field-level guidance.
 3. **Action:** Change a displayed total/client value while keeping answers unchanged using a QA-provided controlled test method
@@ -857,7 +857,7 @@ Frontend implementation slices:
 
 **Actors:** Assigned reviewer; Chief.
 
-**Fixture/precondition:** Approved rubric and an assigned application.
+**Fixture/precondition:** Supplied role-specific rubric, reviewed required-field decisions and an assigned application.
 
 Use separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.
 
@@ -951,7 +951,7 @@ Frontend implementation slices:
 
 **Actors:** Four assigned reviewers; Chief.
 
-**Fixture/precondition:** Approved rubric and active current-round assignments.
+**Fixture/precondition:** Supplied role-specific rubric, reviewed required-field decisions and active current-round assignments.
 
 Use separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.
 

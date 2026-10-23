@@ -87,7 +87,9 @@ Do not treat these document names as authorization for automatic lending decisio
 
 Application, review and financial forms are fixed across the system. A per-event form builder or general workflow designer is outside scope. Fixed forms still have versions so deployed schema changes cannot reinterpret historic answers or evaluations.
 
-The final reviewer questions, weights, score ceilings and calculation rules are not supplied. Review completion is four finalized valid evaluations; advancement still requires the chief reviewer's explicit action. No automatic score threshold may be invented.
+On 2026-10-23 the product owner supplied the ordinary-reviewer and employer-reviewer forms. The fixed forms share innovation (45%, maximum 64), commercialization/market (40%, maximum 51), and documentation (15%, maximum 39) sections. The supplied per-review formula is `0.45 × A + 0.40 × B + 0.15 × C`, with maximum **55.05**; do not silently normalize it to 100. Ordinary reviewers answer the qualitative questionnaire; the employer answers the separate risk checklist and concluding qualitative questions. See [the supplied rubric contract](review-rubric.md) for exact questions, bands and source row IDs.
+
+Cross-review aggregation/ranking/ties, permitted fractional scores/rounding, and requiredness/answer types for some qualitative, evidence, signature and administrative fields remain open. The source requests a one-week turnaround; automatic expiry or an enforced deadline was not specified. Review completion is four finalized valid evaluations; advancement still requires the chief reviewer's explicit action. No automatic score threshold or top-five selection may be invented. File policy and approved agreement/rules text remain unavailable.
 
 Q39 remains open for each document category's formats, per-file size and any count limit. The 12 MB PDF/Word example in Figma is not the approved new policy. Server-side validation must implement the eventual policy. Store category, owner, application/stage, version, uploader and authorized audience with each document. Public editorial media is not the private document store.
 

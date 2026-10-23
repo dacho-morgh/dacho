@@ -37,3 +37,5 @@ packages/cms-core/public/media
 .scratch/
 
 apps/backend/.support-test-postgres/
+.phase0-test-files/
+.phase0-test-backups/

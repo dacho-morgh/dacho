@@ -1,0 +1,24 @@
+name: dacho-phase0-test
+
+# Opt-in, disposable integration database. Never combine this file with the
+# normal docker-compose.yml or docker-compose.prod.yml.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: phase0_test
+      POSTGRES_PASSWORD: phase0_test_only
+      POSTGRES_DB: dacho_phase0_test
+    ports:
+      - '127.0.0.1:55439:5432'
+    volumes:
+      - phase0_test_pgdata:/var/lib/postgresql/data
+      - ./scripts/phase0-test-db-init.sql:/docker-entrypoint-initdb.d/01-guard.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U phase0_test -d dacho_phase0_test']
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+volumes:
+  phase0_test_pgdata:

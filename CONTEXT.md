@@ -1,83 +1,153 @@
 # dacho
 
-The website and request-management system for the specialized Innovation Factory of oil, gas, and petrochemicals in Bushehr province, operated by the Bushehr Province Non-Governmental Research & Technology Fund. Companies register themselves, take part in events, and apply for the factory's services through CMS-defined forms; requests reach the roles that act on them.
+The Innovation Factory's company participation, event review, investment follow-up and exhibition system, operated by the Bushehr Province Non-Governmental Research & Technology Fund. Domain terms follow the approved system requirements recorded on 2026-10-23.
 
-## Language
+## People and responsibilities
 
 **Innovation Factory** (کارخانه نوآوری):
-The factory whose services the system manages.
-_Avoid_: factory, the company
+The specialized oil, gas and petrochemical innovation factory in Bushehr whose participation services the system manages.
+_Avoid_: the company, factory account
 
 **Fund** (صندوق پژوهش و فناوری):
-The client/owner — the provincial research & technology fund that operates the factory.
-_Avoid_: client, customer, owner
+The organization that owns and operates the Innovation Factory's system.
+_Avoid_: company, System Owner
 
 **Company** (شرکت):
-The organization that registers on the site, takes part in events, and applies for the factory's services. A first-class record — the `companies` collection in `cms-core` — and the **account holder**: the requests, letters and support tickets belong to it, and people act for it.
-_Avoid_: applicant, applicant organization, organization, business, account, principal
+The legal organization that holds its participation account and owns its applications, letters and support correspondence. One representative acts for it within the agreed scope.
+_Avoid_: user, person, applicant user
 
-**Company user** (مدیر شرکت / نماینده شرکت):
-A person who signs in on behalf of a company and acts for it, through the `users.company` relation.
-_Avoid_: applicant, applicant user, customer, end user, principal
+**Company Representative** (نماینده شرکت):
+The person who signs in and acts for their own company, including completing its dossier and submitting its applications.
+_Avoid_: company account, applicant organization
 
 **Internal user** (کاربر داخلی):
-A member of the Fund's own team, created by seeding rather than by self-registration.
-_Avoid_: staff, admin, employee, operator
+A person appointed to an internal operational responsibility by the System Owner.
+_Avoid_: company representative, self-registered staff
+
+**Operational role** (نقش عملیاتی):
+Exactly one of System Owner, Central Secretariat, Chief Reviewer, Reviewer, Employer Reviewer, Investment Reviewer or Company Representative assigned to a person. Editorial content privileges are separate from these operational responsibilities.
+_Avoid_: dynamic role, multiple operational roles, event assignment
+
+**System Owner** (صاحب سیستم):
+The operational role responsible for personnel and system configuration, with exceptional audited employer replacement and rejected-application reopening authority.
+_Avoid_: Fund, generic admin
+
+**Central Secretariat** (دبیرخانه مرکزی):
+The operational role responsible for company verification, support, supplementary documents, result publication and exhibition attendance/payment/cancellation handling.
+_Avoid_: Chief Reviewer, generic admin
+
+**Chief Reviewer** (سردبیر داوری):
+The event-responsible person who triages applications, assigns ordinary reviewers and explicitly decides after a complete review round.
+_Avoid_: reviewer, investment decision maker
 
 **Reviewer** (داور):
-A domain expert who scores plans submitted to events and financing.
-_Avoid_: judge, evaluator, referee
+A person assigned to evaluate an application independently using the fixed review form, with access to their own evaluation.
+_Avoid_: chief, referee role name
 
-**Secretariat** (دبیرخانه):
-The central office that receives requests and routes them to the right unit.
-_Avoid_: front office, reception
+**Employer Reviewer** (کارفرما):
+The named person attached to a subtopic who occupies its fixed fourth-review position alongside three ordinary reviewers.
+_Avoid_: employer organization, interchangeable ordinary reviewer
 
-**Plan** (طرح):
-A proposal submitted by a company for review (e.g. financing, events).
-_Avoid_: proposal, project, submission
+**Investment Reviewer** (کمیته سرمایه‌گذاری):
+The single assigned person who assesses permitted case/financial records and sends an internal memo to Secretariat.
+_Avoid_: voting committee, investment approver
 
-**Request** (درخواست):
-A company's formal application for a specific service, carrying documents and answers.
-_Avoid_: application, ticket, form submission
+**Event responsibility** (مسئولیت رویداد):
+The appointment of a Chief Reviewer or Investment Reviewer for a particular event, distinct from that person's operational role.
+_Avoid_: global role, access to every event
 
-**Service** (خدمت):
-One of the factory's offerings (financing, events, exhibitions, knowledge-based, commercialization). Defined in the CMS: a dynamic form schema **and** — under revision, see **Workflow** — a routing definition.
-_Avoid_: product, offering
+## Company and event participation
+
+**Company dossier** (پرونده شرکت):
+The company's identity, profile and registration records, distinct from its explicitly public directory presentation.
+_Avoid_: public company page, account credentials
+
+**Verification submission** (ارسال برای احراز):
+A particular submitted version of the company dossier on which Secretariat records a verification decision.
+_Avoid_: account suspension, legal operating status
+
+**Participation eligibility** (صلاحیت شرکت برای شرکت در فرآیند):
+The company's current entitlement, following verification, to formally apply to events or reserve booths, subject to each workflow's further rules.
+_Avoid_: panel access, exhibition attendance approval
+
+**Event** (رویداد):
+A participation opportunity containing technology categories and subtopics, with its own responsible team and registration window.
+_Avoid_: exhibition, shared generic service request
+
+**Subtopic** (زیرعنوان / نیاز):
+A specific need within an event's technology category, with one employer reviewer and its own RFP.
+_Avoid_: event, application
+
+**RFP** (درخواست ارائه پیشنهاد):
+The administrator-supplied specification for a subtopic to which a company responds with its proposal.
+_Avoid_: company proposal, shared proposal
+
+**Event application** (درخواست رویداد):
+One company's formal request for one event subtopic, with an independent tracking identity, revision history and outcome.
+_Avoid_: combined multi-subtopic request, support ticket
+
+**Proposal** (پروپوزال / طرح پیشنهادی):
+The company's submitted response to the RFP of its selected subtopic.
+_Avoid_: RFP, investment memo
+
+**Application revision** (نسخه درخواست):
+A preserved version of an application's submitted answers, proposal and accepted context; correction retains the application identity.
+_Avoid_: new application, rewritten historical submission
+
+**Review round** (دور داوری):
+The evaluation cycle for one proposal revision, comprising a fixed employer slot and three distinct ordinary reviewers.
+_Avoid_: application status, reusable historical scores
+
+**Evaluation** (ارزیابی داور):
+One assigned reviewer's answers under a fixed versioned rubric; only a valid finalized evaluation counts toward the current round's four required reviews.
+_Avoid_: chief decision, draft completion
+
+**Chief decision** (تصمیم سردبیر):
+The explicit advancement, correction or rejection action by the responsible chief after a complete review round.
+_Avoid_: automatic score threshold, investment approval
+
+**Financial package** (بسته مدارک مالی):
+The case-linked financial submission made after chief advancement, visible only to its owning company, assigned investment person, Secretariat and System Owner.
+_Avoid_: ordinary reviewer attachment, public media
+
+**Investment memo** (یادداشت سرمایه‌گذاری):
+The assigned investment person's internal assessment sent to Secretariat, distinct from the company's published result.
+_Avoid_: vote, company-visible outcome
+
+**Published outcome** (نتیجه منتشرشده):
+The separate result text explicitly released by Secretariat for the owning company.
+_Avoid_: internal memo, private reviewer score
+
+## Exhibition participation and shared work
+
+**Exhibition** (نمایشگاه):
+A participation opportunity containing identified booths with fixed prices and a configurable per-company booth limit.
+_Avoid_: event review workflow, interactive floor plan
+
+**Booth application** (درخواست غرفه):
+One company's request for one specific booth, with its own captured price, attendance decision, receipt versions and cancellation history.
+_Avoid_: combined booth order, shared receipt
+
+**Reservation** (رزرو غرفه):
+The exclusive hold established when a valid booth application is submitted, retained until an authorized release without automatic expiry.
+_Avoid_: confirmed payment, expiring cart
+
+**Attendance approval** (تأیید حضور):
+Secretariat's approval of an individual booth application that permits its payment receipt to be submitted.
+_Avoid_: company verification, payment confirmation
+
+**Payment receipt** (فیش پرداخت):
+The private evidence submitted for one booth application's payment, subject to manual verification and preserved correction versions.
+_Avoid_: online payment, combined invoice, confirmed booth
 
 **Form** (فرم):
-The CMS-defined field schema a company fills to apply for a service — dynamic (rich text + typed fields), editable without code.
-_Avoid_: questionnaire, template
+A fixed system-wide, versioned set of questions and validation rules for a participation stage.
+_Avoid_: per-event form builder, workflow designer
 
-**Workflow** (فرآیند) and **Step** (گام):
-*Under revision (2026-10-12).* The client has dropped the dynamic message-flow design: the CMS-defined, per-service ordered step sequence is no longer the intended routing model, and no replacement is decided yet. Nothing in this context may assume a per-service step array or engine-ordered steps. Kept here until the routing model is redefined.
-_Avoid_: pipeline, flow, process, stage, phase, node
-
-**Role** (نقش):
-A named operational responsibility in the factory (دبیرخانه، داور، واحد حسابداری، مدیر ارشد). A dynamic CMS collection, many-to-many with users. Its consumer — workflow-step gating — is under revision with **Workflow**; the collection and the access model around it stand.
-_Avoid_: permission, group, team
+**Correspondence** (مکاتبات):
+Authorized letters and support messages, linked to the relevant case and attachment audience where needed.
+_Avoid_: new dossier permission, final outcome publication
 
 **Panel** (پنل):
-A role-specific dashboard — company panel, reviewer panel, admin panel, secretariat.
-_Avoid_: dashboard, console
-
-## Architectural boundaries (resolved)
-
-- **CMS owns definitions** (service, form schema, roles — and the routing definition, itself under revision) in `cms.*`.
-- **Backend owns instances** (requests, letters, activities, support tickets) in the `dashboard.*` schema; it reads definitions through Payload's REST API with a service-account key. The `public.*` split in earlier prose was never implemented — do not move tables on its account.
-- **Dynamic form answers are stored as JSONB** on the request, validated against the CMS form schema at submission.
-- **Identity** (built 2026-10-17; supersedes the 2026-10-12 plan in `.scratch/company-identity/map.md`, a git-ignored local map): the **Company is the account holder** — a first-class `companies` collection in `cms-core`, keyed by a unique national id. A company holds exactly one `representative` (نماینده), a required relation to `users`; the flattened `company*` columns are gone. **Users stay the central identity store** — a company owns no credentials and cannot sign in.
-- **Roles** (decided 2026-10-17; `editor` added 2026-10-18): authorization is a **single axis** — `users.roles`, a multi-valued select of **`admin`** (administers everything), **`editor`** («تحریر» — the Fund's content desk: publishes posts, news, categories, media, FAQ and the `mag` page), **`representative`** (acts for their company) and **`referee`** (reviews; granted but not yet consumed). A user may hold any number of them at once; Payload stores them in the `users_roles` join table. This replaces the retired `role: applicant | staff`, `cmsRole: admin | editor` and the dynamic `roles` m2m — the latter and `services.workflow` were deleted with the dropped message-flow design.
-- **Registration** (decided 2026-10-17): `/self-signup` is **one atomic act** — the person and the company they represent are created in a single transaction, so a rejected company never leaves a locked-out person behind. **One company, one representative**: a national id that already belongs to a company is rejected with `409 duplicate_national_id`; there is no create-or-claim path, and adding a second person to a company is not supported.
-- **Authentication** (→ `docs/linear/authentication.md`): one central `users` collection is the identity store, shared with the CMS. The live application path is Payload **username (= phone) or email + password** via `/api/users/login`; the backend's OTP + ES256 JWT stack is implemented but reached by no screen. Credentials are progressive — `phone` required, `email`/`username`/`password` optional. Payload keeps email + password auth for editors.
-- **Authorization** (→ `docs/linear/authorization.md`): one axis — `users.roles` (see **Roles** above). The former three-axis model is retired. Only `admin` and `editor` may write the CMS: `editor` on the content desk (posts, news, categories, media, FAQ, `mag`), `adminOnly` on everything else. Nothing outside `admin`/`editor` can write a CMS collection — a company user cannot.
-- **Backend framework: Express.**
-- **Database:** single PostgreSQL, two schemas (`cms.*` for Payload, `dashboard.*` for backend tables), self-hosted.
-- **Domain names:** working subdomains until the client provides real ones.
-- **Email:** deferred — v1 uses in-app notifications only.
-- **Observability:** structured JSON logs in Phase 1; full stack deferred.
-
-## cms-core collections
-
-Content: Pages, Media, News, Posts, Categories, Events, Exhibitions, Services, FAQ, Reviews, Sponsors, Sliders, NewsletterSubscribers.
-Definitional: Companies, Users.
-Form-builder forms (the `forms` collection) back the per-service request forms and the `/connect` + `/cooperation` pages.
+The authenticated workspace exposing the actions and queues permitted by a person's role, ownership and assignments.
+_Avoid_: role switcher, permission source

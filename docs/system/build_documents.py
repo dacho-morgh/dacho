@@ -18,7 +18,7 @@ for line in old_plan.splitlines():
 TASKS = [
 ('T01','Record approved scope and open inputs','Product','Record both workflows, decisions, decision owners and affected tasks; keep unresolved values explicit.'),
 ('T02','Seven-role permission and scope matrix','BE,CMS','Specify own/other/unassigned visibility and operations, including CMS, API, populated fields, files, search and counts.'),
-('T03','Fixed form and document specifications','Product,BE,FE','Define field types/requirements/absence semantics/conditions/versions; obtain final rubric, file policy and agreement text; no form builder.'),
+('T03','Fixed form and document specifications','Product,BE,FE','Define field types/requirements/absence semantics/conditions/versions; capture supplied ordinary/employer rubric and resolve remaining interpretations, file policy and agreement text; no form builder.'),
 ('T04','Isolated test environment and migration inventory','QA,Data','Separate test database/files from live data; inventory existing migrations/data and rehearse recovery.'),
 ('T05','Persist company addresses and executives','BE','Real Payload adapter saves addresses/executives and fresh sessions reload them; in-memory tests alone are insufficient.'),
 ('T06','Protect private company and identity fields','CMS,BE','Deny unauthorized direct CMS/relationship reads and identity/representative changes; whitelist public directory fields.'),
@@ -39,7 +39,7 @@ TASKS = [
 ('T21','Chief triage, correction, rejection and reopen','BE,FE','Reasons required; corrections revise same application; rejection locks only company/event/subtopic; audited reopen is owner-only.'),
 ('T22','Review rounds and four distinct assignments','BE,FE','Capture fixed employer plus three distinct ordinary reviewers; round references exact proposal revision.'),
 ('T23','Assigned reviewer queue and dossier','BE,FE','Reviewer/employer sees assigned cases and necessary company profiles only; financial files and other evaluations are excluded.'),
-('T24','Fixed review rubric and score calculation','BE,FE','Use approved questions/ceilings/formula; reject missing/out-of-range/tampered values; no invented weights or automatic advancement.'),
+('T24','Fixed review rubric and score calculation','BE,FE','Use supplied ordinary/employer questions, ceilings and 0.45*A+0.40*B+0.15*C (max 55.05); resolve rounding/requiredness; reject invalid/tampered values; no invented aggregation or automatic advancement.'),
 ('T25','Draft, finalization and locked evaluations','BE,FE','Drafts do not count; complete required review forms before finalizing; no normal edits to finalized evaluations or impersonation.'),
 ('T26','Reviewer replacement and assignment history','BE,FE','Chief replaces unfinished ordinary reviewer; owner alone replaces employer with reason; revoke old access and preserve history.'),
 ('T27','Atomic 4/4 completion and confidentiality','BE,FE','1–3 evaluations stay incomplete; concurrent finalization produces one completion; every reviewer sees only own evaluation.'),
@@ -122,7 +122,7 @@ Each booth has its own application, fixed toman price, receipt, state and cancel
 
 ## Backlog
 
-BE = backend/data; CMS = Payload; FE = panel; QA = verification. Dependency links determine execution order, not numbering. T03 means readiness of the corresponding stage's form contract: an unfinished rubric blocks T24, not login/verification. Start T36/T37 early enough for the first business transition to have history and reliable notifications.
+BE = backend/data; CMS = Payload; FE = panel; QA = verification. Dependency links determine execution order, not numbering. T03 means readiness of the corresponding stage's form contract: remaining review-form interpretations block corresponding T24 assertions, not login/verification. Start T36/T37 early enough for the first business transition to have history and reliable notifications.
 '''
 groups = [(0,'Contracts and safe test environment',1,4),(1,'Fixes and shared foundation',5,10),(2,'Signup, profile and verification',11,15),(3,'Event configuration and intake',16,21),(4,'Four independent evaluations',22,28),(5,'Investment and publication',29,33),(6,'Correspondence, history and panels',34,40),(7,'Event release evidence',41,46),(8,'Exhibition and manual receipts',47,55)]
 parts=[overview]
@@ -137,7 +137,7 @@ parts.append('''
 
 The October 22 backend unit run passed 9 files/42 tests. Destructive integration/frontend fixture suites were not run on the shared environment. This historical result is not acceptance of missing business behavior or a fresh certification of the current build.
 
-Q39 file formats/sizes/counts, final reviewer questions/ceilings/formula and approved agreement/rules text remain open. Do not silently adopt the Figma examples. Backend record/API names are proposed technical contracts; the business rules above are confirmed scope. Team capacity and calendar commitments remain unspecified.
+The user supplied ordinary/employer reviewer forms and the per-review formula (maximum 55.05) on 2026-10-23; see [review rubric](system/review-rubric.md). Q39 file formats/sizes/counts, approved agreement/rules text and remaining rubric interpretations remain open. Do not derive authority from Figma examples or invent four-review aggregation. Backend record/API names are proposed technical contracts; the business rules above are confirmed scope. Team capacity and calendar commitments remain unspecified.
 ''')
 PLAN.write_text('\n'.join(parts)+'\n',encoding='utf-8')
 index=['# GitHub implementation task index','','Registered 2026-10-23: 55 issues with acceptance criteria and prerequisite links. Human acceptance issues are indexed separately in [the manual test catalogue](system/manual-acceptance-tests.md).','','[Project](https://github.com/orgs/dacho-morgh/projects/1) · [Project issue search](https://github.com/dacho-morgh/dacho/issues?q=is%3Aissue+state%3Aopen+project%3Adacho-morgh%2F1)','','| ID | Task | Issue |','| --- | --- | --- |']
@@ -223,12 +223,12 @@ CASES = [
 'Open unassigned case/company URLs as R1 => Access is denied even with copied URLs.',
 'Open another reviewer evaluation or financial-stage document => R1 cannot see others scores, memo or financial files.',
 'Compare reviewer queue and counts => They include assigned authorized cases only.']),
-('UAT16','Review rubric validation and score computation','T24','Assigned reviewer; QA','Final product-approved rubric, ceilings and formula. Blocked until supplied.',[
-'Enter a known valid answer set with independently calculated expected score => Displayed/server-returned totals match the approved formula.',
+('UAT16','Review rubric validation and score computation','T24','Assigned reviewer; QA','User-supplied ordinary/employer rubric in docs/system/review-rubric.md; deployed scoring slice, approved fractional/rounding and requiredness decisions for exercised fields. Block only assertions whose inputs remain missing.',[
+'Test both role forms with A=64, B=51, C=39 and all-zero answers, then a known mixed answer set => Scores match 0.45*A+0.40*B+0.15*C: maximum 55.05, zero 0; ordinary qualitative questions and employer risk checklist remain distinct.',
 'Try missing required answers and values below/above approved ranges => Final submission is refused with field-level guidance.',
 'Change a displayed total/client value while keeping answers unchanged using a QA-provided controlled test method => Server does not trust the tampered total.',
 'Inspect completion before chief action => Even a high final score does not automatically advance the application.']),
-('UAT17','Evaluation draft, final submission and lock','T25','Assigned reviewer; Chief','Approved rubric and an assigned application.',[
+('UAT17','Evaluation draft, final submission and lock','T25','Assigned reviewer; Chief','Supplied role-specific rubric, reviewed required-field decisions and an assigned application.',[
 'Fill part of evaluation, save draft and reload => Own draft persists and completion count does not increase.',
 'Try finalizing an incomplete required form set => Validation blocks finalization.',
 'Complete all required forms and finalize => One finalized evaluation is recorded and count increases once.',
@@ -238,7 +238,7 @@ CASES = [
 'Open saved case/file URLs as the replaced reviewer => Current access is denied.',
 'Try changing employer as chief => Action is denied.',
 'Replace employer as Owner with a reason => New fixed assignee is recorded with actor/reason/history, without erasing earlier attribution.']),
-('UAT19','Four-of-four readiness without automatic advancement','T27','Four assigned reviewers; Chief','Approved rubric and active current-round assignments.',[
+('UAT19','Four-of-four readiness without automatic advancement','T27','Four assigned reviewers; Chief','Supplied role-specific rubric, reviewed required-field decisions and active current-round assignments.',[
 'Finalize one, then two, then three evaluations => Progress reads 1/4, 2/4 and 3/4 and advancement remains unavailable.',
 'Inspect each reviewer account => Each sees only own evaluation, even when the chief sees aggregate progress.',
 'Finalize the fourth valid evaluation => Current round becomes ready exactly once.',
@@ -422,7 +422,7 @@ Updated 2026-10-23. **42 manual gates; none executed by writing this catalogue.*
 1. Product Owner and QA review scope and open inputs (UAT42). Operator confirms an isolated staging URL, database and document area. Never use real company documents or real bank transfers.
 2. Engineering deploys a coherent slice and records build/commit. A login gate can run as soon as T11 is ready; it does not wait for the entire event system.
 3. A human tester uses the stated role accounts and performs each Action. Compare actual behavior with each Expected result; do not infer results from code or issue status.
-4. Record Pass, Fail or Blocked with evidence. Missing build, final rubric, approved agreement text, file policy or fixture is Blocked, never Pass.
+4. Record Pass, Fail or Blocked with evidence. Missing build, required rubric interpretation, approved agreement text, file policy or fixture is Blocked, never Pass. Supplied reviewer questions and per-review scoring are recorded in review-rubric.md.
 5. Keep failed/blocked test issues open, link defects, fix and rerun against a recorded build. Close a gate only after all expected results pass. Independent slice gates do not replace the full event/exhibition walkthrough.
 
 ## Shared synthetic fixture pack
@@ -432,7 +432,7 @@ Updated 2026-10-23. **42 manual gates; none executed by writing this catalogue.*
 - Events E1/E2 with separate responsible teams; at least two subtopics in E1 with distinct RFP files and different employers where needed.
 - Exhibition X1 with at least three distinguishable booths/prices and configurable company limit (use two for cap tests).
 - Distinguishable valid company/proposal/financial/receipt files and controlled invalid fixtures, prepared only after approved category policies are supplied.
-- Known expected list counts, application revisions and review rounds. Final rubric includes independently calculated expected values once product-approved.
+- Known expected list counts, application revisions and review rounds. Use the supplied ordinary/employer forms and independently calculated expected values (all maxima yield 55.05); resolve remaining rounding/requiredness before those assertions.
 - Operator-assisted notification failure and disposable migration/restore fixtures. Human concurrency smoke requires two testers/sessions and companion automated evidence.
 
 ## Evidence template

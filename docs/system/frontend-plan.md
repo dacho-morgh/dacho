@@ -84,7 +84,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT03, UAT15, UAT29. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT03, UAT15, UAT29. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE01 -->
 
@@ -116,7 +116,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT01. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT01. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE02 -->
 
@@ -148,7 +148,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT02. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT02. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE03 -->
 
@@ -184,7 +184,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT04, UAT05, UAT06. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT04, UAT05, UAT06. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE04 -->
 
@@ -218,7 +218,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT06, UAT07. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT06, UAT07. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE05 -->
 
@@ -254,7 +254,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT07, UAT10, UAT33. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT07, UAT10, UAT33. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE06 -->
 
@@ -292,7 +292,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT05, UAT09, UAT11, UAT22, UAT25, UAT35. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT05, UAT09, UAT11, UAT22, UAT25, UAT35. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE07 -->
 
@@ -326,7 +326,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT03, UAT08. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT03, UAT08. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE08 -->
 
@@ -358,7 +358,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT08. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT08. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE09 -->
 
@@ -392,7 +392,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT09. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT09. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE10 -->
 
@@ -427,7 +427,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT08, UAT09, UAT10. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT08, UAT09, UAT10. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE11 -->
 
@@ -464,7 +464,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT10, UAT11. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT10, UAT11. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE12 -->
 
@@ -500,7 +500,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT10, UAT12, UAT13, UAT20, UAT26. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT10, UAT12, UAT13, UAT20, UAT26. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE13 -->
 
@@ -534,7 +534,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT12, UAT13, UAT20. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT12, UAT13, UAT20. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE14 -->
 
@@ -569,7 +569,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT14, UAT18, UAT19. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT14, UAT18, UAT19. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE15 -->
 
@@ -604,7 +604,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT15, UAT19. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT15, UAT19. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE16 -->
 
@@ -629,15 +629,15 @@ Source entry points under `apps/frontend/src/components/dashboard/` unless a dif
 Source review is not a runtime pass. Missing screen families require design completion against the approved workflow.
 
 ## Deliverable and acceptance
-- [ ] Render the final approved system-wide questions, bounds and scoring description; rubric is currently unresolved.
+- [ ] Render the supplied fixed ordinary/employer question sets and common weighted score out of 55.05 from docs/system/review-rubric.md; keep remaining interpretation questions explicit.
 - [ ] Save and reopen drafts for the active round; show server field errors and persisted state.
 - [ ] Require explicit final confirmation and lock finalized evaluations against normal editing.
-- [ ] Show authoritative server score and applicable rubric version; never use unapproved 45/40/15 or trigger automatic advancement.
+- [ ] Show authoritative server score and applicable rubric version using the user-supplied 45/40/15 formula; do not normalize to 100, invent cross-review aggregation or trigger automatic advancement.
 - [ ] Integrate real authorized API responses, including loading/empty/denied/error and stale submission handling. No mocked completion evidence.
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT16, UAT17. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT16, UAT17. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE17 -->
 
@@ -672,7 +672,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT19, UAT20, UAT21. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT19, UAT20, UAT21. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE18 -->
 
@@ -709,7 +709,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT21, UAT22, UAT23, UAT25. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT21, UAT22, UAT23, UAT25. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE19 -->
 
@@ -743,7 +743,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT23, UAT24. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT23, UAT24. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE20 -->
 
@@ -777,7 +777,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT25, UAT26. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT25, UAT26. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE21 -->
 
@@ -811,7 +811,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT25, UAT27. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT25, UAT27. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE22 -->
 
@@ -846,7 +846,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT28, UAT29. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT28, UAT29. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE23 -->
 
@@ -879,7 +879,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT31. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT31. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE24 -->
 
@@ -914,7 +914,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT32, UAT34. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT32, UAT34. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE25 -->
 
@@ -947,7 +947,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT33. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT33. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE26 -->
 
@@ -982,7 +982,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT34, UAT35, UAT36. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT34, UAT35, UAT36. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE27 -->
 
@@ -1015,7 +1015,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT37. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT37. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE28 -->
 
@@ -1048,7 +1048,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT30. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT30. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE29 -->
 
@@ -1085,7 +1085,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT15, UAT23, UAT38, UAT42. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT15, UAT23, UAT38, UAT42. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE30 -->
 
@@ -1128,7 +1128,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT39. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT39. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE31 -->
 
@@ -1168,7 +1168,7 @@ Source review is not a runtime pass. Missing screen families require design comp
 - [ ] Use Persian UI copy and existing shared components/style conventions. UI visibility supplements server authorization.
 
 ## Verification and handoff
-Human gates: UAT40. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Final rubric, category-specific file limits and approved agreement text are still open inputs where applicable.
+Human gates: UAT40. Run each gate when its slice is deployed; record build, tester, steps and evidence. Gates start **Not run**. Add focused automated coverage appropriate to the changed behavior and link defects. Reviewer forms and per-review scoring were supplied on 2026-10-23 (docs/system/review-rubric.md); remaining interpretation questions, category-specific file limits and approved agreement text are still open where applicable.
 
 <!-- dacho-frontend-plan:FE32 -->
 

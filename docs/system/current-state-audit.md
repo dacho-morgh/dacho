@@ -1,5 +1,7 @@
 # Implementation baseline audit
 
+Phase 0 follow-up, 2026-10-23: [migration inventory](migration-inventory.md) verified that the current Payload config and migrations use `public`, while backend tables use `dashboard`. References to `cms` below reflect the earlier audit/design expectation; this batch does not move schemas. Isolated synthetic integration and recovery checks are recorded separately in [test-environment.md](test-environment.md).
+
 Inspection date: **2026-10-22**. Documented in English on 2026-10-23. This is a historical source inspection, not a fresh certification that the current checkout or production is unchanged. The planning and acceptance-test work did not implement these capabilities or rerun the application suites.
 
 | Area | Observed implementation | Required work / evidence |
