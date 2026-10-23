@@ -35,3 +35,11 @@ The exact T02 acceptance items read from issue #16 are:
 - «کنترل در CMS مستقیم، proxy، API، فایل و آمار اعمال شود»
 
 These acceptance items require defining the permission and visible-field outcomes for own, others’, and unassigned records, then applying those controls across direct CMS access, proxy, API, files, and statistics. They do not state that T02 implements the seven-role controls itself: the issue’s context defines the seven-role model, while implementation work is split into later tasks such as T08/T09.
+
+## Git handoff and final update limits
+
+The branch was committed (`dc46563`) and pushed, and [draft PR #145](https://github.com/dacho-morgh/dacho/pull/145) was created and read back with base `main` and head `codex/phase-0-system-foundation`. T01's scope register, T02's policy matrix and T04's isolated harness/rehearsal are ready for review; this is not a claim that all seven-role enforcement is deployed. T03 remains partial after incorporating the supplied reviewer forms. Every human UAT gate stays Not run.
+
+The browser operator inspected the status menu: it exposes exactly **Todo**, **In Progress**, and **Done**. All four selected cards remain In Progress/open while this draft is reviewed and inputs remain outstanding; no new status options were created. Last verified board totals were **Todo 125 / In Progress 4 / Done 0**.
+
+The browser tool became unavailable during the final handoff, and the connected GitHub tool still returned 404 for the private repository. The manager created the PR using the existing standard Git credential interface and GitHub REST API, without exposing or persisting credentials. A read-only Project API attempt was refused because that credential lacks `read:project`; no permission expansion was performed. No issue comments were posted and no issue bodies, checkboxes, labels or other project cards were changed. The PR links all four issues and the checked-in execution record provides the detailed update.

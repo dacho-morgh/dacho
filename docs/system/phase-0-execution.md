@@ -23,6 +23,8 @@ The session supports four concurrent agents including the manager, so the roles 
 4. Assigned frontend, backend and Figma in parallel; then started integration review and board operations after the documentation agents finished.
 5. Recorded typed forms with pending business values; read Figma metadata/screenshots and documented sample rubric/assignment ambiguities; aligned the glossary and scope register to approved decisions.
 6. The user supplied ordinary-reviewer and employer-reviewer forms during execution. Captured them as a new authoritative rubric source, including shared 45/40/15 weights, raw weighted maximum 55.05, distinct qualitative/risk sections and remaining interpretation questions. Updated requirements and generated planning/UAT specifications without claiming execution or silently normalizing scores.
+7. Committed implementation/specification evidence as `dc46563` and pushed the branch. The browser tool later became unavailable; the GitHub connector still returned 404. The manager used the existing Git Credential Manager credential through the standard Git credential interface to create and read back [draft PR #145](https://github.com/dacho-morgh/dacho/pull/145). Credentials were neither printed nor saved. No new access scope was requested or granted.
+8. Stopped the dedicated test container after verification, preserving its test volume and ignored backup/file evidence. No shared service was stopped. The work is handed off through the draft PR; no merge or production release occurred.
 
 ## Evidence and status
 
@@ -45,6 +47,8 @@ Both planning generators ran successfully: **55 original tasks, 32 FE packages, 
 - T04: [Isolated environment](test-environment.md), [migration inventory](migration-inventory.md), guarded runner/configs and recovery evidence.
 - Cross-layer review: [Integration review](phase-0-integration-review.md).
 - Live project state: [Board status](phase-0-board-status.md).
+
+GitHub handoff: [draft PR #145](https://github.com/dacho-morgh/dacho/pull/145), base `main`, head `codex/phase-0-system-foundation`. Project cards #15–#18 were moved from Todo to In Progress and verified through the authenticated UI. That field offers only Todo, In Progress and Done; the branch is awaiting review and T03 remains partial, so none was moved to Done. No issue comments or body/label changes were posted. A later API read could not recheck Project fields because the existing credential lacks `read:project`; the earlier UI verification is the board evidence.
 
 ## Remaining inputs
 
