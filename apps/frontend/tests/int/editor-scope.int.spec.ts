@@ -14,9 +14,9 @@ import { Media } from '@cms-core/collections/Media'
 import { News } from '@cms-core/collections/News'
 import { Posts } from '@cms-core/collections/Posts'
 import { Mag } from '@cms-core/globals/Mag'
+import type { User } from '@dacho/cms-core'
 import { getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { User } from '@dacho/cms-core'
 import config from '@/payload.config'
 
 /**
@@ -70,7 +70,10 @@ const makeUser = (index: number, name: string, roles?: User['roles']) =>
 
 // The minimal rich-text body `posts.content` requires.
 const CONTENT = {
-  root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'text', text: 'متن' }] }] },
+  root: {
+    type: 'root',
+    children: [{ type: 'paragraph', children: [{ type: 'text', text: 'متن' }] }],
+  },
 } as never
 
 describe('editor role', () => {
@@ -108,9 +111,9 @@ describe('editor role', () => {
     it('gates nothing outside the declared scope', async () => {
       const sanitized = await config
       const editorsGated = [
-        ...sanitized.collections.filter((c) => c.access?.create === hasContentRole).map(
-          (c) => c.slug,
-        ),
+        ...sanitized.collections
+          .filter((c) => c.access?.create === hasContentRole)
+          .map((c) => c.slug),
         ...sanitized.globals.filter((g) => g.access?.update === hasContentRole).map((g) => g.slug),
       ]
 
@@ -164,16 +167,19 @@ describe('editor role', () => {
     it('lets an editor update the mag global', async () => {
       // Write the value that is already there, so the assertion is about access
       // rather than about a specific field.
-      const before = await payload.findGlobal({ slug: 'mag' })
+      const before = await payload.findGlobal({ slug: 'mag', depth: 0 })
+      // A never-saved global omits the relationship; persisted empty values are null.
+      const hero = before.hero ?? null
       const updated = await payload.updateGlobal({
         slug: 'mag',
-        data: { hero: before.hero },
+        data: { hero },
+        depth: 0,
         user: editor,
         overrideAccess: false,
         context: { disableRevalidate: true },
       })
 
-      expect(updated.hero).toEqual(before.hero)
+      expect(updated.hero).toEqual(hero)
     })
 
     it('still lets an admin create a post', async () => {

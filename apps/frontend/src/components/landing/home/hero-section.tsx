@@ -51,14 +51,23 @@ const HeroSection = () => {
               از <span className="text-brand-500">فرصت</span> تا{' '}
               <span className="text-secondary-600">موفقیت</span>
             </Typography>
-            <Typography variant="16/light" lg="20/regular" color="neutral-500" className="w-full">
+            <Typography
+              data-hero-enter
+              variant="16/light"
+              lg="20/regular"
+              color="neutral-500"
+              className="w-full"
+            >
               فرصت‌های سرمایه‌گذاری، همکاری و حضور در رویدادهای تخصصی را کشف کنید و مسیر رشد
               کسب‌وکارتان را هموارتر کنید.
             </Typography>
           </div>
 
-          <div className="flex w-full flex-col justify-center gap-4 self-start px-20 pb-20 md:flex-row lg:justify-start lg:gap-2 lg:px-0 lg:pb-0">
-            <Button variant="primary" size="36" lg="48" className="font-light!">
+          <div
+            data-hero-enter
+            className="flex w-full flex-col justify-center gap-4 self-start px-20 pb-20 md:flex-row lg:justify-start lg:gap-2 lg:px-0 lg:pb-0"
+          >
+            <Button asChild variant="primary" size="36" lg="48" className="font-light!">
               <Link href="/register">ثبت‌نام در پتروفاند</Link>
             </Button>
             <Button

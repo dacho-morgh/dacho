@@ -85,10 +85,18 @@ const EventsSection = async () => {
 
   return (
     <section className="relative z-10 flex w-full flex-col items-center gap-8 bg-white px-4 py-4 lg:gap-8 lg:px-0 lg:py-12">
-      <Typography as="h2" variant="32/extrabold" lg="40/extrabold" color="neutral-600">
+      <Typography
+        data-home-reveal
+        as="h2"
+        variant="32/extrabold"
+        lg="40/extrabold"
+        color="neutral-600"
+      >
         نمایشگاه و رویداد ها
       </Typography>
-      <EventsCarousel items={items} />
+      <div data-home-reveal className="w-full max-w-7xl">
+        <EventsCarousel items={items} />
+      </div>
     </section>
   )
 }

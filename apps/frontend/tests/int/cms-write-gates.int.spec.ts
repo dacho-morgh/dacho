@@ -243,6 +243,7 @@ describe('CMS write gates', () => {
       await payload.delete({
         collection: 'services',
         where: { title: { equals: 'خدمت مدیر' } },
+        context: { disableRevalidate: true },
       })
     })
 

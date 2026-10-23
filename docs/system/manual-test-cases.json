@@ -1,0 +1,1439 @@
+[
+  {
+    "id": "UAT01",
+    "title": "Password login, logout and session access",
+    "implementationTasks": [
+      "T11"
+    ],
+    "roles": "Company A representative",
+    "preconditions": "A registered company account with known test password.",
+    "steps": [
+      {
+        "action": "Sign in with phone and password, then repeat in a fresh session with email",
+        "expected": "Both identify the same company and open its panel."
+      },
+      {
+        "action": "Try an incorrect password and an unknown account",
+        "expected": "No authenticated panel or account data is disclosed; a usable error appears."
+      },
+      {
+        "action": "Log out and open the saved private panel URL in a fresh tab",
+        "expected": "Authentication is required again; browser navigation does not restore private access."
+      },
+      {
+        "action": "Sign back in",
+        "expected": "The same company profile and prior data load, without duplicate accounts."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 102,
+    "frontendTasks": [
+      "FE02"
+    ],
+    "body": "Human acceptance gate for **Password login, logout and session access**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T11 — #25](https://github.com/dacho-morgh/dacho/issues/25)\n\nFrontend implementation slices:\n- [FE02 — #72](https://github.com/dacho-morgh/dacho/issues/72)\n\n**Actors:** Company A representative.\n\n**Fixture/precondition:** A registered company account with known test password.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Sign in with phone and password, then repeat in a fresh session with email\n   **Expected:** Both identify the same company and open its panel.\n2. **Action:** Try an incorrect password and an unknown account\n   **Expected:** No authenticated panel or account data is disclosed; a usable error appears.\n3. **Action:** Log out and open the saved private panel URL in a fresh tab\n   **Expected:** Authentication is required again; browser navigation does not restore private access.\n4. **Action:** Sign back in\n   **Expected:** The same company profile and prior data load, without duplicate accounts.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT01 -->\n"
+  },
+  {
+    "id": "UAT02",
+    "title": "Atomic signup and duplicate company protection",
+    "implementationTasks": [
+      "T11"
+    ],
+    "roles": "New company representative",
+    "preconditions": "Unused synthetic company national ID; separate administrator browser session.",
+    "steps": [
+      {
+        "action": "Register full company name, national ID, activity, representative name/position/phone/email and password",
+        "expected": "One person and one company are created; panel access works."
+      },
+      {
+        "action": "Observe participation before verification",
+        "expected": "Panel/profile completion is available, formal event/booth application is blocked."
+      },
+      {
+        "action": "Repeat signup with the same company national ID",
+        "expected": "Clear duplicate error; no second company or stranded user is created."
+      },
+      {
+        "action": "Repeat public signup while an administrator session exists in another browser",
+        "expected": "New account remains a company representative and receives no internal privileges."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 103,
+    "frontendTasks": [
+      "FE03"
+    ],
+    "body": "Human acceptance gate for **Atomic signup and duplicate company protection**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T11 — #25](https://github.com/dacho-morgh/dacho/issues/25)\n\nFrontend implementation slices:\n- [FE03 — #80](https://github.com/dacho-morgh/dacho/issues/80)\n\n**Actors:** New company representative.\n\n**Fixture/precondition:** Unused synthetic company national ID; separate administrator browser session.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Register full company name, national ID, activity, representative name/position/phone/email and password\n   **Expected:** One person and one company are created; panel access works.\n2. **Action:** Observe participation before verification\n   **Expected:** Panel/profile completion is available, formal event/booth application is blocked.\n3. **Action:** Repeat signup with the same company national ID\n   **Expected:** Clear duplicate error; no second company or stranded user is created.\n4. **Action:** Repeat public signup while an administrator session exists in another browser\n   **Expected:** New account remains a company representative and receives no internal privileges.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT02 -->\n"
+  },
+  {
+    "id": "UAT03",
+    "title": "Personnel creation and single operational role",
+    "implementationTasks": [
+      "T08"
+    ],
+    "roles": "System Owner; newly created reviewer",
+    "preconditions": "Owner account and synthetic staff identity.",
+    "steps": [
+      {
+        "action": "Create an internal user and assign Reviewer",
+        "expected": "User can sign in with only the assigned operational role."
+      },
+      {
+        "action": "Attempt to grant a second operational role",
+        "expected": "The system prevents multiple operational roles and explains the constraint."
+      },
+      {
+        "action": "Use the reviewer account to open personnel administration",
+        "expected": "Access is denied; the owner can still manage personnel."
+      },
+      {
+        "action": "Deactivate the reviewer and retry its private URLs in a fresh session",
+        "expected": "Active access is removed while historical attribution is retained."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 104,
+    "frontendTasks": [
+      "FE01",
+      "FE08"
+    ],
+    "body": "Human acceptance gate for **Personnel creation and single operational role**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T08 — #22](https://github.com/dacho-morgh/dacho/issues/22)\n\nFrontend implementation slices:\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE08 — #73](https://github.com/dacho-morgh/dacho/issues/73)\n\n**Actors:** System Owner; newly created reviewer.\n\n**Fixture/precondition:** Owner account and synthetic staff identity.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Create an internal user and assign Reviewer\n   **Expected:** User can sign in with only the assigned operational role.\n2. **Action:** Attempt to grant a second operational role\n   **Expected:** The system prevents multiple operational roles and explains the constraint.\n3. **Action:** Use the reviewer account to open personnel administration\n   **Expected:** Access is denied; the owner can still manage personnel.\n4. **Action:** Deactivate the reviewer and retry its private URLs in a fresh session\n   **Expected:** Active access is removed while historical attribution is retained.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT03 -->\n"
+  },
+  {
+    "id": "UAT04",
+    "title": "Company dossier, addresses and executives persist",
+    "implementationTasks": [
+      "T05",
+      "T13"
+    ],
+    "roles": "Company A representative",
+    "preconditions": "Company account and approved synthetic document fixtures.",
+    "steps": [
+      {
+        "action": "Complete company classification, legal type, location, needs, founding year, key members, projects/customers, insured employee count and available documents",
+        "expected": "Required missing items are identified; legal type and knowledge-based status remain separate."
+      },
+      {
+        "action": "Add and edit multiple addresses and executives; mark absent website/certificates/residency as Does not have",
+        "expected": "Explicit absence is accepted where permitted and data saves."
+      },
+      {
+        "action": "Sign out, sign back in and open profile/resume",
+        "expected": "Saved addresses, people and document references survive real storage/reload."
+      },
+      {
+        "action": "Open the company from an authorized Secretariat account",
+        "expected": "The same submitted data appears without missing arrays or placeholder-only resume content."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 105,
+    "frontendTasks": [
+      "FE04"
+    ],
+    "body": "Human acceptance gate for **Company dossier, addresses and executives persist**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T05 — #19](https://github.com/dacho-morgh/dacho/issues/19)\n- [T13 — #27](https://github.com/dacho-morgh/dacho/issues/27)\n\nFrontend implementation slices:\n- [FE04 — #82](https://github.com/dacho-morgh/dacho/issues/82)\n\n**Actors:** Company A representative.\n\n**Fixture/precondition:** Company account and approved synthetic document fixtures.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Complete company classification, legal type, location, needs, founding year, key members, projects/customers, insured employee count and available documents\n   **Expected:** Required missing items are identified; legal type and knowledge-based status remain separate.\n2. **Action:** Add and edit multiple addresses and executives; mark absent website/certificates/residency as Does not have\n   **Expected:** Explicit absence is accepted where permitted and data saves.\n3. **Action:** Sign out, sign back in and open profile/resume\n   **Expected:** Saved addresses, people and document references survive real storage/reload.\n4. **Action:** Open the company from an authorized Secretariat account\n   **Expected:** The same submitted data appears without missing arrays or placeholder-only resume content.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT04 -->\n"
+  },
+  {
+    "id": "UAT05",
+    "title": "Private company documents and direct download isolation",
+    "implementationTasks": [
+      "T06",
+      "T10"
+    ],
+    "roles": "Companies A and B; authorized Secretariat",
+    "preconditions": "A and B have separate accounts and synthetic private documents.",
+    "steps": [
+      {
+        "action": "Upload a policy-valid company document as A and download it",
+        "expected": "Correct contents and ownership are preserved."
+      },
+      {
+        "action": "Copy the document and private profile URLs into B and a logged-out browser",
+        "expected": "Both private reads are denied; no sensitive metadata is exposed."
+      },
+      {
+        "action": "Inspect public company-directory presentation",
+        "expected": "Only intentionally public fields appear; registration/verification dossier is absent."
+      },
+      {
+        "action": "Try an invalid upload and retry an interrupted upload",
+        "expected": "A clear error appears; no phantom completed document or workflow advancement occurs."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 106,
+    "frontendTasks": [
+      "FE04",
+      "FE07"
+    ],
+    "body": "Human acceptance gate for **Private company documents and direct download isolation**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T06 — #20](https://github.com/dacho-morgh/dacho/issues/20)\n- [T10 — #24](https://github.com/dacho-morgh/dacho/issues/24)\n\nFrontend implementation slices:\n- [FE04 — #82](https://github.com/dacho-morgh/dacho/issues/82)\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n\n**Actors:** Companies A and B; authorized Secretariat.\n\n**Fixture/precondition:** A and B have separate accounts and synthetic private documents.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Upload a policy-valid company document as A and download it\n   **Expected:** Correct contents and ownership are preserved.\n2. **Action:** Copy the document and private profile URLs into B and a logged-out browser\n   **Expected:** Both private reads are denied; no sensitive metadata is exposed.\n3. **Action:** Inspect public company-directory presentation\n   **Expected:** Only intentionally public fields appear; registration/verification dossier is absent.\n4. **Action:** Try an invalid upload and retry an interrupted upload\n   **Expected:** A clear error appears; no phantom completed document or workflow advancement occurs.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT05 -->\n"
+  },
+  {
+    "id": "UAT06",
+    "title": "Verification return, correction, resubmission and approval",
+    "implementationTasks": [
+      "T14"
+    ],
+    "roles": "Company A; Secretariat",
+    "preconditions": "A completed synthetic company dossier awaiting verification.",
+    "steps": [
+      {
+        "action": "Submit the profile for verification",
+        "expected": "Secretariat receives the submitted revision; company sees pending status."
+      },
+      {
+        "action": "Return or reject documents with a reason",
+        "expected": "Company sees that reason and can edit the same company profile."
+      },
+      {
+        "action": "Correct and resubmit",
+        "expected": "Same company identity is used; previous submission/decision remains in history."
+      },
+      {
+        "action": "Approve as Secretariat and inspect the company account",
+        "expected": "Approval actor/time and eligibility are visible; company cannot approve itself."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 107,
+    "frontendTasks": [
+      "FE04",
+      "FE05"
+    ],
+    "body": "Human acceptance gate for **Verification return, correction, resubmission and approval**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T14 — #33](https://github.com/dacho-morgh/dacho/issues/33)\n\nFrontend implementation slices:\n- [FE04 — #82](https://github.com/dacho-morgh/dacho/issues/82)\n- [FE05 — #84](https://github.com/dacho-morgh/dacho/issues/84)\n\n**Actors:** Company A; Secretariat.\n\n**Fixture/precondition:** A completed synthetic company dossier awaiting verification.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Submit the profile for verification\n   **Expected:** Secretariat receives the submitted revision; company sees pending status.\n2. **Action:** Return or reject documents with a reason\n   **Expected:** Company sees that reason and can edit the same company profile.\n3. **Action:** Correct and resubmit\n   **Expected:** Same company identity is used; previous submission/decision remains in history.\n4. **Action:** Approve as Secretariat and inspect the company account\n   **Expected:** Approval actor/time and eligibility are visible; company cannot approve itself.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT06 -->\n"
+  },
+  {
+    "id": "UAT07",
+    "title": "Eligibility gate and identity re-verification",
+    "implementationTasks": [
+      "T15"
+    ],
+    "roles": "Company A; Secretariat",
+    "preconditions": "One incomplete company and one approved company with an existing application.",
+    "steps": [
+      {
+        "action": "Attempt formal event application and booth reservation as incomplete/pending company",
+        "expected": "Both are refused with a route to profile completion."
+      },
+      {
+        "action": "Approve the complete company and repeat valid participation",
+        "expected": "Event/booth actions become available within their other rules."
+      },
+      {
+        "action": "Change approved identity or registration documents",
+        "expected": "Renewed verification is required for new participation."
+      },
+      {
+        "action": "Open an application submitted before the edit",
+        "expected": "It retains the approved company snapshot from its original submission."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 108,
+    "frontendTasks": [
+      "FE05",
+      "FE06"
+    ],
+    "body": "Human acceptance gate for **Eligibility gate and identity re-verification**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T15 — #34](https://github.com/dacho-morgh/dacho/issues/34)\n\nFrontend implementation slices:\n- [FE05 — #84](https://github.com/dacho-morgh/dacho/issues/84)\n- [FE06 — #85](https://github.com/dacho-morgh/dacho/issues/85)\n\n**Actors:** Company A; Secretariat.\n\n**Fixture/precondition:** One incomplete company and one approved company with an existing application.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Attempt formal event application and booth reservation as incomplete/pending company\n   **Expected:** Both are refused with a route to profile completion.\n2. **Action:** Approve the complete company and repeat valid participation\n   **Expected:** Event/booth actions become available within their other rules.\n3. **Action:** Change approved identity or registration documents\n   **Expected:** Renewed verification is required for new participation.\n4. **Action:** Open an application submitted before the edit\n   **Expected:** It retains the approved company snapshot from its original submission.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT07 -->\n"
+  },
+  {
+    "id": "UAT08",
+    "title": "Event creation, registration window and event teams",
+    "implementationTasks": [
+      "T16"
+    ],
+    "roles": "Owner; Chiefs E1 and E2",
+    "preconditions": "Two synthetic events and separate chief/investment accounts.",
+    "steps": [
+      {
+        "action": "Create E1 and E2 with registration windows and separate responsible teams",
+        "expected": "Correct definitions persist and appear in the panel."
+      },
+      {
+        "action": "Open E1 work as its responsible chief, then as the E2 chief",
+        "expected": "Only authorized event work is available."
+      },
+      {
+        "action": "Attempt application outside the configured registration window",
+        "expected": "Formal submission is blocked with a clear message."
+      },
+      {
+        "action": "Reload event configuration",
+        "expected": "Responsible people, dates and event identity remain correct."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 109,
+    "frontendTasks": [
+      "FE08",
+      "FE09",
+      "FE11"
+    ],
+    "body": "Human acceptance gate for **Event creation, registration window and event teams**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T16 — #28](https://github.com/dacho-morgh/dacho/issues/28)\n\nFrontend implementation slices:\n- [FE08 — #73](https://github.com/dacho-morgh/dacho/issues/73)\n- [FE09 — #81](https://github.com/dacho-morgh/dacho/issues/81)\n- [FE11 — #74](https://github.com/dacho-morgh/dacho/issues/74)\n\n**Actors:** Owner; Chiefs E1 and E2.\n\n**Fixture/precondition:** Two synthetic events and separate chief/investment accounts.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Create E1 and E2 with registration windows and separate responsible teams\n   **Expected:** Correct definitions persist and appear in the panel.\n2. **Action:** Open E1 work as its responsible chief, then as the E2 chief\n   **Expected:** Only authorized event work is available.\n3. **Action:** Attempt application outside the configured registration window\n   **Expected:** Formal submission is blocked with a clear message.\n4. **Action:** Reload event configuration\n   **Expected:** Responsible people, dates and event identity remain correct.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT08 -->\n"
+  },
+  {
+    "id": "UAT09",
+    "title": "Categories, subtopics, employer and correct RFP",
+    "implementationTasks": [
+      "T17",
+      "T18"
+    ],
+    "roles": "Owner; Company A",
+    "preconditions": "E1 with two technology categories and distinguishable RFP fixture files.",
+    "steps": [
+      {
+        "action": "Create subtopics and assign one employer reviewer plus the correct RFP per subtopic",
+        "expected": "Relationships persist and company sees the matching names/files."
+      },
+      {
+        "action": "Switch company selection between subtopics and download each RFP",
+        "expected": "Each download contains the correct distinguishable fixture."
+      },
+      {
+        "action": "Attempt an invalid cross-event category/subtopic or ineligible employer assignment",
+        "expected": "Configuration is rejected rather than silently mismatched."
+      },
+      {
+        "action": "Change the current RFP after an application was submitted",
+        "expected": "Earlier application still references its submitted RFP version."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 110,
+    "frontendTasks": [
+      "FE07",
+      "FE10",
+      "FE11"
+    ],
+    "body": "Human acceptance gate for **Categories, subtopics, employer and correct RFP**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T17 — #29](https://github.com/dacho-morgh/dacho/issues/29)\n- [T18 — #30](https://github.com/dacho-morgh/dacho/issues/30)\n\nFrontend implementation slices:\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n- [FE10 — #83](https://github.com/dacho-morgh/dacho/issues/83)\n- [FE11 — #74](https://github.com/dacho-morgh/dacho/issues/74)\n\n**Actors:** Owner; Company A.\n\n**Fixture/precondition:** E1 with two technology categories and distinguishable RFP fixture files.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Create subtopics and assign one employer reviewer plus the correct RFP per subtopic\n   **Expected:** Relationships persist and company sees the matching names/files.\n2. **Action:** Switch company selection between subtopics and download each RFP\n   **Expected:** Each download contains the correct distinguishable fixture.\n3. **Action:** Attempt an invalid cross-event category/subtopic or ineligible employer assignment\n   **Expected:** Configuration is rejected rather than silently mismatched.\n4. **Action:** Change the current RFP after an application was submitted\n   **Expected:** Earlier application still references its submitted RFP version.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT09 -->\n"
+  },
+  {
+    "id": "UAT10",
+    "title": "Independent subtopic applications and company ownership",
+    "implementationTasks": [
+      "T12",
+      "T19"
+    ],
+    "roles": "Company A; Company B",
+    "preconditions": "Approved A/B; two E1 subtopics and one E2 subtopic.",
+    "steps": [
+      {
+        "action": "Apply as A to two E1 subtopics",
+        "expected": "Two separate application IDs/tracking codes, statuses and dossiers appear."
+      },
+      {
+        "action": "Change or reject one application",
+        "expected": "The other application remains independent."
+      },
+      {
+        "action": "Attempt another active duplicate or a mismatched event/subtopic request",
+        "expected": "Duplicate/invalid selection is rejected."
+      },
+      {
+        "action": "Open A application URL as B and inspect B counts",
+        "expected": "No case data or counts from A are disclosed."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 111,
+    "frontendTasks": [
+      "FE06",
+      "FE11",
+      "FE12",
+      "FE13"
+    ],
+    "body": "Human acceptance gate for **Independent subtopic applications and company ownership**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T12 — #26](https://github.com/dacho-morgh/dacho/issues/26)\n- [T19 — #35](https://github.com/dacho-morgh/dacho/issues/35)\n\nFrontend implementation slices:\n- [FE06 — #85](https://github.com/dacho-morgh/dacho/issues/85)\n- [FE11 — #74](https://github.com/dacho-morgh/dacho/issues/74)\n- [FE12 — #86](https://github.com/dacho-morgh/dacho/issues/86)\n- [FE13 — #88](https://github.com/dacho-morgh/dacho/issues/88)\n\n**Actors:** Company A; Company B.\n\n**Fixture/precondition:** Approved A/B; two E1 subtopics and one E2 subtopic.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Apply as A to two E1 subtopics\n   **Expected:** Two separate application IDs/tracking codes, statuses and dossiers appear.\n2. **Action:** Change or reject one application\n   **Expected:** The other application remains independent.\n3. **Action:** Attempt another active duplicate or a mismatched event/subtopic request\n   **Expected:** Duplicate/invalid selection is rejected.\n4. **Action:** Open A application URL as B and inspect B counts\n   **Expected:** No case data or counts from A are disclosed.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT10 -->\n"
+  },
+  {
+    "id": "UAT11",
+    "title": "Proposal draft, fixed form and versioned consent",
+    "implementationTasks": [
+      "T03",
+      "T20"
+    ],
+    "roles": "Company A",
+    "preconditions": "Approved company, valid subtopic/RFP, approved form and agreement text.",
+    "steps": [
+      {
+        "action": "Enter application answers, key members and proposal, save draft and reload",
+        "expected": "Saved draft is recoverable and not yet a submitted review case."
+      },
+      {
+        "action": "Try final submit without required answer/file or agreement acceptance",
+        "expected": "Submission is blocked and missing items are identified."
+      },
+      {
+        "action": "Accept non-compete/rules and submit a policy-valid proposal",
+        "expected": "One submitted revision records actor/time and text/form/RFP versions."
+      },
+      {
+        "action": "Double-click submit or refresh the result",
+        "expected": "No duplicate application, tracking code or effective submission is created."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 112,
+    "frontendTasks": [
+      "FE07",
+      "FE12"
+    ],
+    "body": "Human acceptance gate for **Proposal draft, fixed form and versioned consent**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T03 — #17](https://github.com/dacho-morgh/dacho/issues/17)\n- [T20 — #36](https://github.com/dacho-morgh/dacho/issues/36)\n\nFrontend implementation slices:\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n- [FE12 — #86](https://github.com/dacho-morgh/dacho/issues/86)\n\n**Actors:** Company A.\n\n**Fixture/precondition:** Approved company, valid subtopic/RFP, approved form and agreement text.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Enter application answers, key members and proposal, save draft and reload\n   **Expected:** Saved draft is recoverable and not yet a submitted review case.\n2. **Action:** Try final submit without required answer/file or agreement acceptance\n   **Expected:** Submission is blocked and missing items are identified.\n3. **Action:** Accept non-compete/rules and submit a policy-valid proposal\n   **Expected:** One submitted revision records actor/time and text/form/RFP versions.\n4. **Action:** Double-click submit or refresh the result\n   **Expected:** No duplicate application, tracking code or effective submission is created.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT11 -->\n"
+  },
+  {
+    "id": "UAT12",
+    "title": "Chief return and same-case correction",
+    "implementationTasks": [
+      "T21"
+    ],
+    "roles": "Responsible chief; Company A",
+    "preconditions": "A submitted application in initial chief triage.",
+    "steps": [
+      {
+        "action": "Open the application as responsible chief and return it with specific corrections",
+        "expected": "Company sees correction-required status and reason."
+      },
+      {
+        "action": "Open as company, correct permitted answers/proposal and resubmit",
+        "expected": "Same application/tracking identity receives a new revision."
+      },
+      {
+        "action": "Inspect both versions and transition history",
+        "expected": "Prior contents and actors remain traceable."
+      },
+      {
+        "action": "Try editing a submitted case without an authorized correction state",
+        "expected": "Ordinary company edits are refused."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 113,
+    "frontendTasks": [
+      "FE13",
+      "FE14"
+    ],
+    "body": "Human acceptance gate for **Chief return and same-case correction**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T21 — #37](https://github.com/dacho-morgh/dacho/issues/37)\n\nFrontend implementation slices:\n- [FE13 — #88](https://github.com/dacho-morgh/dacho/issues/88)\n- [FE14 — #90](https://github.com/dacho-morgh/dacho/issues/90)\n\n**Actors:** Responsible chief; Company A.\n\n**Fixture/precondition:** A submitted application in initial chief triage.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Open the application as responsible chief and return it with specific corrections\n   **Expected:** Company sees correction-required status and reason.\n2. **Action:** Open as company, correct permitted answers/proposal and resubmit\n   **Expected:** Same application/tracking identity receives a new revision.\n3. **Action:** Inspect both versions and transition history\n   **Expected:** Prior contents and actors remain traceable.\n4. **Action:** Try editing a submitted case without an authorized correction state\n   **Expected:** Ordinary company edits are refused.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT12 -->\n"
+  },
+  {
+    "id": "UAT13",
+    "title": "Terminal rejection scope and owner reopen",
+    "implementationTasks": [
+      "T21"
+    ],
+    "roles": "Chief; Company A; Owner",
+    "preconditions": "Two independent applications by A to different E1 subtopics.",
+    "steps": [
+      {
+        "action": "Reject one application with reason",
+        "expected": "It is terminal for that company/event/subtopic and the reason is visible."
+      },
+      {
+        "action": "Try applying again to that rejected subtopic, then use the other subtopic",
+        "expected": "Reapplication is blocked only in the rejected scope; the other remains usable."
+      },
+      {
+        "action": "Try reopen as company or ordinary reviewer",
+        "expected": "Reopen is denied."
+      },
+      {
+        "action": "Reopen as Owner with reason",
+        "expected": "The same case/history reopens and owner action is recorded."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 114,
+    "frontendTasks": [
+      "FE13",
+      "FE14"
+    ],
+    "body": "Human acceptance gate for **Terminal rejection scope and owner reopen**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T21 — #37](https://github.com/dacho-morgh/dacho/issues/37)\n\nFrontend implementation slices:\n- [FE13 — #88](https://github.com/dacho-morgh/dacho/issues/88)\n- [FE14 — #90](https://github.com/dacho-morgh/dacho/issues/90)\n\n**Actors:** Chief; Company A; Owner.\n\n**Fixture/precondition:** Two independent applications by A to different E1 subtopics.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Reject one application with reason\n   **Expected:** It is terminal for that company/event/subtopic and the reason is visible.\n2. **Action:** Try applying again to that rejected subtopic, then use the other subtopic\n   **Expected:** Reapplication is blocked only in the rejected scope; the other remains usable.\n3. **Action:** Try reopen as company or ordinary reviewer\n   **Expected:** Reopen is denied.\n4. **Action:** Reopen as Owner with reason\n   **Expected:** The same case/history reopens and owner action is recorded.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT13 -->\n"
+  },
+  {
+    "id": "UAT14",
+    "title": "Assign fixed employer and three distinct reviewers",
+    "implementationTasks": [
+      "T22"
+    ],
+    "roles": "Responsible chief; employer; Reviewers R1–R3",
+    "preconditions": "A triaged application and eligible reviewer accounts.",
+    "steps": [
+      {
+        "action": "Start the review round",
+        "expected": "Subtopic employer automatically occupies the fixed employer slot."
+      },
+      {
+        "action": "Select three distinct ordinary reviewers and submit",
+        "expected": "Four distinct active assignments are created for the proposal revision."
+      },
+      {
+        "action": "Try duplicate people, fewer than three ordinary reviewers or replacing the fixed employer as chief",
+        "expected": "Invalid assignment is refused."
+      },
+      {
+        "action": "Open each assigned reviewer account",
+        "expected": "The correct case appears once in each queue."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 115,
+    "frontendTasks": [
+      "FE15"
+    ],
+    "body": "Human acceptance gate for **Assign fixed employer and three distinct reviewers**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T22 — #38](https://github.com/dacho-morgh/dacho/issues/38)\n\nFrontend implementation slices:\n- [FE15 — #92](https://github.com/dacho-morgh/dacho/issues/92)\n\n**Actors:** Responsible chief; employer; Reviewers R1–R3.\n\n**Fixture/precondition:** A triaged application and eligible reviewer accounts.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Start the review round\n   **Expected:** Subtopic employer automatically occupies the fixed employer slot.\n2. **Action:** Select three distinct ordinary reviewers and submit\n   **Expected:** Four distinct active assignments are created for the proposal revision.\n3. **Action:** Try duplicate people, fewer than three ordinary reviewers or replacing the fixed employer as chief\n   **Expected:** Invalid assignment is refused.\n4. **Action:** Open each assigned reviewer account\n   **Expected:** The correct case appears once in each queue.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT14 -->\n"
+  },
+  {
+    "id": "UAT15",
+    "title": "Assigned-only reviewer dossier and own-evaluation privacy",
+    "implementationTasks": [
+      "T23",
+      "T09"
+    ],
+    "roles": "Reviewer R1; unassigned reviewer; Company B",
+    "preconditions": "One active assignment for R1 and another case not assigned to R1.",
+    "steps": [
+      {
+        "action": "Open R1 assigned application and necessary company profile",
+        "expected": "Correct proposal/RFP and permitted profile data are readable."
+      },
+      {
+        "action": "Open unassigned case/company URLs as R1",
+        "expected": "Access is denied even with copied URLs."
+      },
+      {
+        "action": "Open another reviewer evaluation or financial-stage document",
+        "expected": "R1 cannot see others scores, memo or financial files."
+      },
+      {
+        "action": "Compare reviewer queue and counts",
+        "expected": "They include assigned authorized cases only."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 116,
+    "frontendTasks": [
+      "FE01",
+      "FE16",
+      "FE30"
+    ],
+    "body": "Human acceptance gate for **Assigned-only reviewer dossier and own-evaluation privacy**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T23 — #39](https://github.com/dacho-morgh/dacho/issues/39)\n- [T09 — #23](https://github.com/dacho-morgh/dacho/issues/23)\n\nFrontend implementation slices:\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE16 — #94](https://github.com/dacho-morgh/dacho/issues/94)\n- [FE30 — #79](https://github.com/dacho-morgh/dacho/issues/79)\n\n**Actors:** Reviewer R1; unassigned reviewer; Company B.\n\n**Fixture/precondition:** One active assignment for R1 and another case not assigned to R1.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Open R1 assigned application and necessary company profile\n   **Expected:** Correct proposal/RFP and permitted profile data are readable.\n2. **Action:** Open unassigned case/company URLs as R1\n   **Expected:** Access is denied even with copied URLs.\n3. **Action:** Open another reviewer evaluation or financial-stage document\n   **Expected:** R1 cannot see others scores, memo or financial files.\n4. **Action:** Compare reviewer queue and counts\n   **Expected:** They include assigned authorized cases only.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT15 -->\n"
+  },
+  {
+    "id": "UAT16",
+    "title": "Review rubric validation and score computation",
+    "implementationTasks": [
+      "T24"
+    ],
+    "roles": "Assigned reviewer; QA",
+    "preconditions": "Final product-approved rubric, ceilings and formula. Blocked until supplied.",
+    "steps": [
+      {
+        "action": "Enter a known valid answer set with independently calculated expected score",
+        "expected": "Displayed/server-returned totals match the approved formula."
+      },
+      {
+        "action": "Try missing required answers and values below/above approved ranges",
+        "expected": "Final submission is refused with field-level guidance."
+      },
+      {
+        "action": "Change a displayed total/client value while keeping answers unchanged using a QA-provided controlled test method",
+        "expected": "Server does not trust the tampered total."
+      },
+      {
+        "action": "Inspect completion before chief action",
+        "expected": "Even a high final score does not automatically advance the application."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 117,
+    "frontendTasks": [
+      "FE17"
+    ],
+    "body": "Human acceptance gate for **Review rubric validation and score computation**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T24 — #40](https://github.com/dacho-morgh/dacho/issues/40)\n\nFrontend implementation slices:\n- [FE17 — #96](https://github.com/dacho-morgh/dacho/issues/96)\n\n**Actors:** Assigned reviewer; QA.\n\n**Fixture/precondition:** Final product-approved rubric, ceilings and formula. Blocked until supplied.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Enter a known valid answer set with independently calculated expected score\n   **Expected:** Displayed/server-returned totals match the approved formula.\n2. **Action:** Try missing required answers and values below/above approved ranges\n   **Expected:** Final submission is refused with field-level guidance.\n3. **Action:** Change a displayed total/client value while keeping answers unchanged using a QA-provided controlled test method\n   **Expected:** Server does not trust the tampered total.\n4. **Action:** Inspect completion before chief action\n   **Expected:** Even a high final score does not automatically advance the application.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT16 -->\n"
+  },
+  {
+    "id": "UAT17",
+    "title": "Evaluation draft, final submission and lock",
+    "implementationTasks": [
+      "T25"
+    ],
+    "roles": "Assigned reviewer; Chief",
+    "preconditions": "Approved rubric and an assigned application.",
+    "steps": [
+      {
+        "action": "Fill part of evaluation, save draft and reload",
+        "expected": "Own draft persists and completion count does not increase."
+      },
+      {
+        "action": "Try finalizing an incomplete required form set",
+        "expected": "Validation blocks finalization."
+      },
+      {
+        "action": "Complete all required forms and finalize",
+        "expected": "One finalized evaluation is recorded and count increases once."
+      },
+      {
+        "action": "Retry finalization and attempt ordinary editing",
+        "expected": "No duplicate count; finalized content is locked."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 118,
+    "frontendTasks": [
+      "FE17"
+    ],
+    "body": "Human acceptance gate for **Evaluation draft, final submission and lock**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T25 — #41](https://github.com/dacho-morgh/dacho/issues/41)\n\nFrontend implementation slices:\n- [FE17 — #96](https://github.com/dacho-morgh/dacho/issues/96)\n\n**Actors:** Assigned reviewer; Chief.\n\n**Fixture/precondition:** Approved rubric and an assigned application.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Fill part of evaluation, save draft and reload\n   **Expected:** Own draft persists and completion count does not increase.\n2. **Action:** Try finalizing an incomplete required form set\n   **Expected:** Validation blocks finalization.\n3. **Action:** Complete all required forms and finalize\n   **Expected:** One finalized evaluation is recorded and count increases once.\n4. **Action:** Retry finalization and attempt ordinary editing\n   **Expected:** No duplicate count; finalized content is locked.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT17 -->\n"
+  },
+  {
+    "id": "UAT18",
+    "title": "Reviewer replacement and employer exception",
+    "implementationTasks": [
+      "T26"
+    ],
+    "roles": "Chief; Owner; old/new reviewers",
+    "preconditions": "Incomplete ordinary assignment and an employer assignment.",
+    "steps": [
+      {
+        "action": "Replace an unfinished ordinary reviewer as chief",
+        "expected": "Replacement receives the case and old assignment is retained as history."
+      },
+      {
+        "action": "Open saved case/file URLs as the replaced reviewer",
+        "expected": "Current access is denied."
+      },
+      {
+        "action": "Try changing employer as chief",
+        "expected": "Action is denied."
+      },
+      {
+        "action": "Replace employer as Owner with a reason",
+        "expected": "New fixed assignee is recorded with actor/reason/history, without erasing earlier attribution."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 119,
+    "frontendTasks": [
+      "FE15"
+    ],
+    "body": "Human acceptance gate for **Reviewer replacement and employer exception**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T26 — #42](https://github.com/dacho-morgh/dacho/issues/42)\n\nFrontend implementation slices:\n- [FE15 — #92](https://github.com/dacho-morgh/dacho/issues/92)\n\n**Actors:** Chief; Owner; old/new reviewers.\n\n**Fixture/precondition:** Incomplete ordinary assignment and an employer assignment.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Replace an unfinished ordinary reviewer as chief\n   **Expected:** Replacement receives the case and old assignment is retained as history.\n2. **Action:** Open saved case/file URLs as the replaced reviewer\n   **Expected:** Current access is denied.\n3. **Action:** Try changing employer as chief\n   **Expected:** Action is denied.\n4. **Action:** Replace employer as Owner with a reason\n   **Expected:** New fixed assignee is recorded with actor/reason/history, without erasing earlier attribution.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT18 -->\n"
+  },
+  {
+    "id": "UAT19",
+    "title": "Four-of-four readiness without automatic advancement",
+    "implementationTasks": [
+      "T27"
+    ],
+    "roles": "Four assigned reviewers; Chief",
+    "preconditions": "Approved rubric and active current-round assignments.",
+    "steps": [
+      {
+        "action": "Finalize one, then two, then three evaluations",
+        "expected": "Progress reads 1/4, 2/4 and 3/4 and advancement remains unavailable."
+      },
+      {
+        "action": "Inspect each reviewer account",
+        "expected": "Each sees only own evaluation, even when the chief sees aggregate progress."
+      },
+      {
+        "action": "Finalize the fourth valid evaluation",
+        "expected": "Current round becomes ready exactly once."
+      },
+      {
+        "action": "Open company and chief panels before chief approval",
+        "expected": "Company has not advanced to financial intake automatically; chief must explicitly decide."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 120,
+    "frontendTasks": [
+      "FE15",
+      "FE16",
+      "FE18"
+    ],
+    "body": "Human acceptance gate for **Four-of-four readiness without automatic advancement**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T27 — #43](https://github.com/dacho-morgh/dacho/issues/43)\n\nFrontend implementation slices:\n- [FE15 — #92](https://github.com/dacho-morgh/dacho/issues/92)\n- [FE16 — #94](https://github.com/dacho-morgh/dacho/issues/94)\n- [FE18 — #97](https://github.com/dacho-morgh/dacho/issues/97)\n\n**Actors:** Four assigned reviewers; Chief.\n\n**Fixture/precondition:** Approved rubric and active current-round assignments.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Finalize one, then two, then three evaluations\n   **Expected:** Progress reads 1/4, 2/4 and 3/4 and advancement remains unavailable.\n2. **Action:** Inspect each reviewer account\n   **Expected:** Each sees only own evaluation, even when the chief sees aggregate progress.\n3. **Action:** Finalize the fourth valid evaluation\n   **Expected:** Current round becomes ready exactly once.\n4. **Action:** Open company and chief panels before chief approval\n   **Expected:** Company has not advanced to financial intake automatically; chief must explicitly decide.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT19 -->\n"
+  },
+  {
+    "id": "UAT20",
+    "title": "Chief decision and corrected-proposal review round",
+    "implementationTasks": [
+      "T28"
+    ],
+    "roles": "Chief; Company A; reviewers",
+    "preconditions": "One 4/4 case and one case requiring a proposal correction.",
+    "steps": [
+      {
+        "action": "Approve advancement as responsible chief on complete case",
+        "expected": "Financial stage opens only after this explicit action."
+      },
+      {
+        "action": "Return another reviewed case for proposal correction and resubmit as company",
+        "expected": "Same application gets new proposal revision and new review round."
+      },
+      {
+        "action": "Inspect history and progress",
+        "expected": "Old evaluations remain readable to authorized staff but do not count in the new round."
+      },
+      {
+        "action": "Try using an old reviewer page/action on the superseded round",
+        "expected": "It cannot alter current-round completion."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 121,
+    "frontendTasks": [
+      "FE13",
+      "FE14",
+      "FE18"
+    ],
+    "body": "Human acceptance gate for **Chief decision and corrected-proposal review round**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T28 — #44](https://github.com/dacho-morgh/dacho/issues/44)\n\nFrontend implementation slices:\n- [FE13 — #88](https://github.com/dacho-morgh/dacho/issues/88)\n- [FE14 — #90](https://github.com/dacho-morgh/dacho/issues/90)\n- [FE18 — #97](https://github.com/dacho-morgh/dacho/issues/97)\n\n**Actors:** Chief; Company A; reviewers.\n\n**Fixture/precondition:** One 4/4 case and one case requiring a proposal correction.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Approve advancement as responsible chief on complete case\n   **Expected:** Financial stage opens only after this explicit action.\n2. **Action:** Return another reviewed case for proposal correction and resubmit as company\n   **Expected:** Same application gets new proposal revision and new review round.\n3. **Action:** Inspect history and progress\n   **Expected:** Old evaluations remain readable to authorized staff but do not count in the new round.\n4. **Action:** Try using an old reviewer page/action on the superseded round\n   **Expected:** It cannot alter current-round completion.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT20 -->\n"
+  },
+  {
+    "id": "UAT21",
+    "title": "Financial-stage invitation and timing",
+    "implementationTasks": [
+      "T29"
+    ],
+    "roles": "Company A; Chief",
+    "preconditions": "One case before chief advancement and another advanced case.",
+    "steps": [
+      {
+        "action": "Try opening/submitting financial stage before chief approval",
+        "expected": "Action is unavailable/denied."
+      },
+      {
+        "action": "Approve advancement as chief",
+        "expected": "Owning company receives an in-app invitation linked to the correct case."
+      },
+      {
+        "action": "Open the invitation as company",
+        "expected": "Required financial categories and next action are clear."
+      },
+      {
+        "action": "Open the same invitation/case as another company",
+        "expected": "Financial intake is denied."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 122,
+    "frontendTasks": [
+      "FE18",
+      "FE19"
+    ],
+    "body": "Human acceptance gate for **Financial-stage invitation and timing**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T29 — #45](https://github.com/dacho-morgh/dacho/issues/45)\n\nFrontend implementation slices:\n- [FE18 — #97](https://github.com/dacho-morgh/dacho/issues/97)\n- [FE19 — #98](https://github.com/dacho-morgh/dacho/issues/98)\n\n**Actors:** Company A; Chief.\n\n**Fixture/precondition:** One case before chief advancement and another advanced case.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Try opening/submitting financial stage before chief approval\n   **Expected:** Action is unavailable/denied.\n2. **Action:** Approve advancement as chief\n   **Expected:** Owning company receives an in-app invitation linked to the correct case.\n3. **Action:** Open the invitation as company\n   **Expected:** Required financial categories and next action are clear.\n4. **Action:** Open the same invitation/case as another company\n   **Expected:** Financial intake is denied.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT21 -->\n"
+  },
+  {
+    "id": "UAT22",
+    "title": "Financial package completion, versions and younger company",
+    "implementationTasks": [
+      "T30"
+    ],
+    "roles": "Company A; assigned investment person",
+    "preconditions": "Advanced case; synthetic financial files; younger-company fixture.",
+    "steps": [
+      {
+        "action": "Upload financial statements, debts/facilities, tax/insurance records, contracts/orders/commitments, estimate/use of funds and available guarantees",
+        "expected": "Correct categories persist."
+      },
+      {
+        "action": "Omit a required category or use an invalid file",
+        "expected": "Final package submission is blocked without handing an incomplete package to investment review."
+      },
+      {
+        "action": "Submit a complete package, including since-establishment records for the younger-company fixture",
+        "expected": "Authorized investment queue receives the correct version."
+      },
+      {
+        "action": "Reload and inspect documents",
+        "expected": "Submitted package and file versions remain consistent."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 123,
+    "frontendTasks": [
+      "FE07",
+      "FE19"
+    ],
+    "body": "Human acceptance gate for **Financial package completion, versions and younger company**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T30 — #46](https://github.com/dacho-morgh/dacho/issues/46)\n\nFrontend implementation slices:\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n- [FE19 — #98](https://github.com/dacho-morgh/dacho/issues/98)\n\n**Actors:** Company A; assigned investment person.\n\n**Fixture/precondition:** Advanced case; synthetic financial files; younger-company fixture.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Upload financial statements, debts/facilities, tax/insurance records, contracts/orders/commitments, estimate/use of funds and available guarantees\n   **Expected:** Correct categories persist.\n2. **Action:** Omit a required category or use an invalid file\n   **Expected:** Final package submission is blocked without handing an incomplete package to investment review.\n3. **Action:** Submit a complete package, including since-establishment records for the younger-company fixture\n   **Expected:** Authorized investment queue receives the correct version.\n4. **Action:** Reload and inspect documents\n   **Expected:** Submitted package and file versions remain consistent.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT22 -->\n"
+  },
+  {
+    "id": "UAT23",
+    "title": "Investment assignment and financial confidentiality",
+    "implementationTasks": [
+      "T31"
+    ],
+    "roles": "Assigned/unassigned investment people; Chief; reviewer; Company A; Secretariat; Owner",
+    "preconditions": "A submitted financial package and separate event responsibilities.",
+    "steps": [
+      {
+        "action": "Open as assigned investment person",
+        "expected": "Case, permitted four reviews and financial files are available."
+      },
+      {
+        "action": "Open same financial file/URL as chief, employer reviewer, ordinary reviewer or unassigned investment person",
+        "expected": "File, sensitive metadata and case access beyond scope are denied."
+      },
+      {
+        "action": "Open as owning company, Secretariat and Owner",
+        "expected": "Authorized financial records are available."
+      },
+      {
+        "action": "Inspect another event queue and copied URLs",
+        "expected": "Investment access remains case-assignment scoped."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 124,
+    "frontendTasks": [
+      "FE19",
+      "FE20",
+      "FE30"
+    ],
+    "body": "Human acceptance gate for **Investment assignment and financial confidentiality**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T31 — #47](https://github.com/dacho-morgh/dacho/issues/47)\n\nFrontend implementation slices:\n- [FE19 — #98](https://github.com/dacho-morgh/dacho/issues/98)\n- [FE20 — #99](https://github.com/dacho-morgh/dacho/issues/99)\n- [FE30 — #79](https://github.com/dacho-morgh/dacho/issues/79)\n\n**Actors:** Assigned/unassigned investment people; Chief; reviewer; Company A; Secretariat; Owner.\n\n**Fixture/precondition:** A submitted financial package and separate event responsibilities.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Open as assigned investment person\n   **Expected:** Case, permitted four reviews and financial files are available.\n2. **Action:** Open same financial file/URL as chief, employer reviewer, ordinary reviewer or unassigned investment person\n   **Expected:** File, sensitive metadata and case access beyond scope are denied.\n3. **Action:** Open as owning company, Secretariat and Owner\n   **Expected:** Authorized financial records are available.\n4. **Action:** Inspect another event queue and copied URLs\n   **Expected:** Investment access remains case-assignment scoped.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT23 -->\n"
+  },
+  {
+    "id": "UAT24",
+    "title": "Investment memo handoff without decision controls",
+    "implementationTasks": [
+      "T32"
+    ],
+    "roles": "Assigned investment person; Secretariat; Company A",
+    "preconditions": "A complete assigned financial dossier.",
+    "steps": [
+      {
+        "action": "Write and send an internal investment memo",
+        "expected": "Secretariat receives the case-linked memo with author/time."
+      },
+      {
+        "action": "Inspect investment actions",
+        "expected": "There are no separate investment approve/reject/return or multi-member voting actions."
+      },
+      {
+        "action": "Open the company account before publication",
+        "expected": "Private memo is not visible and no final outcome auto-publishes."
+      },
+      {
+        "action": "Reload the internal dossier/history",
+        "expected": "Memo and handoff remain attributable and persistent."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 125,
+    "frontendTasks": [
+      "FE20"
+    ],
+    "body": "Human acceptance gate for **Investment memo handoff without decision controls**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T32 — #48](https://github.com/dacho-morgh/dacho/issues/48)\n\nFrontend implementation slices:\n- [FE20 — #99](https://github.com/dacho-morgh/dacho/issues/99)\n\n**Actors:** Assigned investment person; Secretariat; Company A.\n\n**Fixture/precondition:** A complete assigned financial dossier.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Write and send an internal investment memo\n   **Expected:** Secretariat receives the case-linked memo with author/time.\n2. **Action:** Inspect investment actions\n   **Expected:** There are no separate investment approve/reject/return or multi-member voting actions.\n3. **Action:** Open the company account before publication\n   **Expected:** Private memo is not visible and no final outcome auto-publishes.\n4. **Action:** Reload the internal dossier/history\n   **Expected:** Memo and handoff remain attributable and persistent.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT24 -->\n"
+  },
+  {
+    "id": "UAT25",
+    "title": "Supplementary financial documents through Secretariat",
+    "implementationTasks": [
+      "T33",
+      "T35"
+    ],
+    "roles": "Investment person; Secretariat; Company A; reviewer",
+    "preconditions": "An internal memo requesting extra evidence.",
+    "steps": [
+      {
+        "action": "As Secretariat send a case-linked request for supplementary documents",
+        "expected": "Company receives an actionable support message, not a published final outcome."
+      },
+      {
+        "action": "Reply as company with authorized private attachments",
+        "expected": "Files remain linked to the case and financial category."
+      },
+      {
+        "action": "Open as assigned investment person",
+        "expected": "Supplementary files can be reviewed and another memo can be provided."
+      },
+      {
+        "action": "Try the supplementary-file URL as ordinary reviewer/chief/another company",
+        "expected": "Financial confidentiality remains enforced."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 126,
+    "frontendTasks": [
+      "FE07",
+      "FE19",
+      "FE21",
+      "FE22"
+    ],
+    "body": "Human acceptance gate for **Supplementary financial documents through Secretariat**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T33 — #51](https://github.com/dacho-morgh/dacho/issues/51)\n- [T35 — #50](https://github.com/dacho-morgh/dacho/issues/50)\n\nFrontend implementation slices:\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n- [FE19 — #98](https://github.com/dacho-morgh/dacho/issues/98)\n- [FE21 — #100](https://github.com/dacho-morgh/dacho/issues/100)\n- [FE22 — #75](https://github.com/dacho-morgh/dacho/issues/75)\n\n**Actors:** Investment person; Secretariat; Company A; reviewer.\n\n**Fixture/precondition:** An internal memo requesting extra evidence.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** As Secretariat send a case-linked request for supplementary documents\n   **Expected:** Company receives an actionable support message, not a published final outcome.\n2. **Action:** Reply as company with authorized private attachments\n   **Expected:** Files remain linked to the case and financial category.\n3. **Action:** Open as assigned investment person\n   **Expected:** Supplementary files can be reviewed and another memo can be provided.\n4. **Action:** Try the supplementary-file URL as ordinary reviewer/chief/another company\n   **Expected:** Financial confidentiality remains enforced.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT25 -->\n"
+  },
+  {
+    "id": "UAT26",
+    "title": "Secretariat publication and company-visible outcome",
+    "implementationTasks": [
+      "T33"
+    ],
+    "roles": "Secretariat; Company A; investment person",
+    "preconditions": "Internal memo ready for disclosure.",
+    "steps": [
+      {
+        "action": "Inspect company view before publication",
+        "expected": "Only permitted status/correspondence is visible, without memo or private scores."
+      },
+      {
+        "action": "Publish a separate company-visible result text as Secretariat",
+        "expected": "Publication actor/time and disclosed text are recorded."
+      },
+      {
+        "action": "Open the company case and notification",
+        "expected": "Correct published result appears for that company only."
+      },
+      {
+        "action": "Inspect internal dossier",
+        "expected": "Private memo, prior versions and review evidence remain distinct from published text."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 127,
+    "frontendTasks": [
+      "FE13",
+      "FE21"
+    ],
+    "body": "Human acceptance gate for **Secretariat publication and company-visible outcome**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T33 — #51](https://github.com/dacho-morgh/dacho/issues/51)\n\nFrontend implementation slices:\n- [FE13 — #88](https://github.com/dacho-morgh/dacho/issues/88)\n- [FE21 — #100](https://github.com/dacho-morgh/dacho/issues/100)\n\n**Actors:** Secretariat; Company A; investment person.\n\n**Fixture/precondition:** Internal memo ready for disclosure.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Inspect company view before publication\n   **Expected:** Only permitted status/correspondence is visible, without memo or private scores.\n2. **Action:** Publish a separate company-visible result text as Secretariat\n   **Expected:** Publication actor/time and disclosed text are recorded.\n3. **Action:** Open the company case and notification\n   **Expected:** Correct published result appears for that company only.\n4. **Action:** Inspect internal dossier\n   **Expected:** Private memo, prior versions and review evidence remain distinct from published text.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT26 -->\n"
+  },
+  {
+    "id": "UAT27",
+    "title": "Role-specific messaging and attachment permissions",
+    "implementationTasks": [
+      "T34",
+      "T35"
+    ],
+    "roles": "All seven roles across two events/companies",
+    "preconditions": "Scoped cases and synthetic attachments.",
+    "steps": [
+      {
+        "action": "Send as company, ordinary reviewer and employer",
+        "expected": "Company can contact Secretariat support; reviewers only the responsible chief."
+      },
+      {
+        "action": "Try unrelated recipients as investment person",
+        "expected": "Only authorized participants in assigned case are selectable/accepted."
+      },
+      {
+        "action": "Send as owner/chief and inspect unrelated case visibility",
+        "expected": "General sending does not grant access to unrelated dossiers."
+      },
+      {
+        "action": "Send/download an authorized attachment then copy its URL to an unauthorized account",
+        "expected": "Delivery works for intended audience and download is denied elsewhere."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 128,
+    "frontendTasks": [
+      "FE22"
+    ],
+    "body": "Human acceptance gate for **Role-specific messaging and attachment permissions**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T34 — #49](https://github.com/dacho-morgh/dacho/issues/49)\n- [T35 — #50](https://github.com/dacho-morgh/dacho/issues/50)\n\nFrontend implementation slices:\n- [FE22 — #75](https://github.com/dacho-morgh/dacho/issues/75)\n\n**Actors:** All seven roles across two events/companies.\n\n**Fixture/precondition:** Scoped cases and synthetic attachments.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Send as company, ordinary reviewer and employer\n   **Expected:** Company can contact Secretariat support; reviewers only the responsible chief.\n2. **Action:** Try unrelated recipients as investment person\n   **Expected:** Only authorized participants in assigned case are selectable/accepted.\n3. **Action:** Send as owner/chief and inspect unrelated case visibility\n   **Expected:** General sending does not grant access to unrelated dossiers.\n4. **Action:** Send/download an authorized attachment then copy its URL to an unauthorized account\n   **Expected:** Delivery works for intended audience and download is denied elsewhere.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT27 -->\n"
+  },
+  {
+    "id": "UAT28",
+    "title": "History, notifications and retry visibility",
+    "implementationTasks": [
+      "T36",
+      "T37"
+    ],
+    "roles": "Company; Secretariat; Chief; QA",
+    "preconditions": "A staging build with controlled notification-failure fixture or operator support.",
+    "steps": [
+      {
+        "action": "Perform verification, return/resubmit and assignment actions",
+        "expected": "History includes actor/time/reason/revision/old-new state; recipients receive case-linked in-app work."
+      },
+      {
+        "action": "Delete a displayed letter",
+        "expected": "Workflow history remains intact."
+      },
+      {
+        "action": "Use the controlled notification failure and operator retry",
+        "expected": "Business state remains committed and notification arrives without repeated business transition."
+      },
+      {
+        "action": "Reload each authorized account",
+        "expected": "State/history/counts agree; unauthorized accounts cannot read the history."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 129,
+    "frontendTasks": [
+      "FE23"
+    ],
+    "body": "Human acceptance gate for **History, notifications and retry visibility**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T36 — #31](https://github.com/dacho-morgh/dacho/issues/31)\n- [T37 — #32](https://github.com/dacho-morgh/dacho/issues/32)\n\nFrontend implementation slices:\n- [FE23 — #76](https://github.com/dacho-morgh/dacho/issues/76)\n\n**Actors:** Company; Secretariat; Chief; QA.\n\n**Fixture/precondition:** A staging build with controlled notification-failure fixture or operator support.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Perform verification, return/resubmit and assignment actions\n   **Expected:** History includes actor/time/reason/revision/old-new state; recipients receive case-linked in-app work.\n2. **Action:** Delete a displayed letter\n   **Expected:** Workflow history remains intact.\n3. **Action:** Use the controlled notification failure and operator retry\n   **Expected:** Business state remains committed and notification arrives without repeated business transition.\n4. **Action:** Reload each authorized account\n   **Expected:** State/history/counts agree; unauthorized accounts cannot read the history.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT28 -->\n"
+  },
+  {
+    "id": "UAT29",
+    "title": "Queues, counts and shared dossier actions",
+    "implementationTasks": [
+      "T38",
+      "T39"
+    ],
+    "roles": "All roles with own and unrelated cases",
+    "preconditions": "Known fixture counts for two companies and two events.",
+    "steps": [
+      {
+        "action": "Compare each role overview count with its filtered list",
+        "expected": "Counts equal authorized list items."
+      },
+      {
+        "action": "Search/filter by event, stage and title, then open cases",
+        "expected": "No unrelated case leaks through count, search or populated company fields."
+      },
+      {
+        "action": "Open each permitted shared dossier",
+        "expected": "Correct revision/files/history/actions appear and no removed-route button remains."
+      },
+      {
+        "action": "Change responsibility/assignment and refresh",
+        "expected": "Lists, counters, detail actions and old URLs reflect revoked/new access."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 130,
+    "frontendTasks": [
+      "FE01",
+      "FE23"
+    ],
+    "body": "Human acceptance gate for **Queues, counts and shared dossier actions**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T38 — #52](https://github.com/dacho-morgh/dacho/issues/52)\n- [T39 — #53](https://github.com/dacho-morgh/dacho/issues/53)\n\nFrontend implementation slices:\n- [FE01 — #70](https://github.com/dacho-morgh/dacho/issues/70)\n- [FE23 — #76](https://github.com/dacho-morgh/dacho/issues/76)\n\n**Actors:** All roles with own and unrelated cases.\n\n**Fixture/precondition:** Known fixture counts for two companies and two events.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Compare each role overview count with its filtered list\n   **Expected:** Counts equal authorized list items.\n2. **Action:** Search/filter by event, stage and title, then open cases\n   **Expected:** No unrelated case leaks through count, search or populated company fields.\n3. **Action:** Open each permitted shared dossier\n   **Expected:** Correct revision/files/history/actions appear and no removed-route button remains.\n4. **Action:** Change responsibility/assignment and refresh\n   **Expected:** Lists, counters, detail actions and old URLs reflect revoked/new access.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT29 -->\n"
+  },
+  {
+    "id": "UAT30",
+    "title": "RTL, mobile, keyboard and error states",
+    "implementationTasks": [
+      "T40"
+    ],
+    "roles": "Company; reviewer; Secretariat",
+    "preconditions": "Supported test browsers and phone-size viewport/device; empty/loading/error fixtures.",
+    "steps": [
+      {
+        "action": "Use login, profile, request, evaluation, letters and receipt screens by keyboard",
+        "expected": "Focus, labels and submit/error guidance are usable."
+      },
+      {
+        "action": "Repeat core forms at phone width with Persian names, long text and mixed numbers",
+        "expected": "RTL layout remains readable with reachable controls and no lost input."
+      },
+      {
+        "action": "Exercise loading, empty, validation, denied and network-error states",
+        "expected": "Each has a clear recoverable outcome."
+      },
+      {
+        "action": "Open a stale form while another actor changes the case",
+        "expected": "Conflict/refresh guidance prevents silent overwrite."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 131,
+    "frontendTasks": [
+      "FE29"
+    ],
+    "body": "Human acceptance gate for **RTL, mobile, keyboard and error states**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T40 — #54](https://github.com/dacho-morgh/dacho/issues/54)\n\nFrontend implementation slices:\n- [FE29 — #78](https://github.com/dacho-morgh/dacho/issues/78)\n\n**Actors:** Company; reviewer; Secretariat.\n\n**Fixture/precondition:** Supported test browsers and phone-size viewport/device; empty/loading/error fixtures.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Use login, profile, request, evaluation, letters and receipt screens by keyboard\n   **Expected:** Focus, labels and submit/error guidance are usable.\n2. **Action:** Repeat core forms at phone width with Persian names, long text and mixed numbers\n   **Expected:** RTL layout remains readable with reachable controls and no lost input.\n3. **Action:** Exercise loading, empty, validation, denied and network-error states\n   **Expected:** Each has a clear recoverable outcome.\n4. **Action:** Open a stale form while another actor changes the case\n   **Expected:** Conflict/refresh guidance prevents silent overwrite.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT30 -->\n"
+  },
+  {
+    "id": "UAT31",
+    "title": "Booth catalogue, prices, guide map and company limit",
+    "implementationTasks": [
+      "T47"
+    ],
+    "roles": "Owner; Company A",
+    "preconditions": "A synthetic exhibition with identifiable booths.",
+    "steps": [
+      {
+        "action": "Configure booth IDs/specifications/availability/final prices in toman and company limit",
+        "expected": "Definitions persist and appear correctly."
+      },
+      {
+        "action": "Open booth list and guide map as company",
+        "expected": "Correct numbers, sizes, prices and availability are understandable; clickable floor map is not required."
+      },
+      {
+        "action": "Edit a current booth price",
+        "expected": "New selection uses the new price while previous recorded application price remains unchanged."
+      },
+      {
+        "action": "Inspect available features",
+        "expected": "No required gateway, ancillary-service pricing or automatic-expiry controls are introduced."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 132,
+    "frontendTasks": [
+      "FE24"
+    ],
+    "body": "Human acceptance gate for **Booth catalogue, prices, guide map and company limit**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T47 — #61](https://github.com/dacho-morgh/dacho/issues/61)\n\nFrontend implementation slices:\n- [FE24 — #77](https://github.com/dacho-morgh/dacho/issues/77)\n\n**Actors:** Owner; Company A.\n\n**Fixture/precondition:** A synthetic exhibition with identifiable booths.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Configure booth IDs/specifications/availability/final prices in toman and company limit\n   **Expected:** Definitions persist and appear correctly.\n2. **Action:** Open booth list and guide map as company\n   **Expected:** Correct numbers, sizes, prices and availability are understandable; clickable floor map is not required.\n3. **Action:** Edit a current booth price\n   **Expected:** New selection uses the new price while previous recorded application price remains unchanged.\n4. **Action:** Inspect available features\n   **Expected:** No required gateway, ancillary-service pricing or automatic-expiry controls are introduced.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT31 -->\n"
+  },
+  {
+    "id": "UAT32",
+    "title": "Independent booth requests, reservations and company cap",
+    "implementationTasks": [
+      "T48"
+    ],
+    "roles": "Approved Companies A and B",
+    "preconditions": "Exhibition limit two for A; at least three free booths.",
+    "steps": [
+      {
+        "action": "Apply as A for two specific booths",
+        "expected": "Two independent requests/tracking identities and exclusive reservations appear."
+      },
+      {
+        "action": "Try a third active booth request",
+        "expected": "Company limit blocks it, including repeated tabs."
+      },
+      {
+        "action": "Try selecting an A-reserved booth as B",
+        "expected": "B cannot reserve the same booth."
+      },
+      {
+        "action": "Reload after time passes without a decision",
+        "expected": "Reservations persist; changing one request does not alter the other."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 133,
+    "frontendTasks": [
+      "FE25"
+    ],
+    "body": "Human acceptance gate for **Independent booth requests, reservations and company cap**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T48 — #62](https://github.com/dacho-morgh/dacho/issues/62)\n\nFrontend implementation slices:\n- [FE25 — #87](https://github.com/dacho-morgh/dacho/issues/87)\n\n**Actors:** Approved Companies A and B.\n\n**Fixture/precondition:** Exhibition limit two for A; at least three free booths.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Apply as A for two specific booths\n   **Expected:** Two independent requests/tracking identities and exclusive reservations appear.\n2. **Action:** Try a third active booth request\n   **Expected:** Company limit blocks it, including repeated tabs.\n3. **Action:** Try selecting an A-reserved booth as B\n   **Expected:** B cannot reserve the same booth.\n4. **Action:** Reload after time passes without a decision\n   **Expected:** Reservations persist; changing one request does not alter the other.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT32 -->\n"
+  },
+  {
+    "id": "UAT33",
+    "title": "Separate attendance approval before payment",
+    "implementationTasks": [
+      "T55"
+    ],
+    "roles": "Company A; Secretariat",
+    "preconditions": "A reserved booth application with attendance pending.",
+    "steps": [
+      {
+        "action": "Try submitting receipt as the verified company before attendance approval",
+        "expected": "Receipt action/API is denied; company verification alone is insufficient."
+      },
+      {
+        "action": "Approve attendance as Secretariat",
+        "expected": "Payment/receipt becomes available for that application only."
+      },
+      {
+        "action": "Reject attendance on a separate application with reason",
+        "expected": "That booth releases with history; unrelated application is unchanged."
+      },
+      {
+        "action": "Reload the company view",
+        "expected": "Attendance state, reason and next step are clear and distinct from paid/confirmed state."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 134,
+    "frontendTasks": [
+      "FE06",
+      "FE26"
+    ],
+    "body": "Human acceptance gate for **Separate attendance approval before payment**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T55 — #63](https://github.com/dacho-morgh/dacho/issues/63)\n\nFrontend implementation slices:\n- [FE06 — #85](https://github.com/dacho-morgh/dacho/issues/85)\n- [FE26 — #89](https://github.com/dacho-morgh/dacho/issues/89)\n\n**Actors:** Company A; Secretariat.\n\n**Fixture/precondition:** A reserved booth application with attendance pending.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Try submitting receipt as the verified company before attendance approval\n   **Expected:** Receipt action/API is denied; company verification alone is insufficient.\n2. **Action:** Approve attendance as Secretariat\n   **Expected:** Payment/receipt becomes available for that application only.\n3. **Action:** Reject attendance on a separate application with reason\n   **Expected:** That booth releases with history; unrelated application is unchanged.\n4. **Action:** Reload the company view\n   **Expected:** Attendance state, reason and next step are clear and distinct from paid/confirmed state.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT33 -->\n"
+  },
+  {
+    "id": "UAT34",
+    "title": "Independent booth price snapshot and currency",
+    "implementationTasks": [
+      "T49"
+    ],
+    "roles": "Owner; Company A; Secretariat",
+    "preconditions": "Two booth applications with different fixed toman prices.",
+    "steps": [
+      {
+        "action": "Inspect each approved application price",
+        "expected": "Each shows only its own booth amount and explicit currency/unit."
+      },
+      {
+        "action": "Change catalogue price as Owner",
+        "expected": "Existing recorded application amount/version does not silently change."
+      },
+      {
+        "action": "Compare UI amount to the test operator financial record",
+        "expected": "No toman/rial or rounding conversion error exists."
+      },
+      {
+        "action": "Inspect payment requirements for both requests",
+        "expected": "No combined invoice/receipt substitutes for independent booth payments."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 135,
+    "frontendTasks": [
+      "FE25",
+      "FE27"
+    ],
+    "body": "Human acceptance gate for **Independent booth price snapshot and currency**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T49 — #64](https://github.com/dacho-morgh/dacho/issues/64)\n\nFrontend implementation slices:\n- [FE25 — #87](https://github.com/dacho-morgh/dacho/issues/87)\n- [FE27 — #91](https://github.com/dacho-morgh/dacho/issues/91)\n\n**Actors:** Owner; Company A; Secretariat.\n\n**Fixture/precondition:** Two booth applications with different fixed toman prices.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Inspect each approved application price\n   **Expected:** Each shows only its own booth amount and explicit currency/unit.\n2. **Action:** Change catalogue price as Owner\n   **Expected:** Existing recorded application amount/version does not silently change.\n3. **Action:** Compare UI amount to the test operator financial record\n   **Expected:** No toman/rial or rounding conversion error exists.\n4. **Action:** Inspect payment requirements for both requests\n   **Expected:** No combined invoice/receipt substitutes for independent booth payments.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT34 -->\n"
+  },
+  {
+    "id": "UAT35",
+    "title": "Independent receipt submission and duplicate protection",
+    "implementationTasks": [
+      "T50"
+    ],
+    "roles": "Company A; Secretariat",
+    "preconditions": "Two attendance-approved booth applications and synthetic receipt fixtures.",
+    "steps": [
+      {
+        "action": "Upload a policy-valid receipt to the first request",
+        "expected": "Pending-verification status appears; booth is not confirmed merely by upload."
+      },
+      {
+        "action": "Open the second request",
+        "expected": "It still needs its own independent receipt."
+      },
+      {
+        "action": "Attempt to count the same payment receipt as a second independent payment",
+        "expected": "Duplicate/misassociated payment is prevented or flagged for refusal before confirmation."
+      },
+      {
+        "action": "Reload and inspect file/transaction details",
+        "expected": "Correct request association and receipt history persist with private access."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 136,
+    "frontendTasks": [
+      "FE07",
+      "FE27"
+    ],
+    "body": "Human acceptance gate for **Independent receipt submission and duplicate protection**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T50 — #65](https://github.com/dacho-morgh/dacho/issues/65)\n\nFrontend implementation slices:\n- [FE07 — #71](https://github.com/dacho-morgh/dacho/issues/71)\n- [FE27 — #91](https://github.com/dacho-morgh/dacho/issues/91)\n\n**Actors:** Company A; Secretariat.\n\n**Fixture/precondition:** Two attendance-approved booth applications and synthetic receipt fixtures.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Upload a policy-valid receipt to the first request\n   **Expected:** Pending-verification status appears; booth is not confirmed merely by upload.\n2. **Action:** Open the second request\n   **Expected:** It still needs its own independent receipt.\n3. **Action:** Attempt to count the same payment receipt as a second independent payment\n   **Expected:** Duplicate/misassociated payment is prevented or flagged for refusal before confirmation.\n4. **Action:** Reload and inspect file/transaction details\n   **Expected:** Correct request association and receipt history persist with private access.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT35 -->\n"
+  },
+  {
+    "id": "UAT36",
+    "title": "Receipt correction preserves reservation; confirmation is idempotent",
+    "implementationTasks": [
+      "T51"
+    ],
+    "roles": "Company A; Secretariat; Company B",
+    "preconditions": "One submitted booth receipt awaiting verification.",
+    "steps": [
+      {
+        "action": "Return receipt with reason as Secretariat",
+        "expected": "Company sees correction action; booth remains reserved against Company B."
+      },
+      {
+        "action": "Submit corrected receipt as company",
+        "expected": "Same request receives a new receipt version and old version remains in history."
+      },
+      {
+        "action": "Verify/confirm payment as Secretariat",
+        "expected": "Exactly that booth becomes confirmed once."
+      },
+      {
+        "action": "Retry confirmation or refresh/reopen another tab",
+        "expected": "No duplicate financial effect or changed unrelated booth appears."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 137,
+    "frontendTasks": [
+      "FE27"
+    ],
+    "body": "Human acceptance gate for **Receipt correction preserves reservation; confirmation is idempotent**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T51 — #66](https://github.com/dacho-morgh/dacho/issues/66)\n\nFrontend implementation slices:\n- [FE27 — #91](https://github.com/dacho-morgh/dacho/issues/91)\n\n**Actors:** Company A; Secretariat; Company B.\n\n**Fixture/precondition:** One submitted booth receipt awaiting verification.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Return receipt with reason as Secretariat\n   **Expected:** Company sees correction action; booth remains reserved against Company B.\n2. **Action:** Submit corrected receipt as company\n   **Expected:** Same request receives a new receipt version and old version remains in history.\n3. **Action:** Verify/confirm payment as Secretariat\n   **Expected:** Exactly that booth becomes confirmed once.\n4. **Action:** Retry confirmation or refresh/reopen another tab\n   **Expected:** No duplicate financial effect or changed unrelated booth appears.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT36 -->\n"
+  },
+  {
+    "id": "UAT37",
+    "title": "Cancellation before/after receipt and manual refund record",
+    "implementationTasks": [
+      "T52"
+    ],
+    "roles": "Company A; Secretariat",
+    "preconditions": "One reserved request without receipt and another with submitted/confirmed receipt.",
+    "steps": [
+      {
+        "action": "Cancel the no-receipt request as company",
+        "expected": "Only its booth releases and company active count updates."
+      },
+      {
+        "action": "Request cancellation after receipt/payment",
+        "expected": "Request goes to Secretariat; company cannot directly release the booth."
+      },
+      {
+        "action": "Process authorized cancellation and any synthetic manual refund record as Secretariat",
+        "expected": "Actor/reason/reference/amount are retained and inventory releases consistently."
+      },
+      {
+        "action": "Inspect other booth request and prior payment history",
+        "expected": "Other request is unchanged; financial/history records are not physically erased."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 138,
+    "frontendTasks": [
+      "FE28"
+    ],
+    "body": "Human acceptance gate for **Cancellation before/after receipt and manual refund record**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T52 — #67](https://github.com/dacho-morgh/dacho/issues/67)\n\nFrontend implementation slices:\n- [FE28 — #93](https://github.com/dacho-morgh/dacho/issues/93)\n\n**Actors:** Company A; Secretariat.\n\n**Fixture/precondition:** One reserved request without receipt and another with submitted/confirmed receipt.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Cancel the no-receipt request as company\n   **Expected:** Only its booth releases and company active count updates.\n2. **Action:** Request cancellation after receipt/payment\n   **Expected:** Request goes to Secretariat; company cannot directly release the booth.\n3. **Action:** Process authorized cancellation and any synthetic manual refund record as Secretariat\n   **Expected:** Actor/reason/reference/amount are retained and inventory releases consistently.\n4. **Action:** Inspect other booth request and prior payment history\n   **Expected:** Other request is unchanged; financial/history records are not physically erased.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT37 -->\n"
+  },
+  {
+    "id": "UAT38",
+    "title": "Two-session concurrency smoke test",
+    "implementationTasks": [
+      "T07",
+      "T27",
+      "T44",
+      "T48"
+    ],
+    "roles": "Two human testers; company/reviewer/Secretariat fixtures",
+    "preconditions": "Disposable staging data; synchronized browser sessions; supporting automated concurrency results.",
+    "steps": [
+      {
+        "action": "From two company sessions submit for the same free booth at the same time",
+        "expected": "At most one active reservation is confirmed; the losing user receives a clear conflict."
+      },
+      {
+        "action": "Submit concurrent requests near the company booth cap and double-submit a draft",
+        "expected": "Cap remains respected; one effective submission/tracking identity per request."
+      },
+      {
+        "action": "Synchronize final evaluation submissions on a current round",
+        "expected": "Progress reaches valid 4/4 once without automatic chief advancement."
+      },
+      {
+        "action": "Record observed states and compare operator audit/automated results",
+        "expected": "No duplicate effect is visible; human smoke evidence is not substituted for DB isolation tests."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 139,
+    "frontendTasks": [
+      "FE30"
+    ],
+    "body": "Human acceptance gate for **Two-session concurrency smoke test**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T07 — #21](https://github.com/dacho-morgh/dacho/issues/21)\n- [T27 — #43](https://github.com/dacho-morgh/dacho/issues/43)\n- [T44 — #58](https://github.com/dacho-morgh/dacho/issues/58)\n- [T48 — #62](https://github.com/dacho-morgh/dacho/issues/62)\n\nFrontend implementation slices:\n- [FE30 — #79](https://github.com/dacho-morgh/dacho/issues/79)\n\n**Actors:** Two human testers; company/reviewer/Secretariat fixtures.\n\n**Fixture/precondition:** Disposable staging data; synchronized browser sessions; supporting automated concurrency results.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** From two company sessions submit for the same free booth at the same time\n   **Expected:** At most one active reservation is confirmed; the losing user receives a clear conflict.\n2. **Action:** Submit concurrent requests near the company booth cap and double-submit a draft\n   **Expected:** Cap remains respected; one effective submission/tracking identity per request.\n3. **Action:** Synchronize final evaluation submissions on a current round\n   **Expected:** Progress reaches valid 4/4 once without automatic chief advancement.\n4. **Action:** Record observed states and compare operator audit/automated results\n   **Expected:** No duplicate effect is visible; human smoke evidence is not substituted for DB isolation tests.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT38 -->\n"
+  },
+  {
+    "id": "UAT39",
+    "title": "Full event human acceptance walkthrough",
+    "implementationTasks": [
+      "T42",
+      "T43",
+      "T45",
+      "T46"
+    ],
+    "roles": "Owner; Secretariat; Chief; employer; three reviewers; investment person; Company A",
+    "preconditions": "All corresponding individual event gates passed; final forms/policies/text supplied.",
+    "steps": [
+      {
+        "action": "Create the event/team/subtopic/RFP and register/verify company",
+        "expected": "Owner and Secretariat actions establish a usable eligible company."
+      },
+      {
+        "action": "Submit proposal, return/correct once, assign employer plus three reviewers and finalize all four",
+        "expected": "Same case/history and correct 4/4 are retained; chief explicitly advances."
+      },
+      {
+        "action": "Submit financial package, send memo and obtain one supplementary document through Secretariat",
+        "expected": "Scoped privacy and authorized handoffs work across separate accounts."
+      },
+      {
+        "action": "Publish result as Secretariat and inspect company plus unrelated accounts",
+        "expected": "Company sees correct result; scores/memo/financial files remain protected; release evidence is complete."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 140,
+    "frontendTasks": [
+      "FE31"
+    ],
+    "body": "Human acceptance gate for **Full event human acceptance walkthrough**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T42 — #56](https://github.com/dacho-morgh/dacho/issues/56)\n- [T43 — #57](https://github.com/dacho-morgh/dacho/issues/57)\n- [T45 — #59](https://github.com/dacho-morgh/dacho/issues/59)\n- [T46 — #60](https://github.com/dacho-morgh/dacho/issues/60)\n\nFrontend implementation slices:\n- [FE31 — #101](https://github.com/dacho-morgh/dacho/issues/101)\n\n**Actors:** Owner; Secretariat; Chief; employer; three reviewers; investment person; Company A.\n\n**Fixture/precondition:** All corresponding individual event gates passed; final forms/policies/text supplied.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Create the event/team/subtopic/RFP and register/verify company\n   **Expected:** Owner and Secretariat actions establish a usable eligible company.\n2. **Action:** Submit proposal, return/correct once, assign employer plus three reviewers and finalize all four\n   **Expected:** Same case/history and correct 4/4 are retained; chief explicitly advances.\n3. **Action:** Submit financial package, send memo and obtain one supplementary document through Secretariat\n   **Expected:** Scoped privacy and authorized handoffs work across separate accounts.\n4. **Action:** Publish result as Secretariat and inspect company plus unrelated accounts\n   **Expected:** Company sees correct result; scores/memo/financial files remain protected; release evidence is complete.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT39 -->\n"
+  },
+  {
+    "id": "UAT40",
+    "title": "Full exhibition human acceptance walkthrough",
+    "implementationTasks": [
+      "T53",
+      "T54"
+    ],
+    "roles": "Owner; Secretariat; Companies A and B",
+    "preconditions": "Individual exhibition gates passed; catalogue limit/prices and valid synthetic receipts.",
+    "steps": [
+      {
+        "action": "Configure exhibition and apply for several specific booths",
+        "expected": "Independent requests/reservations respect exclusivity and company cap."
+      },
+      {
+        "action": "Approve attendance then submit separate receipts",
+        "expected": "No preapproval payment or combined payment path is used."
+      },
+      {
+        "action": "Return one receipt, correct it and confirm payment; cancel another through the appropriate pre/post-receipt path",
+        "expected": "Reservations, states and inventory remain independent and consistent."
+      },
+      {
+        "action": "Reconcile booth list, company counts and payment records",
+        "expected": "Confirmed/released inventory matches evidence; nothing expires automatically."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 141,
+    "frontendTasks": [
+      "FE32"
+    ],
+    "body": "Human acceptance gate for **Full exhibition human acceptance walkthrough**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T53 — #68](https://github.com/dacho-morgh/dacho/issues/68)\n- [T54 — #69](https://github.com/dacho-morgh/dacho/issues/69)\n\nFrontend implementation slices:\n- [FE32 — #95](https://github.com/dacho-morgh/dacho/issues/95)\n\n**Actors:** Owner; Secretariat; Companies A and B.\n\n**Fixture/precondition:** Individual exhibition gates passed; catalogue limit/prices and valid synthetic receipts.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Configure exhibition and apply for several specific booths\n   **Expected:** Independent requests/reservations respect exclusivity and company cap.\n2. **Action:** Approve attendance then submit separate receipts\n   **Expected:** No preapproval payment or combined payment path is used.\n3. **Action:** Return one receipt, correct it and confirm payment; cancel another through the appropriate pre/post-receipt path\n   **Expected:** Reservations, states and inventory remain independent and consistent.\n4. **Action:** Reconcile booth list, company counts and payment records\n   **Expected:** Confirmed/released inventory matches evidence; nothing expires automatically.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT40 -->\n"
+  },
+  {
+    "id": "UAT41",
+    "title": "Operator migration and backup/restore rehearsal",
+    "implementationTasks": [
+      "T41",
+      "T46"
+    ],
+    "roles": "Test operator; Owner; QA witness",
+    "preconditions": "Disposable database/files snapshot and reviewed migration/recovery runbook; no live system.",
+    "steps": [
+      {
+        "action": "Inventory fixture users/roles/companies/applications/documents before migration",
+        "expected": "Expected identities and counts are recorded."
+      },
+      {
+        "action": "Run the reviewed migration on the disposable copy",
+        "expected": "Mapping preserves records and editorial privileges without assuming empty data."
+      },
+      {
+        "action": "Restore database and private files from the test backup",
+        "expected": "The same documented application/file relationships and permitted downloads work."
+      },
+      {
+        "action": "Run login/ownership/document smoke checks with QA witness",
+        "expected": "Evidence records build/runbook versions, recovery result and defects; production was untouched."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 142,
+    "frontendTasks": [],
+    "body": "Human acceptance gate for **Operator migration and backup/restore rehearsal**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T41 — #55](https://github.com/dacho-morgh/dacho/issues/55)\n- [T46 — #60](https://github.com/dacho-morgh/dacho/issues/60)\n\n**Actors:** Test operator; Owner; QA witness.\n\n**Fixture/precondition:** Disposable database/files snapshot and reviewed migration/recovery runbook; no live system.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Inventory fixture users/roles/companies/applications/documents before migration\n   **Expected:** Expected identities and counts are recorded.\n2. **Action:** Run the reviewed migration on the disposable copy\n   **Expected:** Mapping preserves records and editorial privileges without assuming empty data.\n3. **Action:** Restore database and private files from the test backup\n   **Expected:** The same documented application/file relationships and permitted downloads work.\n4. **Action:** Run login/ownership/document smoke checks with QA witness\n   **Expected:** Evidence records build/runbook versions, recovery result and defects; production was untouched.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT41 -->\n"
+  },
+  {
+    "id": "UAT42",
+    "title": "Human readiness review: scope, permissions and safe test fixtures",
+    "implementationTasks": [
+      "T01",
+      "T02",
+      "T03",
+      "T04"
+    ],
+    "roles": "Product Owner; QA lead; technical operator",
+    "preconditions": "English requirements, role matrix, staging build details and synthetic fixture manifest.",
+    "steps": [
+      {
+        "action": "Review seven roles and event/booth flow with product owner",
+        "expected": "Approved decisions and current open inputs are explicit; no invented scoring/file limits."
+      },
+      {
+        "action": "Review test environment URL/database/file location with operator",
+        "expected": "It is isolated and safe for fixture creation/deletion and receipt simulations."
+      },
+      {
+        "action": "Provision separate role accounts, two companies/events and distinguishable synthetic files",
+        "expected": "Tester can identify actor, ownership and expected visibility."
+      },
+      {
+        "action": "Record which slices are ready and which tests are blocked",
+        "expected": "Tests remain Not run or Blocked until executed; implementation completion is not a claimed UAT pass."
+      }
+    ],
+    "status": "Not run",
+    "issueNumber": 143,
+    "frontendTasks": [
+      "FE30"
+    ],
+    "body": "Human acceptance gate for **Human readiness review: scope, permissions and safe test fixtures**. This issue specifies a test; it has not been executed.\n\n## When to run\nRun after the linked implementation slice is deployed to an isolated test environment. Do not wait for the entire system if this slice is independently usable. Keep open until actual human acceptance is recorded.\n\n## Prerequisites\n- [T01 — #15](https://github.com/dacho-morgh/dacho/issues/15)\n- [T02 — #16](https://github.com/dacho-morgh/dacho/issues/16)\n- [T03 — #17](https://github.com/dacho-morgh/dacho/issues/17)\n- [T04 — #18](https://github.com/dacho-morgh/dacho/issues/18)\n\nFrontend implementation slices:\n- [FE30 — #79](https://github.com/dacho-morgh/dacho/issues/79)\n\n**Actors:** Product Owner; QA lead; technical operator.\n\n**Fixture/precondition:** English requirements, role matrix, staging build details and synthetic fixture manifest.\n\nUse separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.\n\n## Procedure and expected results\n1. **Action:** Review seven roles and event/booth flow with product owner\n   **Expected:** Approved decisions and current open inputs are explicit; no invented scoring/file limits.\n2. **Action:** Review test environment URL/database/file location with operator\n   **Expected:** It is isolated and safe for fixture creation/deletion and receipt simulations.\n3. **Action:** Provision separate role accounts, two companies/events and distinguishable synthetic files\n   **Expected:** Tester can identify actor, ownership and expected visibility.\n4. **Action:** Record which slices are ready and which tests are blocked\n   **Expected:** Tests remain Not run or Blocked until executed; implementation completion is not a claimed UAT pass.\n\n## Evidence and exit criteria\n- [ ] Record build/commit, test URL, date, tester and account roles (no passwords).\n- [ ] Record fixture/application/tracking IDs and relevant revision/round.\n- [ ] Attach screenshots or screen recording of outcomes; include denied/negative-path evidence.\n- [ ] Verify persistence after refresh or a fresh session where relevant.\n- [ ] Every expected result passed. Otherwise leave this gate open and link defect issues or missing inputs.\n- [ ] Rerun affected steps after a fix; record the new build and result.\n\nExecution record: **Not run**. Tester: —. Build: —. Date: —. Result: —. Evidence/defects: —.\n\nClosing the implementation issue or passing automated tests does not pass this gate. This gate supplements, not replaces, automated access, integration and concurrency testing.\n\n<!-- dacho-human-acceptance:UAT42 -->\n"
+  }
+]

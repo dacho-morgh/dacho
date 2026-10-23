@@ -149,6 +149,7 @@ async function main(): Promise<void> {
   payload.logger.info('— Seeding services…')
   const svcFinancing = await payload.create({
     collection: 'services',
+    context: { disableRevalidate: true },
     data: {
       title: 'خدمات تامین مالی',
       excerpt: 'ارائه انواع تسهیلات مالی، صدور ضمانت‌نامه‌های بانکی و سرمایه‌گذاری برای شرکت‌ها و فناوران.',
@@ -157,6 +158,7 @@ async function main(): Promise<void> {
   })
   const svcKnowledge = await payload.create({
     collection: 'services',
+    context: { disableRevalidate: true },
     data: {
       title: 'خدمات دانش بنیان',
       excerpt: 'حمایت از شرکت‌های دانش‌بنیان و استارتاپ‌های فناور در مسیر رشد، توسعه و ورود به بازار.',
@@ -165,6 +167,7 @@ async function main(): Promise<void> {
   })
   const svcCommercial = await payload.create({
     collection: 'services',
+    context: { disableRevalidate: true },
     data: {
       title: 'خدمات تجاری‌سازی و ورود به صنعت و بازار',
       excerpt: 'تسهیل مسیر تجاری‌سازی، توسعه بازار و ایجاد ارتباط با صنعت. از اعتبارسنجی ایده تا توسعه بازار و جذب شرکای صنعتی.',
@@ -173,6 +176,7 @@ async function main(): Promise<void> {
   })
   const svcGuarantee = await payload.create({
     collection: 'services',
+    context: { disableRevalidate: true },
     data: {
       title: 'صدور ضمانت‌نامه',
       excerpt: 'صدور انواع ضمانت‌نامه برای حضور مطمئن شرکت‌های فناور در قراردادها و مناقصه‌ها.',
@@ -181,6 +185,7 @@ async function main(): Promise<void> {
   })
   const svcInvestment = await payload.create({
     collection: 'services',
+    context: { disableRevalidate: true },
     data: {
       title: 'سرمایه‌گذاری خطرپذیر',
       excerpt: 'مشارکت در طرح‌های نوآورانه و همراهی با تیم‌ها از مرحله نمونه اولیه تا توسعه بازار.',
@@ -189,6 +194,7 @@ async function main(): Promise<void> {
   })
   await payload.create({
     collection: 'services',
+    context: { disableRevalidate: true },
     data: {
       title: 'مشاوره توسعه کسب‌وکار',
       excerpt: 'ارائه مشاوره تخصصی در زمینه مدل کسب‌وکار، فروش، بازاریابی و جذب سرمایه.',

@@ -5,6 +5,7 @@ import { ArrowUpIcon } from '@/components/icons'
 import { Media } from '@/components/Media'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import NewsMediaLink from './news-media-link'
 
 export type NewsCardData = Pick<News | Post, 'heroImage' | 'slug' | 'title'>
 
@@ -71,10 +72,12 @@ const NewsCard = ({ news, variant, ...props }: NewsCardProps) => {
 
   return (
     <article
+      data-home-reveal
       dir="rtl"
-      className="group flex h-full w-full flex-col items-end overflow-hidden rounded-4xl bg-white drop-shadow-xl transition-all lg:drop-shadow-md"
+      className="group flex h-full w-full flex-col items-end overflow-hidden rounded-4xl bg-white drop-shadow-xl lg:drop-shadow-md"
     >
-      <Link
+      <NewsMediaLink
+        data-home-media
         href={href}
         aria-label={news.title}
         className="relative h-50 w-full shrink-0 overflow-hidden rounded-t-3xl 8xl:h-65"
@@ -85,7 +88,7 @@ const NewsCard = ({ news, variant, ...props }: NewsCardProps) => {
             alt=""
             fill
             sizes="(min-width: 1280px) 416px, (min-width: 768px) 50vw, 100vw"
-            className="pointer-events-none object-cover transition-transform duration-300 group-hover:scale-105"
+            className="pointer-events-none object-cover"
           />
         ) : hasHeroImage ? (
           <Media
@@ -93,7 +96,7 @@ const NewsCard = ({ news, variant, ...props }: NewsCardProps) => {
             resource={news.heroImage}
             size="(min-width: 1280px) 416px, (min-width: 768px) 50vw, 100vw"
             pictureClassName="absolute inset-0 block"
-            imgClassName="pointer-events-none object-cover transition-transform duration-300 group-hover:scale-105"
+            imgClassName="pointer-events-none object-cover"
           />
         ) : (
           <Image
@@ -101,7 +104,7 @@ const NewsCard = ({ news, variant, ...props }: NewsCardProps) => {
             alt=""
             fill
             sizes="(min-width: 1280px) 416px, (min-width: 768px) 50vw, 100vw"
-            className="pointer-events-none object-cover transition-transform duration-300 group-hover:scale-105"
+            className="pointer-events-none object-cover"
           />
         )}
         {editorial?.label && (
@@ -111,7 +114,7 @@ const NewsCard = ({ news, variant, ...props }: NewsCardProps) => {
             </Typography>
           </span>
         )}
-      </Link>
+      </NewsMediaLink>
 
       <div className="flex h-full w-full flex-col justify-between gap-4 p-5">
         {editorial && (
