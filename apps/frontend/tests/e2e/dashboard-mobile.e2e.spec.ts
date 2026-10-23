@@ -21,6 +21,7 @@ const manager = {
 let payload: Awaited<ReturnType<typeof getPayload>>
 let applicantId: number | string
 let managerId: number | string
+let companyId: number | string
 
 async function signIn(page: Page, username: string) {
   const response = await page.request.post('http://localhost:3000/api/users/login', {
@@ -61,8 +62,9 @@ test.beforeAll(async () => {
       name: 'Mobile dashboard applicant test',
     },
   })
+  applicantId = applicantUser.id
   // The company is a separate record linked to the user as its representative.
-  await payload.create({
+  const company = await payload.create({
     collection: 'companies',
     data: {
       name: 'Mobile dashboard company test',
@@ -74,7 +76,7 @@ test.beforeAll(async () => {
       representative: applicantUser.id,
     },
   })
-  applicantId = applicantUser.id
+  companyId = company.id
 
   const managerUser = await payload.create({
     collection: 'users',
@@ -92,6 +94,10 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
+  // The company references its representative with ON DELETE restrict.
+  if (companyId !== undefined) {
+    await payload.delete({ collection: 'companies', id: companyId })
+  }
   if (applicantId !== undefined) {
     await payload.delete({ collection: 'users', id: applicantId })
   }
