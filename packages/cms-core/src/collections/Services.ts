@@ -1,10 +1,12 @@
 import type { CollectionConfig } from 'payload'
+import { revalidatePath } from 'next/cache'
 
 import { anyone } from '@cms-core/access/anyone'
 import { adminOnly } from '@cms-core/access/adminOnly'
 
 export const Services: CollectionConfig = {
   slug: 'services',
+  orderable: true,
   labels: {
     singular: 'Service',
     plural: 'Services',
@@ -18,6 +20,8 @@ export const Services: CollectionConfig = {
   admin: {
     useAsTitle: 'title',
     defaultColumns: ['title', 'createdAt'],
+    description:
+      'Drag rows using their handles to set the homepage grid order. Cards flow right to left, then onto the next row. New services appear at the end.',
   },
   fields: [
     {
@@ -85,16 +89,17 @@ export const Services: CollectionConfig = {
       type: 'textarea',
       label: 'Excerpt',
       admin: {
-        description: 'Short summary for listings and previews',
+        description: 'Description shown on the homepage service card and in listings.',
       },
     },
     {
       name: 'featuredImage',
       type: 'upload',
       relationTo: 'media',
-      label: 'Featured Image',
+      label: 'Service Illustration (SVG or WebP)',
+      filterOptions: { mimeType: { in: ['image/svg+xml', 'image/webp'] } },
       admin: {
-        description: 'Thumbnail shown on landing page listings',
+        description: 'SVG or WebP illustration shown on the homepage service card.',
       },
     },
     {
@@ -133,4 +138,18 @@ export const Services: CollectionConfig = {
       },
     },
   ],
+  hooks: {
+    afterChange: [
+      ({ doc, req: { context } }) => {
+        if (!context.disableRevalidate) revalidatePath('/')
+        return doc
+      },
+    ],
+    afterDelete: [
+      ({ doc, req: { context } }) => {
+        if (!context.disableRevalidate) revalidatePath('/')
+        return doc
+      },
+    ],
+  },
 }

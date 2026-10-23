@@ -28,7 +28,10 @@ const NewsSection = async () => {
       dir="rtl"
       className="relative z-10 flex w-full flex-col items-center gap-10 bg-neutral-50 px-4 py-8 lg:px-0 lg:py-10"
     >
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
+      <div
+        data-home-reveal
+        className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right"
+      >
         <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">
           <div className="my-2 w-1 rounded-full bg-secondary-500 lg:my-3 lg:w-2" />
           <Typography as="h2" variant="32/extrabold" sm="40/extrabold" color="neutral-600">

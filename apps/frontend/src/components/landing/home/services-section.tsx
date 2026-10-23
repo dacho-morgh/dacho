@@ -3,20 +3,7 @@ import { getPayload } from 'payload'
 import { Typography } from '@/components/ui/typography'
 import { buildSafe } from '@/utilities/buildSafe'
 import ServiceCard from './service-card'
-
-const cardSpan = (index: number, total: number) => {
-  if (total === 5) {
-    return index === 4
-      ? 'md:col-span-2 xl:col-span-3'
-      : index === 3
-        ? 'xl:col-span-3'
-        : 'xl:col-span-2'
-  }
-
-  if (total === 4 || total === 2) return 'xl:col-span-3'
-  if (total === 1) return 'md:col-span-2 xl:col-span-6'
-  return 'xl:col-span-2'
-}
+import { serviceCardClassName, servicesGridClassName } from './services-layout'
 
 const ServicesSection = async () => {
   const services = await buildSafe('home services', async () => {
@@ -24,9 +11,10 @@ const ServicesSection = async () => {
     const { docs } = await payload.find({
       collection: 'services',
       depth: 1,
-      limit: 5,
+      limit: 0,
+      pagination: false,
       overrideAccess: false,
-      sort: 'createdAt',
+      sort: ['_order', 'createdAt', 'id'],
     })
     return docs
   })
@@ -36,10 +24,10 @@ const ServicesSection = async () => {
   return (
     <section
       id="services"
-      className="relative z-10 flex w-full flex-col items-center gap-10 bg-neutral-50 px-4 py-8 lg:px-0 lg:py-10"
+      className="relative z-10 w-full bg-neutral-50 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12"
     >
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
-        <div className="mx-auto mb-10 flex w-full max-w-[1600px] flex-col gap-3 text-right md:mb-12">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 text-right sm:gap-10">
+        <div data-home-reveal className="flex min-w-0 flex-col gap-3 text-right">
           <div className="flex items-stretch gap-3">
             <span
               aria-hidden="true"
@@ -53,20 +41,21 @@ const ServicesSection = async () => {
             variant="16/regular"
             sm="20/regular"
             color="neutral-500"
-            className="max-w-5xl lg:ms-30 xl:ms-40 8xl:ms-0"
+            className="max-w-5xl"
           >
             از انتشار فرصت‌های صنعتی تا داوری تخصصی و تخصیص بودجه، تمام مسیر همکاری در یک فضای
             یکپارچه مدیریت می‌شود.
           </Typography>
         </div>
 
-        <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-6">
+        <div className={servicesGridClassName}>
           {services.map((service, index) => (
-            <div key={service.id} className={cardSpan(index, services.length)}>
-              <ServiceCard
-                index={index}
-                service={{ title: service.title, description: service.excerpt || '' }}
-              />
+            <div
+              data-home-reveal
+              key={service.id}
+              className={serviceCardClassName(index, services.length)}
+            >
+              <ServiceCard service={service} />
             </div>
           ))}
         </div>

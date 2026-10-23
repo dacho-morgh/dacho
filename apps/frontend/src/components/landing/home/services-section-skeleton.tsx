@@ -1,15 +1,18 @@
 import { Skeleton } from '@/components/ui/skeleton'
+import { serviceCardClassName, servicesGridClassName } from './services-layout'
 
 const ServiceCardSkeleton = () => (
   <article
     aria-hidden="true"
-    className="flex h-[420px] min-w-0 flex-col items-end gap-4 rounded-[40px] bg-white px-4 pt-4 pb-8 drop-shadow-xl lg:h-auto lg:w-96"
+    className="flex h-full min-w-0 flex-col gap-5 rounded-3xl bg-white p-5 shadow-sm sm:p-6"
   >
-    <Skeleton className="h-60 w-full shrink-0 rounded-3xl bg-neutral-200 lg:h-80 lg:rounded-4xl" />
-    <div className="flex w-full flex-col items-start gap-2 px-2 text-right">
-      <Skeleton className="h-6 w-40 rounded-md bg-neutral-200" />
-      <Skeleton className="h-4 w-full rounded-md bg-neutral-100" />
-      <Skeleton className="h-4 w-3/4 rounded-md bg-neutral-100" />
+    <div className="flex min-h-8 items-start md:min-h-16 lg:min-h-18">
+      <Skeleton className="h-8 w-3/4 rounded-md bg-neutral-200" />
+    </div>
+    <Skeleton className="aspect-video max-h-56 w-full shrink-0 rounded-2xl bg-neutral-200" />
+    <div className="flex w-full flex-col gap-2">
+      <Skeleton className="h-5 w-full rounded-md bg-neutral-100" />
+      <Skeleton className="h-5 w-3/4 rounded-md bg-neutral-100" />
     </div>
   </article>
 )
@@ -17,25 +20,23 @@ const ServiceCardSkeleton = () => (
 const ServicesSectionSkeleton = () => (
   <section
     aria-label="در حال بارگذاری ارائه خدمات"
-    className="flex w-full flex-col items-center gap-6 overflow-x-clip py-16 md:py-24 lg:py-28 2xl:py-32"
+    className="w-full bg-neutral-50 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12"
   >
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 text-right">
-      <div className="flex items-stretch gap-2 lg:ms-30 xl:ms-40 8xl:ms-0">
-        <Skeleton className="my-2 w-1 rounded-full bg-neutral-300 lg:my-3 lg:w-2" />
-        <Skeleton className="h-8 w-44 rounded-lg bg-neutral-200" />
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 sm:gap-10">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-stretch gap-3">
+          <Skeleton className="my-2 w-1.5 shrink-0 rounded-full bg-neutral-300" />
+          <Skeleton className="h-[50px] w-44 rounded-lg bg-neutral-200 sm:h-16" />
+        </div>
+        <Skeleton className="h-14 w-full max-w-5xl rounded-md bg-neutral-100 sm:h-16" />
       </div>
-      <Skeleton className="h-5 max-w-5xl rounded-md bg-neutral-100 lg:ms-30 xl:ms-40 8xl:ms-0" />
-    </div>
-
-    <div className="flex w-full gap-6 overflow-hidden px-6 lg:px-30 xl:px-40 8xl:px-0">
-      <ServiceCardSkeleton />
-      <ServiceCardSkeleton />
-      <ServiceCardSkeleton />
-    </div>
-
-    <div className="flex w-full items-start gap-2 ps-8 md:ps-20 lg:ps-30 xl:ps-40">
-      <Skeleton className="size-12 rounded-xl bg-neutral-200" />
-      <Skeleton className="size-12 rounded-xl bg-neutral-200" />
+      <div className={servicesGridClassName}>
+        {Array.from({ length: 5 }, (_, index) => (
+          <div key={index} className={serviceCardClassName(index, 5)}>
+            <ServiceCardSkeleton />
+          </div>
+        ))}
+      </div>
     </div>
   </section>
 )
