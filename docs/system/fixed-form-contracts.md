@@ -74,7 +74,7 @@ One application is bound to one event **subtopic**. Its category is derived from
 | `companySnapshotId` | server-generated immutable reference | R (server) | Approved company revision at submission. Never chosen by client. |
 | `applicationTeam` | list of member references or `{ name, role, relation }` | R | Key members relevant to this proposal; final minimum beyond a nonempty team is unresolved. Preserve submitted names/roles in revision. |
 | `rfpVersionId` | server-provided version ID | R | Exact downloadable RFP for the selected subtopic; submit checks it is still valid or gives a stale-version response. |
-| `proposalDocuments` | private document reference list | R | Matching proposal category linked to this application revision, not another subtopic. File count/format/size open under Q39. |
+| `proposalDocuments` | private document reference list | R | Matching proposal category linked to this application revision, not another subtopic. Word/PDF reference list under the approved temporary [document policy](document-policy.json): 10 MB per file, both formats allowed together. |
 | `nonCompeteAcceptance` | `{ textVersionId, accepted: true }` | R | Actual checked acceptance; server records actor/time and immutable text version. Never prechecked. |
 | `eventRulesAcceptance` | `{ textVersionId, accepted: true }` | R | Same treatment, separately versioned. |
 | `formVersion` | version ID | R (server) | Fixed application schema used for answers, even when the schema later changes. |
@@ -83,13 +83,13 @@ The proposed application form has no extra free-form question until Product supp
 
 ## Fixed reviewer evaluation — two supplied form variants
 
-Four **distinct** active people evaluate the same current round: three assigned ordinary reviewers and the subtopic's named employer reviewer. Each can draft and finalize only their own evaluation. The user supplied the two fixed forms on 2026-10-23; [review-rubric.md](review-rubric.md) now records their shared A/B/C scoring rows, the ordinary 13 yes/no questions, the employer risk checklist, recommendation, identity and sensitive administrative fields. The confirmed formula is `0.45 × A + 0.40 × B + 0.15 × C`, with raw maxima 64, 51 and 39 and weighted maximum **55.05**. It must not be normalized to 100 or used for automatic advancement. Remaining subitem, requiredness, aggregation and rounding questions are listed in that document.
+Four **distinct** active people evaluate the same current round: three assigned ordinary reviewers and the subtopic's named employer reviewer. Each can draft and finalize only their own evaluation. The user supplied the two fixed forms on 2026-10-23; [review-rubric.md](review-rubric.md) now records their shared A/B/C scoring rows, the ordinary 13 yes/no questions, the employer risk checklist, recommendation, identity and sensitive administrative fields. The confirmed formula is `0.45 × A + 0.40 × B + 0.15 × C`, with raw maxima 64, 51 and 39 and weighted maximum **55.05**. It must not be normalized to 100 or used for automatic advancement. The user clarified that all qualitative/risk questions are required for finalization and articles contribute at most 2 points total. Cross-review aggregation is not requested and is not a T03 blocker; technical scoring/answer representation is documented separately.
 
 | Proposed key | Type | Submit/finalize | Meaning |
 | --- | --- | --- | --- |
 | `reviewRoundId`, `assignmentId` | server-resolved IDs | R | Active assignment for the exact application/proposal revision; employer slot is marked separately. |
 | `rubricVersionId`, `formVariant` | immutable version ID; `ordinary` or `employer` | R | Exact supplied fixed form and version used for the active slot; versioned implementation must settle remaining ambiguities. |
-| `answers` | keyed typed score/qualitative map | R per finalized validation policy | A/B/C score rows and variant-specific qualitative items from [review-rubric.md](review-rubric.md); drafts may be incomplete. |
+| `answers` | keyed typed score/qualitative map | R at finalization; partial draft allowed | A/B/C score rows and variant-specific qualitative items from [review-rubric.md](review-rubric.md); drafts may be incomplete. |
 | `rowComments` | optional keyed text map | O | Source says comments may be added if needed; keep them outside arithmetic. |
 | `calculatedScores` | server result | R (server) | Server calculates section totals and weighted total, validates score ranges/tier consistency and rejects tampered client totals. |
 | `evaluationState` | `draft` / `finalized` | R (server) | Finalization checks current assignment/rubric and locks ordinary editing. |
@@ -122,36 +122,42 @@ The booth catalogue, application, attendance decision and price are separate bac
 | Proposed key | Type | Submit | Meaning |
 | --- | --- | --- | --- |
 | `boothApplicationId` | server-resolved ID | R | Resolves one exhibition/booth/company and the fixed price snapshot. |
-| `receiptDocument` | private document reference | R | Proof for that application; Q39 policy still open. |
+| `receiptDocuments` | private document reference list | R | Proof for one receipt version of that application; Word and PDF may coexist under [document-policy.json](document-policy.json). Multiple representations are not separate payments or receipts for other booths. |
 | `declaredPayment` | amount + unit + payment reference/date, if requested | C | Exact declaration fields are unresolved; server compares to its price snapshot, never trusts client price. Display is in toman; storage/conversion unit must be explicit. |
 | `receiptVersion` | server version ID | R (server) | A correction adds a version; prior decisions and files remain history. |
 
 Correspondence uses `threadId`, optional `caseId`, authorized `recipientId`, nonempty `subject` and `body`, and a list of private attachment references where allowed. Proposed `messageKind` distinguishes general support, case discussion, supplementary financial request/reply and outcome publication; publication remains a separate explicit Secretariat action. Recipient and case linkage are validated server-side. Message delivery does not grant dossier access. A supplementary financial attachment retains financial confidentiality even inside a letter. Letter deletion from a display must not erase audit/history.
 
-## Category-specific private document policy (Q39 open)
+## Approved temporary private document policy (Q39 follow-up)
 
-Product has **not supplied** accepted formats, maximum per-file size or count limits for these categories. The Figma 12 MB PDF/Word example must not be copied into the policy. Each row needs a versioned decision and server validation before its corresponding submission gate can be accepted. A generic fallback is not an approved substitute.
+The user's 2026-10-23 follow-up supplies one temporary policy for **all** document categories: **Word and PDF only**, up to **10 MB per file**, and **multiple files on one field**, including a Word file and a PDF together for an RFP. Images were mentioned but explicitly deferred for now. The machine-readable specification is [document-policy.json](document-policy.json); this is a contract for later upload implementation, not a claim that current routes enforce it.
 
-| Category / context | Submit expectation | Formats | Per-file maximum | Count limit | Policy owner/input still needed |
-| --- | --- | --- | --- | --- | --- |
-| RFP, event/subtopic, owner upload | One versioned RFP available for download per active subtopic | Open | Open | Open | Product/owner approves publisher and replacement rules |
-| Proposal, event application revision | Required matching private proposal | Open | Open | Open | Q39 |
-| Articles of association | Required verification evidence | Open | Open | Open | Q39 |
-| Establishment notices | Required verification evidence | Open | Open | Open | Q39 |
-| Amendment notices | Conditional verification evidence | Open | Open | Open | Q39 and absence declaration |
-| Catalogues | If available | Open | Open | Open | Q39 |
-| Certificates/licenses | If available | Open | Open | Open | Q39 |
-| Financial statements | Required applicable years | Open | Open | Open | Q39 and fiscal-period convention |
-| Debt/facility evidence | Conditional to declaration | Open | Open | Open | Q39 and absence/evidence rule |
-| Tax and insurance records | Conditional to applicability | Open | Open | Open | Q39 and absence/evidence rule |
-| Contracts/orders/MOUs/commitments | If present | Open | Open | Open | Q39 |
-| Project estimate/use-of-funds | Required package evidence | Open | Open | Open | Q39 |
-| Guarantee/collateral | If available | Open | Open | Open | Q39 |
-| Supplementary case files | If requested | Open | Open | Open | Q39 and request-specific category |
-| Booth payment receipt | Required after attendance approval | Open | Open | Open | Q39 |
-| General/case correspondence attachment | Conditional to message | Open | Open | Open | Q39; financial subtype remains restricted |
+Word includes `.doc` and `.docx`; PDF uses `.pdf`. Technical size representation is decimal MB: `maxFileBytes = 10_000_000`, inclusive. The 10 MB limit applies independently to each file, not to the whole field: a valid 10 MB Word and a valid 10 MB PDF may coexist. No numerical business count cap was supplied; this does not impose one file per field, one file per format, or a maximum of two. The old Figma 12 MB example is superseded.
 
-For every accepted file store category, owner company, uploader, exact case/stage, associated record/revision, document-policy version, safe metadata and authorized audience. Validate server-side before associating it; authorize metadata and download at use time after reassignment or role removal. Keep private files out of Payload's public editorial `media` collection and out of public URLs. Replacing a file makes a new association/version; preserve the historic submitted reference. The UI displays category-specific policy returned by the server and distinguishes pending, failed, accepted and rejected upload states.
+| Category / context | Submit expectation | Formats | Per-file maximum | Files per field |
+| --- | --- | --- | --- | --- |
+| RFP, event/subtopic, owner upload | One logical versioned RFP with one or more representations | Word/PDF | 10 MB | Multiple; Word + PDF together |
+| Proposal, event application revision | Required matching private proposal | Word/PDF | 10 MB | Multiple |
+| Articles of association | Required verification evidence | Word/PDF | 10 MB | Multiple |
+| Establishment notices | Required verification evidence | Word/PDF | 10 MB | Multiple |
+| Amendment notices | Conditional verification evidence | Word/PDF | 10 MB | Multiple |
+| Catalogues | If available | Word/PDF | 10 MB | Multiple |
+| Certificates/licenses | If available | Word/PDF | 10 MB | Multiple |
+| Financial statements | Required applicable years | Word/PDF | 10 MB | Multiple, grouped by applicable period |
+| Debt/facility evidence | Conditional to declaration | Word/PDF | 10 MB | Multiple |
+| Tax and insurance records | Conditional to applicability | Word/PDF | 10 MB | Multiple |
+| Contracts/orders/MOUs/commitments | If present | Word/PDF | 10 MB | Multiple |
+| Project estimate/use-of-funds | Required package evidence | Word/PDF | 10 MB | Multiple |
+| Guarantee/collateral | If available | Word/PDF | 10 MB | Multiple |
+| Supplementary case files | If requested | Word/PDF | 10 MB | Multiple |
+| Booth payment receipt | Required after attendance approval | Word/PDF | 10 MB | Multiple representations of one receipt version/application |
+| General/case correspondence attachment | Conditional to message | Word/PDF | 10 MB | Multiple; financial subtype remains restricted |
+
+For every accepted file store category, owner company, uploader, exact case/stage, associated record/revision, document-policy version, safe metadata and authorized audience. Validate extension, MIME/content consistency and actual byte length server-side before associating it; browser-provided MIME and names are not proof. Reject images, spreadsheets, presentations and other formats under the current policy. UI validation supplements the server checks.
+
+An RFP version refers to its complete file list: the company can select/download both Word and PDF, and an application snapshots that version and its file references. Multiple representations do not create additional applications. Receipt files likewise belong to one receipt version and one booth application; they cannot be counted as payments for several booths. Replacing a submitted file creates a new association/version and preserves every historic file reference. An invalid/pending file cannot count as a completed required document.
+
+Authorize metadata and download at use time after reassignment or role removal. Keep private files out of Payload's public editorial `media` collection and public URLs. The UI displays the policy returned by the server and distinguishes pending, failed, accepted and rejected uploads. Technical request/transport protection must support the approved Word-plus-PDF pair instead of applying the per-file limit to the entire request.
 
 ## Existing implementation mapping and required contracts
 
@@ -173,15 +179,15 @@ Submitted verification, application, evaluation, financial package and receipt r
 
 | Task / dependency | Ready now from this document | Still needed before implementation or acceptance |
 | --- | --- | --- |
-| T01 / #15 scope | Approved workflow and open inputs are recorded in requirements/workflows; this dictionary is consistent with them. The user supplied reviewer forms on 2026-10-23. | Product decision owners should record Q39, agreement/rules approval and remaining rubric interpretation decisions. |
+| T01 / #15 scope | Approved workflow and open inputs are recorded in requirements/workflows; this dictionary is consistent with them. The user supplied reviewer forms on 2026-10-23. | Q39 formats/size and rubric requiredness/article points are now recorded; approved agreement/rules text remains missing. |
 | T02 / #16 permissions | Document-category audiences and filtered DTO obligations are specified here and in backend design. | Final seven-role matrix/access tests across CMS, API, files, search, counts and populated records; technical ownership with BE/CMS. |
-| T03 / #17 fixed forms | Stage 1–4, the supplied two review forms and scoring formula in [review-rubric.md](review-rubric.md), receipt/correspondence and absence/version semantics can guide schema/API design. | Remaining rubric subitem/qualitative/aggregation/rounding decisions; category-specific Q39 values; approved non-compete and event-rules text; tax/insurance/debt absence rules, exact enum/date/period conventions and final API/error names. T03 is **partially ready by stage**, not globally complete. |
+| T03 / #17 fixed forms | Stage 1–4, the supplied two review forms and scoring formula in [review-rubric.md](review-rubric.md), receipt/correspondence and absence/version semantics can guide schema/API design. | Approved non-compete and event-rules text is still needed for consent acceptance. No numerical file-count cap was supplied, so allow multiple files without inventing a product cap. Technical owners settle field/enum/date/precision/API details; these are not additional product blockers. Category absence proposals remain distinct from approved eligibility rules. T03 is **partially ready by stage** until the agreement texts exist. |
 | T04 / #18 isolated environment | No data mutation or migration is required by this contract. | QA/Data establish isolated DB/files, migration inventory and recovery rehearsal before persistence/destructive tests. |
 | T11 / #25 signup | Stage 1 field list and atomicity are ready for FE/BE implementation. | Agree technical identity format/password policy and migrate current UI/server field mismatch. Remaining review-form decisions do not block signup. |
-| T13–T15 verification | Dossier structure, explicit absence and revisions are ready for design. | Resolve technical enums/conditional evidence and private file policy before final document-upload acceptance. |
-| T20 / #36 application | One-subtopic form, proposal and consent recording are defined. | Approved agreement/rules text and proposal Q39 policy before full submit/UAT; RFP policy before owner upload. |
-| T24–T25 / #40–41 evaluation | Assignment/round/finalization invariants and both source forms' rows, score ranges, weights and formula are defined in [review-rubric.md](review-rubric.md). | Resolve A3 evidence/subitem scoring, qualitative/checklist finalization requirements, precision and aggregation before full acceptance. No score or pass threshold is inferred from Figma. |
-| T30 / #46 financial package | Category checklist and three-year/younger-company rule are defined. | Financial Q39 limits and absence/period decisions before complete-package acceptance. |
-| Receipt/correspondence slices | Independent receipt version and private attachment classification are defined. | Receipt/correspondence Q39 policy and exact declared-payment fields before final gate. |
+| T13–T15 verification | Dossier structure, explicit absence and revisions are ready for design. | Implement the approved Word/PDF, 10 MB-per-file policy and technical enum/conditional-evidence handling before document-upload acceptance. |
+| T20 / #36 application | One-subtopic form, proposal and consent recording are defined. | Approved agreement/rules text before full consent submit/UAT; implement the supplied multi-file Word/PDF policy for proposal and RFP. |
+| T24–T25 / #40–41 evaluation | Assignment/round/finalization invariants and both source forms' rows, score ranges, weights and formula are defined in [review-rubric.md](review-rubric.md). | All qualitative/risk answers are required at finalization; A3 articles are 0 or 2 total. Implement supplied scoring and versioned technical precision without adding aggregation or a pass threshold. No scoring authority is inferred from Figma. |
+| T30 / #46 financial package | Category checklist and three-year/younger-company rule are defined. | Implement approved file limits and technical period/absence representation; do not turn proposed absence handling into an invented automatic eligibility rule. |
+| Receipt/correspondence slices | Independent receipt version and private attachment classification are defined. | Implement the approved multi-file policy and exact declared-payment fields; keep each receipt version tied to one booth application. |
 
 Source references: [requirements](product-requirements.md), [workflows](workflows.md), [backend design](backend-design.md), [frontend design](frontend-design.md), [frontend audit](frontend-audit.md), [delivery plan](../event-review-system-plan.md). This is a documentation contract, not proof of implemented validation or passed human tests.

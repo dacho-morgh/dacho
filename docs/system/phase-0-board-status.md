@@ -4,6 +4,8 @@ Verified in the authenticated GitHub UI on 2026-10-23 for [Event and exhibition 
 
 ## Status changes
 
+The acceptance descriptions in this initial table predate the user's later reviewer-form and upload-policy decisions. For the current contract, see the follow-up sections and [fixed forms](fixed-form-contracts.md).
+
 | Task | Issue | Previous project status | Current project status | Issue state | Acceptance snapshot |
 | --- | --- | --- | --- | --- | --- |
 | T01 — ثبت تصمیم‌های باز و محدودهٔ دو مسیر | [#15](https://github.com/dacho-morgh/dacho/issues/15) | Todo | In Progress | Open | Six acceptance items remain unchecked. Scope includes event and exhibition flows, seven roles, four-reviewer assignment and editor gate, investment notes, booth/payment rules, and unresolved Q39/formula/agreement inputs. |
@@ -16,7 +18,7 @@ Verified in the authenticated GitHub UI on 2026-10-23 for [Event and exhibition 
 - Each issue page showed the Project `Status` field change to `In Progress` after the update; the board then showed T01–T04 in the In Progress column (4 items), Todo at 125, and Done at 0.
 - Issue states remain Open. Existing labels and issue bodies were observed before and after status edits and were not changed. The update changed only each card’s project status.
 - No other project cards were moved. Human acceptance/UAT gates, including the linked UAT42 issue #143, were left unchanged and remain separate execution gates. This status update does not record UAT execution or acceptance.
-- T03 still lacks the final rubric/questions, Q39 policy, and agreement text; these were explicitly recorded as unresolved in issue #17 and were not invented. T04’s status indicates active work only; it does not claim its checklist is complete.
+- At the initial verification, T03 lacked the final rubric/questions, Q39 policy, and agreement text, as recorded in issue #17. Those are historical inputs, subsequently narrowed by the user decisions below. T04's initial status indicated active work rather than completed acceptance.
 - GitHub’s private issue/project connector returned 404, so the authenticated browser UI was used. The local publication record remains [github-publication.md](github-publication.md). This file records observed planning state and does not claim a commit or push.
 
 ## Screenshot
@@ -27,7 +29,7 @@ The final board view was captured in the browser after verification. The browser
 
 After the initial issue read, the user supplied the ordinary/employer forms and the core review questions, ceilings, weights, and formula. The supplied maximum is **55.05**. Therefore, the initial table above is a historical snapshot of the inputs visible at the time, not a statement that the review rubric remains wholly unspecified.
 
-Q39/file policy, agreement text, and interpretation remain open. Keep those as explicit decisions; do not infer their contents from the supplied forms or score formula. T03 remains In Progress pending these open inputs and review of the updated specification.
+At this intermediate point, Q39/file policy, agreement text, and interpretation remained open. The later clarification below supersedes that intermediate input state. T03 remains In Progress pending the still-missing approved consent text and review of the updated specification.
 
 The exact T02 acceptance items read from issue #16 are:
 
@@ -43,3 +45,9 @@ The branch was committed (`dc46563`) and pushed, and [draft PR #145](https://git
 The browser operator inspected the status menu: it exposes exactly **Todo**, **In Progress**, and **Done**. All four selected cards remain In Progress/open while this draft is reviewed and inputs remain outstanding; no new status options were created. Last verified board totals were **Todo 125 / In Progress 4 / Done 0**.
 
 The browser tool became unavailable during the final handoff, and the connected GitHub tool still returned 404 for the private repository. The manager created the PR using the existing standard Git credential interface and GitHub REST API, without exposing or persisting credentials. A read-only Project API attempt was refused because that credential lacks `read:project`; no permission expansion was performed. No issue comments were posted and no issue bodies, checkboxes, labels or other project cards were changed. The PR links all four issues and the checked-in execution record provides the detailed update.
+
+## Later T03 input clarification — 2026-10-23
+
+The user approved mandatory qualitative/risk answers, a total article contribution of 2 points, and a temporary all-category Word/PDF upload policy of 10 MB per file. A field may hold both formats simultaneously; images are deferred and no numerical count cap was supplied. The remaining consent source is approved non-compete/event-rules text. Technical choices and unrequested four-review aggregation are not extra product blockers.
+
+The corresponding contract changes are delivered on the existing Phase 0 branch and draft PR #145. The T03 card stays open/In Progress and human acceptance remains Not run. No new Project field mutation is needed for this clarification.

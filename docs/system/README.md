@@ -18,7 +18,8 @@ Updated: 2026-10-23. This is the English specification for the event, review, in
 | [GitHub publication record](github-publication.md) | Published issue ranges, label scope, project verification and execution limits |
 | [Scope and decision register](scope-decisions.md) | T01 approved decisions, decision ownership, open inputs and affected tasks |
 | [Permission matrix](permission-matrix.md) | T02 target role/ownership/assignment policy and current implementation gaps |
-| [Fixed form contracts](fixed-form-contracts.md) | T03 typed fields, conditional/absence semantics, versions and pending policies |
+| [Fixed form contracts](fixed-form-contracts.md) | T03 typed fields, conditional/absence semantics, versions and multi-file policy |
+| [Approved document policy](document-policy.json) | Temporary Word/PDF-only, 10 MB per file, multiple files in one field |
 | [Supplied review rubric](review-rubric.md) | Ordinary/employer forms, shared scoring up to 55.05 and remaining interpretation questions |
 | [Isolated test environment](test-environment.md) | T04 guarded disposable database/files and recorded recovery checks |
 | [Migration inventory](migration-inventory.md) | Current migration streams, schema discrepancy and rollout limits |
@@ -41,11 +42,11 @@ Changes to product rules should update the requirements, affected state transiti
 
 Run `python docs/system/build_frontend_plan.py`, then `python docs/system/build_documents.py`. These scripts only write planning documents/JSON; they never create GitHub issues or run tests. The checked-in issue-map JSON files record verified issue numbers. Frontend prerequisite links and human-gate associations derive from the task data. Keep the original task table/index present because the system generator preserves their existing IDs and dependency map.
 
-## Outstanding inputs
+## Current decisions and outstanding inputs
 
-- Q39: allowed formats, maximum size and any count limit for RFP/proposals, company records, financial records and payment receipts. A universal 12 MB policy was explicitly not accepted.
-- Review-form interpretation details: four-review aggregation/ranking, fractional scores/rounding and incomplete field requiredness. The user supplied questions, ceilings and 45/40/15 per-review weighting on 2026-10-23; see [review-rubric.md](review-rubric.md). The supplied maximum is 55.05; Figma alone remains insufficient authority.
+- Q39 formats/size are now supplied: Word/PDF only, 10 MB per file, multiple representations on the same field; images deferred. No numerical count cap was requested. This is an implementation-ready policy, not a pending product blocker.
+- Review clarification is now supplied: articles contribute 2 points total; all qualitative/risk questions are mandatory at finalization. The chief sees four separate evaluations; aggregation is not requested. See [review-rubric.md](review-rubric.md).
 - Approved non-compete agreement and event-rules text.
 - Team capacity and calendar commitments. Delivery ordering is specified; dates and effort estimates are not.
 
-These inputs block their respective acceptance assertions, not the entire documentation or access-control foundation.
+Missing approved agreement text blocks its consent assertions; unspecified staffing blocks calendar commitments. The supplied file/review decisions and technical contract choices do not block unrelated implementation.

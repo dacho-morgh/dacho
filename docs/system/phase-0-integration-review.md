@@ -1,5 +1,8 @@
 # Phase 0 integration review (T01–T04 / #15–#18)
 
+Later T03 clarification, 2026-10-23: this report describes the earlier inspection. The user has since supplied mandatory qualitative/risk answers, a 2-point total article cap and a temporary all-category Word/PDF policy, 10 MB per file, with Word + PDF together on one field. No numerical file-count cap or aggregate-review feature is requested. See [current form contracts](fixed-form-contracts.md), [rubric](review-rubric.md) and [document policy](document-policy.json); only the approved consent texts remain a Product input for T03. Earlier mentions of unresolved Q39/requiredness/aggregation below are historical, not current blockers.
+
+
 Review date: 2026-10-23. Scope is the Phase 0 contract and isolated-test artifacts on `codex/phase-0-system-foundation`. This is a review of specifications and test safeguards, not acceptance of later workflow implementation or human UAT. The connected GitHub issue fetch returned 404 for #15–#18; a separate authenticated browser operator read those issue bodies and recorded their acceptance snapshots in [board status](phase-0-board-status.md). I compared the artifacts with the local [delivery plan](../event-review-system-plan.md), [product requirements](product-requirements.md), [workflows](workflows.md), and that remote acceptance snapshot.
 
 ## Contract findings

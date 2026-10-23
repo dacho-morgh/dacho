@@ -1,5 +1,8 @@
 # Phase 0 Figma evidence: T01–T04
 
+Later T03 clarification, 2026-10-23: this report describes the earlier inspection. The user has since supplied mandatory qualitative/risk answers, a 2-point total article cap and a temporary all-category Word/PDF policy, 10 MB per file, with Word + PDF together on one field. No numerical file-count cap or aggregate-review feature is requested. See [current form contracts](fixed-form-contracts.md), [rubric](review-rubric.md) and [document policy](document-policy.json); only the approved consent texts remain a Product input for T03. Earlier mentions of unresolved Q39/requiredness/aggregation below are historical, not current blockers.
+
+
 Read-only review on 2026-10-23 of the connected Figma file [Dashboard](https://www.figma.com/design/qVz7LsJUPwiXI3OMoW9kAj/Dashboard). This note records live metadata and rendered screenshots fetched during this review. It supplements the historical/source audit in [frontend-audit.md](frontend-audit.md); it does not treat a Figma frame as an approved requirement or deployed acceptance evidence. No Figma writes or implementation were made.
 
 Later the same day, the user supplied the ordinary and employer review forms. Their shared 45/40/15 weights, raw maxima and per-review formula are now authoritative through [review-rubric.md](review-rubric.md). References below to an *unapproved* Figma rubric describe the earlier inspection, before those forms arrived. The forms independently support those weights; Figma itself remains reference evidence, and the remaining scoring/answer decisions in the rubric contract stay open.

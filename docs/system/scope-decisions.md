@@ -19,6 +19,8 @@ The Fund owns the product. “Product owner” below means the Fund's authorized
 | D09 — cancellation | Company cancels directly before receipt. After receipt, Secretariat decides cancellation/release and records any manual refund. Other booth applications remain independent. | Product owner / backend and frontend | T48, T51–T54 |
 | D10 — forms and history | Fixed, versioned system forms; snapshot consent, RFP and submitted data. Guard stale/repeated mutations and preserve decision history and reliable in-app notifications. | Product owner / technical owners | T03, T07, T18, T20, T24–T25, T28, T30, T36–T37, T44 |
 | D11 — delivery and evidence | Access/private files/persistence first, entire event path next, exhibition path afterward. Use isolated synthetic fixtures. Engineering completion does not pass human gates. | Product owner / engineering and QA | T04, T41–T46, T54; UAT01–UAT42 |
+| D12 — Q39 temporary upload policy | All categories: Word/PDF only, 10 MB per file; a field accepts multiple representations including Word + PDF together. Images deferred; no numerical count cap supplied. | Product owner / backend, CMS and frontend; [policy](document-policy.json) | T03, T10, T18, T20, T30, T35, T50; related upload gates |
+| D13 — review clarification | Every qualitative/risk answer required to finalize; drafts can be incomplete. Articles are 0 or 2 total. Chief considers four individual results; no aggregate/ranking feature requested. | Product owner / backend and frontend; [rubric](review-rubric.md) | T03, T24–T25, FE17, UAT16–UAT17 |
 
 ## Open inputs and bounded consequences
 
@@ -26,15 +28,14 @@ No placeholder in this table is a default production value. Implementation may p
 
 | Input | Required decision and owner | Affected implementation / acceptance |
 | --- | --- | --- |
-| Q39 — document policies | Product owner supplies formats, per-file size and any count limit for each document category; technical owner reviews enforceability. No universal 12 MB policy was approved. | T03, T10, T18, T20, T30, T35, T50; corresponding upload assertions in UAT05, UAT09, UAT11, UAT22, UAT25, UAT35 |
-| Review-form interpretation | Product owner supplied ordinary/employer forms on 2026-10-23: shared 45/40/15 scoring, maxima 64/51/39, supplied weighted maximum 55.05, separate qualitative/risk questions. [Rubric contract](review-rubric.md) preserves this source. Four-review aggregation/ranking/ties, fractional scoring/rounding and incomplete field requiredness remain open; technical owner versions the reviewed contract. Figma alone is not authority. | T03, T24–T25, FE17 and the relevant scoring/finalization assertions in UAT16–UAT20 |
+| Review technical details | Supplied forms and D13 settle the product requirements needed for implementation. Technical owners version answer representation/precision. Chief reviews four individual scores; aggregation/ranking is not requested and is not a blocker. Figma alone is not authority. | T24–T25 and FE17 implementation; not additional Product input |
 | Agreement and event rules | Product owner supplies approved non-compete agreement and event-rules text with identifiable versions. | T03, T20, FE12 and consent assertions in UAT11 |
 | Technical form dictionary | Technical owners review the [fixed form contracts](fixed-form-contracts.md), including enum values, date representation, validation and category-specific absence semantics. Proposed details do not become approved business policy by being documented. | Stage-specific T03 readiness, T11, T13, T20, T24, T30 and frontend integration |
 | Schedule and staffing | Delivery owner supplies team capacity and calendar commitments. | Calendar commitments only; dependency order remains usable |
 
 ## Boundaries and exclusions
 
-Retain Next.js/Payload, Express, shared CMS domain and PostgreSQL `cms`/`dashboard` boundaries. Record/API names in technical design remain proposed. The approved scope excludes a workflow designer, per-event form builder, new OTP screens, multiple company representatives, investment voting or investment approve/reject controls, online payments, ancillary exhibition pricing, interactive floor plans and automatic reservation expiry.
+Retain Next.js/Payload, Express, shared CMS domain and actual PostgreSQL `public`/`dashboard` storage boundaries (the earlier design used `cms` as the conceptual ownership label). Record/API names in technical design remain proposed. The approved scope excludes a workflow designer, per-event form builder, new OTP screens, multiple company representatives, investment voting or investment approve/reject controls, online payments, ancillary exhibition pricing, interactive floor plans and automatic reservation expiry.
 
 Existing historical `admin/editor/representative/referee` code and general service forms remain implementation baseline, not the seven-role target. The root [glossary](../../CONTEXT.md) now uses approved domain language; the [dated implementation audit](current-state-audit.md) describes the legacy behavior. Older dynamic-role/three-review documents and conflicting Figma copy do not override this register's source requirements.
 
