@@ -54,7 +54,7 @@ flowchart TD
 | Triage reject | Chief assigned to event | Terminal outcome and lock for company + event + subtopic; unrelated applications stay usable |
 | Start review | Chief assigned to event | Exactly four active distinct people; one fixed employer slot and three ordinary slots; round references proposal revision |
 | Save evaluation draft | Current assigned reviewer | Only own answers change; no contribution to completion count |
-| Finalize evaluation | Current assigned reviewer, complete valid fixed rubric | Lock own submission; update completion exactly once; notify responsibly |
+| Finalize evaluation | Current assigned reviewer, complete valid fixed rubric including every qualitative question and employer risk-checklist item | Lock own submission; update completion exactly once; notify responsibly; unanswered blocks, a valid negative answer does not |
 | Replace ordinary reviewer | Responsible chief, unfinished ordinary assignment | Old assignment access revoked; replacement begins new assignment; history remains |
 | Replace employer | System Owner, explicit reason | Exceptional replacement captured against the case; historical RFP/employer context preserved |
 | Complete round | Derived from final evaluations for active slots on current revision | Only 4/4 enables chief decision; no automated acceptance |
@@ -63,6 +63,8 @@ flowchart TD
 | Reopen terminal rejection | System Owner, reason | Same application/history reopened; never silently create a duplicate application |
 
 Chief and employer assignments are captured for the relevant event/case. Changing a live subtopic RFP or personnel configuration must not retroactively rewrite an already submitted application. Technical handling of deactivated personnel must preserve history and remove active access.
+
+The [supplied ordinary/employer rubric](review-rubric.md) versions both role-specific question sets and their common per-review scoring formula. A score out of 55.05 is separate from round completion and the chief decision; four-review averaging, ranking and top-five selection are not implied by the forms. The one-week instruction does not authorize automatic assignment expiry.
 
 ## 3. Investment package, supplementary files and publication
 

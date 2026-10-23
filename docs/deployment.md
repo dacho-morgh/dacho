@@ -1,5 +1,11 @@
 # Deployment (VPS)
 
+Current delivery rule: ongoing work targets `staging`; `main` is production
+and must receive no push/merge/release without the user's explicit release
+instruction. Use [the staging guide](staging.md) and
+`docker-compose.staging.yml` for the separate staging stack. The instructions
+below describe production operations and do not authorize executing them.
+
 How to run the full stack — Postgres, fused frontend/CMS, and the OTP-auth backend — on a single Linux VPS with Docker Compose.
 
 ## 1. Prerequisites

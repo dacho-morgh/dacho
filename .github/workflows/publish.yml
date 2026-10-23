@@ -1,12 +1,12 @@
 name: Publish
 
-# The VPS CD timer deploys only when both images for this SHA are available.
+# Called by CI only after the same checks pass for main and staging. The VPS
+# production poller looks for sha-<commit> and must never see a staging build.
 env:
   DOCKER_METADATA_SHORT_SHA_LENGTH: '7'
 
 on:
-  push:
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   publish:
-    name: Build & push images
+    name: Build & push ${{ matrix.service }}
+    if: github.ref_name == 'main' || github.ref_name == 'staging'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -37,10 +38,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          flavor: latest=false
           tags: |
-            type=sha
-            type=ref,event=branch
-            type=raw,value=latest
+            type=sha,format=short,prefix=sha-,enable=${{ github.ref_name == 'main' }}
+            type=raw,value=main,enable=${{ github.ref_name == 'main' }}
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
+            type=sha,format=short,prefix=staging-sha-,enable=${{ github.ref_name == 'staging' }}
+            type=raw,value=staging,enable=${{ github.ref_name == 'staging' }}
 
       - name: Build & push
         uses: docker/build-push-action@v6
@@ -50,5 +54,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          cache-from: type=gha,scope=${{ matrix.service }}-${{ github.ref_name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}-${{ github.ref_name }}

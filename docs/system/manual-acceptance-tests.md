@@ -7,7 +7,7 @@ Updated 2026-10-23. **42 manual gates; none executed by writing this catalogue.*
 1. Product Owner and QA review scope and open inputs (UAT42). Operator confirms an isolated staging URL, database and document area. Never use real company documents or real bank transfers.
 2. Engineering deploys a coherent slice and records build/commit. A login gate can run as soon as T11 is ready; it does not wait for the entire event system.
 3. A human tester uses the stated role accounts and performs each Action. Compare actual behavior with each Expected result; do not infer results from code or issue status.
-4. Record Pass, Fail or Blocked with evidence. Missing build, final rubric, approved agreement text, file policy or fixture is Blocked, never Pass.
+4. Record Pass, Fail or Blocked with evidence. Missing build, approved agreement text or fixture is Blocked, never Pass. Reviewer questions/scoring/requiredness are supplied in review-rubric.md; temporary multi-file Word/PDF limits are supplied in document-policy.json.
 5. Keep failed/blocked test issues open, link defects, fix and rerun against a recorded build. Close a gate only after all expected results pass. Independent slice gates do not replace the full event/exhibition walkthrough.
 
 ## Shared synthetic fixture pack
@@ -16,8 +16,8 @@ Updated 2026-10-23. **42 manual gates; none executed by writing this catalogue.*
 - Companies: incomplete, pending, returned and approved; include a recently established company. Use unused synthetic national IDs and test-only credentials.
 - Events E1/E2 with separate responsible teams; at least two subtopics in E1 with distinct RFP files and different employers where needed.
 - Exhibition X1 with at least three distinguishable booths/prices and configurable company limit (use two for cap tests).
-- Distinguishable valid company/proposal/financial/receipt files and controlled invalid fixtures, prepared only after approved category policies are supplied.
-- Known expected list counts, application revisions and review rounds. Final rubric includes independently calculated expected values once product-approved.
+- Distinguishable valid Word/PDF company/proposal/financial/receipt files, including a Word+PDF pair on one field and per-file sizes at 10,000,000 bytes and one byte above; include images and spoofed extensions as invalid fixtures under document-policy.json.
+- Known expected list counts, application revisions and review rounds. Use the supplied ordinary/employer forms and independently calculated expected values (all maxima yield 55.05); include the 2-point article cap and every qualitative/risk answer, and record the versioned technical score representation.
 - Operator-assisted notification failure and disposable migration/restore fixtures. Human concurrency smoke requires two testers/sessions and companion automated evidence.
 
 ## Evidence template
@@ -292,14 +292,14 @@ Frontend implementation slices:
 Use separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.
 
 ## Procedure and expected results
-1. **Action:** Upload a policy-valid company document as A and download it
-   **Expected:** Correct contents and ownership are preserved.
+1. **Action:** Upload valid Word (.doc/.docx) and PDF files together to one company-document field as A and download each
+   **Expected:** Both coexist with correct content and ownership under one field; the per-file limit is 10 MB, not a combined-field cap.
 2. **Action:** Copy the document and private profile URLs into B and a logged-out browser
    **Expected:** Both private reads are denied; no sensitive metadata is exposed.
 3. **Action:** Inspect public company-directory presentation
    **Expected:** Only intentionally public fields appear; registration/verification dossier is absent.
-4. **Action:** Try an invalid upload and retry an interrupted upload
-   **Expected:** A clear error appears; no phantom completed document or workflow advancement occurs.
+4. **Action:** Upload a valid file of exactly 10,000,000 bytes, then one byte above the limit, an image and a falsely renamed file; retry an interrupted upload
+   **Expected:** The valid boundary file is accepted; oversized/disallowed/mismatched content is rejected with a usable error; failed files do not satisfy submission.
 
 ## Evidence and exit criteria
 - [ ] Record build/commit, test URL, date, tester and account roles (no passwords).
@@ -485,8 +485,8 @@ Use separate authenticated browser profiles for different roles. Use synthetic c
 ## Procedure and expected results
 1. **Action:** Create subtopics and assign one employer reviewer plus the correct RFP per subtopic
    **Expected:** Relationships persist and company sees the matching names/files.
-2. **Action:** Switch company selection between subtopics and download each RFP
-   **Expected:** Each download contains the correct distinguishable fixture.
+2. **Action:** Attach Word and PDF to one RFP version, switch company selection between subtopics and download each representation
+   **Expected:** Both representations are available for the correct subtopic/version; neither overwrites the other or creates another application.
 3. **Action:** Attempt an invalid cross-event category/subtopic or ineligible employer assignment
    **Expected:** Configuration is rejected rather than silently mismatched.
 4. **Action:** Change the current RFP after an application was submitted
@@ -811,15 +811,15 @@ Frontend implementation slices:
 
 **Actors:** Assigned reviewer; QA.
 
-**Fixture/precondition:** Final product-approved rubric, ceilings and formula. Blocked until supplied.
+**Fixture/precondition:** User-supplied ordinary/employer rubric in docs/system/review-rubric.md; deployed scoring slice implementing supplied row ranges, the 2-point total article cap and mandatory qualitative/risk answers. Use versioned technical precision; no four-review aggregate is requested.
 
 Use separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.
 
 ## Procedure and expected results
-1. **Action:** Enter a known valid answer set with independently calculated expected score
-   **Expected:** Displayed/server-returned totals match the approved formula.
-2. **Action:** Try missing required answers and values below/above approved ranges
-   **Expected:** Final submission is refused with field-level guidance.
+1. **Action:** Test both role forms with A=64, B=51, C=39 and all-zero answers, then a known mixed answer set
+   **Expected:** Scores match 0.45*A+0.40*B+0.15*C: maximum 55.05, zero 0; ordinary qualitative questions and employer risk checklist remain distinct.
+2. **Action:** Compare no articles, one article and several articles; try missing required answers and out-of-range scores
+   **Expected:** Article contribution is 0, 2 and 2 respectively; invalid/missing answers are refused with field-level guidance.
 3. **Action:** Change a displayed total/client value while keeping answers unchanged using a QA-provided controlled test method
    **Expected:** Server does not trust the tampered total.
 4. **Action:** Inspect completion before chief action
@@ -857,17 +857,17 @@ Frontend implementation slices:
 
 **Actors:** Assigned reviewer; Chief.
 
-**Fixture/precondition:** Approved rubric and an assigned application.
+**Fixture/precondition:** Supplied role-specific rubric with every qualitative/risk answer required, and an assigned application.
 
 Use separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.
 
 ## Procedure and expected results
 1. **Action:** Fill part of evaluation, save draft and reload
    **Expected:** Own draft persists and completion count does not increase.
-2. **Action:** Try finalizing an incomplete required form set
-   **Expected:** Validation blocks finalization.
-3. **Action:** Complete all required forms and finalize
-   **Expected:** One finalized evaluation is recorded and count increases once.
+2. **Action:** Leave one ordinary qualitative answer or one employer risk-checklist item unanswered, then repeat with a valid negative answer
+   **Expected:** Unanswered blocks finalization; a valid no answer satisfies requiredness without forcing a positive assessment.
+3. **Action:** Complete all quantitative and qualitative/risk answers, including recommendation and top-five response/rationale, and finalize
+   **Expected:** One finalized evaluation is recorded and count increases once; optional row comments or administrative fields do not add a new gate.
 4. **Action:** Retry finalization and attempt ordinary editing
    **Expected:** No duplicate count; finalized content is locked.
 
@@ -951,7 +951,7 @@ Frontend implementation slices:
 
 **Actors:** Four assigned reviewers; Chief.
 
-**Fixture/precondition:** Approved rubric and active current-round assignments.
+**Fixture/precondition:** Supplied role-specific rubric with every qualitative/risk answer required, and active current-round assignments.
 
 Use separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.
 
@@ -1710,8 +1710,8 @@ Frontend implementation slices:
 Use separate authenticated browser profiles for different roles. Use synthetic company IDs/documents/payment receipts only. Do not execute against live companies, production migrations or real financial transactions. If policy/rubric/text needed by a step is not supplied, record Blocked; do not invent it.
 
 ## Procedure and expected results
-1. **Action:** Upload a policy-valid receipt to the first request
-   **Expected:** Pending-verification status appears; booth is not confirmed merely by upload.
+1. **Action:** Upload a valid Word and PDF representation together for the first request receipt
+   **Expected:** Both files attach to one receipt version for that application; pending-verification status appears and upload alone does not confirm the booth.
 2. **Action:** Open the second request
    **Expected:** It still needs its own independent receipt.
 3. **Action:** Attempt to count the same payment receipt as a second independent payment

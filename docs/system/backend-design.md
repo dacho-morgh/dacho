@@ -6,6 +6,8 @@
 
 The monorepo has `apps/frontend` (Next.js + Payload), `apps/backend` (Express) and `packages/cms-core` (shared CMS domain). PostgreSQL has `cms.*` definitions/identity and `dashboard.*` operational instances. Keep that split rather than moving tables to match obsolete aspirational prose.
 
+Phase 0 correction, 2026-10-23: fresh [migration/config inspection](migration-inventory.md) establishes that current CMS tables are in `public`, not `cms`; `cms` in this proposed design names the ownership boundary. Preserve the existing `public`/`dashboard` storage split. This specification does not authorize a schema move.
+
 CMS owns users, companies, content and event/exhibition definitions. Extend it with event teams, technology categories/subtopics and versioned RFP definitions. The backend owns applications, revisions, assignments, evaluations, operational transitions, correspondence, reservations and payment processing records. Decide one authoritative location for verification state and expose it consistently; do not maintain independently editable approval flags in both services.
 
 The backend reads CMS definitions through Payload's API. Operations across that HTTP boundary are not automatically one SQL transaction. Use a documented ownership boundary and reliable event/outbox or equivalent coordination where needed; do not promise cross-service atomicity just because both schemas use PostgreSQL.

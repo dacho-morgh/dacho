@@ -1,0 +1,36 @@
+{
+  "policyVersion": "private-documents-2026-10-23-v1",
+  "status": "approved-temporary-specification",
+  "source": "User decision on 2026-10-23; runtime enforcement belongs to T10 and linked upload slices.",
+  "allowedFileTypes": [
+    { "format": "PDF", "extension": ".pdf", "mimeType": "application/pdf" },
+    { "format": "Word", "extension": ".doc", "mimeType": "application/msword" },
+    { "format": "Word", "extension": ".docx", "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+  ],
+  "maxFileBytes": 10000000,
+  "sizeDisplay": "10 MB per file",
+  "sizeConvention": "Technical representation: decimal MB, 1 MB = 1000000 bytes; the boundary is inclusive.",
+  "multipleFilesPerField": true,
+  "maxFilesPerField": null,
+  "countDecision": "No numerical count cap was supplied. A field must support Word and PDF together; do not infer a one-file limit or a maximum of two.",
+  "imagesAllowed": false,
+  "imageDecision": "Mentioned for later; explicitly deferred in the current Word/PDF-only policy.",
+  "categories": [
+    "rfp",
+    "proposal",
+    "articlesOfAssociation",
+    "establishmentNotices",
+    "amendmentNotices",
+    "catalogues",
+    "certificatesLicenses",
+    "financialStatements",
+    "debtFacilityEvidence",
+    "taxInsuranceRecords",
+    "contractsOrdersMousCommitments",
+    "projectEstimateUseOfFunds",
+    "guaranteeCollateral",
+    "supplementaryCaseFiles",
+    "boothPaymentReceipt",
+    "correspondenceAttachment"
+  ]
+}
