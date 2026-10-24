@@ -24,6 +24,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import type { DashboardNavigation } from './sidebar-shell'
 
@@ -57,6 +58,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ user, navigation, companyName, className, ...props }: AppSidebarProps) {
   const pathname = usePathname()
+  const { isMobile, setOpenMobile } = useSidebar()
   const navItems = navigation.destinations.flatMap((href) => {
     const item = knownDestinations[href]
     return item ? [{ ...item, href }] : []
@@ -105,6 +107,7 @@ export function AppSidebar({ user, navigation, companyName, className, ...props 
                       <SidebarMenuButton
                         asChild
                         isActive={isActive}
+                        onClick={() => { if (isMobile) setOpenMobile(false) }}
                         className={`group relative flex h-10 w-full flex-1 items-center rounded-xl px-3 py-2 transition-colors ${
                           isActive
                             ? 'bg-brand-50 font-normal text-brand-600 hover:bg-brand-100 hover:text-brand-600 active:bg-brand-200'
