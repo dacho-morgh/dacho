@@ -1,3 +1,4 @@
+import { isActiveAccount } from '@cms-core/access/roles'
 import configPromise from '@payload-config'
 import { GeistMono } from 'geist/font/mono'
 import { Menu } from 'lucide-react'
@@ -37,13 +38,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // Invalid, expired, or otherwise unreadable sessions are unauthenticated.
   }
 
-  if (!user) redirect(getLoginUrl(returnUrl))
+  if (!user || !isActiveAccount(user) || user.backendService) redirect(getLoginUrl(returnUrl))
 
   const isSeniorManager = await isSeniorManagerUser(payload, user)
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className={cn('flex min-h-screen w-full overflow-x-clip bg-[#F8FAFC] text-slate-800 antialiased', GeistMono.variable)} dir="rtl">
+      <div
+        className={cn(
+          'flex min-h-screen w-full overflow-x-clip bg-[#F8FAFC] text-slate-800 antialiased',
+          GeistMono.variable,
+        )}
+        dir="rtl"
+      >
         <DashboardSidebar user={user} isSeniorManager={isSeniorManager} />
         <SidebarInset className="flex min-w-0 flex-1 flex-col bg-[#F8FAFC]">
           <SidebarTrigger

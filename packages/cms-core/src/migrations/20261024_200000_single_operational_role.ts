@@ -24,5 +24,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   `)
 }
 export async function down(_args: MigrateDownArgs): Promise<void> {
-  throw new Error('Personnel migration requires reviewed restore or forward repair; legacy assignments are retained in users.legacy_roles.')
+  throw new Error(
+    'Personnel migration requires reviewed restore or forward repair; legacy assignments are retained in users.legacy_roles.',
+  )
 }

@@ -8,7 +8,16 @@ import {
 } from 'payload'
 
 import { hasCmsRole } from '@cms-core/access/hasCmsRole'
-import { compatibilityRoles, isActiveAccount, isBackendService, isInternalAdmin, OPERATIONAL_ROLE_LABELS, OPERATIONAL_ROLES, USER_ROLE_LABELS, USER_ROLES } from '@cms-core/access/roles'
+import {
+  compatibilityRoles,
+  isActiveAccount,
+  isBackendService,
+  isInternalAdmin,
+  OPERATIONAL_ROLE_LABELS,
+  OPERATIONAL_ROLES,
+  USER_ROLE_LABELS,
+  USER_ROLES,
+} from '@cms-core/access/roles'
 import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
 import {
   isDuplicateNationalId,
@@ -45,23 +54,38 @@ export const Users: CollectionConfig = {
     update: canUpdateUser,
   },
   hooks: {
-    beforeLogin: [({ user }) => {
-      if (!isActiveAccount(user) || user.backendService) throw new APIError('Account is inactive.', 403)
-    }],
+    beforeLogin: [
+      ({ user }) => {
+        if (!isActiveAccount(user) || user.backendService)
+          throw new APIError('Account is inactive.', 403)
+      },
+    ],
     beforeChange: [
       ({ data, originalDoc, req, context, operation }) => {
-        if (typeof data.phone === 'string' && data.phone.trim() !== '') data.username = data.phone.trim()
+        if (typeof data.phone === 'string' && data.phone.trim() !== '')
+          data.username = data.phone.trim()
         const provision = !req.user && context.allowPersonnelProvisioning === true
         const owner = isInternalAdmin(req.user)
-        const selfSignup = context.forceRepresentativeSignup === true || (operation === 'create' && !owner && !provision)
+        const selfSignup =
+          context.forceRepresentativeSignup === true ||
+          (operation === 'create' && !owner && !provision)
         if (selfSignup) {
           data.operationalRole = 'representative'
           data.isActive = true
           data.contentEditor = false
           data.backendService = false
+          data.enableAPIKey = false
+          data.apiKey = null
         } else if (!owner && !provision) {
           // Local API callers also obey this boundary even with overrideAccess.
-          for (const field of ['operationalRole', 'isActive', 'contentEditor', 'backendService', 'legacyRoles']) delete data[field]
+          for (const field of [
+            'operationalRole',
+            'isActive',
+            'contentEditor',
+            'backendService',
+            'legacyRoles',
+          ])
+            delete data[field]
         }
         if (owner) {
           delete data.backendService
@@ -73,17 +97,23 @@ export const Users: CollectionConfig = {
           }
         }
         const account = { ...originalDoc, ...data }
-        if (account.backendService && !provision && operation === 'create') throw new APIError('Forbidden service provisioning.', 403)
+        if (account.backendService && !provision && operation === 'create')
+          throw new APIError('Forbidden service provisioning.', 403)
         delete data.personnelHistory
         const keys = ['operationalRole', 'isActive', 'contentEditor', 'backendService'] as const
         if (operation === 'create' || keys.some((key) => originalDoc?.[key] !== account[key])) {
-          data.personnelHistory = [...(Array.isArray(originalDoc?.personnelHistory) ? originalDoc.personnelHistory : []), {
-            actorId: req.user ? String(req.user.id) : null,
-            source: provision ? 'operator' : selfSignup ? 'signup' : 'owner',
-            timestamp: new Date().toISOString(),
-            before: originalDoc ? Object.fromEntries(keys.map((key) => [key, originalDoc[key] ?? null])) : null,
-            after: Object.fromEntries(keys.map((key) => [key, account[key] ?? null])),
-          }]
+          data.personnelHistory = [
+            ...(Array.isArray(originalDoc?.personnelHistory) ? originalDoc.personnelHistory : []),
+            {
+              actorId: req.user ? String(req.user.id) : null,
+              source: provision ? 'operator' : selfSignup ? 'signup' : 'owner',
+              timestamp: new Date().toISOString(),
+              before: originalDoc
+                ? Object.fromEntries(keys.map((key) => [key, originalDoc[key] ?? null]))
+                : null,
+              after: Object.fromEntries(keys.map((key) => [key, account[key] ?? null])),
+            },
+          ]
         }
         data.roles = compatibilityRoles(account)
         return data
@@ -93,19 +123,29 @@ export const Users: CollectionConfig = {
   },
   endpoints: [
     {
-      path: '/backend-profile/:id', method: 'patch',
+      path: '/backend-profile/:id',
+      method: 'patch',
       handler: async (req) => {
-        if (!isBackendService(req.user) && !isInternalAdmin(req.user)) return Response.json({ error: 'forbidden' }, { status: 403 })
+        if (!isBackendService(req.user) && !isInternalAdmin(req.user))
+          return Response.json({ error: 'forbidden' }, { status: 403 })
         const body = await req.json?.().catch(() => null)
-        if (!body || typeof body !== 'object' || Array.isArray(body)) return Response.json({ error: 'invalid_profile' }, { status: 400 })
+        if (!body || typeof body !== 'object' || Array.isArray(body))
+          return Response.json({ error: 'invalid_profile' }, { status: 400 })
         const data: Record<string, string> = {}
         for (const key of ['name', 'phone', 'email', 'position']) {
           if (key in body) {
-            if (typeof body[key] !== 'string') return Response.json({ error: 'invalid_profile' }, { status: 400 })
+            if (typeof body[key] !== 'string')
+              return Response.json({ error: 'invalid_profile' }, { status: 400 })
             data[key] = body[key]
           }
         }
-        const doc = await req.payload.update({ collection: 'users', id: String(req.routeParams?.id), data, overrideAccess: true, req })
+        const doc = await req.payload.update({
+          collection: 'users',
+          id: String(req.routeParams?.id),
+          data,
+          overrideAccess: true,
+          req,
+        })
         return Response.json({ doc })
       },
     },
@@ -242,6 +282,26 @@ export const Users: CollectionConfig = {
     strategies: [createBackendJwtStrategy(process.env.BACKEND_JWKS_URL)],
   },
   fields: [
+    // Payload's base auth fields otherwise expose decrypted API keys on user
+    // reads. Service identity reads must never disclose another account's key.
+    {
+      name: 'apiKey',
+      type: 'text',
+      access: {
+        read: ownerOnlyField,
+        create: ownerOnlyField,
+        update: ownerOnlyField,
+      },
+    },
+    {
+      name: 'enableAPIKey',
+      type: 'checkbox',
+      access: {
+        read: ownerOnlyField,
+        create: ownerOnlyField,
+        update: ownerOnlyField,
+      },
+    },
     {
       name: 'name',
       type: 'text',
@@ -257,39 +317,80 @@ export const Users: CollectionConfig = {
       },
     },
     {
-      name: 'operationalRole', type: 'select', label: 'نقش عملیاتی',
-      options: OPERATIONAL_ROLES.map((role) => ({ label: OPERATIONAL_ROLE_LABELS[role], value: role })),
+      name: 'operationalRole',
+      type: 'select',
+      label: 'نقش عملیاتی',
+      options: OPERATIONAL_ROLES.map((role) => ({
+        label: OPERATIONAL_ROLE_LABELS[role],
+        value: role,
+      })),
       defaultValue: 'representative',
-      admin: { position: 'sidebar', description: 'هر شخص دقیقاً یک نقش عملیاتی دارد.' },
+      admin: {
+        position: 'sidebar',
+        description: 'هر شخص دقیقاً یک نقش عملیاتی دارد.',
+      },
       access: { create: ownerOnlyField, update: ownerOnlyField },
     },
     {
-      name: 'isActive', type: 'checkbox', label: 'حساب فعال', defaultValue: true,
-      admin: { position: 'sidebar' }, access: { create: ownerOnlyField, update: ownerOnlyField },
-    },
-    {
-      name: 'contentEditor', type: 'checkbox', label: 'مجوز تحریر محتوا', defaultValue: false,
-      admin: { position: 'sidebar', description: 'مجوز محتوا مستقل از نقش عملیاتی است.' },
+      name: 'isActive',
+      type: 'checkbox',
+      label: 'حساب فعال',
+      defaultValue: true,
+      admin: { position: 'sidebar' },
       access: { create: ownerOnlyField, update: ownerOnlyField },
     },
     {
-      name: 'backendService', type: 'checkbox', defaultValue: false,
-      admin: { hidden: true }, access: { create: () => false, update: () => false },
+      name: 'contentEditor',
+      type: 'checkbox',
+      label: 'مجوز تحریر محتوا',
+      defaultValue: false,
+      admin: {
+        position: 'sidebar',
+        description: 'مجوز محتوا مستقل از نقش عملیاتی است.',
+      },
+      access: { create: ownerOnlyField, update: ownerOnlyField },
     },
     {
-      name: 'legacyRoles', type: 'json', label: 'نقش‌های پیش از مهاجرت',
-      admin: { readOnly: true }, access: { create: () => false, update: () => false, read: ownerOnlyField },
+      name: 'backendService',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: { hidden: true },
+      access: { create: () => false, update: () => false },
     },
     {
-      name: 'personnelHistory', type: 'json', label: 'تاریخچه دسترسی',
-      admin: { readOnly: true }, access: { create: () => false, update: () => false, read: ownerOnlyField },
+      name: 'legacyRoles',
+      type: 'json',
+      label: 'نقش‌های پیش از مهاجرت',
+      admin: { readOnly: true },
+      access: {
+        create: () => false,
+        update: () => false,
+        read: ownerOnlyField,
+      },
+    },
+    {
+      name: 'personnelHistory',
+      type: 'json',
+      label: 'تاریخچه دسترسی',
+      admin: { readOnly: true },
+      access: {
+        create: () => false,
+        update: () => false,
+        read: ownerOnlyField,
+      },
     },
     // Stored compatibility projection for older dashboard queries. It is never
     // an input to authorization, and legacy assignments are retained above.
     {
-      name: 'roles', type: 'select', hasMany: true,
-      options: USER_ROLES.map((role) => ({ label: USER_ROLE_LABELS[role], value: role })),
-      admin: { hidden: true }, access: { create: () => false, update: () => false },
+      name: 'roles',
+      type: 'select',
+      hasMany: true,
+      options: USER_ROLES.map((role) => ({
+        label: USER_ROLE_LABELS[role],
+        value: role,
+      })),
+      admin: { hidden: true },
+      access: { create: () => false, update: () => false },
     },
     // The representative's job title within the company (سمت).
     {
