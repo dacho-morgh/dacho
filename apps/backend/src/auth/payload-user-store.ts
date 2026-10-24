@@ -59,8 +59,13 @@ export class PayloadUserStore implements UserStore {
       headers: this.headers(),
       body: JSON.stringify(fields),
     })
-    const data = await this.ok(res)
-    return this.toUser(unwrap(data))
+    // The CMS command answers with a deliberately narrow, six-field projection
+    // that carries no authorization state. Mapping that body would report an
+    // active representative as inactive and role-less, so reload the identity.
+    await this.ok(res)
+    const user = await this.findById(id)
+    if (!user) throw new Error(`Payload user ${id} missing after profile update`)
+    return user
   }
 
   private async findByPhone(phone: string): Promise<User | undefined> {

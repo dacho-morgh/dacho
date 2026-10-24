@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import request from 'supertest'
 
+import { PayloadUserStore, type HttpFetcher } from '../src/auth/payload-user-store.js'
 import { createTestApp } from './helpers.js'
 
 async function signIn(app: Parameters<typeof request>[0], phone: string, delivery: { lastCodeFor(p: string): string | undefined }) {
@@ -79,6 +80,69 @@ describe('OTP auth flow', () => {
     expect(res.status).toBe(200)
     expect(res.body.user.name).toBe('Ali')
     expect(res.body.user.phone).toBe('0912')
+  })
+
+  it('complete-profile returns the reloaded identity, not the six-field projection', async () => {
+    const fetcher: HttpFetcher = async (url, init) => {
+      // findOrCreateByPhone lookup
+      if (url.includes('where%5Bphone%5D'))
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            docs: [{ id: 'u1', phone: '0912', name: 'Ali', operationalRole: 'representative', isActive: true }],
+          }),
+        }
+      // The CMS command answers with a safe projection that has no auth state.
+      if (init?.method === 'PATCH')
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            doc: {
+              id: 'u1',
+              name: 'Ali',
+              phone: '0912',
+              email: null,
+              position: null,
+              updatedAt: '2026-10-24T20:00:00.000Z',
+            },
+          }),
+        }
+      // Authoritative identity reload.
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 'u1',
+          phone: '0912',
+          name: 'Ali',
+          operationalRole: 'representative',
+          isActive: true,
+          backendService: false,
+          contentEditor: false,
+        }),
+      }
+    }
+    const { app, delivery } = await createTestApp({
+      userStore: new PayloadUserStore({ baseUrl: 'http://cms:3000', apiKey: 'KEY', fetcher }),
+    })
+    const token = await signIn(app, '0912', delivery)
+
+    const res = await request(app)
+      .post('/auth/complete-profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Ali' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.user).toMatchObject({
+      id: 'u1',
+      phone: '0912',
+      name: 'Ali',
+      operationalRole: 'representative',
+      isActive: true,
+      roles: ['representative'],
+    })
   })
 
   it('rejects complete-profile without a token with 401', async () => {

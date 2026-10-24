@@ -2,7 +2,7 @@ import type { Express } from 'express'
 import { Pool } from 'pg'
 
 import { InMemoryCompanyStore } from '../src/auth/company-store.js'
-import { InMemoryUserStore } from '../src/auth/user-store.js'
+import { InMemoryUserStore, type UserStore } from '../src/auth/user-store.js'
 import { createApp } from '../src/app.js'
 import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
 import { JwtSigner } from '../src/jwt.js'
@@ -13,15 +13,20 @@ export interface TestApp {
   app: Express
   delivery: ConsoleOtpDelivery
   codeStore: InMemoryCodeStore
-  userStore: InMemoryUserStore
+  userStore: UserStore
   companyStore: InMemoryCompanyStore
   jwt: JwtSigner
 }
 
-export async function createTestApp(): Promise<TestApp> {
+export interface TestAppOptions {
+  /** Swap the in-memory identity store for a remote-backed implementation. */
+  userStore?: UserStore
+}
+
+export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
   const delivery = new ConsoleOtpDelivery()
   const codeStore = new InMemoryCodeStore()
-  const userStore = new InMemoryUserStore()
+  const userStore = options.userStore ?? new InMemoryUserStore()
   const companyStore = new InMemoryCompanyStore()
   const jwt = await JwtSigner.create('test-kid')
   // Unit tests never touch the dashboard routes, so the pool is never queried;

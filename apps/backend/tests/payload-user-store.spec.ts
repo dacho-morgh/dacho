@@ -76,21 +76,78 @@ describe('PayloadUserStore', () => {
     await expect(store.findById('missing')).resolves.toBeUndefined()
   })
 
-  it('update sends a PATCH and returns the updated user', async () => {
+  it('reloads the identity after the six-field profile projection', async () => {
+    // The CMS backend-profile command deliberately answers with this projection.
+    const projection = {
+      id: 'u1',
+      name: 'Ali',
+      phone: '0912',
+      email: null,
+      position: null,
+      updatedAt: '2026-10-24T20:00:00.000Z',
+    }
     const { fetcher, calls } = mockFetcher((_url, init) =>
       init?.method === 'PATCH'
-        ? { status: 200, body: { doc: { id: 'u1', phone: '0912', name: 'Ali', operationalRole: 'representative', isActive: true, roles: ['admin'] } } }
-        : { status: 404, body: {} },
+        ? { status: 200, body: { doc: projection } }
+        : {
+            status: 200,
+            body: {
+              id: 'u1',
+              phone: '0912',
+              name: 'Ali',
+              operationalRole: 'representative',
+              isActive: true,
+              backendService: false,
+              contentEditor: false,
+              roles: ['representative'],
+            },
+          },
     )
     const store = new PayloadUserStore({ baseUrl: 'http://cms:3000', apiKey: 'KEY', fetcher })
 
     const user = await store.update('u1', { name: 'Ali' })
 
-    expect(user.name).toBe('Ali')
-    expect(user.roles).toEqual(['representative'])
-    const patch = calls.find((c) => c.method === 'PATCH')!
+    // Mapping the projection alone would yield isActive:false, operationalRole
+    // null and roles:[] for an active representative.
+    expect(user).toMatchObject({
+      id: 'u1',
+      phone: '0912',
+      name: 'Ali',
+      operationalRole: 'representative',
+      isActive: true,
+      roles: ['representative'],
+    })
+    const patch = calls.find((call) => call.method === 'PATCH')!
     expect(patch.url).toBe('http://cms:3000/api/users/backend-profile/u1')
     expect(JSON.parse(patch.body!)).toEqual({ name: 'Ali' })
+    const reload = calls.find((call) => call.method === 'GET')!
+    expect(reload.url).toBe('http://cms:3000/api/users/u1?depth=0')
+    expect(calls.map((call) => call.method)).toEqual(['PATCH', 'GET'])
+  })
+
+  it('fails explicitly when the identity reload after a profile update is missing', async () => {
+    const { fetcher } = mockFetcher((_url, init) =>
+      init?.method === 'PATCH'
+        ? {
+            status: 200,
+            body: {
+              doc: {
+                id: 'u1',
+                name: 'Ali',
+                phone: '0912',
+                email: null,
+                position: null,
+                updatedAt: null,
+              },
+            },
+          }
+        : { status: 404, body: {} },
+    )
+    const store = new PayloadUserStore({ baseUrl: 'http://cms:3000', apiKey: 'KEY', fetcher })
+
+    await expect(store.update('u1', { name: 'Ali' })).rejects.toThrow(
+      'missing after profile update',
+    )
   })
 
   it('derives roles from the active scalar role, ignoring legacy/client arrays', async () => {
