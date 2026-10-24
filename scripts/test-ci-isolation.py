@@ -142,6 +142,30 @@ class CIIsolationContract(unittest.TestCase):
         self.assertLess(e2e.index(mirror), e2e.index(install))
         self.assertIn("playwright install --with-deps chromium", install)
 
+    def test_e2e_owns_a_real_backend_with_ephemeral_credentials(self):
+        e2e = block(block(CI, "jobs", 0), "e2e", 2)
+        credentials = step(e2e, "Generate ephemeral backend credentials")
+        seed = step(e2e, "Migrate + seed content")
+        build = step(e2e, "Build")
+        run = step(e2e, "Run Playwright")
+        self.assertIn("namedCurve: 'prime256v1'", credentials)
+        self.assertIn("mode: 0o600", credentials)
+        for setting in ("JWT_PRIVATE_KEY_FILE", "SERVICE_ACCOUNT_API_KEY", "PAYLOAD_API_KEY", "INTERNAL_PROXY_SECRET"):
+            self.assertIn(setting, credentials)
+        self.assertIn("::add-mask::", credentials)
+        self.assertIn("seed:service-account", seed)
+        self.assertIn("pnpm --filter @dacho/backend build", build)
+        self.assertIn("PLAYWRIGHT_BACKEND_SERVER_COMMAND: pnpm --filter @dacho/backend start", run)
+        self.assertLess(e2e.index(credentials), e2e.index(seed))
+        self.assertLess(e2e.index(seed), e2e.index(build))
+        self.assertLess(e2e.index(build), e2e.index(run))
+        self.assertIn("if: always()", step(e2e, "Remove ephemeral backend key"))
+
+        config = (Path(__file__).resolve().parents[1] / "apps/frontend/playwright.config.ts").read_text()
+        self.assertIn("PLAYWRIGHT_BACKEND_SERVER_COMMAND", config)
+        self.assertIn("/health", config)
+        self.assertNotIn("reuseExistingServer: true", config)
+
     def test_mirror_step_rewrites_runner_mirror_lists(self):
         e2e = block(block(CI, "jobs", 0), "e2e", 2)
         mirror = step(e2e, "Use Ubuntu archive mirror for browser dependencies")
