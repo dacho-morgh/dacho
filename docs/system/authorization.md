@@ -33,7 +33,7 @@ totals, stats, activity history and document parents.
 | Chief Reviewer | assigned requests only; event responsibility is future T16 | assigned case's necessary profile only, not the CMS dossier |
 | Reviewer | assigned requests only | assigned case's necessary profile only |
 | Employer Reviewer | assigned requests only | assigned subtopic/case profile only |
-| Investment Reviewer | assigned requests only | assigned case profile/financial package only |
+| Investment Reviewer | assigned requests only | assigned case profile; financial package only after an authorized persisted handoff (currently unavailable, so denied) |
 | Company Representative | `owner_id = current user` | own company only |
 
 `dashboard.case_assignments.role` must exactly match the person's current
@@ -70,7 +70,7 @@ never treated as an access check.
 | `POST /admin/requests/:id/assignments` | System Owner only; target must be active and its current role must match the assignment role; duplicate active assignment `409` |
 | `DELETE /admin/requests/:id/assignments/:userId` | System Owner only; stores revoker, time and reason; access ends immediately |
 | `GET /admin/requests/:id/assignments` | System Owner / Central Secretariat |
-| `GET /letters`, `GET /letters/:id`, `DELETE /letters/:id` | owner/recipient scope; internal assignees see participant or assigned-case letters only |
+| `GET /letters`, `GET /letters/:id`, `DELETE /letters/:id` | case letters require current case ownership/assignment and sender-or-recipient participation; deletion additionally requires recipient scope. Non-case personal letters retain sender/recipient scope; all-scope oversight remains explicit |
 | `GET /stats`, `GET /activities` | identical scope as the request list |
 | `GET /admin/companies`, `GET /admin/companies/:id` | System Owner / Central Secretariat; explicit projection with no raw user, credential, API key, session or personnel history |
 | `GET /admin/employees` | System Owner / Central Secretariat; id/name/role/active only |
@@ -108,7 +108,7 @@ absent or denied rather than stubbed permissively:
   and chief decisions (T19–T28).
 - Financial package completeness/handoff, investment memo and publication
   (T29–T33). T10 stores financial files and enforces confidentiality, but no
-  financial submission state machine exists.
+  financial submission or handoff state machine exists, so investment financial-document access fails closed even with case assignment.
 - Correspondence attachment workflow and booth receipts (T35, T50).
 - Any dashboard action that has no backend command is not advertised in
   `allowedActions`.

@@ -56,7 +56,7 @@ role, ownership and active assignment. A document id or URL is never authority.
 | --- | --- |
 | Company dossier (`articlesOfAssociation`, notices, catalogues, certificates) | owning representative, System Owner, Central Secretariat. Chief/reviewer/employer/investment are denied even when assigned to a case |
 | Case (`proposal`) | owning representative, System Owner, Central Secretariat, and an actively assigned chief/reviewer/employer/investment reviewer |
-| Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner, Central Secretariat, and an actively **assigned investment reviewer**. Chief, ordinary reviewer and employer reviewer are explicitly denied |
+| Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner and Central Secretariat. Investment reviewer access requires an authorized persisted handoff; T29/T30 have not delivered that state, so investment access currently fails closed. Chief, ordinary reviewer and employer reviewer are explicitly denied |
 | Future workflow (`rfp`, `supplementaryCaseFiles`, `boothPaymentReceipt`, `correspondenceAttachment`) | denied with `422 unsupported_category` until T18/T33/T35/T50 provide the parent workflow |
 
 Uploads: an active representative may add files to its own draft request or own
@@ -90,6 +90,9 @@ falls back to a public media URL.
   metadata row.
 - Uploading or failing an upload never changes the request status or any
   workflow state. Financial/files completeness remains T30 work.
+- Request document uploads/deletes serialize on the current request row and
+  recheck its owner/status after acquiring the lock, so submission cannot race
+  with a draft mutation.
 - Existing submitted/financial snapshots are not mutated by this slice.
 - Deleting a displayed document removes the private bytes and metadata; broader
   audit/history retention is a later workflow concern.
@@ -123,7 +126,10 @@ rehearsal applied all seven backend migrations on the disposable database.
 - Private storage keys are not present in responses and path traversal is
   rejected.
 - Frontend component tests cover progress, retry, local type/size errors,
-  denied/expired sessions and pending-upload submit blocking.
+  denied/expired sessions and pending-upload submit blocking, plus category,
+  version, parent and delayed-upload scope changes.
+- Integration tests cover submit-versus-upload/delete row-lock ordering,
+  participant-only case letters, recipient-only deletion and revocation.
 
 UAT05/UAT09/UAT11/UAT22/UAT25/UAT35 remain **Not run**. Issue #71 stays open for
 the RFP, finance-package, correspondence and receipt integrations.

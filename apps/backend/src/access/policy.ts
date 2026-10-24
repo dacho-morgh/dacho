@@ -251,7 +251,9 @@ export function canReadDocument(
     case 'employer-reviewer':
       return document.assigned && audience === 'case'
     case 'investment-reviewer':
-      return document.assigned && (audience === 'case' || audience === 'financial')
+      // The persisted financial handoff workflow is not implemented yet.
+      // Assignment alone must never expose a financial package.
+      return document.assigned && audience === 'case'
   }
 }
 

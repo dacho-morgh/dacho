@@ -162,10 +162,10 @@ describe('document read authority', () => {
     assigned: false,
   }
 
-  it('allows owner, Secretariat, own representative and the assigned investment reviewer to read financial files', () => {
+  it('allows owner, Secretariat and the own representative to read financial files while investment handoff is absent', () => {
     expect(canReadDocument('system-owner', financial, 'o1', null)).toBe(true)
     expect(canReadDocument('central-secretariat', financial, 's1', null)).toBe(true)
-    expect(canReadDocument('investment-reviewer', financial, 'i1', null)).toBe(true)
+    expect(canReadDocument('investment-reviewer', financial, 'i1', null)).toBe(false)
     expect(canReadDocument('representative', financial, 'rep-1', 'company-1')).toBe(true)
   })
 

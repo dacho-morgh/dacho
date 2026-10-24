@@ -44,9 +44,9 @@ const LETTER_COLUMNS = `
 `
 
 /**
- * Letters follow the same row scope as their case. An internal assignee only
- * sees letters they sent/received or that are attached to an assigned request;
- * being messaged never grants access to an unrelated case.
+ * Case letters are visible to current case participants only. Personal letters
+ * retain sender/recipient mailbox access. Case assignment by itself is not
+ * enough to reveal correspondence between other participants.
  */
 function letterScopeClause(scope: RequestScope, params: unknown[], alias = 'l'): string {
   switch (scope.kind) {
@@ -56,19 +56,35 @@ function letterScopeClause(scope: RequestScope, params: unknown[], alias = 'l'):
       return 'FALSE'
     case 'owner':
       params.push(scope.userId)
-      return `${alias}.recipient_id = $${params.length}`
+      return `(
+        (${alias}.request_id IS NULL AND (${alias}.recipient_id = $${params.length} OR ${alias}.sender_id = $${params.length}))
+        OR (${alias}.request_id IN (SELECT r.id FROM dashboard.requests r WHERE r.owner_id = $${params.length})
+            AND (${alias}.recipient_id = $${params.length} OR ${alias}.sender_id = $${params.length}))
+      )`
     case 'assigned':
       params.push(scope.userId)
       const userParam = params.length
       params.push(scope.role)
       return `(
-        ${alias}.recipient_id = $${userParam}
-        OR ${alias}.sender_id = $${userParam}
-        OR ${alias}.request_id IN (
+        (${alias}.request_id IS NULL AND (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam}))
+        OR (${alias}.request_id IN (
           SELECT ca.request_id FROM dashboard.case_assignments ca
           WHERE ca.user_id = $${userParam} AND ca.role = $${params.length} AND ca.active
-        )
+        ) AND (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam}))
       )`
+  }
+}
+
+/** Deletion is a mailbox action for recipients; assignment and authorship do not grant it. */
+function letterDeleteScopeClause(scope: RequestScope, params: unknown[], alias = 'l'): string {
+  switch (scope.kind) {
+    case 'all': return 'TRUE'
+    case 'none': return 'FALSE'
+    case 'owner':
+    case 'assigned':
+      const readable = letterScopeClause(scope, params, alias)
+      params.push(scope.userId)
+      return `(${readable}) AND ${alias}.recipient_id = $${params.length}`
   }
 }
 
@@ -239,7 +255,7 @@ export class LetterRepository {
 
   async deleteScoped(id: string, scope: RequestScope): Promise<boolean> {
     const params: unknown[] = [id]
-    const whereSql = letterScopeClause(scope, params, 'l')
+    const whereSql = letterDeleteScopeClause(scope, params, 'l')
     const result = await this.pool.query(
       `DELETE FROM dashboard.letters l WHERE l.id = $1 AND ${whereSql}`,
       params,
