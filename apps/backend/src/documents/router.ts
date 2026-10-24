@@ -226,6 +226,11 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           res.status(400).json({ error: 'invalid_document_parent' })
           return
         }
+        const parentCompany = await deps.companyStore.findById(requestedCompanyId).catch(() => undefined)
+        if (!parentCompany) {
+          res.status(404).json({ error: 'not_found' })
+          return
+        }
       } else if (!requestId || requestedCompanyId) {
         res.status(400).json({ error: 'invalid_document_parent' })
         return

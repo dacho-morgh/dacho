@@ -412,6 +412,16 @@ describe('shared access policy and private documents (T09/T10)', () => {
       companyId: '1',
     })
     expect(crossCompany.status).toBe(404)
+
+    const missingCompany = await upload({
+      userId: people.owner.id,
+      category: 'articlesOfAssociation',
+      filename: 'missing.pdf',
+      contentType: 'application/pdf',
+      body: pdf('missing'),
+      companyId: '999999',
+    })
+    expect(missingCompany.status).toBe(404)
   })
 
   it('validates assignment role/account state and does not let another role assign', async () => {
