@@ -31,6 +31,12 @@ async function signIn(page: Page, username: string) {
   expect(response.ok()).toBe(true)
 }
 
+async function expectProfileField(page: Page, label: string, value: string) {
+  const field = page.getByLabel(label, { exact: true })
+  await expect(field).toBeVisible()
+  await expect(field).toHaveValue(value)
+}
+
 async function expectDashboardPagesFit(page: Page, paths: string[]) {
   for (const width of [360, 390, 430]) {
     await page.setViewportSize({ width, height: 844 })
@@ -44,20 +50,12 @@ async function expectDashboardPagesFit(page: Page, paths: string[]) {
       // Streaming can return HTTP 200 for loading/error shells. Wait for real
       // fixture fields before measuring the profile, including on narrow phones.
       if (path === '/dashboard/profile/company') {
-        await expect(page.getByLabel('نام شرکت', { exact: true })).toHaveValue(
-          applicant.companyName,
-        )
-        await expect(page.getByLabel('شناسه ملی', { exact: true })).toHaveValue(
-          applicant.companyNationalId,
-        )
-        await expect(page.getByLabel('شماره ثبت', { exact: true })).toHaveValue(
-          applicant.companyRegistrationNumber,
-        )
+        await expectProfileField(page, 'نام شرکت', applicant.companyName)
+        await expectProfileField(page, 'شناسه ملی', applicant.companyNationalId)
+        await expectProfileField(page, 'شماره ثبت', applicant.companyRegistrationNumber)
       } else if (path === '/dashboard/profile/account') {
-        await expect(page.getByLabel('شماره تلفن همراه', { exact: true })).toHaveValue(
-          applicant.phone,
-        )
-        await expect(page.getByLabel('آدرس ایمیل', { exact: true })).toHaveValue(applicant.email)
+        await expectProfileField(page, 'شماره تلفن همراه', applicant.phone)
+        await expectProfileField(page, 'آدرس ایمیل', applicant.email)
       } else if (path === '/dashboard/profile/resume') {
         await expect(
           page.getByRole('heading', { name: 'رزومه و سوابق شرکت', exact: true }),
