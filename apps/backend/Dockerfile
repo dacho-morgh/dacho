@@ -38,6 +38,8 @@ COPY --from=build --chown=nodejs:nodejs /out/backend ./
 # node-pg-migrate .ts migrations (runMigrations resolves ../../migrations from
 # dist/db/); they are NOT compiled into dist/, so ship them from the source tree.
 COPY --chown=nodejs:nodejs apps/backend/migrations ./migrations
+# A fresh named volume mounted here inherits ownership from this directory.
+RUN mkdir -p /data/private-documents && chown nodejs:nodejs /data/private-documents
 USER nodejs
 EXPOSE 4000
 ENV PORT=4000

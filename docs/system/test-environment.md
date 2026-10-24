@@ -24,9 +24,9 @@ This is an opt-in local environment for backend/Payload integration fixtures and
 
 ## Isolation and fail-closed checks
 
-`docker-compose.test.yml` is a standalone Compose file with project `dacho-phase0-test`, database `dacho_phase0_test`, user `phase0_test`, a dedicated named Postgres volume and loopback port **55439**. It does not refer to the normal Compose project, `pgdata` volume, port 5432 or production secrets. `scripts/phase0-test.ps1` sets `DATABASE_URL` to that exact endpoint and `PAYLOAD_MEDIA_DIR` to ignored `.phase0-test-files` in this checkout; it also prevents dotenv from overriding those process values. The file directory has its own marker. The database is initialized with `public.phase0_test_guard` and an exact marker.
+`docker-compose.test.yml` is a standalone Compose file with project `dacho-phase0-test`, database `dacho_phase0_test`, user `phase0_test`, a dedicated named Postgres volume and loopback port **55439**. It does not refer to the normal Compose project, `pgdata` volume, port 5432 or production secrets. `scripts/phase0-test.ps1` sets `DATABASE_URL` to that exact endpoint, `PAYLOAD_MEDIA_DIR` to ignored `.phase0-test-files` and `PRIVATE_DOCUMENTS_DIR` to `.phase0-test-files/private-documents` in this checkout; it also prevents dotenv from overriding those process values. The file directory has its own marker. The database is initialized with `public.phase0_test_guard` and an exact marker.
 
-Both integration Vitest configurations load the same guard **before test files**. The guard requires `PHASE0_ISOLATED_TEST=1`, the exact URL including user/password/port/database and no query parameters, the exact marked file directory, and the live database marker. A missing variable or marker aborts the suite. This closes the existing default-URL path in backend specs and protects direct `pnpm ... test:int` invocations. The frontend config's `test:int` includes CMS integration specs that delete fixture rows and create files. Keep these gates if new integration configurations are added. Unit tests do not need Docker.
+Both integration Vitest configurations load the same guard **before test files**. The guard requires `PHASE0_ISOLATED_TEST=1`, the exact URL including user/password/port/database and no query parameters, the exact marked file directory, a separate marked private-document subdirectory, and the live database marker. A missing variable or marker aborts the suite. This closes the existing default-URL path in backend specs and protects direct `pnpm ... test:int` invocations. The frontend config's `test:int` includes CMS integration specs that delete fixture rows and create files. Keep these gates if new integration configurations are added. Unit tests do not need Docker.
 
 The guard is a test harness safety net, not a migration deployment gate: direct `payload migrate`/backend `migrate` commands outside the script still accept arbitrary `DATABASE_URL`. Use the wrapper below for rehearsal. Production change control remains separate.
 
@@ -34,8 +34,9 @@ The guard is a test harness safety net, not a migration deployment gate: direct 
 
 GitHub Actions uses the same isolation contract: the integration job creates
 its ephemeral Postgres service with the Phase 0 credentials/database and port
-55439, sets the opt-in flag and checkout-local media directory at job scope,
-and initializes both markers before migrations or either suite. The initial
+55439, sets the opt-in flag, checkout-local media directory and separate
+private-document directory at job scope, and initializes both markers before
+migrations or either suite. The initial
 CI failure came from leaving its old `5432/dacho-cms` service/env in place
 after introducing the guard. See `.github/workflows/ci.yml` and the regression
 check `python scripts/test-ci-isolation.py`; the guard itself remains active.
@@ -56,9 +57,20 @@ Do not combine `docker-compose.test.yml` with another Compose file or override t
 
 ## Rehearsal evidence and limits
 
-Database and files must be backed up as one versioned pair; a database-only restore can leave document metadata pointing at missing bytes. The current system has only public editorial media, so a private document store round-trip cannot yet be exercised. The result below does not prove safety of the future seven-role schema migration or confidential-file implementation.
+Database and files must be backed up as one versioned pair; a database-only restore can leave document metadata pointing at missing bytes. The marked test file root now contains both editorial fixtures and the `private-documents` subdirectory, so a future backup pairs the `.dump` with private metadata bytes as well. The 2026-10-23 restore result predates that store and is not evidence that a private-document backup/restore has been rehearsed; the 2026-10-24 batch did not re-run Backup/RestoreRehearsal.
 
 On **2026-10-23**, `Start` created healthy `dacho-phase0-test-postgres-1` with its own named volume. `Migrate` applied all **20 CMS** and **5 backend** migrations; direct journal queries in `dacho_phase0_test` confirmed `public.payload_migrations=20` and `dashboard.pgmigrations=5`. A direct backend `test:int` attempt without the opt-in flag stopped during setup with **zero tests collected**, proving the default destructive path is closed. The wrapper then passed backend integration (**6 files, 35 tests**) and frontend integration (**44 files, 171 tests passed; 1 file/test skipped**). Backend and frontend typechecks passed.
+
+On **2026-10-24**, the T09/T10 batch re-ran the same guarded wrapper. The
+disposable database now records **7 backend** migrations
+(`dashboard.pgmigrations=7`), including
+`1780511400006_shared_access_and_private_documents`. Backend integration passed
+**8 files / 49 tests**; frontend integration passed **49 files + 1 skipped** and
+**202 tests passed + 1 skipped**. The private-document suite exercises the real
+file directory and Postgres rows, including exact 10,000,000/10,000,001-byte
+boundaries, cross-company denial, financial exclusion, assignment/role/deactivation
+revocation and failed-upload non-advancement. Backup/restore was not re-run for
+this batch; the 2026-10-23 pair remains the recorded rehearsal evidence.
 
 `Backup` produced `.phase0-test-backups/phase0-20261023-180549.dump` with matching `phase0-20261023-180549-files.zip`, after inserting only synthetic `phase0-synthetic-row-v1` and `phase0-synthetic-file-v1`. `RestoreRehearsal` restored the dump to `dacho_phase0_restore` and the ZIP to ignored `restored-files`; the database marker and row matched, and source/restored file SHA-256 matched `AF7F0D581BFACF64FD500C7E31440DD5700FCC40A6031569057738FC969C97A0`. These backup files contain test data and stay ignored locally. No production or shared database was contacted.
 

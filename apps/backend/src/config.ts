@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import path from 'node:path'
 
 export class MissingEnvError extends Error {
   constructor(name: string) {
@@ -24,6 +25,11 @@ export interface Config {
   internalProxySecret: string
   otpDelivery: OtpDeliveryKind
   kavenegar?: KavenegarConfig
+  /**
+   * Private document bytes. This must be a persistent, non-public directory
+   * separate from `PAYLOAD_MEDIA_DIR`; no static route serves it.
+   */
+  privateDocumentsDir: string
 }
 
 function require(env: NodeJS.ProcessEnv, name: string): string {
@@ -63,6 +69,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     payloadApiKey,
     internalProxySecret,
     otpDelivery,
+    privateDocumentsDir:
+      env.PRIVATE_DOCUMENTS_DIR && env.PRIVATE_DOCUMENTS_DIR !== ''
+        ? path.resolve(env.PRIVATE_DOCUMENTS_DIR)
+        : path.resolve(process.cwd(), '.private-documents'),
   }
 
   if (otpDelivery === 'kavenegar') {

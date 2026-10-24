@@ -5,6 +5,7 @@ import { PayloadServiceCatalog } from './catalog/payload-service-catalog.js'
 import { loadConfig } from './config.js'
 import { createPool } from './db.js'
 import { runMigrations } from './db/migrate.js'
+import { PrivateDocumentStorage } from './documents/storage.js'
 import { JwtSigner } from './jwt.js'
 import { ConsoleOtpDelivery } from './otp/console-delivery.js'
 import { KavenegarOtpDelivery } from './otp/kavenegar-delivery.js'
@@ -21,6 +22,8 @@ const delivery = config.kavenegar
   : new ConsoleOtpDelivery()
 
 const jwt = await JwtSigner.fromPrivateKeyPem(config.jwtKid, config.jwtPrivateKey)
+const privateDocumentStorage = new PrivateDocumentStorage(config.privateDocumentsDir)
+await privateDocumentStorage.ensure()
 
 const app = createApp({
   codeStore: new PostgresCodeStore(pool),
@@ -31,6 +34,7 @@ const app = createApp({
   pool,
   serviceCatalog: new PayloadServiceCatalog({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
   proxySecret: config.internalProxySecret,
+  privateDocumentStorage,
 })
 
 app.listen(config.port, () => {

@@ -87,6 +87,7 @@ jobs:
       PHASE0_ISOLATED_TEST: '1'
       DATABASE_URL: postgres://phase0_test:phase0_test_only@127.0.0.1:55439/dacho_phase0_test
       PAYLOAD_MEDIA_DIR: ${{ github.workspace }}/.phase0-test-files
+      PRIVATE_DOCUMENTS_DIR: ${{ github.workspace }}/.phase0-test-files/private-documents
       PAYLOAD_SECRET: phase0-test-only-payload-secret-do-not-reuse
       PAYLOAD_SECRET_FILE: ''
       # dotenv 16 treats a nonempty 'false' string as true.
@@ -119,7 +120,7 @@ jobs:
 
       - name: Initialize isolated test environment
         run: |
-          mkdir -p "$PAYLOAD_MEDIA_DIR"
+          mkdir -p "$PAYLOAD_MEDIA_DIR" "$PRIVATE_DOCUMENTS_DIR"
           printf '%s' 'dacho-phase0-disposable-v1' > "$PAYLOAD_MEDIA_DIR/phase0-test-marker.txt"
           docker exec -i "${{ job.services.postgres.id }}" psql -U phase0_test -d dacho_phase0_test -v ON_ERROR_STOP=1 < scripts/phase0-test-db-init.sql
 
@@ -144,6 +145,7 @@ jobs:
       NEXT_PUBLIC_SERVER_URL: http://localhost:3000
       PAYLOAD_URL: http://localhost:3000
       BACKEND_URL: http://localhost:4000
+      PRIVATE_DOCUMENTS_DIR: ${{ github.workspace }}/.e2e-private-documents
       # Do not let a checked-out dotenv file override the ephemeral CI settings.
       DOTENV_CONFIG_OVERRIDE: ''
     services:
@@ -202,6 +204,7 @@ jobs:
       # The DB-free path is covered by the build-without-database job above.
       - name: Migrate + seed content
         run: |
+          mkdir -p "$PRIVATE_DOCUMENTS_DIR"
           echo "n" | pnpm --filter @dacho/frontend payload migrate
           pnpm --filter @dacho/frontend seed:landing
           pnpm --filter @dacho/frontend seed:mag

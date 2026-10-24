@@ -22,6 +22,7 @@ function Set-IsolatedEnvironment {
   $env:PHASE0_ISOLATED_TEST = '1'
   $env:DATABASE_URL = 'postgres://phase0_test:phase0_test_only@127.0.0.1:55439/dacho_phase0_test'
   $env:PAYLOAD_MEDIA_DIR = $files
+  $env:PRIVATE_DOCUMENTS_DIR = Join-Path $files 'private-documents'
   $env:PAYLOAD_SECRET = 'phase0-test-only-payload-secret-do-not-reuse'
   $env:PAYLOAD_SECRET_FILE = ''
   # dotenv 16 coerces the string 'false' to true; an empty value disables override.
@@ -35,6 +36,8 @@ function Assert-Ready {
   if ((Get-Content -LiteralPath $markerFile -Raw).Trim() -ne $expectedMarker) {
     throw 'Dedicated private-file marker mismatch.'
   }
+  $privateDir = Join-Path $files 'private-documents'
+  if (!(Test-Path -LiteralPath $privateDir)) { throw 'Dedicated private-document directory missing. Run Start first.' }
   $marker = & docker compose -f $compose -p dacho-phase0-test exec -T postgres `
     psql -U phase0_test -d $db -Atqc 'SELECT marker FROM public.phase0_test_guard WHERE id = 1'
   if ($LASTEXITCODE -ne 0 -or $marker.Trim() -ne $expectedMarker) {
@@ -46,6 +49,7 @@ Set-Location -LiteralPath $repo
 switch ($Action) {
   'Start' {
     New-Item -ItemType Directory -Force -Path $files | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $files 'private-documents') | Out-Null
     Set-Content -LiteralPath (Join-Path $files 'phase0-test-marker.txt') -Value $expectedMarker -NoNewline
     Compose @('up', '-d', '--wait')
     Assert-Ready

@@ -21,10 +21,13 @@ The production VPS poller follows `main` and its `sha-` tags, so staging images
 cannot satisfy a production deployment.
 
 `docker-compose.staging.yml` is a standalone stack for prebuilt images, with
-Compose project `dacho-staging`, its own Postgres and uploaded-media volumes,
-separate database user/name, separate secrets, and loopback ports 3300 and 4400.
-It reuses the production image builds to keep the runtime equivalent. It does
-not configure a public hostname or automatic staging deployment.
+Compose project `dacho-staging`, its own Postgres, uploaded-media and private
+document volumes, separate database user/name, separate secrets, and loopback
+ports 3300 and 4400. The backend stores private documents under the dedicated
+`staging_private_documents` volume
+(`PRIVATE_DOCUMENTS_DIR=/data/private-documents`), never under public media. It
+reuses the production image builds to keep the runtime equivalent. It does not
+configure a public hostname or automatic staging deployment.
 
 ## Configure a staging host
 

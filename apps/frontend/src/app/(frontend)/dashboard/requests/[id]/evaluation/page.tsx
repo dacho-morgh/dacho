@@ -1,18 +1,13 @@
-import configPromise from '@payload-config'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import { AdminRequestEvaluation } from '@/components/dashboard/admin-request-evaluation'
-import { isSeniorManagerUser } from '@/utilities/dashboard-server'
 
-export const dynamic = 'force-dynamic'
-
+/**
+ * The review-evaluation workflow (rounds, four assignments and the fixed
+ * rubric) is not implemented yet. The shared authorization response does not
+ * advertise an evaluation action, so this stale route must not present a form
+ * whose backend command does not exist. It returns to the authorized dossier;
+ * T24/T25 will replace it when the review workflow is delivered.
+ */
 export default async function EvaluationPage({ params }: { params: Promise<{ id: string }> }) {
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  const isSeniorManager = await isSeniorManagerUser(payload, user)
-  if (!isSeniorManager) redirect('/dashboard/requests')
-
   const { id } = await params
-  return <AdminRequestEvaluation id={id} />
+  redirect(`/dashboard/requests/${encodeURIComponent(id)}`)
 }

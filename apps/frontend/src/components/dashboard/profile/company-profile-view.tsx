@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useState } from 'react'
 import { DashboardAddIcon, DashboardEditIcon, DashboardTrashIcon } from '@/components/icons'
+import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -256,6 +257,34 @@ export function CompanyProfileView({ initialProfile }: { initialProfile: Profile
               onChange={(economicCode) => setBasicForm({ ...basicForm, economicCode })}
             />
           </div>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4">
+        <div className="flex flex-col gap-1">
+          <Typography as="h2" variant="20/bold" color="neutral-600">
+            مدارک شرکت
+          </Typography>
+          <Typography variant="12/regular" color="neutral-500">
+            فایل‌ها به‌صورت خصوصی ذخیره می‌شوند و فقط با مجوز همین شرکت یا دبیرخانه/صاحب سیستم قابل دانلود هستند.
+          </Typography>
+        </div>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {([
+            ['articlesOfAssociation', 'اساس‌نامه'],
+            ['establishmentNotices', 'آگهی تأسیس'],
+            ['amendmentNotices', 'آگهی تغییرات'],
+            ['catalogues', 'کاتالوگ محصولات'],
+            ['certificatesLicenses', 'گواهی‌ها و مجوزها'],
+          ] as const).map(([category, label]) => (
+            <PrivateDocumentField
+              key={category}
+              category={category}
+              label={label}
+              companyId={profile.companyId ?? undefined}
+              canUpload
+            />
+          ))}
         </div>
       </section>
 

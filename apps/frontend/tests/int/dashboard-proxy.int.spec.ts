@@ -57,6 +57,27 @@ describe('buildBackendRequest', () => {
     expect(headers['x-user-roles']).toBe('')
   })
 
+  it('forwards multipart upload bytes without corrupting the boundary or binary content', async () => {
+    const bytes = new Uint8Array([0, 1, 2, 3, 255, 254, 13, 10])
+    const contentType =
+      'multipart/form-data; boundary=----dacho-boundary'
+    const req = new NextRequest('http://localhost:3000/api/dashboard/documents', {
+      method: 'POST',
+      headers: { 'content-type': contentType },
+      body: bytes,
+    })
+    const { init } = await buildBackendRequest(
+      { id: 7, roles: ['representative'] },
+      req,
+      ['documents'],
+      { backendUrl: 'http://b:4000', proxySecret: 's' },
+    )
+
+    expect(init.headers).toMatchObject({ 'content-type': contentType })
+    expect(init.body).toBeInstanceOf(ArrayBuffer)
+    expect([...new Uint8Array(init.body as ArrayBuffer)]).toEqual([...bytes])
+  })
+
   it('omits the cms-role header when it is null', async () => {
     const req = new NextRequest('http://localhost:3000/api/dashboard/stats', { method: 'GET' })
     const { init } = await buildBackendRequest(

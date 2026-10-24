@@ -10,6 +10,7 @@ import {
 import { hasCmsRole } from '@cms-core/access/hasCmsRole'
 import {
   compatibilityRoles,
+  hasOperationalRole,
   isActiveAccount,
   isBackendService,
   isInternalAdmin,
@@ -59,7 +60,12 @@ const isServiceProfileTarget = (target: unknown): boolean => {
 
 const ownerOnlyField: FieldAccess = ({ req }) => isInternalAdmin(req.user)
 const canReadUser: Access = ({ req }) => {
-  if (isInternalAdmin(req.user) || isBackendService(req.user)) return true
+  if (
+    isInternalAdmin(req.user) ||
+    isBackendService(req.user) ||
+    hasOperationalRole(req.user, 'central-secretariat')
+  )
+    return true
   if (!isActiveAccount(req.user) || req.user?.backendService || !req.user?.id) return false
   return { id: { equals: req.user.id } }
 }

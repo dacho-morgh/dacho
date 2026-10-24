@@ -1,6 +1,16 @@
 # Frontend design and integration specification
 
-Updated 2026-10-23. The product rules are approved; route names, DTO shapes and module boundaries below are **proposed implementation design**, not claims about existing APIs. Read [requirements](product-requirements.md), [workflows](workflows.md), [backend design](backend-design.md) and [frontend audit](frontend-audit.md) first.
+Updated 2026-10-24. The product rules are approved; route names, DTO shapes and module boundaries below are **proposed implementation design** unless an implementation update says otherwise. Read [requirements](product-requirements.md), [workflows](workflows.md), [backend design](backend-design.md) and [frontend audit](frontend-audit.md) first.
+
+Implementation update (FE07 usable portion, 2026-10-24): the shared
+`PrivateDocumentField` is connected to the real authorized document API on the
+company-profile and request screens. It supports multiple files, Word/PDF
+validation, per-file progress, retry, denied/expired-session states and blocks
+final request submission while an upload is pending or a required proposal is
+missing. Company dossier uploads and draft request files are immediate; RFP,
+finance-package completeness, correspondence attachments and booth receipts
+remain later workflow integrations, so issue #71 stays open. See
+[private documents](private-documents.md).
 
 ## Design boundaries
 

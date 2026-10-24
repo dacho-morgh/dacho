@@ -49,6 +49,19 @@ export async function assertIsolatedTestEnvironment(): Promise<void> {
     throw new Error('PAYLOAD_MEDIA_DIR is not the marked Phase 0 disposable file directory.')
   }
 
+  const privateDir = process.env.PRIVATE_DOCUMENTS_DIR
+  if (!privateDir || !existsSync(privateDir)) {
+    throw new Error('Integration tests require the dedicated PRIVATE_DOCUMENTS_DIR.')
+  }
+  const resolvedPrivate = realpathSync(privateDir)
+  if (
+    !resolvedPrivate.startsWith(resolved + path.sep) ||
+    resolvedPrivate === resolved ||
+    resolvedPrivate === path.join(resolved, 'media')
+  ) {
+    throw new Error('PRIVATE_DOCUMENTS_DIR must be a separate directory under the marked Phase 0 file root.')
+  }
+
   const pool = new Pool({ connectionString: raw, connectionTimeoutMillis: 3000, max: 1 })
   try {
     const result = await pool.query<{ database: string; user_name: string; marker: string }>(

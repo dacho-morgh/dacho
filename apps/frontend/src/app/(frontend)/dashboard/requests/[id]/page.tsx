@@ -3,9 +3,10 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import { AdminRequestDetail } from '@/components/dashboard/admin-request-detail'
+import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Typography } from '@/components/ui/typography'
 import type { RequestDetail } from '@/utilities/dashboard-api'
-import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
+import { isInternalDashboardUser, serverDashboardFetch } from '@/utilities/dashboard-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,9 +14,9 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const { id } = await params
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: await headers() })
-  const isSeniorManager = await isSeniorManagerUser(payload, user)
+  const isInternal = isInternalDashboardUser(user)
 
-  if (isSeniorManager) {
+  if (isInternal) {
     return <AdminRequestDetail id={id} />
   }
 
@@ -47,6 +48,41 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           ))}
         </div>
       </section>
+      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+        <Typography as="h2" variant="20/bold" className="text-neutral-900">
+          مدارک درخواست
+        </Typography>
+        <Typography variant="14/regular" className="text-neutral-500">
+          مدارک مالی فقط برای شرکت، دبیرخانه، صاحب سیستم و مسئول سرمایه‌گذاریِ منتسب قابل مشاهده است.
+        </Typography>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <PrivateDocumentField
+            category="proposal"
+            label="پروپوزال"
+            requestId={data.request.id}
+            canUpload={data.request.allowedActions?.includes('uploadDocument') === true}
+            canDelete={data.request.allowedActions?.includes('deleteDocument') === true}
+          />
+          {([
+            ['financialStatements', 'صورت‌های مالی'],
+            ['debtFacilityEvidence', 'بدهی‌ها و تسهیلات'],
+            ['taxInsuranceRecords', 'اظهارنامه مالیاتی و بیمه'],
+            ['contractsOrdersMousCommitments', 'قراردادها و تعهدات'],
+            ['projectEstimateUseOfFunds', 'برآورد و مصرف منابع'],
+            ['guaranteeCollateral', 'تضامین و وثایق'],
+          ] as const).map(([category, label]) => (
+            <PrivateDocumentField
+              key={category}
+              category={category}
+              label={label}
+              requestId={data.request.id}
+              canUpload={data.request.allowedActions?.includes('uploadDocument') === true}
+              canDelete={data.request.allowedActions?.includes('deleteDocument') === true}
+            />
+          ))}
+        </div>
+      </section>
+
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">
         <Typography as="h2" variant="20/bold" className="text-neutral-900">
           روند بررسی

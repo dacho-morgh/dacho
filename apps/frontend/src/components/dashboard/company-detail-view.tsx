@@ -2,17 +2,34 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { useEffect, useState } from 'react'
 import { DashboardAddIcon, DashboardEditIcon, DashboardTrashIcon } from '@/components/icons'
 
+interface CompanyDetailResponse {
+  representative?: { id: string; name: string | null; phone?: string | null; email?: string | null; position?: string | null }
+  companyId?: string | null
+  company?: {
+    name?: string
+    establishmentDate?: string
+    status?: string
+    type?: string
+    registrationNumber?: string
+    economicCode?: string
+    nationalId?: string
+  }
+  addresses?: { title: string; address: string; postalCode: string }[]
+}
+
 export function CompanyDetailView({ id }: { id: string }) {
-  const [data, setData] = useState<{ user?: { companyName?: string; companyEstablishmentDate?: string; companyStatus?: string; companyType?: string; companyRegistrationNumber?: string; companyEconomicCode?: string; companyNationalId?: string }; profile?: { addresses: { title: string; address: string; postalCode: string }[] } } | null>(null)
+  const [data, setData] = useState<CompanyDetailResponse | null>(null)
   useEffect(() => { fetch(`/api/dashboard/admin/companies/${encodeURIComponent(id)}`).then((response) => response.ok ? response.json() : null).then(setData).catch(() => setData(null)) }, [id])
-  const user = data?.user
-  const fields: Array<[string, string | undefined]> = [['نام شرکت', user?.companyName], ['تاریخ تاسیس', user?.companyEstablishmentDate], ['وضعیت شرکت', user?.companyStatus], ['نوع شرکت', user?.companyType], ['شماره ثبت', user?.companyRegistrationNumber], ['کد اقتصادی', user?.companyEconomicCode], ['شناسه ملی', user?.companyNationalId]]
-  const addresses = data?.profile?.addresses ?? []
+  const user = data?.company
+  const companyName = user?.name
+  const fields: Array<[string, string | undefined]> = [['نام شرکت', user?.name], ['تاریخ تاسیس', user?.establishmentDate], ['وضعیت شرکت', user?.status], ['نوع شرکت', user?.type], ['شماره ثبت', user?.registrationNumber], ['کد اقتصادی', user?.economicCode], ['شناسه ملی', user?.nationalId]]
+  const addresses = data?.addresses ?? []
   return (
     <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:p-10" dir="rtl">
       <div className="flex items-center gap-2">
@@ -22,7 +39,7 @@ export function CompanyDetailView({ id }: { id: string }) {
           </Typography>
         </Link>
         <Typography variant="14/regular" color="muted">
-            / {user?.companyName || '—'}
+            / {companyName || '—'}
         </Typography>
       </div>
       <div className="flex min-h-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:min-h-[912px] lg:flex-row">
@@ -53,14 +70,14 @@ export function CompanyDetailView({ id }: { id: string }) {
             <div className="flex items-center gap-4">
               <Image
                 src="/figma/dashboard/profile-avatar.png"
-                alt={user?.companyName || 'شرکت'}
+                alt={companyName || 'شرکت'}
                 width={80}
                 height={80}
                 className="rounded-xl object-cover"
               />
               <div>
                 <Typography variant="20/bold" color="neutral-900">
-                  {user?.companyName || '—'}
+                  {companyName || '—'}
                 </Typography>
                 <Typography variant="14/regular" color="muted">
                   شناسه: {id}
@@ -99,6 +116,25 @@ export function CompanyDetailView({ id }: { id: string }) {
                     کد پستی: {address.postalCode || '—'}
                   </Typography>
                 </div>
+              ))}
+            </div>
+          </InfoSection>
+          <InfoSection title="مدارک خصوصی شرکت">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {([
+                ['articlesOfAssociation', 'اساس‌نامه'],
+                ['establishmentNotices', 'آگهی تأسیس'],
+                ['amendmentNotices', 'آگهی تغییرات'],
+                ['catalogues', 'کاتالوگ محصولات'],
+                ['certificatesLicenses', 'گواهی‌ها و مجوزها'],
+              ] as const).map(([category, label]) => (
+                <PrivateDocumentField
+                  key={category}
+                  category={category}
+                  label={label}
+                  companyId={data?.companyId ?? undefined}
+                  canUpload
+                />
               ))}
             </div>
           </InfoSection>

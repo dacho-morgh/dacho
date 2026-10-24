@@ -31,5 +31,5 @@ export default async function NewRequestPage({ searchParams }: { searchParams: P
     if (!query.eventTitle || !field.name.toLocaleLowerCase().includes('event')) return []
     return [[field.name, field.name.toLocaleLowerCase().includes('id') ? String(query.eventId ?? '') : query.eventTitle]]
   }))
-  return <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6 sm:p-10" dir="rtl"><Typography as="h1" variant="24/bold" className="text-neutral-900">ثبت درخواست {service.title}</Typography><section className="rounded-2xl border border-neutral-200 bg-white p-6"><NewRequestForm serviceId={String(service.id)} title={service.title} fields={fields} initialAnswers={initialAnswers} /></section></main>
+  return <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6 sm:p-10" dir="rtl"><Typography as="h1" variant="24/bold" className="text-neutral-900">ثبت درخواست {service.title}</Typography><section className="rounded-2xl border border-neutral-200 bg-white p-6"><NewRequestForm serviceId={String(service.id)} serviceKey={service.key ?? undefined} title={service.title} fields={fields} initialAnswers={initialAnswers} /></section></main>
 }

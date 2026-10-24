@@ -56,6 +56,9 @@ services:
       OTP_DELIVERY: ${STAGING_OTP_DELIVERY:-console}
       KAVENEGAR_API_KEY: ${STAGING_KAVENEGAR_API_KEY:-}
       KAVENEGAR_TEMPLATE: ${STAGING_KAVENEGAR_TEMPLATE:-testtemplate}
+      PRIVATE_DOCUMENTS_DIR: /data/private-documents
+    volumes:
+      - staging_private_documents:/data/private-documents
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,6 +68,7 @@ services:
 volumes:
   staging_pgdata:
   staging_media:
+  staging_private_documents:
 
 secrets:
   staging_jwt_private_key:

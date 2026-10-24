@@ -90,11 +90,34 @@ const seniorManagerNavItems: NavItem[] = [
   // },
 ]
 
+const reviewerNavItems: NavItem[] = [
+  {
+    title: 'داشبورد',
+    href: '/dashboard',
+    icon: DashboardIcon,
+    exact: true,
+  },
+  {
+    title: 'درخواست‌های منتسب',
+    href: '/dashboard/requests',
+    icon: RequestsIcon,
+  },
+  {
+    title: 'نامه‌ها',
+    href: '/dashboard/letters',
+    icon: LettersIcon,
+  },
+]
+
 export interface SidebarUser {
   name?: string | null
   email?: string | null
-  /** The single authorization axis; a user may hold several roles. */
+  /** Compatibility projection; never used as authority. */
   roles?: string[] | null
+  /** The current scalar operational role. */
+  operationalRole?: string | null
+  isActive?: boolean | null
+  backendService?: boolean | null
   position?: string | null
   companyName?: string | null
 }
@@ -115,14 +138,32 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname()
 
-  // Internal navigation is gated on the admin role alone.
+  const role = user?.operationalRole
+  const isCompanyAdministrator =
+    role === 'system-owner' || role === 'central-secretariat'
+  const isInternal = Boolean(role && role !== 'representative')
   const isSeniorManager =
-    isSeniorManagerProp ?? (Array.isArray(user?.roles) && user.roles.includes('admin'))
+    isCompanyAdministrator ||
+    (!role && (isSeniorManagerProp ?? (Array.isArray(user?.roles) && user.roles.includes('admin'))))
 
-  const navItems = isSeniorManager ? seniorManagerNavItems : applicantNavItems
-  const displayName = isSeniorManager
-    ? user?.name || user?.email || 'مدیر ارشد'
+  const navItems = isCompanyAdministrator
+    ? seniorManagerNavItems
+    : isInternal
+      ? reviewerNavItems
+      : applicantNavItems
+  const displayName = isInternal
+    ? user?.name || user?.email || 'کاربر داخلی'
     : companyNameProp || user?.name || 'پروفایل شرکت'
+  const roleLabel: Record<string, string> = {
+    'system-owner': 'صاحب سیستم',
+    'central-secretariat': 'دبیرخانه مرکزی',
+    'chief-reviewer': 'سردبیر داوری',
+    reviewer: 'داور',
+    'employer-reviewer': 'کارفرما',
+    'investment-reviewer': 'کمیته سرمایه‌گذاری',
+    representative: 'نماینده شرکت',
+  }
+  const roleCaption = role ? roleLabel[role] : isSeniorManager ? 'مدیر ارشد' : null
 
   return (
     <Sidebar
@@ -224,8 +265,13 @@ export function AppSidebar({
                   }}
                 />
               </div>
-              <span className="truncate text-sm leading-6 font-semibold text-[#525252]">
-                {displayName}
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm leading-6 font-semibold text-neutral-600">
+                  {displayName}
+                </span>
+                {roleCaption ? (
+                  <span className="truncate text-xs leading-5 text-neutral-400">{roleCaption}</span>
+                ) : null}
               </span>
             </Link>
 
