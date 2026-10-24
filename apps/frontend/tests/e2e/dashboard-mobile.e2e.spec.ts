@@ -207,6 +207,9 @@ test('rechecks revoked role access on client navigation and direct entry', async
       id: managerId,
       data: { operationalRole: 'reviewer' },
       overrideAccess: true,
+      // The Users beforeChange hook drops role fields for local calls that do
+      // not opt in, even with overrideAccess.
+      context: { allowPersonnelProvisioning: true },
     })
 
     // The shared layout still has its former sidebar instance. Clicking its
@@ -223,6 +226,7 @@ test('rechecks revoked role access on client navigation and direct entry', async
       id: managerId,
       data: { operationalRole: 'system-owner' },
       overrideAccess: true,
+      context: { allowPersonnelProvisioning: true },
     })
   }
 })
