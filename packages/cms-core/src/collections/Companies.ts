@@ -1,7 +1,7 @@
 import type { Access, CollectionConfig, FieldAccess } from 'payload'
 
 import { adminOnly } from '@cms-core/access/adminOnly'
-import { hasRole, isInternalAdmin } from '@cms-core/access/roles'
+import { hasRole, isBackendService, isInternalAdmin } from '@cms-core/access/roles'
 import { companyDirectory } from '@cms-core/endpoints/companyDirectory'
 
 /**
@@ -30,7 +30,7 @@ const canCreateCompany: Access = ({ req }) => {
  */
 const canEditCompany: Access = ({ req }) => {
   const user = req.user
-  if (isInternalAdmin(user)) return true
+  if (isInternalAdmin(user) || isBackendService(user)) return true
   if (!user || !hasRole(user, 'representative')) return false
   // `representative` is the company's link back to the acting person.
   return { representative: { equals: user.id } }

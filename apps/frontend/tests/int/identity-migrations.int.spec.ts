@@ -4,6 +4,7 @@ import type { MigrateUpArgs } from '@payloadcms/db-postgres'
 import { expect, test } from 'vitest'
 import { up as migrateIdentity } from '../../../../packages/cms-core/src/migrations/20261017_210000_company_and_collapsed_roles'
 import { up as renameRoles } from '../../../../packages/cms-core/src/migrations/20261017_223000_rename_user_role_and_drop_roles_collection'
+import { up as singleRole } from '../../../../packages/cms-core/src/migrations/20261024_200000_single_operational_role'
 import { up as addEditor } from '../../../../packages/cms-core/src/migrations/20261018_090000_add_editor_role'
 
 const require = createRequire(import.meta.url)
@@ -66,7 +67,7 @@ test('upgrades existing identities without losing accounts, privileges, or legac
       db: {
         execute: (statement: Parameters<InstanceType<typeof PgDialect>['sqlToQuery']>[0]) => {
           const query = dialect.sqlToQuery(statement)
-          return client.query(query.sql.replaceAll('"public".', `"${schema}".`), query.params)
+          return client.query(query.sql.replaceAll('"public".', `"${schema}".`).replaceAll('public.', `"${schema}".`), query.params)
         },
       },
     } as unknown as MigrateUpArgs
@@ -94,6 +95,16 @@ test('upgrades existing identities without losing accounts, privileges, or legac
     expect((await client.query('SELECT name FROM roles')).rows).toHaveLength(1)
     expect((await client.query('SELECT roles_id FROM users_rels')).rows).toHaveLength(1)
     expect((await client.query('SELECT role_id FROM services_workflow')).rows).toHaveLength(1)
+    await client.query(`INSERT INTO users (id, name, hash, salt) VALUES (6,'Conflicting','hash-6','salt-6'),(7,'Reviewer','hash-7','salt-7'); INSERT INTO users_roles ("order",parent_id,value) VALUES (1,6,'representative'),(2,6,'referee'),(1,7,'referee'),(2,7,'editor');`)
+    await singleRole(args)
+    const mapped = (await client.query('SELECT id, operational_role, is_active, content_editor, backend_service, legacy_roles, hash FROM users ORDER BY id')).rows
+    expect(mapped[0]).toMatchObject({ operational_role: null, is_active: false, backend_service: false, legacy_roles: ['admin'], hash: 'existing-password-hash' })
+    expect(mapped[1]).toMatchObject({ operational_role: 'representative', is_active: true })
+    expect(mapped[2]).toMatchObject({ operational_role: null, is_active: true, content_editor: true, legacy_roles: ['editor'] })
+    expect(mapped[5]).toMatchObject({ operational_role: null, is_active: false, legacy_roles: ['representative', 'referee'] })
+    expect(mapped[6]).toMatchObject({ operational_role: 'reviewer', is_active: true, content_editor: true })
+    expect(mapped.every((row: { operational_role: string }) => row.operational_role !== 'system-owner')).toBe(true)
+
   } finally {
     await client.query('ROLLBACK')
     client.release()

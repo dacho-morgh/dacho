@@ -56,7 +56,7 @@ describe('dashboard CMS definitions (services + user roles)', () => {
     expect(service.gradient).toBe('blue-cyan')
   })
 
-  it('assigns multiple roles to a single user', async () => {
+  it('stores one operational role with separate editorial privilege', async () => {
     const user = await payload.create({
       collection: 'users',
       data: {
@@ -64,12 +64,14 @@ describe('dashboard CMS definitions (services + user roles)', () => {
         password: 'int-test-password',
         phone: TEST_PHONE,
         name: 'کاربر دارای نقش',
-        roles: ['representative', 'referee'],
+        operationalRole: 'reviewer', contentEditor: true, isActive: true,
       },
-      context: { allowRoleAssignment: true },
+      context: { allowPersonnelProvisioning: true },
     })
 
-    expect(user.roles).toEqual(expect.arrayContaining(['representative', 'referee']))
+    expect(user.operationalRole).toBe('reviewer')
+    expect(user.contentEditor).toBe(true)
+    expect(user.roles).toEqual(expect.arrayContaining(['referee', 'editor']))
   })
 
   it('creates a company linked to its representative user', async () => {
@@ -80,9 +82,9 @@ describe('dashboard CMS definitions (services + user roles)', () => {
         password: 'int-test-password',
         phone: COMPANY_PHONE,
         name: 'نماینده شرکت',
-        roles: ['representative'],
+        operationalRole: 'representative', isActive: true,
       },
-      context: { allowRoleAssignment: true },
+      context: { allowPersonnelProvisioning: true },
     })
 
     const company = await payload.create({

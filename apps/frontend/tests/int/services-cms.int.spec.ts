@@ -137,7 +137,7 @@ describe('CMS homepage services', () => {
       const req = await createLocalReq(
         {
           context,
-          user: { id: 1, roles, collection: 'users' } as NonNullable<PayloadRequest['user']>,
+          user: { id: 1, operationalRole: roles.includes('admin') ? 'system-owner' : 'representative', isActive: true, collection: 'users' } as NonNullable<PayloadRequest['user']>,
         },
         payload,
       )

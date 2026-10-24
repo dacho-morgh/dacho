@@ -106,7 +106,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const profileRepo = new ProfileRepository(deps.userStore, deps.companyStore)
   const support = new SupportRepository(deps.pool)
 
-  router.use(requireProxyAuth(deps.proxySecret))
+  router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
 
   // Profile operations use a privileged CMS adapter. Recheck the current actor
   // here so forged/stale role headers cannot authorize private company reads.

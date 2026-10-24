@@ -1,12 +1,6 @@
-/**
- * The authorization axis: a user holds zero or more roles. Collapsed from the
- * former `role: applicant|staff` + `cmsRole: admin|editor` pair; `editor` came
- * back on its own merits as the CMS content desk («تحریر»).
- *
- * Mirrors `USER_ROLES` in `@dacho/cms-core` — the backend must accept every
- * role the CMS can issue, or the Next.js proxy would silently strip it from the
- * `x-user-roles` header it forwards (see `dashboard/proxy-auth.ts`).
- */
+/** Compatibility transport for the existing dashboard, derived by the CMS
+ * adapter from the current active scalar operationalRole. These values are not
+ * additional assignable operational roles. */
 export const USER_ROLES = ['admin', 'editor', 'representative', 'referee'] as const
 
 export type UserRole = (typeof USER_ROLES)[number]
@@ -18,8 +12,11 @@ export interface User {
   email?: string
   /** The representative's job title within the company (سمت). */
   position?: string
-  /** The roles this user holds. A user may hold several at once. */
+  /** Derived compatibility roles; never accepts public role grants. */
   roles?: UserRole[]
+  operationalRole?: string | null
+  isActive?: boolean
+  backendService?: boolean
   /**
    * The id of the company this user represents, resolved by the store from the
    * `companies.representative` relationship (the FK lives on the company).
@@ -75,11 +72,13 @@ export class InMemoryUserStore implements UserStore {
   private readonly users = new Map<string, User>()
   private nextId = 1
 
+  constructor(initial: User[] = []) { for (const user of initial) this.users.set(user.id, user) }
+
   async findOrCreateByPhone(phone: string): Promise<User> {
     for (const user of this.users.values()) {
       if (user.phone === phone) return user
     }
-    const user: User = { id: String(this.nextId++), phone, roles: ['representative'] }
+    const user: User = { id: String(this.nextId++), phone, operationalRole: 'representative', isActive: true, roles: ['representative'] }
     this.users.set(user.id, user)
     return user
   }

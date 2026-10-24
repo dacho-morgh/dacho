@@ -112,9 +112,9 @@ test.beforeAll(async () => {
       phone: manager.phone,
       password,
       name: 'Mobile dashboard manager test',
-      roles: ['admin'],
+      operationalRole: 'system-owner', isActive: true,
     },
-    context: { allowRoleAssignment: true },
+    context: { allowPersonnelProvisioning: true },
   })
   managerId = managerUser.id
 })

@@ -2,6 +2,8 @@
 
 Status: Phase 0 authorization contract, 2026-10-23. This is **target behavior**, not a claim that current routes enforce it. Sources: [requirements](product-requirements.md), [workflows](workflows.md), [backend design](backend-design.md), and [baseline audit](current-state-audit.md). Implementation and negative tests are later work.
 
+Implementation update (T08): the [personnel foundation](personnel-foundation.md) now supplies the scalar role, editorial/service separation and deactivation boundary. General event/case assignment scope in this matrix remains T09 and later work. The baseline audit below describes the pre-T08 inspection.
+
 ## Decision rules
 
 One person has exactly one **operational** role: System Owner (O), Central Secretariat (S), Chief Reviewer (C), Reviewer (R), Employer Reviewer (E), Investment Reviewer (I), or Company Representative (P). `editor` is a separate CMS content privilege, not an operational workflow role; preserve existing editorial access during migration without making an editor a reviewer or owner. **Proposed technical mapping:** an account may retain editorial privilege alongside its one operational role, but operational authority must never be inferred from editorial privilege. Each existing `admin` account requires explicit review and mapping to the appropriate new role; do not automatically grant O to every legacy admin.

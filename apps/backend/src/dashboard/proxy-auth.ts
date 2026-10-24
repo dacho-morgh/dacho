@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 
-import type { UserRole } from '../auth/user-store.js'
+import type { UserRole, UserStore } from '../auth/user-store.js'
 import { USER_ROLES } from '../auth/user-store.js'
 
 /**
@@ -9,8 +9,8 @@ import { USER_ROLES } from '../auth/user-store.js'
  * acting user id; the shared `x-internal-proxy-secret` header proves the request
  * came from our proxy rather than a direct external caller.
  */
-export function requireProxyAuth(proxySecret: string) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+export function requireProxyAuth(proxySecret: string, userStore?: UserStore) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (req.headers['x-internal-proxy-secret'] !== proxySecret) {
       res.status(403).json({ error: 'forbidden' })
       return
@@ -33,6 +33,17 @@ export function requireProxyAuth(proxySecret: string) {
       .map((role) => role.trim())
       .filter((role): role is UserRole => (USER_ROLES as readonly string[]).includes(role))
 
+    if (userStore) {
+      try {
+        const actor = await userStore.findById(userId)
+        if (!actor || actor.isActive === false || actor.backendService) {
+          res.status(403).json({ error: 'forbidden' })
+          return
+        }
+        // Current CMS identity replaces stale/forged forwarded role values.
+        res.locals.userRoles = actor.roles ?? []
+      } catch (error) { next(error); return }
+    }
     next()
   }
 }

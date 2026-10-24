@@ -48,9 +48,11 @@ const makeUser = (index: number, name: string, roles?: User['roles']) =>
       password: 'int-test-password',
       phone: PHONES[index],
       name,
-      ...(roles ? { roles } : {}),
+      operationalRole: roles?.includes('admin') ? 'system-owner' : 'representative',
+      contentEditor: roles?.includes('editor') ?? false,
+      isActive: true,
     },
-    context: { allowRoleAssignment: true },
+    context: { allowPersonnelProvisioning: true },
   })
 
 describe('CMS write gates', () => {

@@ -1,3 +1,4 @@
+import { compatibilityRoles } from '@cms-core/access/roles'
 import type { NextRequest } from 'next/server'
 
 /** Minimal user shape the proxy needs from the resolved Payload session. */
@@ -5,6 +6,10 @@ export interface ProxyUser {
   id: string | number
   /** The single authorization axis: a user may hold several roles. */
   roles?: string[] | null
+  isActive?: boolean | null
+  operationalRole?: string | null
+  contentEditor?: boolean | null
+  backendService?: boolean | null
 }
 
 /** Normalizes the user's roles to a plain string list for the proxy header. */
@@ -39,7 +44,7 @@ export async function buildBackendRequest(
     'x-user-id': String(user.id),
     // The acting user's roles travel as one comma-separated header; this is the
     // only identity axis the backend needs.
-    'x-user-roles': normalizeRoles(user.roles).join(','),
+    'x-user-roles': compatibilityRoles(user).join(','),
   }
 
   const contentType = req.headers.get('content-type')

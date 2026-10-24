@@ -22,7 +22,7 @@ describe('buildBackendRequest', () => {
   it('forwards identity headers and rewrites path + query', async () => {
     const req = new NextRequest('http://localhost:3000/api/dashboard/requests?status=draft', { method: 'GET' })
     const { url, init } = await buildBackendRequest(
-      { id: 7, roles: ['admin', 'referee'] },
+      { id: 7, roles: ['referee'], operationalRole: 'system-owner', isActive: true },
       req,
       ['requests'],
       { backendUrl: 'http://backend:4000/', proxySecret: 'secret' },
@@ -32,7 +32,7 @@ describe('buildBackendRequest', () => {
     expect(init.method).toBe('GET')
     const headers = init.headers as Record<string, string>
     expect(headers['x-user-id']).toBe('7')
-    expect(headers['x-user-roles']).toBe('admin,referee')
+    expect(headers['x-user-roles']).toBe('admin')
     expect(headers['x-internal-proxy-secret']).toBe('secret')
   })
 

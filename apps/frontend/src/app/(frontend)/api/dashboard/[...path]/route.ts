@@ -19,7 +19,7 @@ async function handle(req: NextRequest, path: string[]): Promise<Response> {
     user = null
   }
 
-  if (!user) {
+  if (!user || user.isActive !== true || user.backendService) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), {
       status: 401,
       headers: { 'content-type': 'application/json' },
