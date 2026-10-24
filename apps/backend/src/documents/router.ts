@@ -304,7 +304,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const storageKey = await storage.save(validated.file.body, validated.file.extension)
       let record: PrivateDocumentRecord
       try {
-        record = await documents.create({
+        const input = {
           storageKey,
           category: validated.file.category,
           filename: validated.file.filename,
@@ -314,7 +314,40 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           requestId: requestId ?? null,
           companyId: parentCompanyId,
           uploaderId: actor.id,
-        })
+        }
+        if (requestId) {
+          const client = await deps.pool.connect()
+          try {
+            await client.query('BEGIN')
+            const locked = await client.query<{ owner_id: string; status: string }>(
+              'SELECT owner_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+              [requestId],
+            )
+            const current = locked.rows[0]
+            const currentPermission = current && canUploadOwnedDocument(
+              actor.operationalRole,
+              category,
+              { requestOwnerId: current.owner_id, requestStatus: current.status, requestCompanyId: parentCompanyId },
+              actor.id,
+              companyId,
+            )
+            if (!currentPermission) {
+              await client.query('ROLLBACK')
+              await storage.remove(storageKey)
+              res.status(404).json({ error: 'not_found' })
+              return
+            }
+            record = await documents.create(input, client)
+            await client.query('COMMIT')
+          } catch (error) {
+            await client.query('ROLLBACK')
+            throw error
+          } finally {
+            client.release()
+          }
+        } else {
+          record = await documents.create(input)
+        }
       } catch (error) {
         await storage.remove(storageKey)
         throw error
@@ -374,23 +407,33 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       res.status(404).json({ error: 'not_found' })
       return
     }
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
-    const request = await requests.findByIdScoped(record.requestId, scope)
-    if (!request) {
-      res.status(404).json({ error: 'not_found' })
-      return
-    }
-    if (
-      !canDeleteDocument(
-        actor.operationalRole,
-        { requestOwnerId: record.requestOwnerId, requestStatus: record.requestStatus },
-        actor.id,
+    const client = await deps.pool.connect()
+    let removed: PrivateDocumentRecord | undefined
+    try {
+      await client.query('BEGIN')
+      const { rows } = await client.query<{ owner_id: string; status: string }>(
+        'SELECT owner_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+        [record.requestId],
       )
-    ) {
-      res.status(403).json({ error: 'forbidden' })
-      return
+      const current = rows[0]
+      if (!current) {
+        await client.query('ROLLBACK')
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!canDeleteDocument(actor.operationalRole, { requestOwnerId: current.owner_id, requestStatus: current.status }, actor.id)) {
+        await client.query('ROLLBACK')
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      removed = await documents.delete(record.id, client)
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
     }
-    const removed = await documents.delete(record.id)
     if (!removed) {
       res.status(404).json({ error: 'not_found' })
       return

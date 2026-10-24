@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -339,6 +339,98 @@ describe('shared access policy and private documents (T09/T10)', () => {
     expect(requestRow.rows[0]?.status).toBe('draft')
   })
 
+  it('serializes an upload queued behind submission and removes its staged bytes', async () => {
+    const id = await createRequest()
+    const blocker = await pool.connect()
+    await blocker.query('BEGIN')
+    await blocker.query('SELECT id FROM dashboard.requests WHERE id = $1 FOR UPDATE', [id])
+    let blockerReleased = false
+    try {
+    const submission = submit(id).then((response) => response)
+    const waitUntil = async (check: () => Promise<boolean>) => {
+      const deadline = Date.now() + 3000
+      while (Date.now() < deadline) {
+        if (await check()) return true
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      return false
+    }
+    expect(await waitUntil(async () => {
+      const { rows } = await pool.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM pg_stat_activity
+         WHERE application_name = 'access-documents-integration' AND wait_event_type = 'Lock' AND query LIKE 'UPDATE dashboard.requests%'`,
+      )
+      return Number(rows[0]?.count) > 0
+    })).toBe(true)
+
+    const initialFiles = readdirSync(storageRoot).length
+    const uploading = upload({ userId: people.repA.id, category: 'proposal', filename: 'race.pdf', contentType: 'application/pdf', body: pdf(), requestId: id }).then((response) => response)
+    expect(await waitUntil(async () => readdirSync(storageRoot).length > initialFiles)).toBe(true)
+    await blocker.query('COMMIT')
+    blocker.release()
+    blockerReleased = true
+
+    expect((await submission).status).toBe(200)
+    expect((await uploading).status).toBe(404)
+    expect(readdirSync(storageRoot), readdirSync(storageRoot).join(', ')).toHaveLength(initialFiles)
+    const rows = await pool.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM dashboard.private_documents WHERE request_id = $1', [id])
+    expect(rows.rows[0]?.count).toBe('0')
+    } finally {
+      if (!blockerReleased) {
+        await blocker.query('ROLLBACK').catch(() => undefined)
+        blocker.release()
+      }
+    }
+  })
+
+  it('rechecks the locked request state before deleting a draft document', async () => {
+    const id = await createRequest()
+    const document = await upload({ userId: people.repA.id, category: 'proposal', filename: 'keep.pdf', contentType: 'application/pdf', body: pdf(), requestId: id }).expect(201)
+    const docId = document.body.document.id as string
+    const blocker = await pool.connect()
+    await blocker.query('BEGIN')
+    await blocker.query('SELECT id FROM dashboard.requests WHERE id = $1 FOR UPDATE', [id])
+    let blockerReleased = false
+    try {
+    const submission = submit(id).then((response) => response)
+    const deadline = Date.now() + 3000
+    let submitIsWaiting = false
+    while (Date.now() < deadline) {
+      const { rows } = await pool.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM pg_stat_activity
+         WHERE application_name = 'access-documents-integration' AND wait_event_type = 'Lock' AND query LIKE 'UPDATE dashboard.requests%'`,
+      )
+      if (Number(rows[0]?.count) > 0) { submitIsWaiting = true; break }
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+    expect(submitIsWaiting).toBe(true)
+    const deleting = request(payload).delete(`/documents/${docId}`).set(headers(people.repA.id)).then((response) => response)
+    let deleteIsWaiting = false
+    while (Date.now() < deadline) {
+      const { rows } = await pool.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM pg_stat_activity
+         WHERE application_name = 'access-documents-integration' AND wait_event_type = 'Lock'
+           AND query LIKE 'SELECT owner_id, status::text AS status FROM dashboard.requests%'`,
+      )
+      if (Number(rows[0]?.count) > 0) { deleteIsWaiting = true; break }
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+    expect(deleteIsWaiting).toBe(true)
+    await blocker.query('COMMIT')
+    blocker.release()
+    blockerReleased = true
+
+    expect((await submission).status).toBe(200)
+    expect((await deleting).status).toBe(403)
+    expect((await request(payload).get(`/documents/${docId}`).set(headers(people.repA.id))).status).toBe(200)
+    } finally {
+      if (!blockerReleased) {
+        await blocker.query('ROLLBACK').catch(() => undefined)
+        blocker.release()
+      }
+    }
+  })
+
   it('denies cross-company, unassigned, anonymous and financial downloads while allowing the approved audiences', async () => {
     const id = await createRequest()
     await assign(id, people.chief.id, 'chief-reviewer').expect(201)
@@ -372,7 +464,8 @@ describe('shared access policy and private documents (T09/T10)', () => {
       expect((await request(payload).get(`/documents?requestId=${id}`).set(headers(person.id))).body.items.map((item: { id: string }) => item.id)).not.toContain(financialId)
     }
 
-    expect((await request(payload).get(`/documents/${financialId}/download`).set(headers(people.investment.id))).status).toBe(200)
+    expect((await request(payload).get(`/documents/${financialId}/download`).set(headers(people.investment.id))).status).toBe(404)
+    expect((await request(payload).get(`/documents?requestId=${id}`).set(headers(people.investment.id))).body.items.map((item: { id: string }) => item.id)).not.toContain(financialId)
     expect((await request(payload).get(`/documents/${financialId}/download`).set(headers(people.owner.id))).status).toBe(200)
     expect((await request(payload).get(`/documents/${financialId}/download`).set(headers(people.secretariat.id))).status).toBe(200)
     expect((await request(payload).get(`/documents/${financialId}/download`).set(headers(people.repA.id))).status).toBe(200)
@@ -385,7 +478,7 @@ describe('shared access policy and private documents (T09/T10)', () => {
     expect((await request(payload).get(`/documents/${financialId}/download`).set({ 'x-user-id': people.owner.id })).status).toBe(403)
     const unassigned = await createRequest(people.repB.id, 'other')
     await submit(unassigned, people.repB.id)
-    expect((await request(payload).get(`/documents/${financialId}/download`).set(headers(people.investment.id))).status).toBe(200)
+    expect((await request(payload).get(`/documents/${financialId}/download`).set(headers(people.investment.id))).status).toBe(404)
   })
 
   it('keeps company dossier files private and denies them through case assignment', async () => {
@@ -439,10 +532,10 @@ describe('shared access policy and private documents (T09/T10)', () => {
 
   it('scopes letter reads to participant/assignment and supports draft-only deletion', async () => {
     const id = await createRequest()
-    await pool.query(
+    const participantLetter = await pool.query<{ id: string }>(
       `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
-       VALUES ('official', 'نامه پرونده', 'متن', $1, 'دبیرخانه', 'central-secretariat', $2, $3, false)`,
-      [people.secretariat.id, people.repA.id, id],
+       VALUES ('official', 'نامه پرونده', 'متن', $1, 'دبیرخانه', 'central-secretariat', $2, $3, false) RETURNING id`,
+      [people.chief.id, people.repA.id, id],
     )
 
     expect((await request(payload).get('/letters').set(headers(people.repA.id)).expect(200)).body.total).toBe(1)
@@ -451,6 +544,25 @@ describe('shared access policy and private documents (T09/T10)', () => {
     expect((await request(payload).get('/letters').set(headers(people.chief.id)).expect(200)).body.total).toBe(0)
     await assign(id, people.chief.id, 'chief-reviewer').expect(201)
     expect((await request(payload).get('/letters').set(headers(people.chief.id)).expect(200)).body.total).toBe(1)
+    const addressedToChief = await pool.query<{ id: string }>(
+      `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
+       VALUES ('official', 'برای مشارکت‌کننده', 'متن', $1, 'نماینده', 'representative', $2, $3, false) RETURNING id`,
+      [people.repA.id, people.chief.id, id],
+    )
+    const otherParticipantsLetter = await pool.query<{ id: string }>(
+      `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
+       VALUES ('official', 'بین دو نفر دیگر', 'متن', $1, 'دبیرخانه', 'central-secretariat', $2, $3, false) RETURNING id`,
+      [people.secretariat.id, people.repB.id, id],
+    )
+    expect((await request(payload).get('/letters').set(headers(people.chief.id)).expect(200)).body.items.map((item: { id: string }) => item.id)).not.toContain(otherParticipantsLetter.rows[0]?.id)
+    expect((await request(payload).get('/letters').set(headers(people.repA.id)).expect(200)).body.items.map((item: { id: string }) => item.id)).not.toContain(otherParticipantsLetter.rows[0]?.id)
+    expect((await request(payload).get(`/letters/${otherParticipantsLetter.rows[0]?.id}`).set(headers(people.chief.id)).expect(404)).body.error).toBe('not_found')
+    await request(payload).delete(`/letters/${otherParticipantsLetter.rows[0]?.id}`).set(headers(people.chief.id)).expect(404)
+    await request(payload).delete(`/admin/requests/${id}/assignments/${people.chief.id}`).set(headers(people.owner.id)).expect(200)
+    expect((await request(payload).get('/letters').set(headers(people.chief.id)).expect(200)).body.total).toBe(0)
+    expect((await request(payload).get(`/letters/${addressedToChief.rows[0]?.id}`).set(headers(people.chief.id)).expect(404)).body.error).toBe('not_found')
+    await request(payload).delete(`/letters/${addressedToChief.rows[0]?.id}`).set(headers(people.chief.id)).expect(404)
+    await request(payload).delete(`/letters/${participantLetter.rows[0]?.id}`).set(headers(people.repA.id)).expect(200)
 
     const doc = await upload({
       userId: people.repA.id,

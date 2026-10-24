@@ -1,4 +1,4 @@
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 
 import type { DocumentCategory } from './policy.js'
 
@@ -103,8 +103,8 @@ export interface CreateDocumentInput {
 export class DocumentRepository {
   constructor(private readonly pool: Pool) {}
 
-  async create(input: CreateDocumentInput): Promise<PrivateDocumentRecord> {
-    const { rows } = await this.pool.query<DocumentRow>(
+  async create(input: CreateDocumentInput, client: PoolClient | Pool = this.pool): Promise<PrivateDocumentRecord> {
+    const { rows } = await client.query<DocumentRow>(
       `WITH inserted AS (
          INSERT INTO dashboard.private_documents
            (storage_key, category, original_filename, mime_type, size_bytes, logical_version,
@@ -190,8 +190,8 @@ export class DocumentRepository {
     return Number(rows[0]?.version ?? 1)
   }
 
-  async delete(id: string): Promise<PrivateDocumentRecord | undefined> {
-    const { rows } = await this.pool.query<DocumentRow>(
+  async delete(id: string, client: PoolClient | Pool = this.pool): Promise<PrivateDocumentRecord | undefined> {
+    const { rows } = await client.query<DocumentRow>(
       `WITH removed AS (
          DELETE FROM dashboard.private_documents WHERE id = $1 RETURNING *
        )
