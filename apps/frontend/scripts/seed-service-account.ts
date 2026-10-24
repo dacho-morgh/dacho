@@ -25,7 +25,7 @@ async function main(): Promise<void> {
     await payload.update({
       collection: 'users',
       id: user.id,
-      data: { enableAPIKey: true, apiKey, password, operationalRole: 'representative', isActive: true, backendService: true, contentEditor: false },
+      data: { enableAPIKey: true, apiKey, password, sessions: [], resetPasswordToken: null, resetPasswordExpiration: null, operationalRole: 'representative', isActive: true, backendService: true, contentEditor: false },
       context: { allowPersonnelProvisioning: true },
     })
     console.log(`Updated service account user ${user.id}`)

@@ -28,15 +28,44 @@ import {
   type SelfSignupBody,
 } from '@cms-core/auth/self-signup'
 
+/**
+ * The only fields the profile command may echo back. `apiKey`, `enableAPIKey`,
+ * `sessions`, `personnelHistory`, `legacyRoles` and password material stay
+ * server-side: this handler runs with `overrideAccess`, so field-level read
+ * access does not filter its own write result.
+ */
+const BACKEND_PROFILE_FIELDS = ['id', 'name', 'phone', 'email', 'position', 'updatedAt'] as const
+
+/**
+ * A service credential may only correct contact details of an ordinary active
+ * representative. Phone and email are authentication recovery identifiers, so
+ * owner, staff, editorial, service and inactive identities are refused: a
+ * rewritten number would allow OTP login as that account.
+ */
+const isServiceProfileTarget = (target: unknown): boolean => {
+  const account = target as {
+    operationalRole?: string | null
+    isActive?: boolean | null
+    contentEditor?: boolean | null
+    backendService?: boolean | null
+  } | null
+  return (
+    isActiveAccount(account) &&
+    account?.operationalRole === 'representative' &&
+    account.contentEditor !== true &&
+    account.backendService !== true
+  )
+}
+
 const ownerOnlyField: FieldAccess = ({ req }) => isInternalAdmin(req.user)
 const canReadUser: Access = ({ req }) => {
   if (isInternalAdmin(req.user) || isBackendService(req.user)) return true
-  if (!isActiveAccount(req.user) || !req.user?.id) return false
+  if (!isActiveAccount(req.user) || req.user?.backendService || !req.user?.id) return false
   return { id: { equals: req.user.id } }
 }
 const canUpdateUser: Access = ({ req }) => {
   if (isInternalAdmin(req.user)) return true
-  if (!isActiveAccount(req.user) || isBackendService(req.user) || !req.user?.id) return false
+  if (!isActiveAccount(req.user) || req.user?.backendService || !req.user?.id) return false
   return { id: { equals: req.user.id } }
 }
 
@@ -97,6 +126,10 @@ export const Users: CollectionConfig = {
           }
         }
         const account = { ...originalDoc, ...data }
+        if (account.isActive && !account.operationalRole && !account.contentEditor) {
+          throw new APIError('حساب فعال باید یک نقش عملیاتی داشته باشد.', 400)
+        }
+
         if (account.backendService && !provision && operation === 'create')
           throw new APIError('Forbidden service provisioning.', 403)
         delete data.personnelHistory
@@ -126,11 +159,27 @@ export const Users: CollectionConfig = {
       path: '/backend-profile/:id',
       method: 'patch',
       handler: async (req) => {
-        if (!isBackendService(req.user) && !isInternalAdmin(req.user))
+        const service = isBackendService(req.user)
+        if (!service && !isInternalAdmin(req.user))
           return Response.json({ error: 'forbidden' }, { status: 403 })
         const body = await req.json?.().catch(() => null)
         if (!body || typeof body !== 'object' || Array.isArray(body))
           return Response.json({ error: 'invalid_profile' }, { status: 400 })
+        if (service) {
+          // Unknown targets and privileged identities are refused identically so
+          // the command does not reveal which accounts exist.
+          const target = await req.payload
+            .findByID({
+              collection: 'users',
+              id: String(req.routeParams?.id),
+              depth: 0,
+              overrideAccess: true,
+              req,
+            })
+            .catch(() => null)
+          if (!isServiceProfileTarget(target))
+            return Response.json({ error: 'forbidden' }, { status: 403 })
+        }
         const data: Record<string, string> = {}
         for (const key of ['name', 'phone', 'email', 'position']) {
           if (key in body) {
@@ -139,13 +188,17 @@ export const Users: CollectionConfig = {
             data[key] = body[key]
           }
         }
-        const doc = await req.payload.update({
+        const updated = await req.payload.update({
           collection: 'users',
           id: String(req.routeParams?.id),
           data,
           overrideAccess: true,
           req,
         })
+        const record: Record<string, unknown> = { ...updated }
+        const doc = Object.fromEntries(
+          BACKEND_PROFILE_FIELDS.map((field) => [field, record[field] ?? null]),
+        )
         return Response.json({ doc })
       },
     },

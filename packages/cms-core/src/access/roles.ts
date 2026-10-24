@@ -36,6 +36,7 @@ export type RoleCarrier =
       isActive?: boolean | null
       contentEditor?: boolean | null
       backendService?: boolean | null
+      _strategy?: string | null
       roles?: readonly string[] | null
     }
   | null
@@ -64,6 +65,8 @@ export function isContentEditor(user: unknown): boolean {
 }
 export function isBackendService(user: unknown): boolean {
   const account = user as RoleCarrier
-  return isActiveAccount(account) && account?.backendService === true
+  return (
+    isActiveAccount(account) && account?.backendService === true && account?._strategy === 'api-key'
+  )
 }
 export type { User }

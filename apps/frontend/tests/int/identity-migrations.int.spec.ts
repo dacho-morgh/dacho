@@ -104,6 +104,10 @@ test('upgrades existing identities without losing accounts, privileges, or legac
     expect(mapped[5]).toMatchObject({ operational_role: null, is_active: false, legacy_roles: ['representative', 'referee'] })
     expect(mapped[6]).toMatchObject({ operational_role: 'reviewer', is_active: true, content_editor: true })
     expect(mapped.every((row: { operational_role: string }) => row.operational_role !== 'system-owner')).toBe(true)
+    await client.query('SAVEPOINT active_role_guard')
+    await expect(client.query('UPDATE users SET is_active = true WHERE id = 1')).rejects.toThrow('users_active_operational_role_check')
+    await client.query('ROLLBACK TO SAVEPOINT active_role_guard')
+
 
   } finally {
     await client.query('ROLLBACK')
