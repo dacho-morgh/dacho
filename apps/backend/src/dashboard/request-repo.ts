@@ -67,17 +67,17 @@ export function mapRequestRow(row: RequestRow): RequestDto {
   }
 }
 
-function trackingCodeForYear(year: number, seq: number): string {
+function trackingCodeForYear(year: number, seq: string): string {
   return `DCH-${year}-${seq}`
 }
 
 async function nextTrackingCode(client: PoolClient, year: number): Promise<string> {
-  const { rows } = await client.query<{ c: number }>(
-    `SELECT COUNT(*)::int AS c FROM dashboard.requests WHERE tracking_code LIKE $1`,
-    [`DCH-${year}-%`],
+  const { rows } = await client.query<{ seq: string }>(
+    `SELECT nextval('dashboard.request_tracking_code_seq')::text AS seq`,
   )
-  const count = rows[0]?.c ?? 0
-  return trackingCodeForYear(year, count + 1)
+  const sequence = rows[0]?.seq
+  if (!sequence) throw new Error('Tracking sequence returned no value')
+  return trackingCodeForYear(year, sequence)
 }
 
 export interface CreateRequestInput {
@@ -190,20 +190,20 @@ export class RequestRepository {
     ownerId: string,
     step?: { assignedRole: string; currentStep: string },
   ): Promise<RequestDto | 'not_found' | 'already_submitted'> {
-    const existing = await this.findById(id, ownerId)
-    if (!existing) return 'not_found'
-    if (existing.status !== 'draft') return 'already_submitted'
-
     const { rows } = await this.pool.query<RequestRow>(
       `UPDATE dashboard.requests
        SET status = 'in_review', submission_date = now(), updated_at = now(),
            assigned_role = $3, current_step = $4
-       WHERE id = $1 AND owner_id = $2
+       WHERE id = $1 AND owner_id = $2 AND status = 'draft'
        RETURNING ${REQUEST_COLUMNS}`,
       [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null],
     )
     const updated = rows[0]
-    if (!updated) throw new Error('UPDATE dashboard.requests returned no row')
-    return mapRequestRow(updated)
+    if (updated) return mapRequestRow(updated)
+
+    // A competing submit may have won while this UPDATE waited on its row.
+    // Only the caller that changed the draft receives a successful transition.
+    const existing = await this.findById(id, ownerId)
+    return existing ? 'already_submitted' : 'not_found'
   }
 }

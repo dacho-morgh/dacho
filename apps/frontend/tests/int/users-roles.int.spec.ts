@@ -143,7 +143,9 @@ describe('users roles & access control', () => {
 
   it('rejects a duplicate national id with 409 and creates no user', async () => {
     // The company created by the previous test owns 'int-nid-escalation'.
-    const before = await payload.count({ collection: 'users' })
+    // Other spec files create users concurrently; inspect only this attempt.
+    const attemptedUser = { email: { equals: 'int-duplicate@example.com' } }
+    expect((await payload.count({ collection: 'users', where: attemptedUser })).totalDocs).toBe(0)
 
     const req = await createLocalReq({}, payload)
     Object.assign(req, {
@@ -170,8 +172,8 @@ describe('users roles & access control', () => {
     expect(body.errors[0]?.field).toBe('companyNationalId')
 
     // Atomicity: the rejected signup must not leave a person behind.
-    const after = await payload.count({ collection: 'users' })
-    expect(after.totalDocs).toBe(before.totalDocs)
+    const after = await payload.count({ collection: 'users', where: attemptedUser })
+    expect(after.totalDocs).toBe(0)
   })
 
   it('rejects a signup missing required fields with 400', async () => {
