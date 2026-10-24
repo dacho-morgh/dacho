@@ -1,4 +1,4 @@
-import { isActiveAccount, isInternalAdmin } from '@cms-core/access/roles'
+import { isActiveAccount, operationalRole } from '@cms-core/access/roles'
 import configPromise from '@payload-config'
 import type { User } from '@dacho/cms-core'
 import { headers } from 'next/headers'
@@ -19,5 +19,6 @@ export async function getProfileSessionUser(): Promise<User | null> {
 
 /** True when the user holds the admin role (the internal side of the house). */
 export function isInternalUser(user: Pick<User, 'operationalRole' | 'isActive'> | null | undefined): boolean {
-  return isInternalAdmin(user)
+  const role = operationalRole(user)
+  return role !== null && role !== 'representative'
 }

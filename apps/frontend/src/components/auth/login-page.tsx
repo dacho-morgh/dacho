@@ -1,30 +1,38 @@
 'use client'
 
-import { Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { FormEvent, useState } from 'react'
-import { BrandSandoqLogomark, BrandSandoqLogotype } from '@/components/icons'
+import { BrandSandoqLogomark, BrandSandoqLogotype, DashboardEyeIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Typography } from '@/components/ui/typography'
-import { getSafeReturnUrl } from '@/utilities/auth-return-url'
+import { getExplicitSafeReturnUrl, getSafeReturnUrl } from '@/utilities/auth-return-url'
 
 type Notice = { kind: 'error' | 'info'; message: string } | null
 
 export default function LoginPage({
   registered = false,
-  returnUrl = '/dashboard',
+  expired = false,
+  loggedOut = false,
+  returnUrl,
 }: {
   registered?: boolean
-  returnUrl?: string
+  expired?: boolean
+  loggedOut?: boolean
+  returnUrl?: string | string[]
 }) {
+  const explicitReturnUrl = getExplicitSafeReturnUrl(returnUrl)
   const safeReturnUrl = getSafeReturnUrl(returnUrl)
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState<Notice>(
-    registered
+    expired
+      ? { kind: 'info', message: 'نشست قبلی شما پایان یافته است. برای ادامه دوباره وارد شوید.' }
+      : loggedOut
+        ? { kind: 'info', message: 'با موفقیت از حساب کاربری خارج شدید.' }
+      : registered
       ? { kind: 'info', message: 'ثبت‌نام با موفقیت انجام شد. اکنون می‌توانید وارد شوید.' }
       : null,
   )
@@ -41,23 +49,69 @@ export default function LoginPage({
         body: JSON.stringify({ username: identifier.trim(), password }),
       })
 
-      if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
         setNotice({ kind: 'error', message: 'شماره تلفن، ایمیل یا رمز عبور صحیح نیست.' })
         return
       }
+      if (!response.ok) {
+        setNotice({ kind: 'error', message: 'ورود در دسترس نیست. کمی بعد دوباره تلاش کنید.' })
+        return
+      }
 
-      const payload = (await response.json().catch(() => null)) as { user?: { roles?: string[] | null } } | null
+      const payload = (await response.json().catch(() => null)) as {
+        user?: { contentEditor?: boolean | null }
+      } | null
       const user = payload?.user
-      const roles = Array.isArray(user?.roles) ? user.roles : []
-      // The Fund's own team works in the Payload panel; an editor has no company
-      // dashboard, so sending them to /dashboard would land them nowhere.
-      const isCmsUser = roles.includes('admin') || roles.includes('editor')
-      const destination =
-        safeReturnUrl && safeReturnUrl !== '/login' ? safeReturnUrl : isCmsUser ? '/admin' : '/dashboard'
+      const capabilityResponse = await fetch('/api/dashboard/capabilities', { cache: 'no-store' })
+      if (capabilityResponse.status === 401) {
+        setNotice({ kind: 'error', message: 'نشست ورود تأیید نشد. دوباره وارد شوید.' })
+        return
+      }
+      if (capabilityResponse.status === 403) {
+        if (user?.contentEditor === true) {
+          window.location.replace('/admin')
+          return
+        }
+        setNotice({
+          kind: 'error',
+          message: 'ورود انجام شد، اما دسترسی فعالی برای ورود به پیشخوان پیدا نشد. با پشتیبانی سامانه تماس بگیرید.',
+        })
+        return
+      }
+      if (!capabilityResponse.ok) {
+        setNotice({ kind: 'error', message: 'ورود انجام شد، اما سرویس دسترسی پاسخ نداد. کمی بعد دوباره تلاش کنید.' })
+        return
+      }
+
+      const capabilities = (await capabilityResponse.json()) as {
+        destinations?: string[]
+      }
+      const landing = capabilities.destinations?.[0] ?? '/dashboard'
+      let destination = landing
+      if (explicitReturnUrl) {
+        const requestedPath = explicitReturnUrl.split(/[?#]/, 1)[0]
+        const accessResponse = await fetch(
+          `/api/dashboard/access?path=${encodeURIComponent(requestedPath)}`,
+          { cache: 'no-store' },
+        )
+        if (accessResponse.status === 401) {
+          setNotice({ kind: 'error', message: 'نشست ورود تأیید نشد. دوباره وارد شوید.' })
+          return
+        }
+        if (accessResponse.status === 403) {
+          destination = '/dashboard?access=denied'
+        } else if (!accessResponse.ok) {
+          setNotice({ kind: 'error', message: 'ورود انجام شد، اما بررسی نشانی درخواستی در دسترس نیست.' })
+          return
+        } else {
+          const access = (await accessResponse.json().catch(() => null)) as { allowed?: boolean } | null
+          destination = access?.allowed ? explicitReturnUrl : '/dashboard?access=denied'
+        }
+      }
       // Authentication changes server-visible cookie state. A document-level
       // navigation guarantees that the protected route is requested with the
       // newly stored cookie instead of reusing an unauthenticated router cache.
-      window.location.assign(destination)
+      window.location.replace(destination)
     } catch {
       setNotice({
         kind: 'error',
@@ -71,28 +125,28 @@ export default function LoginPage({
   const showRecoveryNotice = () => {
     setNotice({
       kind: 'info',
-      message: 'بازیابی رمز عبور در مرحله بعدی این سامانه فعال می‌شود.',
+      message: 'بازیابی آنلاین رمز عبور در حال حاضر فعال نیست. برای بازیابی رمز عبور با پشتیبانی تماس بگیرید.',
     })
   }
 
   return (
     <div className="flex min-h-svh w-full items-start justify-center px-5 py-8 min-[480px]:items-center min-[480px]:px-6 min-[480px]:py-12">
       <form
-        className="relative flex w-full max-w-[360px] flex-col gap-10 min-[480px]:gap-16"
+        className="relative flex w-full max-w-[360px] flex-col gap-16"
         onSubmit={handleSubmit}
         aria-label="فرم ورود"
       >
         <div
-          className="flex h-[132px] flex-col items-center justify-center gap-[18px] min-[480px]:h-[164px] min-[480px]:gap-6"
+          className="flex h-[164px] flex-col items-center justify-center gap-6"
           aria-label="کارخانه نوآوری صنایع انرژی بوشهر"
         >
           <BrandSandoqLogomark
             aria-hidden="true"
-            className="h-auto w-[62px] text-brand-500 min-[480px]:h-16 min-[480px]:w-[74px]"
+            className="h-20 w-[94px] text-brand-500"
           />
           <BrandSandoqLogotype
             aria-label="کارخانه نوآوری صنایع انرژی بوشهر"
-            className="h-auto w-[140px] text-brand-500 min-[480px]:h-[60px] min-[480px]:w-[168px]"
+            className="h-[60px] w-[168px] text-brand-500"
             role="img"
           />
         </div>
@@ -100,10 +154,12 @@ export default function LoginPage({
         <div className="flex flex-col gap-8">
           <Input
             autoComplete="username"
-            className="text-sm leading-6 text-neutral-800 placeholder:text-neutral-300"
-            containerClassName="h-12 rounded-lg border-neutral-200 px-3 py-2 shadow-none"
+            autoCapitalize="none"
+            autoCorrect="off"
+            className="text-base leading-7 text-neutral-800 placeholder:text-neutral-300"
+            containerClassName="h-10 rounded-lg border-neutral-100 px-2 py-2 shadow-none"
             id="login-identifier"
-            inputMode="email"
+            inputMode="text"
             inputSize="lg"
             label="شماره تلفن همراه / آدرس ایمیل"
             name="identifier"
@@ -111,27 +167,25 @@ export default function LoginPage({
             placeholder="شماره تلفن همراه یا ایمیل خود را وارد کنید"
             required
             value={identifier}
-            wrapperClassName="gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700"
+            wrapperClassName="gap-2"
           />
 
           <div className="flex flex-col gap-4">
             <Input
               autoComplete="current-password"
-              className="text-sm leading-6 text-neutral-800 placeholder:text-neutral-300"
-              containerClassName="h-12 rounded-lg border-neutral-200 px-3 py-2 shadow-none"
+              className="text-base leading-7 text-neutral-800 placeholder:text-neutral-300"
+              containerClassName="h-10 rounded-lg border-neutral-100 px-2 py-2 shadow-none"
               endIcon={
-                <button
+                <Button
                   aria-label={passwordVisible ? 'پنهان کردن رمز عبور' : 'نمایش رمز عبور'}
-                  className="inline-flex size-6 cursor-pointer items-center justify-center border-0 bg-transparent text-neutral-300 transition-colors hover:text-neutral-500 focus-visible:rounded focus-visible:outline-2 focus-visible:outline-brand-500"
+                  className="size-9 text-neutral-300 hover:text-neutral-500"
                   onClick={() => setPasswordVisible((visible) => !visible)}
+                  size="icon-36"
                   type="button"
+                  variant="text-gray"
                 >
-                  {passwordVisible ? (
-                    <EyeOff aria-hidden="true" className="size-5 stroke-[1.5]" />
-                  ) : (
-                    <Eye aria-hidden="true" className="size-5 stroke-[1.5]" />
-                  )}
-                </button>
+                  <DashboardEyeIcon aria-hidden="true" className="size-5" />
+                </Button>
               }
               id="login-password"
               inputSize="lg"
@@ -142,7 +196,7 @@ export default function LoginPage({
               required
               type={passwordVisible ? 'text' : 'password'}
               value={password}
-              wrapperClassName="gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700"
+              wrapperClassName="gap-2"
             />
 
             <Typography
@@ -152,13 +206,17 @@ export default function LoginPage({
               variant="14/regular"
             >
               <span>رمز عبور خود را فراموش کرده‌اید؟</span>
-              <button
-                className="cursor-pointer border-0 bg-transparent font-[inherit] text-brand-500"
+              <Button
+                className="cursor-pointer border-0 bg-transparent font-[inherit] text-neutral-600"
                 onClick={showRecoveryNotice}
+                size="clear"
                 type="button"
+                variant="text-gray"
               >
-                اینجا کلیک کنید
-              </button>
+                <Typography as="span" variant="16/regular" color="neutral-600">
+                  اینجا کلیک کنید
+                </Typography>
+              </Button>
             </Typography>
           </div>
         </div>
@@ -178,7 +236,9 @@ export default function LoginPage({
               className="text-brand-500"
               href={`/register?returnUrl=${encodeURIComponent(safeReturnUrl)}`}
             >
-              ثبت‌نام کنید
+              <Typography as="span" variant="16/regular" color="brand">
+                ثبت‌نام کنید
+              </Typography>
             </Link>
           </Typography>
         </div>

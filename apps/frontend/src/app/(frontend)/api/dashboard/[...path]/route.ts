@@ -35,6 +35,7 @@ async function handle(req: NextRequest, path: string[]): Promise<Response> {
   const body = await res.arrayBuffer()
   const headers: Record<string, string> = {
     'content-type': res.headers.get('content-type') ?? 'application/json',
+    'cache-control': res.headers.get('cache-control') ?? 'private, no-store, max-age=0',
   }
   // Preserve the authorized-download contract without ever redirecting to a
   // public/static URL. Everything is re-authorized by the backend per request.

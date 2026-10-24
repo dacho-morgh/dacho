@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   AdminListView,
   AdminRowActions,
   type AdminColumn,
+  type AdminListLoadState,
 } from '@/components/dashboard/admin-list-view'
 import { Typography } from '@/components/ui/typography'
 type Company = {
@@ -53,13 +54,30 @@ const columns: AdminColumn<Company>[] = [
 ]
 export function CompanyList() {
   const [companies, setCompanies] = useState<Company[]>([])
-  useEffect(() => {
-    fetch('/api/dashboard/admin/companies?limit=100').then((res) => res.ok ? res.json() : null).then((data) => {
-      setCompanies((data?.items ?? []).map((item: { id: string; companyName?: string; name?: string; companyType?: string; companyProvince?: string; companyCity?: string; companyEstablishmentDate?: string; executives?: { role?: string; name?: string }[] }) => ({
-        id: item.id, name: item.companyName || item.name || '—', ceo: item.executives?.find((executive) => /مدیر\s*عامل/i.test(executive.role || ''))?.name || item.name || '—', companyType: item.companyType || '—', address: [item.companyProvince, item.companyCity].filter(Boolean).join('، ') || '—', activityAge: activityAgeLabel(item.companyEstablishmentDate),
+  const [loadState, setLoadState] = useState<AdminListLoadState>('loading')
+  const loadCompanies = useCallback(async () => {
+    setLoadState('loading')
+    try {
+      const response = await fetch('/api/dashboard/admin/companies?limit=100', { cache: 'no-store' })
+      if (response.status === 401) { setLoadState('unauthenticated'); return }
+      if (response.status === 403) { setLoadState('denied'); return }
+      if (!response.ok) { setLoadState('error'); return }
+      const data = (await response.json()) as { items?: { id: string; companyName?: string; name?: string; companyType?: string; companyProvince?: string; companyCity?: string; companyEstablishmentDate?: string; executives?: { role?: string; name?: string }[] }[] }
+      if (!Array.isArray(data.items)) { setLoadState('error'); return }
+      setCompanies(data.items.map((item) => ({
+        id: item.id,
+        name: item.companyName || item.name || '—',
+        ceo: item.executives?.find((executive) => /مدیر\s*عامل/i.test(executive.role || ''))?.name || item.name || '—',
+        companyType: item.companyType || '—',
+        address: [item.companyProvince, item.companyCity].filter(Boolean).join('، ') || '—',
+        activityAge: activityAgeLabel(item.companyEstablishmentDate),
       })))
-    }).catch(() => setCompanies([]))
+      setLoadState('ready')
+    } catch {
+      setLoadState('error')
+    }
   }, [])
+  useEffect(() => { void loadCompanies() }, [loadCompanies])
   return (
     <AdminListView
       title="شرکت ها"
@@ -69,6 +87,8 @@ export function CompanyList() {
       getSearchText={(item) => Object.values(item).join(' ')}
       getKey={(item) => item.id}
       columns={columns}
+      loadState={loadState}
+      onRetry={() => void loadCompanies()}
     />
   )
 }

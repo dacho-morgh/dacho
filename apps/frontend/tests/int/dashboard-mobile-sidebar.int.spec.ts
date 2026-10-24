@@ -28,6 +28,22 @@ vi.mock('payload', async (importOriginal) => {
   }
 })
 
+vi.mock('@/utilities/dashboard-server', () => ({
+  serverDashboardFetchResult: vi.fn(async (path: string) =>
+    path.startsWith('/capabilities')
+      ? {
+          kind: 'ok',
+          data: {
+            role: 'reviewer',
+            roleLabel: 'کارشناس',
+            responsibilities: ['بررسی درخواست‌ها'],
+            destinations: ['/dashboard'],
+          },
+        }
+      : { kind: 'ok', data: { allowed: true } },
+  ),
+}))
+
 describe('dashboard mobile sidebar', () => {
   it('uses a compact absolute hamburger trigger at the top-left and opens from the right', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })

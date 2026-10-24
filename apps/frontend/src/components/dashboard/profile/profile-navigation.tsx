@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
@@ -19,15 +19,22 @@ const staffProfileRoutes = [
 
 export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }) {
   const pathname = usePathname()
-  const router = useRouter()
   const [isLogoutOpen, setIsLogoutOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [logoutError, setLogoutError] = useState<string | null>(null)
   const profileRoutes = staffMode ? staffProfileRoutes : applicantProfileRoutes
 
   const handleLogout = async () => {
+    setIsLoggingOut(true)
+    setLogoutError(null)
     try {
-      await fetch('/api/users/logout', { method: 'POST' })
+      const response = await fetch('/api/users/logout', { method: 'POST', cache: 'no-store' })
+      if (!response.ok) throw new Error('logout_failed')
+      window.location.replace('/login?loggedOut=1')
+    } catch {
+      setLogoutError('خروج از حساب انجام نشد. ارتباط را بررسی کنید و دوباره تلاش کنید.')
     } finally {
-      router.push('/login')
+      setIsLoggingOut(false)
     }
   }
 
@@ -68,7 +75,7 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
           variant="text-gray"
           size="40"
           className="text-error-500"
-          onClick={() => setIsLogoutOpen(true)}
+          onClick={() => { setLogoutError(null); setIsLogoutOpen(true) }}
         >
           خروج از حساب کاربری
         </Button>
@@ -88,16 +95,22 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
             <Typography variant="16/semibold" color="neutral-500">
               آیا می‌خواهید از حساب کاربری خود خارج شوید؟
             </Typography>
+            {logoutError && (
+              <Typography role="alert" variant="14/regular" color="error" className="rounded-lg bg-error-50 p-3">
+                {logoutError}
+              </Typography>
+            )}
             <div className="flex gap-2">
               <Button
                 type="button"
                 variant="outline-gray"
                 className="flex-1"
+                disabled={isLoggingOut}
                 onClick={() => setIsLogoutOpen(false)}
               >
                 انصراف
               </Button>
-              <Button type="button" variant="destructive" className="flex-1" onClick={handleLogout}>
+              <Button type="button" variant="destructive" className="flex-1" loading={isLoggingOut} onClick={handleLogout}>
                 خروج از حساب
               </Button>
             </div>

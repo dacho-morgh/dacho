@@ -177,3 +177,71 @@ test('manager dashboard pages fit phone widths', async ({ page }) => {
     `/dashboard/companies/${managerId}`,
   ])
 })
+
+test('rechecks revoked role access on client navigation and direct entry', async ({ page }) => {
+  test.setTimeout(90_000)
+  await signIn(page, manager.phone)
+  await page.goto('http://localhost:3000/dashboard')
+
+  const companyLink = page.getByRole('link', { name: 'شرکت‌ها', exact: true })
+  await expect(companyLink).toBeVisible()
+
+  try {
+    await payload.update({
+      collection: 'users',
+      id: managerId,
+      data: { operationalRole: 'reviewer' },
+      overrideAccess: true,
+    })
+
+    // The shared layout still has its former sidebar instance. Clicking its
+    // stale management link must reach the request-time guard before the page.
+    await companyLink.click()
+    await expect(page).toHaveURL('http://localhost:3000/dashboard?access=denied')
+    await expect(page.getByText('به نشانی درخواستی دسترسی ندارید', { exact: false })).toBeVisible()
+
+    await page.goto('http://localhost:3000/dashboard/companies')
+    await expect(page).toHaveURL('http://localhost:3000/dashboard?access=denied')
+  } finally {
+    await payload.update({
+      collection: 'users',
+      id: managerId,
+      data: { operationalRole: 'system-owner' },
+      overrideAccess: true,
+    })
+  }
+})
+
+test('separates management-list loading, empty, expired, denied, and unavailable states', async ({ page }) => {
+  test.setTimeout(90_000)
+  await signIn(page, manager.phone)
+
+  let status = 503
+  let delay = true
+  await page.route('**/api/dashboard/admin/companies*', async (route) => {
+    if (delay) await new Promise((resolve) => setTimeout(resolve, 250))
+    await route.fulfill({ status, json: status === 200 ? { items: [] } : { error: 'test response' } })
+  })
+
+  await page.goto('http://localhost:3000/dashboard')
+  await expect(page.getByRole('status').filter({ hasText: 'در حال دریافت اطلاعات' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'دریافت اطلاعات انجام نشد' })).toBeVisible()
+
+  delay = false
+  status = 200
+  await page.getByRole('button', { name: 'تلاش دوباره' }).click()
+  await expect(page.getByText('هنوز موردی برای نمایش وجود ندارد')).toBeVisible()
+
+  status = 401
+  await page.reload()
+  await expect(page.getByRole('alert').filter({ hasText: 'نشست شما پایان یافته است' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'ورود دوباره' })).toHaveAttribute(
+    'href',
+    /\/login\?.*expired=1/,
+  )
+
+  status = 403
+  await page.reload()
+  await expect(page.getByRole('alert').filter({ hasText: 'دسترسی به این اطلاعات مجاز نیست' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'بازگشت به پیشخوان' })).toHaveAttribute('href', '/dashboard')
+})

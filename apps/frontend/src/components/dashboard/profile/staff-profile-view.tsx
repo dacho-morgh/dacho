@@ -1,12 +1,5 @@
-'use client'
-
-import { useState } from 'react'
-import { DashboardEditIcon } from '@/components/icons'
-import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
-import type { ContactInfoDto, ProfileDto } from '@/utilities/dashboard-api'
-import { updateProfile } from '@/utilities/dashboard-api'
-import { InlineProfileField } from './inline-profile-field'
+import type { DashboardOwnProfileDto } from '@/utilities/dashboard-api'
 
 export function StaffProfileView({
   initialProfile,
@@ -14,41 +7,13 @@ export function StaffProfileView({
   position,
   accessLabel,
 }: {
-  initialProfile: ProfileDto
+  initialProfile: DashboardOwnProfileDto
   name: string
   position: string
   accessLabel: string
 }) {
-  const [profile, setProfile] = useState(initialProfile)
-  const [form, setForm] = useState<ContactInfoDto>(initialProfile.contacts)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleSave = async () => {
-    setError(null)
-    setIsSaving(true)
-    try {
-      const updated = await updateProfile({ contacts: form })
-      if (!updated) throw new Error('contact_update_failed')
-      setProfile(updated)
-      setForm(updated.contacts)
-      setIsEditing(false)
-    } catch {
-      setError('ذخیره اطلاعات تماس انجام نشد.')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   return (
     <div className="flex flex-col gap-6" dir="rtl">
-      {error && (
-        <Typography role="alert" color="error" className="rounded-lg bg-error-50 p-3">
-          {error}
-        </Typography>
-      )}
-
       <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
         <div>
           <Typography as="h2" variant="20/bold" color="neutral-600">
@@ -66,49 +31,17 @@ export function StaffProfileView({
       </section>
 
       <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <Typography as="h2" variant="20/bold" color="neutral-600">
-              اطلاعات تماس
-            </Typography>
-            <Typography className="mt-1" color="neutral-400">
-              شماره تلفن و ایمیل حساب کاربری
-            </Typography>
-          </div>
-          <Button
-            type="button"
-            variant={isEditing ? 'primary' : 'gray'}
-            size="32"
-            loading={isSaving}
-            onClick={() => {
-              if (isEditing) void handleSave()
-              else {
-                setForm({ ...profile.contacts })
-                setError(null)
-                setIsEditing(true)
-              }
-            }}
-          >
-            {!isEditing && <DashboardEditIcon className="size-5" />}
-            {isEditing ? 'ذخیره' : 'ویرایش'}
-          </Button>
+        <div>
+          <Typography as="h2" variant="20/bold" color="neutral-600">
+            اطلاعات تماس
+          </Typography>
+          <Typography className="mt-1" color="neutral-400">
+            برای تغییر اطلاعات تماس با پشتیبانی سامانه تماس بگیرید.
+          </Typography>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <InlineProfileField
-            label="شماره تلفن همراه"
-            value={form.phone}
-            editing={isEditing}
-            dir="ltr"
-            onChange={(phone) => setForm((current) => ({ ...current, phone }))}
-          />
-          <InlineProfileField
-            label="آدرس ایمیل"
-            value={form.email}
-            editing={isEditing}
-            dir="ltr"
-            type="email"
-            onChange={(email) => setForm((current) => ({ ...current, email }))}
-          />
+          <ReadOnlyProfileField label="شماره تلفن همراه" value={initialProfile.contacts.phone} />
+          <ReadOnlyProfileField label="آدرس ایمیل" value={initialProfile.contacts.email} />
         </div>
       </section>
     </div>

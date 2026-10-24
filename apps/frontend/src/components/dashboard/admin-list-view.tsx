@@ -1,6 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Typography } from '@/components/ui/typography'
@@ -16,7 +17,9 @@ import {
   DashboardMoreIcon,
   DashboardSearchIcon,
 } from '@/components/icons'
+import { getLoginUrl } from '@/utilities/auth-return-url'
 export type AdminColumn<T> = { id: string; header?: string; render: (item: T) => React.ReactNode }
+export type AdminListLoadState = 'loading' | 'ready' | 'unauthenticated' | 'denied' | 'error'
 export function AdminRowActions({
   viewHref,
 }: {
@@ -53,6 +56,8 @@ export function AdminListView<T>({
   getSearchText,
   getKey,
   columns,
+  loadState = 'ready',
+  onRetry,
 }: {
   title: string
   addLabel: string
@@ -61,8 +66,13 @@ export function AdminListView<T>({
   getSearchText: (item: T) => string
   getKey: (item: T) => string
   columns: AdminColumn<T>[]
+  loadState?: AdminListLoadState
+  onRetry?: () => void
 }) {
   const [query, setQuery] = useState('')
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const returnUrl = `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ''}`
   const filtered = useMemo(
     () => items.filter((item) => getSearchText(item).includes(query)),
     [items, query, getSearchText],
@@ -110,7 +120,7 @@ export function AdminListView<T>({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((item) => (
+            {loadState === 'ready' && filtered.map((item) => (
               <tr key={getKey(item)} className="h-[72px] border-b border-neutral-100 last:border-0">
                 {columns.map((column) => (
                   <td className="px-4" key={column.id}>
@@ -119,11 +129,54 @@ export function AdminListView<T>({
                 ))}
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {loadState !== 'ready' && (
+              <tr>
+                <td colSpan={columns.length} className="h-60 px-4 text-center">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    {loadState === 'loading' && (
+                      <Typography role="status" aria-live="polite" variant="16/regular" color="muted">
+                        در حال دریافت اطلاعات...
+                      </Typography>
+                    )}
+                    {loadState === 'unauthenticated' && (
+                      <>
+                        <Typography role="alert" variant="16/regular" color="neutral-700">
+                          نشست شما پایان یافته است. برای ادامه دوباره وارد شوید.
+                        </Typography>
+                        <Button asChild size="36">
+                          <Link href={getLoginUrl(returnUrl, { expired: true })}>ورود دوباره</Link>
+                        </Button>
+                      </>
+                    )}
+                    {loadState === 'denied' && (
+                      <>
+                        <Typography role="alert" variant="16/regular" color="neutral-700">
+                          دسترسی به این اطلاعات مجاز نیست.
+                        </Typography>
+                        <Button asChild size="36" variant="outline-gray">
+                          <Link href="/dashboard">بازگشت به پیشخوان</Link>
+                        </Button>
+                      </>
+                    )}
+                    {loadState === 'error' && (
+                      <>
+                        <Typography role="alert" variant="16/regular" color="neutral-700">
+                          دریافت اطلاعات انجام نشد. ارتباط را بررسی و دوباره تلاش کنید.
+                        </Typography>
+                        <Button onClick={onRetry} size="36" variant="outline-gray">
+                          تلاش دوباره
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )}
+            {loadState === 'ready' && filtered.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="h-60 text-center">
                   <Typography variant="16/regular" color="muted">
-                    موردی پیدا نشد
+                    {items.length === 0 ? 'هنوز موردی برای نمایش وجود ندارد' : 'موردی پیدا نشد'}
                   </Typography>
                 </td>
               </tr>

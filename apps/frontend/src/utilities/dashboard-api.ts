@@ -110,6 +110,14 @@ export interface ProfileDto {
   companyId?: string | null
 }
 
+/** Safe projection for the current internal user's read-only personal profile. */
+export interface DashboardOwnProfileDto {
+  name: string
+  position: string
+  role: string
+  contacts: ContactInfoDto
+}
+
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   draft: 'پیش‌نویس',
   in_review: 'درحال بررسی',
