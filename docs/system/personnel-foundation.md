@@ -24,7 +24,9 @@ After approved migration in the intended environment, an operator can explicitly
 
 Automated coverage exercises seven-role owner creation, second-role rejection, self-service/public privilege injection, independent editorial access, service profile restrictions, deactivation/login denial, retained attribution, forged/stale proxy roles, current-account revocation and synthetic migration of admin/editor/representative/conflicting accounts. Run integration only through the guarded Phase 0 wrapper.
 
-[UAT03 / #104](https://github.com/dacho-morgh/dacho/issues/104) remains **Not run**. Dedicated dashboard personnel UI, event-role assignments and actual human acceptance remain separate deliverables. No staging deployment or production credential/data change is claimed.
+T09 now consumes this scalar role in the [shared authorization](authorization.md) policy and no longer relies on the compatibility `roles` projection for dashboard decisions. Event-team assignment, dedicated dashboard personnel UI and actual human acceptance remain separate deliverables.
+
+[UAT03 / #104](https://github.com/dacho-morgh/dacho/issues/104) remains **Not run**. No staging deployment or production credential/data change is claimed.
 
 ## Delivery record
 

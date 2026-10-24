@@ -1,8 +1,10 @@
 # Permission matrix — target policy and present gaps
 
-Status: Phase 0 authorization contract, 2026-10-23. This is **target behavior**, not a claim that current routes enforce it. Sources: [requirements](product-requirements.md), [workflows](workflows.md), [backend design](backend-design.md), and [baseline audit](current-state-audit.md). Implementation and negative tests are later work.
+Status: Phase 0 authorization contract, 2026-10-23, with 2026-10-24 implementation updates. This document remains the **target** policy for future event/review/investment/exhibition resources. Sources: [requirements](product-requirements.md), [workflows](workflows.md), [backend design](backend-design.md), and [baseline audit](current-state-audit.md).
 
-Implementation update (T08): the [personnel foundation](personnel-foundation.md) now supplies the scalar role, editorial/service separation and deactivation boundary. General event/case assignment scope in this matrix remains T09 and later work. The baseline audit below describes the pre-T08 inspection.
+Implementation update (T08): the [personnel foundation](personnel-foundation.md) supplies the scalar role, editorial/service separation and deactivation boundary.
+
+Implementation update (T09/T10): [shared authorization](authorization.md) applies the seven roles and explicit case assignments to every resource that currently exists (requests, companies, letters, support, counts, activities and documents), with one row-scope predicate and server-derived `allowedActions`. [Private documents](private-documents.md) implements the approved Word/PDF/10 MB policy with private storage and current-parent download authorization. Future event, review-round, financial-package, correspondence and booth workflows remain denied/absent as documented there. The baseline audit and “present gaps” section below describe the pre-T08 inspection and are retained as history, not as the current state.
 
 ## Decision rules
 
