@@ -32,7 +32,9 @@ async function signIn(page: Page, username: string) {
 }
 
 async function expectProfileField(page: Page, label: string, value: string) {
-  const field = page.getByLabel(label, { exact: true })
+  // React streams a hidden <div id="S:n"> template that can still hold a copy of
+  // the same form, so match only the rendered field.
+  const field = page.getByLabel(label, { exact: true }).filter({ visible: true })
   await expect(field).toBeVisible()
   await expect(field).toHaveValue(value)
 }
