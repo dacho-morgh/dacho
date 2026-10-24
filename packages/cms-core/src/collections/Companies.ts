@@ -1,8 +1,8 @@
-import type { Access, CollectionConfig } from 'payload'
+import type { Access, CollectionConfig, FieldAccess } from 'payload'
 
 import { adminOnly } from '@cms-core/access/adminOnly'
-import { anyone } from '@cms-core/access/anyone'
-import { isInternalAdmin } from '@cms-core/access/roles'
+import { hasRole, isInternalAdmin } from '@cms-core/access/roles'
+import { companyDirectory } from '@cms-core/endpoints/companyDirectory'
 
 /**
  * A Company (شرکت) — the organization that applies for the Innovation
@@ -31,10 +31,14 @@ const canCreateCompany: Access = ({ req }) => {
 const canEditCompany: Access = ({ req }) => {
   const user = req.user
   if (isInternalAdmin(user)) return true
-  if (!user) return false
+  if (!user || !hasRole(user, 'representative')) return false
   // `representative` is the company's link back to the acting person.
   return { representative: { equals: user.id } }
 }
+
+// The natural key and representative link cannot be reassigned from a company
+// session. Signup sets both through its server-selected transactional write.
+const adminOnlyIdentity: FieldAccess = ({ req }) => isInternalAdmin(req.user)
 
 export const Companies: CollectionConfig = {
   slug: 'companies',
@@ -43,9 +47,7 @@ export const Companies: CollectionConfig = {
     plural: 'Companies',
   },
   access: {
-    // Directory is public (the site lists member companies); the record itself
-    // is read by anyone so a company's own representative can load it.
-    read: anyone,
+    read: canEditCompany,
     // An internal admin enrolls a company by hand. Public self-registration
     // creates one through the `/self-signup` endpoint, which sets the
     // `allowCompanySignup` context flag on the transaction it owns.
@@ -55,6 +57,7 @@ export const Companies: CollectionConfig = {
     // company they represent.
     update: canEditCompany,
   },
+  endpoints: [companyDirectory],
   admin: {
     useAsTitle: 'name',
     defaultColumns: ['name', 'nationalId', 'type', 'city', 'representative'],
@@ -75,6 +78,7 @@ export const Companies: CollectionConfig = {
       required: true,
       unique: true,
       index: true,
+      access: { update: adminOnlyIdentity },
     },
     {
       name: 'registrationNumber',
@@ -118,9 +122,12 @@ export const Companies: CollectionConfig = {
       name: 'representative',
       type: 'relationship',
       relationTo: 'users',
+      // A dossier never needs to hydrate the representative's auth record.
+      maxDepth: 0,
       label: 'نماینده',
       required: true,
       index: true,
+      access: { update: adminOnlyIdentity },
       admin: {
         position: 'sidebar',
       },

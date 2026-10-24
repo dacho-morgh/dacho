@@ -25,6 +25,7 @@ Updated: 2026-10-23. This is the English specification for the event, review, in
 | [Migration inventory](migration-inventory.md) | Current migration streams, schema discrepancy and rollout limits |
 | [Phase 0 Figma evidence](phase-0-figma-evidence.md) | Fresh read-only design evidence and conflicts with approved product rules |
 | [Phase 0 execution record](phase-0-execution.md) | Work allocation, branch, evidence, limitations and handoff for T01–T04 |
+| [Company profile foundation](company-profile-foundation.md) | T05/T06 persistence, private dossier access, public projection and validation boundaries |
 
 ## Reading and execution order
 

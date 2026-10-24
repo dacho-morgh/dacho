@@ -186,7 +186,8 @@ jobs:
 
       - name: Use Ubuntu archive mirror for browser dependencies
         run: |
-          for source in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+          # Newer runners use mirror+file URIs in ubuntu.sources.
+          for source in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt; do
             if [[ -f "$source" ]]; then
               sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' "$source"
             fi

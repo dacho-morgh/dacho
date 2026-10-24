@@ -46,7 +46,6 @@ export class ProfileRepository {
       ...(update.type !== undefined ? { type: update.type } : {}),
       ...(update.registrationNumber !== undefined ? { registrationNumber: update.registrationNumber } : {}),
       ...(update.economicCode !== undefined ? { economicCode: update.economicCode } : {}),
-      ...(update.nationalId !== undefined ? { nationalId: update.nationalId } : {}),
     })
     return this.getProfile(userId)
   }

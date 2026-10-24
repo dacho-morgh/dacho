@@ -4,7 +4,9 @@ from pathlib import Path
 import os
 import re
 import shutil
+import shlex
 import subprocess
+import tempfile
 import textwrap
 import unittest
 
@@ -139,6 +141,41 @@ class CIIsolationContract(unittest.TestCase):
         self.assertIn("s|azure.archive.ubuntu.com|archive.ubuntu.com|g", mirror)
         self.assertLess(e2e.index(mirror), e2e.index(install))
         self.assertIn("playwright install --with-deps chromium", install)
+
+    def test_mirror_step_rewrites_runner_mirror_lists(self):
+        e2e = block(block(CI, "jobs", 0), "e2e", 2)
+        mirror = step(e2e, "Use Ubuntu archive mirror for browser dependencies")
+        script = textwrap.dedent(mirror.split("        run: |\n", 1)[1])
+        bash = (
+            Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git/bin/bash.exe"
+            if os.name == "nt" else shutil.which("bash")
+        )
+        if not bash or not Path(bash).exists():
+            self.skipTest("bash is unavailable")
+        fixtures = {
+            "/etc/apt/sources.list": "deb http://azure.archive.ubuntu.com/ubuntu noble main\n",
+            "/etc/apt/sources.list.d/ubuntu.sources": "URIs: mirror+file:/etc/apt/apt-mirrors.txt\n",
+            "/etc/apt/apt-mirrors.txt": "http://azure.archive.ubuntu.com/ubuntu/\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            paths = {}
+            for index, (original, contents) in enumerate(fixtures.items()):
+                target = Path(directory) / f"source-{index}"
+                target.write_text(contents)
+                paths[original] = target
+                script = script.replace(original, shlex.quote(target.as_posix()))
+            # Execute the workflow's loop on disposable fixtures, without sudo
+            # or any access to the host's /etc/apt configuration.
+            script = script.replace("sudo sed -i", "sed -i")
+            result = subprocess.run(
+                [str(bash), "--noprofile", "--norc", "-c", script],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for original in ("/etc/apt/sources.list", "/etc/apt/apt-mirrors.txt"):
+                contents = paths[original].read_text()
+                self.assertIn("http://archive.ubuntu.com/ubuntu", contents)
+                self.assertNotIn("azure.archive.ubuntu.com", contents)
 
 
 if __name__ == "__main__":
