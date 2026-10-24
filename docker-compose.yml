@@ -51,6 +51,9 @@ services:
       OTP_DELIVERY: ${OTP_DELIVERY:-console}
       KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
       KAVENEGAR_TEMPLATE: ${KAVENEGAR_TEMPLATE:-testtemplate}
+      PRIVATE_DOCUMENTS_DIR: /data/private-documents
+    volumes:
+      - private_documents:/data/private-documents
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,6 +69,7 @@ services:
 
 volumes:
   pgdata:
+  private_documents:
 
 secrets:
   jwt_private_key:

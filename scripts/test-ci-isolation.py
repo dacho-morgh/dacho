@@ -49,6 +49,7 @@ class CIIsolationContract(unittest.TestCase):
             "PHASE0_ISOLATED_TEST: '1'",
             f"DATABASE_URL: {DATABASE_URL}",
             "PAYLOAD_MEDIA_DIR: ${{ github.workspace }}/.phase0-test-files",
+            "PRIVATE_DOCUMENTS_DIR: ${{ github.workspace }}/.phase0-test-files/private-documents",
             "PAYLOAD_SECRET: phase0-test-only-payload-secret-do-not-reuse",
             "DOTENV_CONFIG_OVERRIDE: ''",
         ):
@@ -56,6 +57,7 @@ class CIIsolationContract(unittest.TestCase):
 
         initialize = step(integration, "Initialize isolated test environment")
         self.assertIn("phase0-test-marker.txt", initialize)
+        self.assertIn("PRIVATE_DOCUMENTS_DIR", initialize)
         self.assertIn(MARKER, initialize)
         self.assertIn("scripts/phase0-test-db-init.sql", initialize)
         self.assertIn("docker exec -i", initialize)
@@ -69,6 +71,7 @@ class CIIsolationContract(unittest.TestCase):
             self.assertNotIn("DATABASE_URL:", step(integration, name))
 
         wrapper = (Path(__file__).resolve().parents[1] / "scripts/phase0-test.ps1").read_text()
+        self.assertIn("$env:PRIVATE_DOCUMENTS_DIR", wrapper)
         self.assertIn("$env:DOTENV_CONFIG_OVERRIDE = ''", wrapper)
         self.assertNotIn("$env:DOTENV_CONFIG_OVERRIDE = 'false'", wrapper)
 
