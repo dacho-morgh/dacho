@@ -16,7 +16,6 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
     UPDATE public.users SET operational_role = 'representative' WHERE legacy_roles ? 'representative' AND NOT legacy_roles ?| ARRAY['admin', 'referee'];
     UPDATE public.users SET operational_role = 'reviewer' WHERE legacy_roles ? 'referee' AND NOT legacy_roles ?| ARRAY['admin', 'representative'];
     UPDATE public.users SET is_active = false WHERE operational_role IS NULL AND (NOT content_editor OR legacy_roles ? 'admin' OR legacy_roles ? 'referee' OR legacy_roles ? 'representative');
-    ALTER TABLE public.users ADD CONSTRAINT users_active_operational_role_check CHECK (NOT is_active OR operational_role IS NOT NULL OR content_editor);
     DELETE FROM public.users_roles;
     INSERT INTO public.users_roles ("order", parent_id, value)
       SELECT 1, id, 'representative'::public.enum_users_role FROM public.users WHERE is_active AND operational_role = 'representative'
