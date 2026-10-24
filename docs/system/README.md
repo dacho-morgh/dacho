@@ -26,6 +26,7 @@ Updated: 2026-10-23. This is the English specification for the event, review, in
 | [Phase 0 Figma evidence](phase-0-figma-evidence.md) | Fresh read-only design evidence and conflicts with approved product rules |
 | [Phase 0 execution record](phase-0-execution.md) | Work allocation, branch, evidence, limitations and handoff for T01–T04 |
 | [Company profile foundation](company-profile-foundation.md) | T05/T06 persistence, private dossier access, public projection and validation boundaries |
+| [Request tracking foundation](request-tracking-foundation.md) | T07 sequence allocation, atomic submit, synthetic migration rehearsal and rollout boundaries |
 
 ## Reading and execution order
 
