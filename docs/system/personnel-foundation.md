@@ -25,3 +25,11 @@ After approved migration in the intended environment, an operator can explicitly
 Automated coverage exercises seven-role owner creation, second-role rejection, self-service/public privilege injection, independent editorial access, service profile restrictions, deactivation/login denial, retained attribution, forged/stale proxy roles, current-account revocation and synthetic migration of admin/editor/representative/conflicting accounts. Run integration only through the guarded Phase 0 wrapper.
 
 [UAT03 / #104](https://github.com/dacho-morgh/dacho/issues/104) remains **Not run**. Dedicated dashboard personnel UI, event-role assignments and actual human acceptance remain separate deliverables. No staging deployment or production credential/data change is claimed.
+
+## Delivery record
+
+PR [#150](https://github.com/dacho-morgh/dacho/pull/150) (reviewed head `0dd9b5d`) was squash-merged into `staging` as `5f015bbe4b6ee84cf602c4e82b0d14581553b76a` on 2026-10-24. Its reviewed merge head `279d172b6a29dd86914084c6b29dd907c0c381dc` was produced by merging `origin/staging` (`f29b229`) into `codex/t08-personnel`; that merge preserves the P1 service-credential/contact-escalation fixes from `8658456` and the P2 identity-reload fix from `0dd9b5d`.
+
+All required PR checks passed on `279d172` ([CI run 40113036156](https://github.com/dacho-morgh/dacho/actions/runs/40113036156)): staging base policy, lint/typecheck/unit tests, database-free build, Postgres integration and E2E. Staging CI on `5f015bb` ([run 40114463944](https://github.com/dacho-morgh/dacho/actions/runs/40114463944)) passed the same five checks, and its automatic publish job built and pushed both staging images (`staging` and `staging-sha-5f015bb`). The preceding #149 staging run ([run 40112972154](https://github.com/dacho-morgh/dacho/actions/runs/40112972154)) also passed and published its `staging-sha-f29b229` images. Issue #22 is closed, and the project card moved to Done through the board's built-in closed-item automation.
+
+Remaining limitations: UAT03 [#104](https://github.com/dacho-morgh/dacho/issues/104) is still **Not run**; dedicated dashboard personnel/event-assignment UI remains FE01/T09/FE08; and no real account inventory/mapping, production migration, staging runtime deployment or production credential/data change was performed.
