@@ -86,7 +86,7 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
 
       <SheetContent side="center" showCloseButton={false} overlayClassName="bg-black/40" className="gap-5">
         <SheetTitle asChild>
-          <Typography id="profile-logout-title" as="h2" variant="20/bold" color="neutral-600">
+          <Typography as="h2" variant="20/bold" color="neutral-600">
             خروج از حساب کاربری
           </Typography>
         </SheetTitle>
