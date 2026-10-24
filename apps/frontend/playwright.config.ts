@@ -33,14 +33,28 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], channel: 'chromium' },
     },
   ],
-  webServer: {
-    // CI runs the e2e suite against a production build (`pnpm start`); locally
-    // `pnpm dev` stays the default for fast iteration.
-    command: process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? 'pnpm dev',
-    reuseExistingServer: true,
-    url: 'http://localhost:3000',
-    // First `next dev` compile of the Payload app + workspace packages can
-    // exceed the 60s default before :3000 responds.
-    timeout: 180000,
-  },
+  webServer: [
+    // Opt in when Playwright should own the real backend lifecycle. Otherwise
+    // local runs use the backend already configured by the developer.
+    ...(process.env.PLAYWRIGHT_BACKEND_SERVER_COMMAND
+      ? [
+          {
+            command: process.env.PLAYWRIGHT_BACKEND_SERVER_COMMAND,
+            url: `${process.env.BACKEND_URL ?? 'http://localhost:4000'}/health`,
+            reuseExistingServer: !process.env.CI,
+            timeout: 180000,
+          },
+        ]
+      : []),
+    {
+      // CI runs the e2e suite against a production build (`pnpm start`); locally
+      // `pnpm dev` stays the default for fast iteration.
+      command: process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? 'pnpm dev',
+      reuseExistingServer: !process.env.CI,
+      url: 'http://localhost:3000',
+      // First `next dev` compile of the Payload app + workspace packages can
+      // exceed the 60s default before :3000 responds.
+      timeout: 180000,
+    },
+  ],
 })

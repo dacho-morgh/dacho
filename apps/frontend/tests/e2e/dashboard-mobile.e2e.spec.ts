@@ -12,6 +12,7 @@ const applicant = {
   phone: `09${suffix}`,
   companyNationalId: `10${suffix}`,
   companyRegistrationNumber: suffix,
+  companyName: 'Mobile dashboard company test',
 }
 const manager = {
   email: `mobile-manager-${suffix}@example.invalid`,
@@ -30,6 +31,14 @@ async function signIn(page: Page, username: string) {
   expect(response.ok()).toBe(true)
 }
 
+async function expectProfileField(page: Page, label: string, value: string) {
+  // React streams a hidden <div id="S:n"> template that can still hold a copy of
+  // the same form, so match only the rendered field.
+  const field = page.getByLabel(label, { exact: true }).filter({ visible: true })
+  await expect(field).toBeVisible()
+  await expect(field).toHaveValue(value)
+}
+
 async function expectDashboardPagesFit(page: Page, paths: string[]) {
   for (const width of [360, 390, 430]) {
     await page.setViewportSize({ width, height: 844 })
@@ -40,9 +49,26 @@ async function expectDashboardPagesFit(page: Page, paths: string[]) {
         timeout: 60_000,
       })
       expect(response?.status(), path).toBe(200)
+      // Streaming can return HTTP 200 for loading/error shells. Wait for real
+      // fixture fields before measuring the profile, including on narrow phones.
+      if (path === '/dashboard/profile/company') {
+        await expectProfileField(page, 'نام شرکت', applicant.companyName)
+        await expectProfileField(page, 'شناسه ملی', applicant.companyNationalId)
+        await expectProfileField(page, 'شماره ثبت', applicant.companyRegistrationNumber)
+      } else if (path === '/dashboard/profile/account') {
+        await expectProfileField(page, 'شماره تلفن همراه', applicant.phone)
+        await expectProfileField(page, 'آدرس ایمیل', applicant.email)
+      } else if (path === '/dashboard/profile/resume') {
+        await expect(
+          page.getByRole('heading', { name: 'رزومه و سوابق شرکت', exact: true }),
+        ).toBeVisible()
+      }
       await expect
         .poll(
-          () => page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth)),
+          () =>
+            page.evaluate(() =>
+              Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+            ),
           { message: `${path} should fit a ${width}px phone viewport` },
         )
         .toBeLessThanOrEqual(width)
@@ -67,7 +93,7 @@ test.beforeAll(async () => {
   const company = await payload.create({
     collection: 'companies',
     data: {
-      name: 'Mobile dashboard company test',
+      name: applicant.companyName,
       nationalId: applicant.companyNationalId,
       registrationNumber: applicant.companyRegistrationNumber,
       type: 'سهامی خاص',
@@ -109,6 +135,21 @@ test.afterAll(async () => {
 test('applicant dashboard pages fit phone widths', async ({ page }) => {
   test.setTimeout(180_000)
   await signIn(page, applicant.phone)
+  // Exercises session resolution -> Next proxy -> backend -> CMS service account.
+  // No route interception: a missing backend or empty fallback must fail here.
+  const profileResponse = await page.request.get('http://localhost:3000/api/dashboard/profile')
+  expect(profileResponse.status()).toBe(200)
+  expect(await profileResponse.json()).toMatchObject({
+    company: {
+      name: applicant.companyName,
+      nationalId: applicant.companyNationalId,
+      registrationNumber: applicant.companyRegistrationNumber,
+      type: 'سهامی خاص',
+    },
+    contacts: { phone: applicant.phone, email: applicant.email },
+    executives: [],
+    addresses: [],
+  })
   await expectDashboardPagesFit(page, [
     '/dashboard',
     '/dashboard/requests',

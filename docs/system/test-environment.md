@@ -1,5 +1,25 @@
 # Phase 0 isolated integration environment
 
+## Real-backend browser checks
+
+The CI E2E job uses its own disposable Postgres service. It migrates Payload,
+seeds content and an explicit CMS service account, and builds both services.
+Each run generates a fresh ES256 signing key, service API key and internal proxy
+secret. Playwright owns both processes, waits for backend `/health` (the backend
+listens only after its startup migrations), and stops them after the suite. CI
+does not reuse existing servers; the signing-key file is removed even on failure.
+
+For local E2E, use a disposable database and synthetic data only. Configure the
+same backend-required environment documented in `.env.example`, run
+`seed:service-account` with an explicit `SERVICE_ACCOUNT_API_KEY`, and set the
+matching `PAYLOAD_API_KEY` and `INTERNAL_PROXY_SECRET` for both processes. Set
+`PLAYWRIGHT_BACKEND_SERVER_COMMAND="pnpm --filter @dacho/backend start"` after
+building the backend to have Playwright own it; otherwise start the configured
+backend yourself. The frontend command still defaults to `pnpm dev` locally.
+The mobile profile checks require real authenticated API company/contact data
+and visible fixture fields at 360, 390 and 430 px; HTTP 200 alone is insufficient.
+These checks are engineering regression evidence, not human acceptance or T45.
+
 This is an opt-in local environment for backend/Payload integration fixtures and migration rehearsal. It contains **synthetic data only**. It is not a copy of production and does not establish that a real-data migration is safe. The approved requirements explicitly prohibit destructive fixture suites or migration rehearsals on shared/live databases.
 
 ## Isolation and fail-closed checks
