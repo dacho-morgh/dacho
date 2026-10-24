@@ -31,7 +31,7 @@ describe('PayloadUserStore', () => {
 
     const user = await store.findOrCreateByPhone('0912')
 
-    expect(user).toEqual({ id: 'u1', phone: '0912', name: 'Ali' })
+    expect(user).toMatchObject({ id: 'u1', phone: '0912', name: 'Ali', isActive: false, roles: [] })
     expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0)
   })
 
@@ -79,7 +79,7 @@ describe('PayloadUserStore', () => {
   it('update sends a PATCH and returns the updated user', async () => {
     const { fetcher, calls } = mockFetcher((_url, init) =>
       init?.method === 'PATCH'
-        ? { status: 200, body: { doc: { id: 'u1', phone: '0912', name: 'Ali', roles: ['representative'] } } }
+        ? { status: 200, body: { doc: { id: 'u1', phone: '0912', name: 'Ali', operationalRole: 'representative', isActive: true, roles: ['admin'] } } }
         : { status: 404, body: {} },
     )
     const store = new PayloadUserStore({ baseUrl: 'http://cms:3000', apiKey: 'KEY', fetcher })
@@ -89,20 +89,26 @@ describe('PayloadUserStore', () => {
     expect(user.name).toBe('Ali')
     expect(user.roles).toEqual(['representative'])
     const patch = calls.find((c) => c.method === 'PATCH')!
-    expect(patch.url).toBe('http://cms:3000/api/users/u1')
+    expect(patch.url).toBe('http://cms:3000/api/users/backend-profile/u1')
     expect(JSON.parse(patch.body!)).toEqual({ name: 'Ali' })
   })
 
-  it('maps the multi-valued role and drops unknown values', async () => {
+  it('derives roles from the active scalar role, ignoring legacy/client arrays', async () => {
     const { fetcher } = mockFetcher(() => ({
       status: 200,
-      body: { doc: { id: 'u1', phone: '0912', roles: ['representative', 'referee', 'bogus'] } },
+      body: { doc: { id: 'u1', phone: '0912', operationalRole: 'reviewer', isActive: true, roles: ['admin', 'representative'] } },
     }))
     const store = new PayloadUserStore({ baseUrl: 'http://cms:3000', apiKey: 'KEY', fetcher })
 
     const user = await store.findById('u1')
 
-    expect(user?.roles).toEqual(['representative', 'referee'])
+    expect(user?.roles).toEqual(['referee'])
+  })
+
+  it('removes all transport authority from inactive accounts', async () => {
+    const { fetcher } = mockFetcher(() => ({ status: 200, body: { id: 'u', phone: '0912', operationalRole: 'system-owner', isActive: false, roles: ['admin'] } }))
+    const user = await new PayloadUserStore({ baseUrl: 'http://cms', apiKey: 'KEY', fetcher }).findById('u')
+    expect(user?.roles).toEqual([])
   })
 
   // The backend keeps its own copy of USER_ROLES because it cannot import the

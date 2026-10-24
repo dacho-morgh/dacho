@@ -1,3 +1,4 @@
+import { isActiveAccount, isInternalAdmin } from '@cms-core/access/roles'
 import configPromise from '@payload-config'
 import type { User } from '@dacho/cms-core'
 import { headers } from 'next/headers'
@@ -9,13 +10,14 @@ export async function getProfileSessionUser(): Promise<User | null> {
   const requestHeaders = await headers()
 
   try {
-    return (await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })).user ?? null
+    const user = (await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })).user
+    return user && isActiveAccount(user) && !user.backendService ? user : null
   } catch {
     return null
   }
 }
 
 /** True when the user holds the admin role (the internal side of the house). */
-export function isInternalUser(user: Pick<User, 'roles'> | null | undefined): boolean {
-  return Array.isArray(user?.roles) && user.roles.includes('admin')
+export function isInternalUser(user: Pick<User, 'operationalRole' | 'isActive'> | null | undefined): boolean {
+  return isInternalAdmin(user)
 }

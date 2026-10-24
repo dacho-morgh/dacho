@@ -1,3 +1,4 @@
+import { isInternalAdmin } from '@cms-core/access/roles'
 import type { User } from '@dacho/cms-core'
 import { getServerSideURL } from '@dacho/cms-core/utilities'
 import { cookies } from 'next/headers'
@@ -35,6 +36,8 @@ export type SeniorManagerCandidate =
       id?: number | string | null
       position?: string | null
       roles?: string[] | null
+      operationalRole?: string | null
+      isActive?: boolean | null
     }
 
 /**
@@ -49,5 +52,5 @@ export async function isSeniorManagerUser(
   user: SeniorManagerCandidate | null | undefined,
 ): Promise<boolean> {
   if (!user) return false
-  return Array.isArray(user.roles) && user.roles.includes('admin')
+  return isInternalAdmin(user)
 }

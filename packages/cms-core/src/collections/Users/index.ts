@@ -1,4 +1,5 @@
 import {
+  APIError,
   commitTransaction,
   initTransaction,
   type Access,
@@ -7,7 +8,7 @@ import {
 } from 'payload'
 
 import { hasCmsRole } from '@cms-core/access/hasCmsRole'
-import { isInternalAdmin, USER_ROLE_LABELS, USER_ROLES } from '@cms-core/access/roles'
+import { compatibilityRoles, isActiveAccount, isBackendService, isInternalAdmin, OPERATIONAL_ROLE_LABELS, OPERATIONAL_ROLES, USER_ROLE_LABELS, USER_ROLES } from '@cms-core/access/roles'
 import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
 import {
   isDuplicateNationalId,
@@ -18,31 +19,15 @@ import {
   type SelfSignupBody,
 } from '@cms-core/auth/self-signup'
 
-/**
- * Only an internal admin may grant or revoke roles. Everyone else — including
- * anonymous self-signup — is forced to the safe default via `defaultValue` +
- * this field-level gate, and the `beforeChange` hook below is defense-in-depth
- * against a Local API write that bypassed field access.
- *
- * Distinct from the collection-level `access/adminOnly`: Payload types field
- * access and collection access on incompatible argument shapes, so the shared
- * function cannot be reused here.
- */
-const adminOnlyField: FieldAccess = ({ req }) => isInternalAdmin(req.user)
-
+const ownerOnlyField: FieldAccess = ({ req }) => isInternalAdmin(req.user)
+const canReadUser: Access = ({ req }) => {
+  if (isInternalAdmin(req.user) || isBackendService(req.user)) return true
+  if (!isActiveAccount(req.user) || !req.user?.id) return false
+  return { id: { equals: req.user.id } }
+}
 const canUpdateUser: Access = ({ req }) => {
   if (isInternalAdmin(req.user)) return true
-  if (!req.user?.id) return false
-  return { id: { equals: req.user.id } }
-}
-const canReadUser: Access = ({ req }) => {
-  if (isInternalAdmin(req.user)) return true
-  if (!req.user?.id) return false
-  return { id: { equals: req.user.id } }
-}
-const canDeleteUser: Access = ({ req }) => {
-  if (isInternalAdmin(req.user)) return true
-  if (!req.user?.id) return false
+  if (!isActiveAccount(req.user) || isBackendService(req.user) || !req.user?.id) return false
   return { id: { equals: req.user.id } }
 }
 
@@ -54,32 +39,76 @@ export const Users: CollectionConfig = {
     // Public self-registration. Escalation is prevented by the `adminOnly`
     // field-level access on `roles` plus the defaults below.
     create: () => true,
-    delete: canDeleteUser,
+    // Personnel are deactivated so historical attribution remains intact.
+    delete: () => false,
     read: canReadUser,
     update: canUpdateUser,
   },
   hooks: {
+    beforeLogin: [({ user }) => {
+      if (!isActiveAccount(user) || user.backendService) throw new APIError('Account is inactive.', 403)
+    }],
     beforeChange: [
-      ({ data, req, context, operation }) => {
-        // `loginWithUsername` authenticates against username/email; phone is the
-        // application's identifier, so it doubles as the username.
-        if (typeof data.phone === 'string' && data.phone.trim() !== '') {
-          data.username = data.phone.trim()
-        }
-        // A self-signup is a company representative and nothing else. Force the
-        // role to exactly that, even if the browser already holds an admin
-        // session (registration uses its own context for this reason).
-        const selfSignup =
-          context.forceRepresentativeSignup === true ||
-          (operation === 'create' && !isInternalAdmin(req.user) && context.allowRoleAssignment !== true)
+      ({ data, originalDoc, req, context, operation }) => {
+        if (typeof data.phone === 'string' && data.phone.trim() !== '') data.username = data.phone.trim()
+        const provision = !req.user && context.allowPersonnelProvisioning === true
+        const owner = isInternalAdmin(req.user)
+        const selfSignup = context.forceRepresentativeSignup === true || (operation === 'create' && !owner && !provision)
         if (selfSignup) {
-          data.roles = ['representative']
+          data.operationalRole = 'representative'
+          data.isActive = true
+          data.contentEditor = false
+          data.backendService = false
+        } else if (!owner && !provision) {
+          // Local API callers also obey this boundary even with overrideAccess.
+          for (const field of ['operationalRole', 'isActive', 'contentEditor', 'backendService', 'legacyRoles']) delete data[field]
         }
+        if (owner) {
+          delete data.backendService
+          delete data.legacyRoles
+        }
+        if (operation === 'create' || 'operationalRole' in data) {
+          if (!OPERATIONAL_ROLES.includes(data.operationalRole)) {
+            throw new APIError('هر شخص باید دقیقاً یک نقش عملیاتی داشته باشد.', 400)
+          }
+        }
+        const account = { ...originalDoc, ...data }
+        if (account.backendService && !provision && operation === 'create') throw new APIError('Forbidden service provisioning.', 403)
+        delete data.personnelHistory
+        const keys = ['operationalRole', 'isActive', 'contentEditor', 'backendService'] as const
+        if (operation === 'create' || keys.some((key) => originalDoc?.[key] !== account[key])) {
+          data.personnelHistory = [...(Array.isArray(originalDoc?.personnelHistory) ? originalDoc.personnelHistory : []), {
+            actorId: req.user ? String(req.user.id) : null,
+            source: provision ? 'operator' : selfSignup ? 'signup' : 'owner',
+            timestamp: new Date().toISOString(),
+            before: originalDoc ? Object.fromEntries(keys.map((key) => [key, originalDoc[key] ?? null])) : null,
+            after: Object.fromEntries(keys.map((key) => [key, account[key] ?? null])),
+          }]
+        }
+        data.roles = compatibilityRoles(account)
         return data
       },
     ],
+    afterRead: [({ doc }) => ({ ...doc, roles: compatibilityRoles(doc) })],
   },
   endpoints: [
+    {
+      path: '/backend-profile/:id', method: 'patch',
+      handler: async (req) => {
+        if (!isBackendService(req.user) && !isInternalAdmin(req.user)) return Response.json({ error: 'forbidden' }, { status: 403 })
+        const body = await req.json?.().catch(() => null)
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return Response.json({ error: 'invalid_profile' }, { status: 400 })
+        const data: Record<string, string> = {}
+        for (const key of ['name', 'phone', 'email', 'position']) {
+          if (key in body) {
+            if (typeof body[key] !== 'string') return Response.json({ error: 'invalid_profile' }, { status: 400 })
+            data[key] = body[key]
+          }
+        }
+        const doc = await req.payload.update({ collection: 'users', id: String(req.routeParams?.id), data, overrideAccess: true, req })
+        return Response.json({ doc })
+      },
+    },
     {
       path: '/self-signup',
       method: 'post',
@@ -196,7 +225,7 @@ export const Users: CollectionConfig = {
     },
   ],
   admin: {
-    defaultColumns: ['name', 'email', 'phone', 'roles'],
+    defaultColumns: ['name', 'email', 'phone', 'operationalRole', 'isActive'],
     useAsTitle: 'name',
   },
   auth: {
@@ -227,24 +256,40 @@ export const Users: CollectionConfig = {
         position: 'sidebar',
       },
     },
-    // The single authorization axis. A person may hold several roles at once
-    // (e.g. `representative` + `referee`); it defaults to `representative` for
-    // self-signup and is only ever changed by an internal admin. Plural because
-    // it is multi-valued — Payload stores it in the `users_roles` join table.
     {
-      name: 'roles',
-      type: 'select',
-      hasMany: true,
+      name: 'operationalRole', type: 'select', label: 'نقش عملیاتی',
+      options: OPERATIONAL_ROLES.map((role) => ({ label: OPERATIONAL_ROLE_LABELS[role], value: role })),
+      defaultValue: 'representative',
+      admin: { position: 'sidebar', description: 'هر شخص دقیقاً یک نقش عملیاتی دارد.' },
+      access: { create: ownerOnlyField, update: ownerOnlyField },
+    },
+    {
+      name: 'isActive', type: 'checkbox', label: 'حساب فعال', defaultValue: true,
+      admin: { position: 'sidebar' }, access: { create: ownerOnlyField, update: ownerOnlyField },
+    },
+    {
+      name: 'contentEditor', type: 'checkbox', label: 'مجوز تحریر محتوا', defaultValue: false,
+      admin: { position: 'sidebar', description: 'مجوز محتوا مستقل از نقش عملیاتی است.' },
+      access: { create: ownerOnlyField, update: ownerOnlyField },
+    },
+    {
+      name: 'backendService', type: 'checkbox', defaultValue: false,
+      admin: { hidden: true }, access: { create: () => false, update: () => false },
+    },
+    {
+      name: 'legacyRoles', type: 'json', label: 'نقش‌های پیش از مهاجرت',
+      admin: { readOnly: true }, access: { create: () => false, update: () => false, read: ownerOnlyField },
+    },
+    {
+      name: 'personnelHistory', type: 'json', label: 'تاریخچه دسترسی',
+      admin: { readOnly: true }, access: { create: () => false, update: () => false, read: ownerOnlyField },
+    },
+    // Stored compatibility projection for older dashboard queries. It is never
+    // an input to authorization, and legacy assignments are retained above.
+    {
+      name: 'roles', type: 'select', hasMany: true,
       options: USER_ROLES.map((role) => ({ label: USER_ROLE_LABELS[role], value: role })),
-      defaultValue: ['representative'],
-      saveToJWT: true,
-      admin: {
-        position: 'sidebar',
-      },
-      access: {
-        create: adminOnlyField,
-        update: adminOnlyField,
-      },
+      admin: { hidden: true }, access: { create: () => false, update: () => false },
     },
     // The representative's job title within the company (سمت).
     {

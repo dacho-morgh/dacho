@@ -73,7 +73,7 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[1],
         name: 'متقاضی مخرب',
-        roles: ['admin'],
+        roles: ['admin'], operationalRole: 'system-owner', contentEditor: true, backendService: true, isActive: false,
       },
     })
 
@@ -89,9 +89,9 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[4],
         name: 'ادمین تست ثبت‌نام',
-        roles: ['admin'],
+        operationalRole: 'system-owner', isActive: true,
       },
-      context: { allowRoleAssignment: true },
+      context: { allowPersonnelProvisioning: true },
     })
     const req = await createLocalReq({ user: admin }, payload)
     Object.assign(req, {
@@ -106,7 +106,7 @@ describe('users roles & access control', () => {
         companyEstablishmentDate: '1375',
         companyStatus: 'فعال',
         companyEconomicCode: '1234567890',
-        roles: ['admin'],
+        roles: ['admin'], operationalRole: 'system-owner', contentEditor: true, backendService: true, isActive: false,
       }),
     })
 
@@ -193,7 +193,7 @@ describe('users roles & access control', () => {
     expect(messages).toContain('companyNationalId')
   })
 
-  it('allows trusted internal writes to assign roles via context', async () => {
+  it('allows explicit operator provisioning of one role', async () => {
     const user = await payload.create({
       collection: 'users',
       data: {
@@ -201,13 +201,14 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[2],
         name: 'ادمین تست',
-        roles: ['admin', 'referee'],
+        operationalRole: 'system-owner', isActive: true,
       },
-      context: { allowRoleAssignment: true },
+      context: { allowPersonnelProvisioning: true },
     })
 
-    // A user may hold several roles at once.
-    expect(user.roles).toEqual(expect.arrayContaining(['admin', 'referee']))
+    // The legacy array is only a compatibility projection.
+    expect(user.operationalRole).toBe('system-owner')
+    expect(user.roles).toEqual(['admin'])
   })
 
   it('hasCmsRole admits only the admin role', () => {
@@ -218,6 +219,6 @@ describe('users roles & access control', () => {
     expect(admits({ roles: [] })).toBe(false)
     expect(admits({ roles: ['representative'] })).toBe(false)
     expect(admits({ roles: ['referee'] })).toBe(false)
-    expect(admits({ roles: ['admin'] })).toBe(true)
+    expect(admits({ operationalRole: 'system-owner', isActive: true })).toBe(true)
   })
 })

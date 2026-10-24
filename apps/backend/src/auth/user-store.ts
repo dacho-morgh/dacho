@@ -20,6 +20,9 @@ export interface User {
   position?: string
   /** The roles this user holds. A user may hold several at once. */
   roles?: UserRole[]
+  operationalRole?: string | null
+  isActive?: boolean
+  backendService?: boolean
   /**
    * The id of the company this user represents, resolved by the store from the
    * `companies.representative` relationship (the FK lives on the company).
@@ -74,6 +77,8 @@ export function hasUserRole(user: Pick<User, 'roles'> | null | undefined, role: 
 export class InMemoryUserStore implements UserStore {
   private readonly users = new Map<string, User>()
   private nextId = 1
+
+  constructor(initial: User[] = []) { for (const user of initial) this.users.set(user.id, user) }
 
   async findOrCreateByPhone(phone: string): Promise<User> {
     for (const user of this.users.values()) {

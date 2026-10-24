@@ -27,9 +27,9 @@ test.beforeAll(async () => {
       phone: adminPhone,
       password: adminPassword,
       name: 'Registration security test admin',
-      roles: ['admin'],
+      operationalRole: 'system-owner', isActive: true,
     },
-    context: { allowRoleAssignment: true },
+    context: { allowPersonnelProvisioning: true },
   })
   adminId = admin.id
 })
@@ -233,7 +233,7 @@ test.describe('Register', () => {
     const meBody = await me.json()
     expect(meBody.user).toMatchObject({
       id: registrationBody.user.id,
-      roles: ['representative'],
+      operationalRole: 'representative', isActive: true,
     })
 
     const emailLogin = await page.request.post('http://localhost:3000/api/users/login', {
@@ -255,7 +255,7 @@ test.describe('Register', () => {
       headers: cookieRequestHeaders,
     })
     expect(adminMe.ok()).toBe(true)
-    expect((await adminMe.json()).user).toMatchObject({ id: adminId, roles: ['admin'] })
+    expect((await adminMe.json()).user).toMatchObject({ id: adminId, operationalRole: 'system-owner', isActive: true })
 
     const suffix = `${Date.now()}`.slice(-9)
     const phone = `09${suffix}`
@@ -273,7 +273,7 @@ test.describe('Register', () => {
         companyProvince: 'بوشهر',
         companyCity: 'بوشهر',
         // An escalation attempt during signup must be ignored.
-        roles: ['admin'],
+        operationalRole: 'system-owner', isActive: true,
       },
     })
     expect(registration.status()).toBe(201)
@@ -299,6 +299,6 @@ test.describe('Register', () => {
     })
     expect(me.ok()).toBe(true)
     const meBody = await me.json()
-    expect(meBody.user).toMatchObject({ id: body.user.id, roles: ['representative'] })
+    expect(meBody.user).toMatchObject({ id: body.user.id, operationalRole: 'representative', isActive: true })
   })
 })

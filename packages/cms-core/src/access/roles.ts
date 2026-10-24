@@ -1,61 +1,47 @@
 import type { User } from '@cms-core/payload-types'
 
-/**
- * The single authorization axis (decided 2026-10-17, superseding the previous
- * `role: applicant|staff` + `cmsRole: admin|editor` pair).
- *
- * A user holds zero or more roles, so the field is a multi-valued select. Every
- * capability in the system — CMS panel access, the internal dashboard, acting
- * for a company, reviewing plans — is derived from membership in this set.
- */
-export const USER_ROLES = ['admin', 'editor', 'representative', 'referee'] as const
-
-export type UserRole = (typeof USER_ROLES)[number]
-
-/**
- * Persian labels for the admin panel, which otherwise renders the raw English
- * keys. The wording follows `CONTEXT.md`'s language section: نقش is the axis,
- * داور the reviewer, نماینده شرکت the person who acts for a company.
- */
-export const USER_ROLE_LABELS: Record<UserRole, string> = {
-  admin: 'مدیر سامانه',
-  editor: 'تحریر',
+export const OPERATIONAL_ROLES = ['system-owner', 'central-secretariat', 'chief-reviewer', 'reviewer', 'employer-reviewer', 'investment-reviewer', 'representative'] as const
+export type OperationalRole = (typeof OPERATIONAL_ROLES)[number]
+export const OPERATIONAL_ROLE_LABELS: Record<OperationalRole, string> = {
+  'system-owner': 'صاحب سیستم',
+  'central-secretariat': 'دبیرخانه مرکزی',
+  'chief-reviewer': 'سردبیر داوری',
+  reviewer: 'داور',
+  'employer-reviewer': 'کارفرما',
+  'investment-reviewer': 'کمیته سرمایه‌گذاری',
   representative: 'نماینده شرکت',
-  referee: 'داور',
 }
 
-/**
- * A user document narrowed to just the fields authorization reads. Kept
- * structural rather than importing the generated `User` so these checks keep
- * compiling while `payload-types.ts` is regenerated.
- */
-export type RoleCarrier = { roles?: readonly string[] | null } | null | undefined
+// Transitional transport for the existing dashboard. Never accept this array
+// as authority: it is projected from the current scalar role and active state.
+export const USER_ROLES = ['admin', 'editor', 'representative', 'referee'] as const
+export type UserRole = (typeof USER_ROLES)[number]
+export const USER_ROLE_LABELS: Record<UserRole, string> = { admin: 'صاحب سیستم', editor: 'تحریر', representative: 'نماینده شرکت', referee: 'داور' }
+export type RoleCarrier = {
+  operationalRole?: string | null
+  isActive?: boolean | null
+  contentEditor?: boolean | null
+  backendService?: boolean | null
+  roles?: readonly string[] | null
+} | null | undefined
 
-/** True when the carrier holds the given role. */
-export function hasRole(user: RoleCarrier, role: UserRole): boolean {
-  return Array.isArray(user?.roles) && user.roles.includes(role)
+export function isActiveAccount(user: RoleCarrier): boolean { return user?.isActive === true }
+export function compatibilityRoles(user: RoleCarrier): UserRole[] {
+  if (!isActiveAccount(user) || user?.backendService) return []
+  const result: UserRole[] = []
+  if (user?.operationalRole === 'system-owner') result.push('admin')
+  if (user?.operationalRole === 'representative') result.push('representative')
+  if (user?.operationalRole === 'reviewer') result.push('referee')
+  if (user?.contentEditor) result.push('editor')
+  return result
 }
-
-/**
- * True when the user may act on behalf of the Fund's own team: reach the
- * Payload admin panel and the internal dashboard. This is the collapsed
- * replacement for the old `cmsRole === 'admin'` test.
- *
- * The parameter is intentionally loose so this can be passed straight to
- * Payload's `Access` signature.
- */
-export function isInternalAdmin(user: unknown): boolean {
-  return hasRole(user as RoleCarrier, 'admin')
-}
-
-/**
- * True when the user may write editorial content — reach the Payload panel and
- * publish. `admin` holds this implicitly (an admin administers everything);
- * `editor` («تحریر») holds it as their job.
- */
+export function hasRole(user: RoleCarrier, role: UserRole): boolean { return compatibilityRoles(user).includes(role) }
+export function isInternalAdmin(user: unknown): boolean { return hasRole(user as RoleCarrier, 'admin') }
 export function isContentEditor(user: unknown): boolean {
-  return hasRole(user as RoleCarrier, 'admin') || hasRole(user as RoleCarrier, 'editor')
+  return isInternalAdmin(user) || hasRole(user as RoleCarrier, 'editor')
 }
-
-/** Convenience: the Payload-generated user type re-exported for callers. */
+export function isBackendService(user: unknown): boolean {
+  const account = user as RoleCarrier
+  return isActiveAccount(account) && account?.backendService === true
+}
 export type { User }

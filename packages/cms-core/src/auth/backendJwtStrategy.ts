@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 import type { AuthStrategy } from 'payload'
+import { isActiveAccount } from '@cms-core/access/roles'
 
 /** Extracts the raw token from an `Authorization: Bearer <token>` header. */
 export function extractBearerToken(headers: Headers): string | undefined {
@@ -43,7 +44,7 @@ export function createBackendJwtStrategy(jwksUrl: string | undefined): AuthStrat
 
       try {
         const user = await payload.findByID({ collection: 'users', id })
-        if (!user) return { user: null }
+        if (!user || !isActiveAccount(user) || user.backendService) return { user: null }
         return { user: { ...user, collection: 'users' } }
       } catch {
         return { user: null }

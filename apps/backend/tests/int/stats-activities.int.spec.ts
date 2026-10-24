@@ -47,7 +47,10 @@ async function createAppUnderTest() {
     codeStore: new InMemoryCodeStore(),
     delivery: new ConsoleOtpDelivery(),
     jwt,
-    userStore: new InMemoryUserStore(),
+    userStore: new InMemoryUserStore([
+      ...['user-1', 'user-2', 'company-1', 'company-2', 'someone-else'].map((id) => ({ id, phone: id, roles: ['representative' as const], isActive: true })),
+      { id: 'staff-1', phone: 'staff-1', roles: ['admin'], isActive: true },
+    ]),
     companyStore: new InMemoryCompanyStore(),
     pool,
     serviceCatalog,

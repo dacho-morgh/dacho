@@ -1,10 +1,8 @@
 import 'dotenv/config'
 
-import type { User } from '@dacho/cms-core'
 import { getPayload } from 'payload'
 
 import config from '../src/payload.config.js'
-import { readOption } from './args.js'
 
 // ---------------------------------------------------------------------------
 // Lexical richText helpers (RTL Persian). Payload's richText field stores a
@@ -67,61 +65,9 @@ const customLink = (label: string, url: string, appearance?: 'default' | 'outlin
 const EXHIBITION_START = '2027-02-01T00:00:00.000Z'
 const EXHIBITION_END = '2027-02-04T00:00:00.000Z'
 
-// Credentials may be overridden per run:
-//   pnpm seed:landing --password='…'
-//   ADMIN_PASSWORD='…' pnpm seed:landing
-const ADMIN_EMAIL = readOption('email', 'ADMIN_EMAIL', 'sajjaddg@gmail.com')
-// The default mirrors the email's local part so the printed credentials below
-// are the obvious ones rather than a near-miss like `sajjadg`.
-const ADMIN_PASSWORD = readOption('password', 'ADMIN_PASSWORD', 'sajjaddg')
-const ADMIN_NAME = readOption('name', 'ADMIN_NAME', 'Sajjad')
-const ADMIN_PHONE = readOption('phone', 'ADMIN_PHONE', '09120000000')
-
 async function main(): Promise<void> {
   const payload = await getPayload({ config })
   payload.logger.info('Seeding Sandoq landing page…')
-
-  // Keep the seed repeatable: create the requested admin on the first run and
-  // refresh its credentials on subsequent runs without touching other users.
-  payload.logger.info('— Seeding admin user…')
-  const existingAdmin = await payload.find({
-    collection: 'users',
-    where: { email: { equals: ADMIN_EMAIL } },
-    limit: 1,
-  })
-  const adminRoles: { roles: NonNullable<User['roles']> } = { roles: ['admin'] }
-  const adminContext = { allowRoleAssignment: true }
-
-  if (existingAdmin.docs[0]) {
-    await payload.update({
-      collection: 'users',
-      id: existingAdmin.docs[0].id,
-      data: {
-        email: ADMIN_EMAIL,
-        name: ADMIN_NAME,
-        password: ADMIN_PASSWORD,
-        phone: ADMIN_PHONE,
-        ...adminRoles,
-        // Payload locks an account for a period after repeated failed logins.
-        // Seeding is the recovery path for a locked-out operator, so clear it.
-        loginAttempts: 0,
-        lockUntil: null,
-      },
-      context: adminContext,
-    })
-  } else {
-    await payload.create({
-      collection: 'users',
-      data: {
-        email: ADMIN_EMAIL,
-        name: ADMIN_NAME,
-        password: ADMIN_PASSWORD,
-        phone: ADMIN_PHONE,
-        ...adminRoles,
-      },
-      context: adminContext,
-    })
-  }
 
   // 1. Clear landing content (keep users/media untouched).
   for (const collection of [
@@ -644,10 +590,7 @@ async function main(): Promise<void> {
   })
 
   payload.logger.info('Seeded Sandoq landing page successfully!')
-  console.log(`\nDone. Created: admin, 2 categories, 6 services, 3 events, 2 exhibitions, 6 news, 5 reviews, 4 FAQs + home page & globals.`)
-  console.log(`Admin: http://localhost:3000/admin`)
-  console.log(`Email: ${ADMIN_EMAIL}`)
-  console.log(`Password: ${ADMIN_PASSWORD}`)
+  console.log(`\nDone. Created: 2 categories, 6 services, 3 events, 2 exhibitions, 6 news, 5 reviews, 4 FAQs + home page & globals.`)
 }
 
 main()

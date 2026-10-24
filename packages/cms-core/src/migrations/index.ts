@@ -19,6 +19,8 @@ import * as migration_20261017_223000_rename_user_role_and_drop_roles_collection
 import * as migration_20261018_090000_add_editor_role from "./20261018_090000_add_editor_role";
 import * as migration_20261022_200000_add_service_ordering from "./20261022_200000_add_service_ordering";
 
+import * as migration_20261024_200000_single_operational_role from "./20261024_200000_single_operational_role";
+
 export const migrations = [
   {
     up: migration_20260810_103455.up,
@@ -120,4 +122,5 @@ export const migrations = [
     down: migration_20261022_200000_add_service_ordering.down,
     name: "20261022_200000_add_service_ordering",
   },
+  { up: migration_20261024_200000_single_operational_role.up, down: migration_20261024_200000_single_operational_role.down, name: "20261024_200000_single_operational_role" },
 ];

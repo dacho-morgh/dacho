@@ -49,11 +49,12 @@ describe('company persistence and private CMS boundaries (T05/T06)', () => {
           email: `company-profile-${index}@example.invalid`,
           password: 'company-profile-test-only',
           name: `Company profile fixture ${index}`,
-          roles: [role as 'representative' | 'admin' | 'editor' | 'referee'],
+          operationalRole: role === 'admin' ? 'system-owner' : role === 'editor' || role === 'referee' ? 'reviewer' : 'representative',
+          contentEditor: role === 'editor', isActive: true,
           enableAPIKey: true,
           apiKey: keys[index],
         },
-        context: { allowRoleAssignment: true },
+        context: { allowPersonnelProvisioning: true },
       })
       users.push(user.id)
     }
@@ -182,9 +183,9 @@ describe('company persistence and private CMS boundaries (T05/T06)', () => {
     await payload.update({ collection: 'companies', id: companyId, data: { representative: users[1] } })
     expect((await rest(`companies/${companyId}`, keys[0])).status).toBe(404)
     await payload.update({ collection: 'companies', id: companyId, data: { representative: users[0] } })
-    await payload.update({ collection: 'users', id: users[0], data: { roles: ['referee'] } })
+    await payload.update({ collection: 'users', id: users[0], data: { operationalRole: 'reviewer', isActive: true }, context: { allowPersonnelProvisioning: true } })
     expect([401, 403]).toContain((await rest(`companies/${companyId}`, keys[0])).status)
-    await payload.update({ collection: 'users', id: users[0], data: { roles: ['representative'] } })
+    await payload.update({ collection: 'users', id: users[0], data: { operationalRole: 'representative', isActive: true }, context: { allowPersonnelProvisioning: true } })
   })
 
   it('does not grant identity-store access merely for a claimed backend email', async () => {

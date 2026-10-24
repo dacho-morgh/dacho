@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto'
 
 import type { ProfileFields, User, UserRole, UserStore } from './user-store.js'
-import { USER_ROLES } from './user-store.js'
 
 export type HttpFetcher = (
   url: string,
@@ -55,7 +54,7 @@ export class PayloadUserStore implements UserStore {
   }
 
   async update(id: string, fields: ProfileFields): Promise<User> {
-    const res = await this.fetcher(`${this.baseUrl}/api/users/${id}`, {
+    const res = await this.fetcher(`${this.baseUrl}/api/users/backend-profile/${id}`, {
       method: 'PATCH',
       headers: this.headers(),
       body: JSON.stringify(fields),
@@ -99,9 +98,12 @@ export class PayloadUserStore implements UserStore {
       ...(typeof d.name === 'string' ? { name: d.name } : {}),
       ...(typeof d.email === 'string' ? { email: d.email } : {}),
       ...(typeof d.position === 'string' ? { position: d.position } : {}),
-      ...(Array.isArray(d.roles)
-        ? { roles: d.roles.filter((role): role is UserRole => (USER_ROLES as readonly string[]).includes(role)) }
-        : {}),
+      operationalRole: typeof d.operationalRole === 'string' ? d.operationalRole : null,
+      isActive: d.isActive === true,
+      backendService: d.backendService === true,
+      roles: d.isActive === true && d.backendService !== true
+        ? [d.operationalRole === 'system-owner' ? 'admin' : d.operationalRole === 'representative' ? 'representative' : d.operationalRole === 'reviewer' ? 'referee' : undefined, d.contentEditor === true ? 'editor' : undefined].filter((role): role is UserRole => role !== undefined)
+        : [],
     }
   }
 

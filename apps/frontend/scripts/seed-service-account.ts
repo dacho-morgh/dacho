@@ -9,7 +9,8 @@ const SERVICE_EMAIL = 'backend@dacho.local'
 const SERVICE_PHONE = process.env.SERVICE_ACCOUNT_PHONE ?? '09120000002'
 
 async function main(): Promise<void> {
-  const apiKey = process.env.SERVICE_ACCOUNT_API_KEY ?? 'dev-backend-service-account'
+  const apiKey = process.env.SERVICE_ACCOUNT_API_KEY
+  if (!apiKey) throw new Error('SERVICE_ACCOUNT_API_KEY must be supplied explicitly.')
   const password = randomBytes(16).toString('hex')
   const payload = await getPayload({ config })
 
@@ -24,8 +25,8 @@ async function main(): Promise<void> {
     await payload.update({
       collection: 'users',
       id: user.id,
-      data: { enableAPIKey: true, apiKey, password, roles: ['admin'] },
-      context: { allowRoleAssignment: true },
+      data: { enableAPIKey: true, apiKey, password, operationalRole: 'representative', isActive: true, backendService: true, contentEditor: false },
+      context: { allowPersonnelProvisioning: true },
     })
     console.log(`Updated service account user ${user.id}`)
   } else {
@@ -35,12 +36,12 @@ async function main(): Promise<void> {
         email: SERVICE_EMAIL,
         name: 'Backend Service',
         phone: SERVICE_PHONE,
-        roles: ['admin'],
+        operationalRole: 'representative', isActive: true, backendService: true, contentEditor: false,
         enableAPIKey: true,
         apiKey,
         password,
       },
-      context: { allowRoleAssignment: true },
+      context: { allowPersonnelProvisioning: true },
     })
     console.log(`Created service account user ${user.id}`)
   }

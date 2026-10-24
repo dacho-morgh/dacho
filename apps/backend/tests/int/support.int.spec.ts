@@ -26,7 +26,10 @@ async function appUnderTest() {
     codeStore: new InMemoryCodeStore(),
     delivery: new ConsoleOtpDelivery(),
     jwt: await JwtSigner.create('test-kid'),
-    userStore: new InMemoryUserStore(),
+    userStore: new InMemoryUserStore([
+      ...['user-1', 'user-2', 'company-1', 'company-2'].map((id) => ({ id, phone: id, roles: ['representative' as const], isActive: true })),
+      { id: 'staff-1', phone: 'staff-1', roles: ['admin'], isActive: true },
+    ]),
     companyStore: new InMemoryCompanyStore(),
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
@@ -96,12 +99,11 @@ describe('support conversations', () => {
     expect((await request(app).post(`/support/${id}/close`).set(auth('company-2', 'applicant'))).status).toBe(404)
   })
 
-  it('keeps support available when requester-name lookup fails', async () => {
+  it('fails closed when current actor authority cannot be loaded', async () => {
     const app = await appWithFailingUserLookup()
     await request(app).post('/support').set(auth('company-1', 'applicant')).send({ subject: 'نام شرکت', message: 'متن' })
 
     const listed = await request(app).get('/support').set(auth('staff-1', 'staff'))
-    expect(listed.status).toBe(200)
-    expect(listed.body.items[0].requesterName).toBe('شرکت متقاضی')
+    expect(listed.status).toBe(500)
   })
 })

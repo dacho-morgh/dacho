@@ -56,6 +56,7 @@ export function createAuthRouter(deps: AuthDeps): Router {
       }
 
       const user = await deps.userStore.findOrCreateByPhone(phone)
+      if (user.isActive === false || user.backendService) { res.status(403).json({ error: 'forbidden' }); return }
       const token = await deps.jwt.sign({ phone }, user.id)
 
       res.json({ token, user })
@@ -70,7 +71,7 @@ export function createAuthRouter(deps: AuthDeps): Router {
 
     try {
       const user = await deps.userStore.findById(userId)
-      if (!user) {
+      if (!user || user.isActive === false || user.backendService) {
         res.status(404).json({ error: 'not_found' })
         return
       }

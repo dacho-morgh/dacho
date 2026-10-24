@@ -52,7 +52,7 @@ const cleanup = async () => {
 /** A `req` carrying `user` for the pure access predicates. */
 const reqFor = (user: unknown) => ({ req: { user } }) as never
 
-// `allowRoleAssignment` opts out of the beforeChange escalation guard, which
+// `allowPersonnelProvisioning` opts out of the beforeChange escalation guard, which
 // otherwise rewrites every non-admin create to `representative` — the guard the
 // signup tests cover. Without it no fixture could hold a non-default role.
 const makeUser = (index: number, name: string, roles?: User['roles']) =>
@@ -63,9 +63,11 @@ const makeUser = (index: number, name: string, roles?: User['roles']) =>
       password: 'int-test-password',
       phone: PHONES[index],
       name,
-      ...(roles ? { roles } : {}),
+      operationalRole: roles?.includes('admin') ? 'system-owner' : 'representative',
+      contentEditor: roles?.includes('editor') ?? false,
+      isActive: true,
     },
-    context: { allowRoleAssignment: true },
+    context: { allowPersonnelProvisioning: true },
   })
 
 // The minimal rich-text body `posts.content` requires.
@@ -133,19 +135,19 @@ describe('editor role', () => {
 
   describe('predicates', () => {
     it('treats admin and editor as content writers, and nobody else', () => {
-      expect(isContentEditor({ roles: ['admin'] })).toBe(true)
-      expect(isContentEditor({ roles: ['editor'] })).toBe(true)
-      expect(isContentEditor({ roles: ['editor', 'referee'] })).toBe(true)
-      expect(isContentEditor({ roles: ['representative'] })).toBe(false)
-      expect(isContentEditor({ roles: ['referee'] })).toBe(false)
+      expect(isContentEditor({ operationalRole: 'system-owner', isActive: true })).toBe(true)
+      expect(isContentEditor({ operationalRole: 'representative', contentEditor: true, isActive: true })).toBe(true)
+      expect(isContentEditor({ operationalRole: 'reviewer', contentEditor: true, isActive: true })).toBe(true)
+      expect(isContentEditor({ operationalRole: 'representative', isActive: true })).toBe(false)
+      expect(isContentEditor({ operationalRole: 'reviewer', isActive: true })).toBe(false)
       expect(isContentEditor({ roles: [] })).toBe(false)
       expect(isContentEditor(null)).toBe(false)
     })
 
     it('lets an editor reach the Payload panel but not a representative', () => {
-      expect(hasCmsRole(reqFor({ roles: ['editor'] }))).toBe(true)
-      expect(hasCmsRole(reqFor({ roles: ['admin'] }))).toBe(true)
-      expect(hasCmsRole(reqFor({ roles: ['representative'] }))).toBe(false)
+      expect(hasCmsRole(reqFor({ operationalRole: 'representative', contentEditor: true, isActive: true }))).toBe(true)
+      expect(hasCmsRole(reqFor({ operationalRole: 'system-owner', isActive: true }))).toBe(true)
+      expect(hasCmsRole(reqFor({ operationalRole: 'representative', isActive: true }))).toBe(false)
       expect(hasCmsRole(reqFor(null))).toBe(false)
     })
   })

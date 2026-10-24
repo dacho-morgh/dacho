@@ -550,6 +550,44 @@ export interface User {
   id: number;
   name?: string | null;
   phone: string;
+  /**
+   * هر شخص دقیقاً یک نقش عملیاتی دارد.
+   */
+  operationalRole?:
+    | (
+        | 'system-owner'
+        | 'central-secretariat'
+        | 'chief-reviewer'
+        | 'reviewer'
+        | 'employer-reviewer'
+        | 'investment-reviewer'
+        | 'representative'
+      )
+    | null;
+  isActive?: boolean | null;
+  /**
+   * مجوز محتوا مستقل از نقش عملیاتی است.
+   */
+  contentEditor?: boolean | null;
+  backendService?: boolean | null;
+  legacyRoles?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  personnelHistory?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   roles?: ('admin' | 'editor' | 'representative' | 'referee')[] | null;
   position?: string | null;
   updatedAt: string;
@@ -2110,6 +2148,12 @@ export interface CategoriesSelect<T extends boolean = true> {
 export interface UsersSelect<T extends boolean = true> {
   name?: T;
   phone?: T;
+  operationalRole?: T;
+  isActive?: T;
+  contentEditor?: T;
+  backendService?: T;
+  legacyRoles?: T;
+  personnelHistory?: T;
   roles?: T;
   position?: T;
   updatedAt?: T;
