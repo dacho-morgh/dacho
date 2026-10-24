@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DocumentApiError, type PrivateDocumentDto } from '@/utilities/document-api'
 
@@ -38,6 +38,8 @@ function pdf(name = 'proposal.pdf'): File {
 }
 
 describe('PrivateDocumentField states', () => {
+  afterEach(cleanup)
+
   beforeEach(() => {
     listDocuments.mockReset()
     uploadDocument.mockReset()
@@ -108,6 +110,49 @@ describe('PrivateDocumentField states', () => {
     await waitFor(() => expect(onPendingChange).toHaveBeenLastCalledWith(false))
     expect(onReadyChange).toHaveBeenLastCalledWith(true)
     expect(await findByText('proposal.pdf')).toBeTruthy()
+  })
+
+  it('filters mixed categories and versions, then ignores an upload batch after its parent changes', async () => {
+    listDocuments.mockResolvedValueOnce([
+      document,
+      { ...document, id: 'proposal-v2', filename: 'proposal-v2.pdf', logicalVersion: 2 },
+      { ...document, id: 'finance', filename: 'finance.pdf', category: 'financialStatements' },
+    ])
+    const onDocumentsChange = vi.fn()
+    const view = render(createElement(PrivateDocumentField, {
+      category: 'proposal', requestId: 'request-1', logicalVersion: 2, onDocumentsChange,
+    }))
+    expect(await view.findByText('proposal-v2.pdf')).toBeTruthy()
+    expect(view.queryByText('proposal.pdf')).toBeNull()
+    expect(view.queryByText('finance.pdf')).toBeNull()
+    await waitFor(() => expect(onDocumentsChange).toHaveBeenLastCalledWith([
+      { ...document, id: 'proposal-v2', filename: 'proposal-v2.pdf', logicalVersion: 2 },
+    ]))
+
+    let resolveUpload: ((value: PrivateDocumentDto) => void) | undefined
+    uploadDocument.mockImplementationOnce(() => new Promise((resolve) => { resolveUpload = resolve }))
+    const input = view.container.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [pdf('first.pdf'), pdf('second.pdf')] } })
+    await waitFor(() => expect(uploadDocument).toHaveBeenCalledTimes(1))
+    view.rerender(createElement(PrivateDocumentField, { category: 'proposal', requestId: 'request-2' }))
+    resolveUpload?.({ ...document, requestId: 'request-1', filename: 'first.pdf' })
+    await waitFor(() => expect(view.queryByText('first.pdf')).toBeNull())
+    expect(uploadDocument).toHaveBeenCalledTimes(1)
+    expect(view.queryByText('second.pdf')).toBeNull()
+  })
+
+  it('does not mark a required proposal ready when only a financial document exists', async () => {
+    listDocuments.mockResolvedValueOnce([
+      { ...document, id: 'finance-only', filename: 'finance.pdf', category: 'financialStatements' },
+    ])
+    const onReadyChange = vi.fn()
+    const view = render(createElement(PrivateDocumentField, {
+      category: 'proposal', requestId: 'request-1', required: true, onReadyChange,
+    }))
+
+    await waitFor(() => expect(onReadyChange).toHaveBeenLastCalledWith(false))
+    expect(view.queryByText('finance.pdf')).toBeNull()
+    expect(view.getByText('هنوز مدرکی بارگذاری نشده است.')).toBeTruthy()
   })
 
   it('maps a denied list to an explicit no-access message and an expired session to re-login', async () => {

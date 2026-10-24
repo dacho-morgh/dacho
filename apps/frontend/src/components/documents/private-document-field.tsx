@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
@@ -72,6 +72,11 @@ export function PrivateDocumentField({
   const inputRef = useRef<HTMLInputElement>(null)
   const keyCounter = useRef(0)
   const callbacks = useRef({ onPendingChange, onReadyChange, onDocumentsChange })
+  const scopeKey = `${requestId ?? ''}|${companyId ?? ''}|${category}|${logicalVersion ?? ''}`
+  const scopeKeyRef = useRef(scopeKey)
+  useEffect(() => {
+    scopeKeyRef.current = scopeKey
+  }, [scopeKey])
   useEffect(() => {
     callbacks.current = { onPendingChange, onReadyChange, onDocumentsChange }
   }, [onDocumentsChange, onPendingChange, onReadyChange])
@@ -88,10 +93,17 @@ export function PrivateDocumentField({
   const pending = uploads.some((upload) => upload.error === null)
   const hasParent = Boolean(requestId || companyId)
   const uploadAllowed = canUpload && !disabled && hasParent
+  const scopedDocuments = useMemo(() => documents.filter((document) =>
+    document.category === category &&
+    (requestId ? document.requestId === requestId : document.requestId === null && document.companyId === companyId) &&
+    (logicalVersion === undefined || document.logicalVersion === logicalVersion),
+  ), [documents, category, companyId, logicalVersion, requestId])
 
   useEffect(() => {
     let active = true
-    setDocuments([])
+    // Pending uploads belong to the old parent/category/version scope.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUploads([])
     setError(null)
     setSessionExpired(false)
     setListDenied(false)
@@ -100,7 +112,11 @@ export function PrivateDocumentField({
     setLoading(true)
     listDocuments({ requestId, companyId })
       .then((items) => {
-        if (active) setDocuments(items)
+        if (active) setDocuments(items.filter((document) =>
+          document.category === category &&
+          (requestId ? document.requestId === requestId : document.requestId === null && document.companyId === companyId) &&
+          (logicalVersion === undefined || document.logicalVersion === logicalVersion),
+        ))
       })
       .catch((cause: unknown) => {
         if (!active) return
@@ -117,12 +133,13 @@ export function PrivateDocumentField({
       })
 
     return () => { active = false }
-  }, [category, companyId, hasParent, requestId])
+  }, [category, companyId, hasParent, logicalVersion, requestId])
 
   useEffect(() => {
     callbacks.current.onPendingChange?.(pending)
-    callbacks.current.onReadyChange?.(!pending && (!required || documents.length > 0))
-  }, [documents.length, pending, required])
+    callbacks.current.onReadyChange?.(!pending && (!required || scopedDocuments.length > 0))
+    callbacks.current.onDocumentsChange?.(scopedDocuments)
+  }, [scopedDocuments, pending, required])
 
   const report = (cause: unknown) => {
     if (cause instanceof DocumentApiError) {
@@ -134,7 +151,7 @@ export function PrivateDocumentField({
     return 'upload_failed' as const
   }
 
-  const uploadOne = async (file: File) => {
+  const uploadOne = async (file: File, uploadScope = scopeKey) => {
     const key = nextKey(file)
     setUploads((current) => [...current, { key, name: file.name, progress: 0, error: null, file }])
 
@@ -142,15 +159,21 @@ export function PrivateDocumentField({
       const document = await uploadDocument(
         { file, category, requestId, companyId, logicalVersion },
         (progress) => {
+          if (scopeKeyRef.current !== uploadScope) return
           setUploads((current) =>
             current.map((upload) => (upload.key === key ? { ...upload, progress } : upload)),
           )
         },
       )
-      setDocuments((current) => [...current, document])
-      setUploads((current) => current.filter((upload) => upload.key !== key))
-      setError(null)
+      if (scopeKeyRef.current === uploadScope && document.category === category && (logicalVersion === undefined || document.logicalVersion === logicalVersion)) {
+        setDocuments((current) => [...current, document])
+        setUploads((current) => current.filter((upload) => upload.key !== key))
+      } else if (scopeKeyRef.current === uploadScope) {
+        setUploads((current) => current.filter((upload) => upload.key !== key))
+      }
+      if (scopeKeyRef.current === uploadScope) setError(null)
     } catch (cause) {
+      if (scopeKeyRef.current !== uploadScope) return
       const code = report(cause)
       setUploads((current) =>
         current.map((upload) => (upload.key === key ? { ...upload, error: code } : upload)),
@@ -165,9 +188,11 @@ export function PrivateDocumentField({
 
   const chooseFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return
+    const batchScope = scopeKeyRef.current
     setError(null)
     const selected = Array.from(files)
     for (const file of selected) {
+      if (scopeKeyRef.current !== batchScope) return
       const localError = validateSelectedFile(file)
       if (localError) {
         setUploads((current) => [
@@ -182,7 +207,7 @@ export function PrivateDocumentField({
         ])
         continue
       }
-      await uploadOne(file)
+      await uploadOne(file, batchScope)
     }
   }
 
@@ -266,15 +291,15 @@ export function PrivateDocumentField({
         </Typography>
       ) : null}
 
-      {documents.length === 0 && !loading && !listDenied && hasParent ? (
+      {scopedDocuments.length === 0 && !loading && !listDenied && hasParent ? (
         <Typography variant="14/regular" color="neutral-400">
           هنوز مدرکی بارگذاری نشده است.
         </Typography>
       ) : null}
 
-      {documents.length > 0 ? (
+      {scopedDocuments.length > 0 ? (
         <ul className="flex flex-col gap-2" aria-label="مدارک بارگذاری‌شده">
-          {documents.map((document) => (
+          {scopedDocuments.map((document) => (
             <li
               key={document.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-100 px-3 py-2"
