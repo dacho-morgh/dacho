@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { randomInt } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import { getPayload } from 'payload'
 import config from '../../src/payload.config.js'
 
@@ -7,6 +7,7 @@ test.use({ channel: 'chrome' })
 
 const password = 'mobile-dashboard-test-only'
 const suffix = `${Date.now()}${randomInt(100, 999)}`.slice(-9)
+const mobileRequestId = randomUUID()
 const applicant = {
   email: `mobile-applicant-${suffix}@example.invalid`,
   phone: `09${suffix}`,
@@ -170,12 +171,26 @@ test('manager dashboard pages fit phone widths', async ({ page }) => {
     '/dashboard/companies',
     '/dashboard/employees',
     '/dashboard/requests',
-    `/dashboard/requests/mobile-request-${suffix}`,
-    `/dashboard/requests/mobile-request-${suffix}/evaluation`,
+    `/dashboard/requests/${mobileRequestId}`,
+    `/dashboard/requests/${mobileRequestId}/evaluation`,
     '/dashboard/letters',
     '/dashboard/letters/new',
     `/dashboard/companies/${managerId}`,
   ])
+})
+
+test('closes the mobile sidebar after selecting a destination', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await signIn(page, manager.phone)
+  await page.goto('http://localhost:3000/dashboard')
+
+  await page.getByRole('button', { name: 'باز کردن منو' }).click()
+  const mobileSidebar = page.locator('[data-sidebar="sidebar"][data-mobile="true"]')
+  await expect(mobileSidebar).toBeVisible()
+  await mobileSidebar.getByRole('link', { name: 'درخواست‌ها', exact: true }).click()
+
+  await expect(page).toHaveURL('http://localhost:3000/dashboard/requests')
+  await expect(mobileSidebar).toHaveCount(0)
 })
 
 test('rechecks revoked role access on client navigation and direct entry', async ({ page }) => {
@@ -217,17 +232,26 @@ test('separates management-list loading, empty, expired, denied, and unavailable
   await signIn(page, manager.phone)
 
   let status = 503
-  let delay = true
+  let isFirstRequest = true
+  let releaseFirstResponse!: () => void
+  let markFirstRequestSeen!: () => void
+  const firstResponseGate = new Promise<void>((resolve) => { releaseFirstResponse = resolve })
+  const firstRequestSeen = new Promise<void>((resolve) => { markFirstRequestSeen = resolve })
   await page.route('**/api/dashboard/admin/companies*', async (route) => {
-    if (delay) await new Promise((resolve) => setTimeout(resolve, 250))
+    if (isFirstRequest) {
+      isFirstRequest = false
+      markFirstRequestSeen()
+      await firstResponseGate
+    }
     await route.fulfill({ status, json: status === 200 ? { items: [] } : { error: 'test response' } })
   })
 
   await page.goto('http://localhost:3000/dashboard')
+  await firstRequestSeen
   await expect(page.getByRole('status').filter({ hasText: 'در حال دریافت اطلاعات' })).toBeVisible()
+  releaseFirstResponse()
   await expect(page.getByRole('alert').filter({ hasText: 'دریافت اطلاعات انجام نشد' })).toBeVisible()
 
-  delay = false
   status = 200
   await page.getByRole('button', { name: 'تلاش دوباره' }).click()
   await expect(page.getByText('هنوز موردی برای نمایش وجود ندارد')).toBeVisible()

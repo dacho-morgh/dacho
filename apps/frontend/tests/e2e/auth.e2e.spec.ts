@@ -96,10 +96,26 @@ test.describe('Application authentication', () => {
     await page.getByRole('button', { name: 'ورود', exact: true }).click()
 
     await expect(page).toHaveURL(`http://localhost:3000${returnUrl}`)
+    expect((await page.request.get('http://localhost:3000/api/dashboard/capabilities')).status()).toBe(200)
 
     await page.goto('http://localhost:3000/dashboard/profile/account')
-    await page.getByRole('button', { name: 'خروج از حساب کاربری' }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'خروج از حساب' }).click()
+    const logoutTrigger = page.getByRole('button', { name: 'خروج از حساب کاربری' })
+    await logoutTrigger.focus()
+    await page.keyboard.press('Enter')
+    const logoutDialog = page.getByRole('dialog', { name: 'خروج از حساب کاربری' })
+    const cancelLogout = logoutDialog.getByRole('button', { name: 'انصراف' })
+    const confirmLogout = logoutDialog.getByRole('button', { name: 'خروج از حساب' })
+    await expect(cancelLogout).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(confirmLogout).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(cancelLogout).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(logoutDialog).toBeHidden()
+    await expect(logoutTrigger).toBeFocused()
+
+    await page.keyboard.press('Enter')
+    await logoutDialog.getByRole('button', { name: 'خروج از حساب' }).click()
     await expect(page).toHaveURL('http://localhost:3000/login?loggedOut=1')
     expect((await page.request.get('http://localhost:3000/api/dashboard/capabilities')).status()).toBe(401)
 
@@ -127,12 +143,16 @@ test.describe('Application authentication', () => {
     let status = 401
     await page.route('**/api/users/login', (route) => route.fulfill({ status, json: {} }))
     await page.getByRole('button', { name: 'ورود', exact: true }).click()
-    await expect(page.getByRole('alert')).toHaveText('شماره تلفن، ایمیل یا رمز عبور صحیح نیست.')
+    await expect(page.getByRole('form', { name: 'فرم ورود' }).getByRole('alert')).toHaveText(
+      'شماره تلفن، ایمیل یا رمز عبور صحیح نیست.',
+    )
     await expect(identifier).toHaveValue(phoneUser.phone)
 
     status = 503
     await page.getByRole('button', { name: 'ورود', exact: true }).click()
-    await expect(page.getByRole('alert')).toHaveText('ورود در دسترس نیست. کمی بعد دوباره تلاش کنید.')
+    await expect(page.getByRole('form', { name: 'فرم ورود' }).getByRole('alert')).toHaveText(
+      'ورود در دسترس نیست. کمی بعد دوباره تلاش کنید.',
+    )
     await expect(identifier).toHaveValue(phoneUser.phone)
   })
 })
