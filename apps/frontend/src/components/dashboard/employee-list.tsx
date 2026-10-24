@@ -63,7 +63,13 @@ export function EmployeeList() {
   const [employees, setEmployees] = useState<Employee[]>([])
   useEffect(() => {
     fetch('/api/dashboard/admin/employees?limit=100').then((res) => res.ok ? res.json() : null).then((data) => {
-      setEmployees((data?.items ?? []).map((item: { id: string; name?: string; position?: string; role?: string; companyType?: string }) => ({ id: item.id, name: item.name || '—', role: item.position || item.role || '—', activity: item.companyType || '—', degree: '—' })))
+      setEmployees((data?.items ?? []).map((item: { id: string; name?: string | null; operationalRole?: string; isActive?: boolean }) => ({
+        id: item.id,
+        name: item.name || '—',
+        role: roleLabel(item.operationalRole) || '—',
+        activity: item.isActive === false ? 'غیرفعال' : 'فعال',
+        degree: '—',
+      })))
     }).catch(() => setEmployees([]))
   }, [])
   return (
@@ -77,4 +83,16 @@ export function EmployeeList() {
       columns={columns}
     />
   )
+}
+
+function roleLabel(role?: string): string {
+  return {
+    'system-owner': 'صاحب سیستم',
+    'central-secretariat': 'دبیرخانه مرکزی',
+    'chief-reviewer': 'سردبیر داوری',
+    reviewer: 'داور',
+    'employer-reviewer': 'کارفرما',
+    'investment-reviewer': 'کمیته سرمایه‌گذاری',
+    'representative': 'نماینده شرکت',
+  }[role ?? ''] ?? ''
 }

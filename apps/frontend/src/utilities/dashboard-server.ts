@@ -1,4 +1,9 @@
-import { isInternalAdmin } from '@cms-core/access/roles'
+import {
+  isInternalAdmin,
+  operationalRole,
+  type OperationalRole,
+  type RoleCarrier,
+} from '@cms-core/access/roles'
 import type { User } from '@dacho/cms-core'
 import { getServerSideURL } from '@dacho/cms-core/utilities'
 import { cookies } from 'next/headers'
@@ -53,4 +58,27 @@ export async function isSeniorManagerUser(
 ): Promise<boolean> {
   if (!user) return false
   return isInternalAdmin(user)
+}
+
+/** Current seven-role authority for server-rendered workspace selection. */
+export function dashboardOperationalRole(
+  user: SeniorManagerCandidate | null | undefined,
+): OperationalRole | null {
+  return operationalRole(user as RoleCarrier)
+}
+
+/** Any non-representative operational role is internal staff. */
+export function isInternalDashboardUser(
+  user: SeniorManagerCandidate | null | undefined,
+): boolean {
+  const role = dashboardOperationalRole(user)
+  return role !== null && role !== 'representative'
+}
+
+/** Company dossiers are readable by the owner and Secretariat only. */
+export function canReadCompanyDossiers(
+  user: SeniorManagerCandidate | null | undefined,
+): boolean {
+  const role = dashboardOperationalRole(user)
+  return role === 'system-owner' || role === 'central-secretariat'
 }

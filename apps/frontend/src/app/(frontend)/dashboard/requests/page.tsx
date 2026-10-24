@@ -7,7 +7,7 @@ import React from 'react'
 import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import { RequestsListView, type RequestItem } from '@/components/dashboard/requests'
 import { mapRequestItem, type Paginated, type RequestDto } from '@/utilities/dashboard-api'
-import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
+import { isInternalDashboardUser, serverDashboardFetch } from '@/utilities/dashboard-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,9 +19,9 @@ export const metadata: Metadata = {
 export default async function RequestsPage() {
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: await headers() })
-  const isSeniorManager = await isSeniorManagerUser(payload, user)
+  const isInternal = isInternalDashboardUser(user)
 
-  if (isSeniorManager) {
+  if (isInternal) {
     return <AdminRequestList />
   }
 

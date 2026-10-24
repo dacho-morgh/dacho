@@ -33,10 +33,22 @@ async function handle(req: NextRequest, path: string[]): Promise<Response> {
 
   const res = await fetch(url, init)
   const body = await res.arrayBuffer()
-  return new Response(body, {
-    status: res.status,
-    headers: { 'content-type': res.headers.get('content-type') ?? 'application/json' },
-  })
+  const headers: Record<string, string> = {
+    'content-type': res.headers.get('content-type') ?? 'application/json',
+  }
+  // Preserve the authorized-download contract without ever redirecting to a
+  // public/static URL. Everything is re-authorized by the backend per request.
+  for (const name of [
+    'content-disposition',
+    'content-length',
+    'cache-control',
+    'x-content-type-options',
+    'content-security-policy',
+  ]) {
+    const value = res.headers.get(name)
+    if (value) headers[name] = value
+  }
+  return new Response(body, { status: res.status, headers })
 }
 
 export async function GET(req: NextRequest, ctx: Context): Promise<Response> {

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import React from 'react'
+import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import { CompanyList } from '@/components/dashboard/company-list'
 import { RecentActivities } from '@/components/dashboard/recent-activities'
 import {
@@ -19,7 +20,7 @@ import {
   type RequestDto,
   type RequestStats,
 } from '@/utilities/dashboard-api'
-import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
+import { dashboardOperationalRole, serverDashboardFetch } from '@/utilities/dashboard-server'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
@@ -33,9 +34,9 @@ export default async function DashboardPage() {
   const payload = await getPayload({ config: configPromise })
   const requestHeaders = await headers()
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })
-  const isSeniorManager = await isSeniorManagerUser(payload, user)
-  if (isSeniorManager) return <CompanyList />
-
+  const role = dashboardOperationalRole(user)
+  if (role === 'system-owner' || role === 'central-secretariat') return <CompanyList />
+  if (role && role !== 'representative') return <AdminRequestList />
 
   // CMS-owned definitions read server-side via Payload's local API.
   const { docs: services } = await payload.find({ collection: 'services', limit: 100 })

@@ -51,7 +51,13 @@ export async function buildBackendRequest(
   if (contentType) headers['content-type'] = contentType
 
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
-  const body = hasBody ? await req.text() : undefined
+  // JSON can continue to travel as text (and keeps its readable test seam);
+  // multipart uploads must stay byte-exact or the boundary/content is corrupted.
+  const body = hasBody
+    ? contentType?.toLowerCase().includes('application/json')
+      ? await req.text()
+      : await req.arrayBuffer()
+    : undefined
 
   return {
     url: target,

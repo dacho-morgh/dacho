@@ -27,6 +27,7 @@ export interface RequestDto {
   dueDate: string | null
   createdAt: string
   updatedAt: string
+  allowedActions?: ('read' | 'submit' | 'assign' | 'uploadDocument' | 'deleteDocument')[]
 }
 
 export interface LetterDto {
@@ -106,6 +107,7 @@ export interface ProfileDto {
   contacts: ContactInfoDto
   executives: ExecutiveDto[]
   addresses: AddressDto[]
+  companyId?: string | null
 }
 
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
