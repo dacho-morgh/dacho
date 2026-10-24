@@ -22,4 +22,6 @@ The guarded PostgreSQL integration suite covers twelve concurrent HTTP creates, 
 
 Local backend integration passed **7 files / 41 tests** and unit tests passed **9 files / 46 tests**. The **6-test CI isolation contract** passed with the guard unchanged. Shared PR CI remains responsible for lint, workspace typechecks, database-free build, integration and E2E results; the PR records their final status.
 
+Workspace lint passed with eleven existing warnings; all three workspace typechecks and the backend build passed. The first frontend integration run overlapped those checks and failed with two import/startup timeouts plus an unrelated shared user-count assertion. Running the guarded frontend suite alone passed **45 files / 180 tests**, with one file/test skipped. The duplicate-signup assertion now checks only the attempted email, so another file's user fixture cannot affect its orphan-account check; worker limits and timeouts are unchanged.
+
 This completes the T07 engineering slice only. Company-owned event/subtopic applications and snapshot validation remain T12/T19/T20. Durable workflow history and notification delivery remain T36/T37; this change adds no such side effects. T44 and the human two-session gate [#139](https://github.com/dacho-morgh/dacho/issues/139) remain open for their wider prerequisites and evidence.
