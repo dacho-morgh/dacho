@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 
+import type { RequestScope } from '../access/policy.js'
+
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
 export interface RequestDto {
@@ -44,6 +46,12 @@ export const REQUEST_COLUMNS = `
   id, tracking_code, title, service_id, service_key, service_name, owner_id, status,
   current_step_index, assigned_role, current_step, answers, submission_date, due_date,
   created_at, updated_at
+`
+
+const REQUEST_COLUMNS_ALIASED = `
+  r.id, r.tracking_code, r.title, r.service_id, r.service_key, r.service_name, r.owner_id,
+  r.status, r.current_step_index, r.assigned_role, r.current_step, r.answers,
+  r.submission_date, r.due_date, r.created_at, r.updated_at
 `
 
 export function mapRequestRow(row: RequestRow): RequestDto {
@@ -103,8 +111,83 @@ export interface RequestList {
   totalPages: number
 }
 
+/**
+ * The single row predicate used by scoped lists, details and counts. Assignment
+ * scope also requires the assignment role to match the actor's current
+ * operational role, so changing that role revokes the old access immediately.
+ */
+export function requestScopeClause(scope: RequestScope, params: unknown[], alias = 'r'): string {
+  switch (scope.kind) {
+    case 'all':
+      return 'TRUE'
+    case 'none':
+      return 'FALSE'
+    case 'owner':
+      params.push(scope.userId)
+      return `${alias}.owner_id = $${params.length}`
+    case 'assigned':
+      params.push(scope.userId)
+      const userParam = params.length
+      params.push(scope.role)
+      return `EXISTS (
+        SELECT 1 FROM dashboard.case_assignments a
+        WHERE a.request_id = ${alias}.id
+          AND a.user_id = $${userParam}
+          AND a.role = $${params.length}
+          AND a.active
+      )`
+  }
+}
+
 export class RequestRepository {
   constructor(private readonly pool: Pool) {}
+
+  async listScoped(
+    scope: RequestScope,
+    options: { status?: string; page: number; limit: number },
+  ): Promise<RequestList> {
+    const where: string[] = []
+    const params: unknown[] = []
+    const scopeSql = requestScopeClause(scope, params, 'r')
+    where.push(scopeSql)
+    if (options.status) {
+      params.push(options.status)
+      where.push(`r.status = $${params.length}`)
+    }
+    const whereSql = where.join(' AND ')
+    const count = await this.pool.query<{ total: string }>(
+      `SELECT COUNT(*) AS total FROM dashboard.requests r WHERE ${whereSql}`,
+      params,
+    )
+    const total = Number(count.rows[0]?.total ?? 0)
+    const offset = (options.page - 1) * options.limit
+    const { rows } = await this.pool.query<RequestRow>(
+      `SELECT ${REQUEST_COLUMNS_ALIASED}
+       FROM dashboard.requests r
+       WHERE ${whereSql}
+       ORDER BY r.created_at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, options.limit, offset],
+    )
+    return {
+      items: rows.map(mapRequestRow),
+      total,
+      page: options.page,
+      totalPages: Math.max(1, Math.ceil(total / options.limit)),
+    }
+  }
+
+  async findByIdScoped(id: string, scope: RequestScope): Promise<RequestDto | undefined> {
+    const params: unknown[] = [id]
+    const scopeSql = requestScopeClause(scope, params, 'r')
+    const { rows } = await this.pool.query<RequestRow>(
+      `SELECT ${REQUEST_COLUMNS_ALIASED}
+       FROM dashboard.requests r
+       WHERE r.id = $1 AND ${scopeSql}`,
+      params,
+    )
+    return rows[0] ? mapRequestRow(rows[0]) : undefined
+  }
 
   async create(input: CreateRequestInput): Promise<RequestDto> {
     const client = await this.pool.connect()

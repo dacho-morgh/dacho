@@ -1,7 +1,13 @@
 import type { Access, CollectionConfig, FieldAccess } from 'payload'
 
 import { adminOnly } from '@cms-core/access/adminOnly'
-import { hasRole, isBackendService, isInternalAdmin } from '@cms-core/access/roles'
+import {
+  isBackendService,
+  isCompanyAdministrator,
+  isInternalAdmin,
+  isActiveAccount,
+  hasOperationalRole,
+} from '@cms-core/access/roles'
 import { companyDirectory } from '@cms-core/endpoints/companyDirectory'
 
 /**
@@ -24,15 +30,27 @@ const canCreateCompany: Access = ({ req }) => {
 }
 
 /**
- * An internal admin edits any company; a company user edits only the company
- * they represent. Runs as a query constraint so Payload applies it to reads and
- * writes alike.
+ * Owner and Secretariat read the private dossier; a representative reads only
+ * their own company. Chiefs, reviewers, employers and the investment reviewer
+ * get a separate necessary-profile projection from the backend only when they
+ * are assigned to a case; they never gain direct CMS dossier access.
+ */
+const canReadCompany: Access = ({ req }) => {
+  const user = req.user
+  if (isBackendService(user) || isCompanyAdministrator(user) || isInternalAdmin(user)) return true
+  if (!user || !isActiveAccount(user) || !hasOperationalRole(user, 'representative')) return false
+  return { representative: { equals: user.id } }
+}
+
+/**
+ * Owner edits any company and a representative edits its own. Secretariat is a
+ * reviewer, not a company editor. Backend service updates stay scoped by the
+ * calling route and its projection.
  */
 const canEditCompany: Access = ({ req }) => {
   const user = req.user
   if (isInternalAdmin(user) || isBackendService(user)) return true
-  if (!user || !hasRole(user, 'representative')) return false
-  // `representative` is the company's link back to the acting person.
+  if (!user || !isActiveAccount(user) || !hasOperationalRole(user, 'representative')) return false
   return { representative: { equals: user.id } }
 }
 
@@ -47,7 +65,7 @@ export const Companies: CollectionConfig = {
     plural: 'Companies',
   },
   access: {
-    read: canEditCompany,
+    read: canReadCompany,
     // An internal admin enrolls a company by hand. Public self-registration
     // creates one through the `/self-signup` endpoint, which sets the
     // `allowCompanySignup` context flag on the transaction it owns.

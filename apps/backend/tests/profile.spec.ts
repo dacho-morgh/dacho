@@ -132,6 +132,7 @@ describe('Dashboard Profile Endpoints', () => {
     expect((await request(app).get('/admin/companies/1').set(spoofed)).status).toBe(403)
 
     const actor = await userStore.findById(headers['x-user-id'])
+    actor!.operationalRole = 'reviewer'
     actor!.roles = ['referee']
     expect((await request(app).get('/profile').set(headers)).status).toBe(403)
     expect((await request(app).patch('/profile').set(headers).send({ executives: [] })).status).toBe(403)

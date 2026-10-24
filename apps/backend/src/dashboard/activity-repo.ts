@@ -1,5 +1,7 @@
 import type { Pool } from 'pg'
 
+import type { RequestScope } from '../access/policy.js'
+
 export interface ActivityDto {
   id: string
   ownerId: string
@@ -46,6 +48,53 @@ export interface ActivityList {
 
 export class ActivityRepository {
   constructor(private readonly pool: Pool) {}
+
+  async listScoped(scope: RequestScope, page: number, limit: number): Promise<ActivityList> {
+    const params: unknown[] = []
+    let whereSql: string
+    switch (scope.kind) {
+      case 'all':
+        whereSql = 'TRUE'
+        break
+      case 'none':
+        whereSql = 'FALSE'
+        break
+      case 'owner':
+        params.push(scope.userId)
+        whereSql = `a.owner_id = $${params.length}`
+        break
+      case 'assigned':
+        params.push(scope.userId)
+        const userParam = params.length
+        params.push(scope.role)
+        whereSql = `a.request_id IN (
+          SELECT ca.request_id FROM dashboard.case_assignments ca
+          WHERE ca.user_id = $${userParam} AND ca.role = $${params.length} AND ca.active
+        )`
+        break
+    }
+
+    const { rows: countRows } = await this.pool.query<{ total: string }>(
+      `SELECT COUNT(*) AS total FROM dashboard.activities a WHERE ${whereSql}`,
+      params,
+    )
+    const total = Number(countRows[0]?.total ?? 0)
+    const offset = (page - 1) * limit
+    const { rows } = await this.pool.query<ActivityRow>(
+      `SELECT a.id, a.owner_id, a.request_id, a.letter_id, a.type, a.title, a.description, a.at
+       FROM dashboard.activities a
+       WHERE ${whereSql}
+       ORDER BY a.at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
+    )
+    return {
+      items: rows.map(mapActivity),
+      total,
+      page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    }
+  }
 
   async list(ownerId: string, page: number, limit: number): Promise<ActivityList> {
     const { rows: countRows } = await this.pool.query<{ total: string }>(

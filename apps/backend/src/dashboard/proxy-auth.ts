@@ -1,7 +1,19 @@
 import type { NextFunction, Request, Response } from 'express'
 
-import type { UserRole, UserStore } from '../auth/user-store.js'
+import { operationalRoleOf, type OperationalRole } from '../access/roles.js'
+import type { User, UserRole, UserStore } from '../auth/user-store.js'
 import { USER_ROLES } from '../auth/user-store.js'
+
+export interface ActorContext {
+  id: string
+  operationalRole: OperationalRole
+  user: User
+}
+
+/** The current actor resolved by the proxy guard. Never read role headers here. */
+export function actorOf(res: { locals: Record<string, unknown> }): ActorContext {
+  return res.locals.actor as ActorContext
+}
 
 /**
  * Authenticates dashboard requests that arrive through the same-origin Next.js
@@ -40,7 +52,13 @@ export function requireProxyAuth(proxySecret: string, userStore?: UserStore) {
           res.status(403).json({ error: 'forbidden' })
           return
         }
+        const operationalRole = operationalRoleOf(actor)
+        if (!operationalRole) {
+          res.status(403).json({ error: 'forbidden' })
+          return
+        }
         // Current CMS identity replaces stale/forged forwarded role values.
+        res.locals.actor = { id: String(actor.id), operationalRole, user: actor } satisfies ActorContext
         res.locals.userRoles = actor.roles ?? []
       } catch (error) { next(error); return }
     }

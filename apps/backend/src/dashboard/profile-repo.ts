@@ -6,11 +6,18 @@ export interface CompanyInfo { name: string; establishmentDate: string; status: 
 export interface ContactInfo { phone: string; email: string }
 export interface Executive { role: string; name: string }
 export interface Address { id: string; title: string; province: string; city: string; postalCode: string; address: string }
-export interface UserProfile { company: CompanyInfo; contacts: ContactInfo; executives: Executive[]; addresses: Address[] }
+export interface UserProfile {
+  company: CompanyInfo
+  contacts: ContactInfo
+  executives: Executive[]
+  addresses: Address[]
+  /** Server-resolved owning company for authorized document controls. */
+  companyId: string | null
+}
 
 const EMPTY_PROFILE: UserProfile = {
   company: { name: '', establishmentDate: '', status: '', type: '', registrationNumber: '', economicCode: '', nationalId: '' },
-  contacts: { phone: '', email: '' }, executives: [], addresses: [],
+  contacts: { phone: '', email: '' }, executives: [], addresses: [], companyId: null,
 }
 
 /**
@@ -123,6 +130,7 @@ function fromUserAndCompany(
       postalCode: String(item.postalCode ?? ''),
       address: String(item.address ?? ''),
     })),
+    companyId: company?.id ?? null,
   }
 }
 

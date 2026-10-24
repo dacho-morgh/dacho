@@ -12,6 +12,9 @@ describe('current personnel authority at dashboard boundary', () => {
       'x-user-roles': 'admin',
     }
     expect((await request(app).get('/admin/employees').set(headers)).status).toBe(403)
+    // Only the persisted account decides authority; the forwarded role header
+    // is written by the proxy and ignored even when a browser forges it.
+    actor.operationalRole = 'system-owner'
     actor.roles = ['admin']
     expect(
       (
@@ -24,6 +27,7 @@ describe('current personnel authority at dashboard boundary', () => {
     expect((await request(app).get('/admin/employees').set(headers)).status).toBe(403)
     expect((await request(app).get('/letters').set(headers)).status).toBe(403)
     actor.isActive = true
+    actor.operationalRole = 'representative'
     actor.roles = ['representative']
     expect((await request(app).get('/admin/employees').set(headers)).status).toBe(403)
   })

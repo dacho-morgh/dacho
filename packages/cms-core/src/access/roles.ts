@@ -57,6 +57,44 @@ export function compatibilityRoles(user: RoleCarrier): UserRole[] {
 export function hasRole(user: RoleCarrier, role: UserRole): boolean {
   return compatibilityRoles(user).includes(role)
 }
+
+/**
+ * The current scalar operational role. Falls back to the compatibility
+ * projection only for legacy/in-memory records without a scalar value; it never
+ * reads a request header or browser claim.
+ */
+export function operationalRole(user: RoleCarrier): OperationalRole | null {
+  if (!isActiveAccount(user) || user?.backendService) return null
+  if (user?.operationalRole) {
+    return (OPERATIONAL_ROLES as readonly string[]).includes(user.operationalRole)
+      ? (user.operationalRole as OperationalRole)
+      : null
+  }
+  const roles = Array.isArray(user?.roles) ? user.roles : []
+  if (roles.includes('admin')) return 'system-owner'
+  if (roles.includes('representative')) return 'representative'
+  if (roles.includes('referee')) return 'reviewer'
+  return null
+}
+
+export function hasOperationalRole(user: RoleCarrier, role: OperationalRole): boolean {
+  return operationalRole(user) === role
+}
+
+/** Operational staff allowed to read private dossiers (owner and Secretariat). */
+export function isCompanyAdministrator(user: RoleCarrier): boolean {
+  const role = operationalRole(user)
+  return role === 'system-owner' || role === 'central-secretariat'
+}
+
+/**
+ * The Payload admin panel remains a content desk. Secretariat may enter to read
+ * verification records; chief/reviewer/employer/investment and representatives
+ * do not.
+ */
+export function isCmsOperator(user: RoleCarrier): boolean {
+  return isContentEditor(user) || hasOperationalRole(user, 'central-secretariat')
+}
 export function isInternalAdmin(user: unknown): boolean {
   return hasRole(user as RoleCarrier, 'admin')
 }
