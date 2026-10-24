@@ -6,6 +6,9 @@ import { createTestApp } from '../helpers.js'
 const actor = {
   id: 'authorization-test-user',
   phone: '09120000001',
+  name: 'کاربر مجاز',
+  email: 'authorized@example.invalid',
+  position: 'مدیر آزمون',
   operationalRole: 'system-owner',
   roles: ['admin'] as ('admin' | 'editor' | 'representative' | 'referee')[],
   isActive: true,
@@ -29,6 +32,17 @@ describe('dashboard authorization HTTP routes', () => {
     expect(initialCapabilities.status).toBe(200)
     expect(initialCapabilities.body.role).toBe('system-owner')
     expect(initialCapabilities.body.destinations).toContain('/dashboard/companies')
+
+    const selfProfile = await request(app).get('/profile/me').set(identityHeaders())
+    expect(selfProfile.status).toBe(200)
+    expect(selfProfile.body).toEqual({
+      name: actor.name,
+      position: actor.position,
+      role: 'system-owner',
+      contacts: { phone: actor.phone, email: actor.email },
+    })
+    expect(JSON.stringify(selfProfile.body)).not.toContain('authorization-test-user')
+    await request(app).get('/health').expect(200, { status: 'ok' })
 
     const initiallyAllowed = await request(app)
       .get('/access')

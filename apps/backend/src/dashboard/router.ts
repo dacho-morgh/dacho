@@ -502,12 +502,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json(profile)
   })
 
-  router.get('/profile/me', async (_req, res) => {
+  router.get('/profile/me', (_req, res) => {
     const actor = actorOf(res)
-    const user = await deps.userStore.findById(actor.id)
-    if (!user) { res.status(404).json({ error: 'not_found' }); return }
     res.set('Cache-Control', 'private, no-store, max-age=0')
-    res.json(dashboardSelfProfile(user, actor.operationalRole))
+    res.json(dashboardSelfProfile(actor.user, actor.operationalRole))
   })
 
   router.patch('/profile', async (req, res) => {
