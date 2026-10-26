@@ -39,7 +39,7 @@ Approved: one representative, one company; signup grants panel access only. Phon
 
 **Temporary technical syntax rules.** The exact national-ID and phone dictionaries remain pending T03. In the interim, after normalizing Persian/Arabic digits, the server requires the company national ID to be non-empty ASCII digits with no length gate, and keeps the current client-aligned phone shape `^09\d{9}$`. These are interim shape checks only; no national-ID checksum or other product rule is implied. Invalid syntax returns `400 invalid_field` and must never be reported as a duplicate-company conflict.
 
-**Migration ownership for this field.** `packages/cms-core/src/migrations/20261026_100000_add_company_activity_domain.ts` owns the additive `public.companies.activity_domain` column, because `companies` is a Payload collection with schema push disabled. `apps/backend/migrations/` remains reserved for backend-owned `dashboard.*` SQL; T11 adds no backend migration because no backend SQL path needs this column.
+**Migration ownership for this field.** `packages/cms-core/src/migrations/20261026_120000_company_dossier.ts` exclusively owns `public.companies.activity_domain`, because `companies` is a Payload collection with schema push disabled. The earlier `20261026_100000_add_company_activity_domain` entry remains registered as a no-op to preserve migration history without competing column ownership. `apps/backend/migrations/` remains reserved for backend-owned `dashboard.*` SQL; T11 adds no backend migration because no backend SQL path needs this column.
 
 ## Stage 2 — company completion and verification
 
