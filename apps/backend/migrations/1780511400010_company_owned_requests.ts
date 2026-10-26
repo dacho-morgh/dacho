@@ -4,7 +4,9 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
   pgm.sql('ALTER TABLE dashboard.requests ADD COLUMN IF NOT EXISTS company_id text')
   pgm.sql('CREATE INDEX IF NOT EXISTS requests_company_id_idx ON dashboard.requests (company_id)')
 
-  // Controlled mapping: backfill existing requests whose owner was the company representative
+  // Controlled mapping: backfill existing requests whose owner was the company representative.
+  // Explicitly reference public.companies since node-pg-migrate runs in the dashboard schema.
+  // Use DISTINCT ON (representative_id) to ensure deterministic single-company mapping.
   pgm.sql(`
     DO $$
     BEGIN
@@ -14,7 +16,11 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       ) THEN
         UPDATE dashboard.requests r
         SET company_id = c.id::text
-        FROM companies c
+        FROM (
+          SELECT DISTINCT ON (representative_id) id, representative_id
+          FROM public.companies
+          ORDER BY representative_id, created_at ASC
+        ) c
         WHERE c.representative_id::text = r.owner_id
           AND r.company_id IS NULL;
       END IF;

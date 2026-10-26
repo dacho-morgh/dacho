@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   allowedRequestActions,
   bindRequestScope,
+  canDeleteDocument,
+  canReadDocument,
+  canUploadOwnedDocument,
   requestScopeFor,
+  type DocumentForPolicy,
   type RequestForPolicy,
 } from '../src/access/policy.js'
 import { requestScopeClause } from '../src/dashboard/request-repo.js'
@@ -18,16 +22,30 @@ describe('T12: Company-owned applications and acting person separation', () => {
     expect(bindRequestScope(scope, 'user-1', 'company-100')).toEqual({
       kind: 'company',
       companyId: 'company-100',
+      userId: 'user-1',
     })
     expect(bindRequestScope(scope, 'user-1', null)).toEqual({ kind: 'none' })
     expect(bindRequestScope(scope, 'user-1', undefined)).toEqual({ kind: 'none' })
   })
 
-  it('generates company_id SQL filter for company scope', () => {
-    const params: unknown[] = []
-    const clause = requestScopeClause({ kind: 'company', companyId: 'company-100' }, params, 'r')
-    expect(clause).toBe('r.company_id = $1')
-    expect(params).toEqual(['company-100'])
+  it('generates company_id SQL filter and includes legacy unmigrated fallback when userId is bound', () => {
+    const paramsWithUser: unknown[] = []
+    const clauseWithUser = requestScopeClause(
+      { kind: 'company', companyId: 'company-100', userId: 'user-1' },
+      paramsWithUser,
+      'r',
+    )
+    expect(clauseWithUser).toBe('(r.company_id = $1 OR (r.company_id IS NULL AND r.owner_id = $2))')
+    expect(paramsWithUser).toEqual(['company-100', 'user-1'])
+
+    const paramsWithoutUser: unknown[] = []
+    const clauseWithoutUser = requestScopeClause(
+      { kind: 'company', companyId: 'company-100' },
+      paramsWithoutUser,
+      'r',
+    )
+    expect(clauseWithoutUser).toBe('r.company_id = $1')
+    expect(paramsWithoutUser).toEqual(['company-100'])
   })
 
   it('allows access to company applications regardless of acting user', () => {
@@ -75,5 +93,80 @@ describe('T12: Company-owned applications and acting person separation', () => {
 
     // Another user cannot access legacy unmigrated draft
     expect(allowedRequestActions('representative', legacyDraft, 'user-2', 'company-100')).toEqual([])
+  })
+
+  it('authorizes document operations by company rather than former representative account', () => {
+    const caseDoc: DocumentForPolicy = {
+      category: 'proposal',
+      companyId: null,
+      requestId: 'req-1',
+      requestOwnerId: 'user-former',
+      requestCompanyId: 'company-100',
+      assigned: false,
+    }
+
+    // Current representative of company-100 can read
+    expect(canReadDocument('representative', caseDoc, 'user-new', 'company-100')).toBe(true)
+
+    // Former representative who moved to company-200 CANNOT read company-100 case document
+    expect(canReadDocument('representative', caseDoc, 'user-former', 'company-200')).toBe(false)
+
+    // Same-company representative can upload proposal to draft request
+    expect(
+      canUploadOwnedDocument(
+        'representative',
+        'proposal',
+        {
+          requestOwnerId: 'user-former',
+          requestCompanyId: 'company-100',
+          requestStatus: 'draft',
+        },
+        'user-new',
+        'company-100',
+      ),
+    ).toBe(true)
+
+    // Different-company representative cannot upload
+    expect(
+      canUploadOwnedDocument(
+        'representative',
+        'proposal',
+        {
+          requestOwnerId: 'user-former',
+          requestCompanyId: 'company-100',
+          requestStatus: 'draft',
+        },
+        'user-former',
+        'company-200',
+      ),
+    ).toBe(false)
+
+    // Same-company representative can delete draft document
+    expect(
+      canDeleteDocument(
+        'representative',
+        {
+          requestOwnerId: 'user-former',
+          requestCompanyId: 'company-100',
+          requestStatus: 'draft',
+        },
+        'user-new',
+        'company-100',
+      ),
+    ).toBe(true)
+
+    // Former representative now at different company cannot delete draft document
+    expect(
+      canDeleteDocument(
+        'representative',
+        {
+          requestOwnerId: 'user-former',
+          requestCompanyId: 'company-100',
+          requestStatus: 'draft',
+        },
+        'user-former',
+        'company-200',
+      ),
+    ).toBe(false)
   })
 })

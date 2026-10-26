@@ -195,6 +195,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
 
     const companyId = await actorCompanyId(actor.id, actor.operationalRole)
+    if (actor.operationalRole === 'representative' && !companyId) {
+      res.status(403).json({ error: 'company_required' })
+      return
+    }
     const request = await repo.create({
       serviceId,
       serviceKey: service.key,
@@ -318,6 +322,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       req.params.id,
       actor.id,
       firstStep ? { assignedRole: firstStep.roleName, currentStep: firstStep.title } : undefined,
+      companyId,
     )
     if (result === 'not_found') {
       res.status(404).json({ error: 'not_found' })
@@ -403,19 +408,25 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const read = parseBoolean(req.query.read)
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     res.json(await letters.listScoped(scope, { read, page, limit }))
   })
 
   router.get('/letters/:id', async (req, res) => {
     const actor = actorOf(res)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const letter = await letters.findByIdAndMarkReadScoped(req.params.id, scope)
     if (!letter) {
       res.status(404).json({ error: 'not_found' })
       return
     }
     res.json({ letter })
+  })
+
+  router.get('/stats', async (_req, res) => {
+    const actor = actorOf(res)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
+    res.json(await stats.forScope(scope))
   })
 
   router.get('/stats/overview', async (_req, res) => {
@@ -428,7 +439,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const actor = actorOf(res)
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     res.json(await activities.listScoped(scope, page, limit))
   })
 

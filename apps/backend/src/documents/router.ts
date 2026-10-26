@@ -140,7 +140,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     if (requestId) {
       const request = await requests.findByIdScoped(
         requestId,
-        bindRequestScope(requestScopeFor(actor.operationalRole), actor.id),
+        bindRequestScope(requestScopeFor(actor.operationalRole), actor.id, companyId),
       )
       if (!request) {
         res.status(404).json({ error: 'not_found' })
@@ -242,7 +242,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       if (requestId) {
         const request = await requests.findByIdScoped(
           requestId,
-          bindRequestScope(requestScopeFor(actor.operationalRole), actor.id),
+          bindRequestScope(requestScopeFor(actor.operationalRole), actor.id, companyId),
         )
         if (!request) {
           res.status(404).json({ error: 'not_found' })
@@ -250,6 +250,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         }
         requestOwnerId = request.ownerId
         requestStatus = request.status
+        parentCompanyId = request.companyId ?? parentCompanyId
         if (!parentCompanyId) {
           const ownerCompany = await deps.companyStore.findByRepresentative(request.ownerId)
           parentCompanyId = ownerCompany?.id ?? null
@@ -411,8 +412,8 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     let removed: PrivateDocumentRecord | undefined
     try {
       await client.query('BEGIN')
-      const { rows } = await client.query<{ owner_id: string; status: string }>(
-        'SELECT owner_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+      const { rows } = await client.query<{ owner_id: string; company_id: string | null; status: string }>(
+        'SELECT owner_id, company_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
         [record.requestId],
       )
       const current = rows[0]
@@ -421,7 +422,15 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      if (!canDeleteDocument(actor.operationalRole, { requestOwnerId: current.owner_id, requestStatus: current.status }, actor.id)) {
+      const companyId = await actorCompanyId(actor.id, actor.operationalRole)
+      if (
+        !canDeleteDocument(
+          actor.operationalRole,
+          { requestOwnerId: current.owner_id, requestCompanyId: current.company_id, requestStatus: current.status },
+          actor.id,
+          companyId,
+        )
+      ) {
         await client.query('ROLLBACK')
         res.status(403).json({ error: 'forbidden' })
         return

@@ -129,9 +129,15 @@ export function requestScopeClause(scope: RequestScope, params: unknown[], alias
     case 'owner':
       params.push(scope.userId)
       return `${alias}.owner_id = $${params.length}`
-    case 'company':
+    case 'company': {
       params.push(scope.companyId)
-      return `${alias}.company_id = $${params.length}`
+      const compParam = params.length
+      if (scope.userId) {
+        params.push(scope.userId)
+        return `(${alias}.company_id = $${compParam} OR (${alias}.company_id IS NULL AND ${alias}.owner_id = $${params.length}))`
+      }
+      return `${alias}.company_id = $${compParam}`
+    }
     case 'assigned':
       params.push(scope.userId)
       const userParam = params.length
@@ -279,21 +285,38 @@ export class RequestRepository {
     id: string,
     ownerId: string,
     step?: { assignedRole: string; currentStep: string },
+    companyId?: string | null,
   ): Promise<RequestDto | 'not_found' | 'already_submitted'> {
+    let whereClause = `id = $1 AND owner_id = $2 AND status = 'draft'`
+    const params: unknown[] = [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null]
+    if (companyId) {
+      params.push(companyId)
+      whereClause = `id = $1 AND (company_id = $5 OR (company_id IS NULL AND owner_id = $2)) AND status = 'draft'`
+    }
     const { rows } = await this.pool.query<RequestRow>(
       `UPDATE dashboard.requests
        SET status = 'in_review', submission_date = now(), updated_at = now(),
            assigned_role = $3, current_step = $4
-       WHERE id = $1 AND owner_id = $2 AND status = 'draft'
+       WHERE ${whereClause}
        RETURNING ${REQUEST_COLUMNS}`,
-      [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null],
+      params,
     )
     const updated = rows[0]
     if (updated) return mapRequestRow(updated)
 
     // A competing submit may have won while this UPDATE waited on its row.
     // Only the caller that changed the draft receives a successful transition.
-    const existing = await this.findById(id, ownerId)
+    let existing: RequestDto | undefined
+    if (companyId) {
+      const { rows: existingRows } = await this.pool.query<RequestRow>(
+        `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests
+         WHERE id = $1 AND (company_id = $2 OR (company_id IS NULL AND owner_id = $3))`,
+        [id, companyId, ownerId],
+      )
+      existing = existingRows[0] ? mapRequestRow(existingRows[0]) : undefined
+    } else {
+      existing = await this.findById(id, ownerId)
+    }
     return existing ? 'already_submitted' : 'not_found'
   }
 }

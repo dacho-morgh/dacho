@@ -24,7 +24,7 @@ export interface RequestForPolicy {
 export type RequestScope =
   | { kind: 'all' }
   | { kind: 'owner'; userId: string }
-  | { kind: 'company'; companyId: string }
+  | { kind: 'company'; companyId: string; userId?: string }
   | { kind: 'assigned'; userId: string; role: CaseAssignmentRole }
   | { kind: 'none' }
 
@@ -51,7 +51,7 @@ export function bindRequestScope(
 ): RequestScope {
   if (scope.kind === 'owner') return { ...scope, userId }
   if (scope.kind === 'company') {
-    return companyId ? { ...scope, companyId } : { kind: 'none' }
+    return companyId ? { ...scope, companyId, userId } : { kind: 'none' }
   }
   if (scope.kind === 'assigned') return { ...scope, userId }
   return scope
@@ -216,13 +216,17 @@ export function canUploadOwnedDocument(
   const audience = documentAudience(category)
   if (audience === 'unsupported') return false
   if (audience === 'company' && !parent.companyId) return false
-  if (audience !== 'company' && !parent.requestOwnerId) return false
+  if (audience !== 'company' && !parent.requestOwnerId && !parent.requestCompanyId) return false
   if (role === 'system-owner' || role === 'central-secretariat') return true
   if (role !== 'representative') return false
   if (audience === 'company') {
     return Boolean(parent.companyId && parent.companyId === actorCompanyId)
   }
-  if (!parent.requestOwnerId || parent.requestOwnerId !== actorId) return false
+  const ownsRequest = Boolean(
+    (parent.requestCompanyId && actorCompanyId && parent.requestCompanyId === actorCompanyId) ||
+    (!parent.requestCompanyId && parent.requestOwnerId === actorId)
+  )
+  if (!ownsRequest) return false
   // Draft-only company editing keeps submitted/financial snapshots immutable
   // until T30 introduces versioned package submissions.
   return parent.requestStatus === undefined || parent.requestStatus === null || parent.requestStatus === 'draft'
@@ -256,10 +260,13 @@ export function canReadDocument(
     case 'central-secretariat':
       return true
     case 'representative': {
-      const ownCompany = Boolean(document.companyId && document.companyId === actorCompanyId)
-      const ownsRequest = Boolean(document.requestId && document.requestOwnerId === actorId)
-      if (audience === 'company') return ownCompany
-      return ownCompany || ownsRequest
+      const ownCompany = Boolean(
+        (document.companyId && actorCompanyId && document.companyId === actorCompanyId) ||
+        (document.requestCompanyId && actorCompanyId && document.requestCompanyId === actorCompanyId)
+      )
+      const legacyOwnsRequest = Boolean(!document.requestCompanyId && document.requestId && document.requestOwnerId === actorId)
+      if (audience === 'company') return Boolean(document.companyId && actorCompanyId && document.companyId === actorCompanyId)
+      return ownCompany || legacyOwnsRequest
     }
     case 'chief-reviewer':
     case 'reviewer':
@@ -274,10 +281,19 @@ export function canReadDocument(
 
 export function canDeleteDocument(
   role: OperationalRole,
-  document: { requestOwnerId: string | null; requestStatus: string | null },
+  document: {
+    requestOwnerId: string | null
+    requestCompanyId?: string | null
+    requestStatus: string | null
+  },
   actorId: string,
+  actorCompanyId?: string | null,
 ): boolean {
   if (role === 'system-owner') return true
   if (role !== 'representative') return false
-  return document.requestOwnerId === actorId && document.requestStatus === 'draft'
+  if (document.requestStatus !== 'draft') return false
+  if (document.requestCompanyId && actorCompanyId) {
+    return document.requestCompanyId === actorCompanyId
+  }
+  return document.requestOwnerId === actorId
 }
