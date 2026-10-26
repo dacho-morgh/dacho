@@ -72,6 +72,14 @@ describe('dashboard migrations', () => {
     )
   })
 
+  it('adds transition history fields without breaking the activity view', async () => {
+    const cols = await tableColumns('activities')
+    expect(cols).toEqual(
+      expect.arrayContaining(['actor_id', 'action', 'reason', 'from_state', 'to_state', 'revision']),
+    )
+    expect(await tableColumns('requests')).toEqual(expect.arrayContaining(['revision']))
+  })
+
   it('creates the support ticket messages table', async () => {
     const cols = await tableColumns('support_ticket_messages')
     expect(cols).toEqual(expect.arrayContaining(['id', 'ticket_id', 'author_id', 'author_role', 'body', 'created_at']))

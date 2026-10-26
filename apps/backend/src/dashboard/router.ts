@@ -38,6 +38,17 @@ import type { User, UserStore } from '../auth/user-store.js'
 import { SupportRepository } from './support-repo.js'
 import { createDocumentRouter } from '../documents/router.js'
 import type { PrivateDocumentStorage } from '../documents/storage.js'
+import {
+  isUuid,
+  parseBoothCreate,
+  parseBoothUpdate,
+  parseSettingsInput,
+} from '../exhibitions/catalogue.js'
+import {
+  PostgresBoothCatalogueRepository,
+  type BoothCatalogueRepository,
+} from '../exhibitions/catalogue-repo.js'
+import type { ExhibitionStore } from '../exhibitions/exhibition-store.js'
 
 export interface DashboardDeps {
   pool: Pool
@@ -47,6 +58,8 @@ export interface DashboardDeps {
   companyStore: CompanyStore
   privateDocumentStorage: PrivateDocumentStorage
   eventStore?: EventStore
+  boothCatalogue?: BoothCatalogueRepository
+  exhibitionStore?: ExhibitionStore
 }
 
 function parsePositiveInt(value: unknown, fallback: number): number {
@@ -247,6 +260,19 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
   const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
+  const catalogue =
+    deps.boothCatalogue ?? new PostgresBoothCatalogueRepository(deps.pool)
+
+  async function checkExhibition(
+    exhibitionId: string,
+  ): Promise<{ ok: true; exists: boolean } | { ok: false }> {
+    if (!deps.exhibitionStore) return { ok: true, exists: true }
+    try {
+      return { ok: true, exists: await deps.exhibitionStore.exists(exhibitionId) }
+    } catch {
+      return { ok: false }
+    }
+  }
 
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps }))
@@ -356,7 +382,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json({
       request: requestWithActions(actor.operationalRole, actor.id, request),
       owner: safeOwner(await deps.userStore.findById(request.ownerId)),
-      timeline: await activities.listForRequest(request.id),
+      timeline: await activities.listForRequestScoped(request.id, scope),
       workflow: service?.workflow ?? [],
     })
   })
@@ -371,13 +397,24 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
 
     const service = await deps.serviceCatalog.findById(request.serviceId)
-    const timeline = await activities.listForRequest(request.id)
+    const timeline = await activities.listForRequestScoped(request.id, scope)
     res.json({
       request: requestWithActions(actor.operationalRole, actor.id, request),
       timeline,
       workflow: service?.workflow ?? [],
       owner: safeOwner(await deps.userStore.findById(request.ownerId)),
     })
+  })
+
+  router.get('/requests/:id/history', async (req, res) => {
+    const actor = actorOf(res)
+    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const request = await repo.findByIdScoped(req.params.id, scope)
+    if (!request) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    res.json({ items: await activities.listForRequestScoped(request.id, scope) })
   })
 
   router.post('/requests/:id/submit', async (req, res) => {
@@ -449,6 +486,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.post('/admin/requests/:id/assignments', async (req, res) => {
     const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
     const request = await repo.findByIdAny(req.params.id)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     if (!canRequestAction(actor.operationalRole, request, actor.id, 'assign')) {
@@ -482,6 +523,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.delete('/admin/requests/:id/assignments/:userId', async (req, res) => {
     const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
     const request = await repo.findByIdAny(req.params.id)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     if (!canRequestAction(actor.operationalRole, request, actor.id, 'assign')) {
@@ -904,6 +949,135 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const ticket = await support.close(req.params.id, actor.id, isCompanyAdministrator(actor.operationalRole) ? 'admin' : 'representative')
     if (!ticket) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ ticket })
+  })
+
+  router.get('/exhibitions/:exhibitionId/catalogue', async (req, res, next) => {
+    try {
+    const [settings, booths] = await Promise.all([
+      catalogue.getSettings(req.params.exhibitionId),
+      catalogue.listBooths(req.params.exhibitionId),
+    ])
+    res.json({
+      exhibitionId: req.params.exhibitionId,
+      companyBoothLimit: settings?.companyBoothLimit ?? null,
+      guideMapReference: settings?.guideMapReference ?? null,
+      booths,
+    })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/exhibitions/:exhibitionId/catalogue', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const [settings, booths] = await Promise.all([
+      catalogue.getSettings(req.params.exhibitionId),
+      catalogue.listBooths(req.params.exhibitionId, { includeInactive: true }),
+    ])
+    res.json({
+      exhibitionId: req.params.exhibitionId,
+      companyBoothLimit: settings?.companyBoothLimit ?? null,
+      guideMapReference: settings?.guideMapReference ?? null,
+      booths,
+    })
+    } catch (error) { next(error) }
+  })
+
+  router.put('/admin/exhibitions/:exhibitionId/settings', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const parsed = parseSettingsInput(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error })
+      return
+    }
+    const exhibition = await checkExhibition(req.params.exhibitionId)
+    if (!exhibition.ok) {
+      res.status(503).json({ error: 'exhibition_lookup_failed' })
+      return
+    }
+    if (!exhibition.exists) {
+      res.status(404).json({ error: 'exhibition_not_found' })
+      return
+    }
+    const settings = await catalogue.upsertSettings(
+      req.params.exhibitionId,
+      parsed.value,
+      actor.id,
+    )
+    res.json({ settings })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/exhibitions/:exhibitionId/booths', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const parsed = parseBoothCreate(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error })
+      return
+    }
+    const exhibition = await checkExhibition(req.params.exhibitionId)
+    if (!exhibition.ok) {
+      res.status(503).json({ error: 'exhibition_lookup_failed' })
+      return
+    }
+    if (!exhibition.exists) {
+      res.status(404).json({ error: 'exhibition_not_found' })
+      return
+    }
+    const result = await catalogue.createBooth({
+      ...parsed.value,
+      exhibitionId: req.params.exhibitionId,
+      createdBy: actor.id,
+    })
+    if (!result.ok) {
+      res.status(409).json({ error: result.error })
+      return
+    }
+    res.status(201).json({ booth: result.booth })
+    } catch (error) { next(error) }
+  })
+
+  router.patch('/admin/exhibitions/:exhibitionId/booths/:boothId', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    if (!isUuid(req.params.boothId)) {
+      res.status(400).json({ error: 'invalid_booth_id' })
+      return
+    }
+    const parsed = parseBoothUpdate(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error })
+      return
+    }
+    const result = await catalogue.updateBooth({
+      ...parsed.value,
+      exhibitionId: req.params.exhibitionId,
+      boothId: req.params.boothId,
+      updatedBy: actor.id,
+    })
+    if (!result.ok) {
+      res.status(result.error === 'booth_not_found' ? 404 : 409).json({ error: result.error })
+      return
+    }
+    res.json({ booth: result.booth })
+    } catch (error) { next(error) }
   })
 
   return router
