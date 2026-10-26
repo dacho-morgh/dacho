@@ -12,6 +12,7 @@ export interface RequestDto {
   serviceKey: string
   serviceName: string
   ownerId: string
+  companyId: string | null
   status: RequestStatus
   currentStepIndex: number
   assignedRole: string | null
@@ -31,6 +32,7 @@ export interface RequestRow {
   service_key: string
   service_name: string
   owner_id: string
+  company_id: string | null
   status: RequestStatus
   current_step_index: number
   assigned_role: string | null
@@ -43,14 +45,14 @@ export interface RequestRow {
 }
 
 export const REQUEST_COLUMNS = `
-  id, tracking_code, title, service_id, service_key, service_name, owner_id, status,
+  id, tracking_code, title, service_id, service_key, service_name, owner_id, company_id, status,
   current_step_index, assigned_role, current_step, answers, submission_date, due_date,
   created_at, updated_at
 `
 
 const REQUEST_COLUMNS_ALIASED = `
   r.id, r.tracking_code, r.title, r.service_id, r.service_key, r.service_name, r.owner_id,
-  r.status, r.current_step_index, r.assigned_role, r.current_step, r.answers,
+  r.company_id, r.status, r.current_step_index, r.assigned_role, r.current_step, r.answers,
   r.submission_date, r.due_date, r.created_at, r.updated_at
 `
 
@@ -63,6 +65,7 @@ export function mapRequestRow(row: RequestRow): RequestDto {
     serviceKey: row.service_key,
     serviceName: row.service_name,
     ownerId: row.owner_id,
+    companyId: row.company_id ?? null,
     status: row.status,
     currentStepIndex: row.current_step_index,
     assignedRole: row.assigned_role,
@@ -94,6 +97,7 @@ export interface CreateRequestInput {
   serviceName: string
   title: string
   ownerId: string
+  companyId?: string | null
   answers: Record<string, unknown>
 }
 
@@ -125,6 +129,9 @@ export function requestScopeClause(scope: RequestScope, params: unknown[], alias
     case 'owner':
       params.push(scope.userId)
       return `${alias}.owner_id = $${params.length}`
+    case 'company':
+      params.push(scope.companyId)
+      return `${alias}.company_id = $${params.length}`
     case 'assigned':
       params.push(scope.userId)
       const userParam = params.length
@@ -196,10 +203,10 @@ export class RequestRepository {
       const year = new Date().getFullYear()
       const trackingCode = await nextTrackingCode(client, year)
       const { rows } = await client.query<RequestRow>(
-        `INSERT INTO dashboard.requests (tracking_code, title, service_id, service_key, service_name, owner_id, answers)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO dashboard.requests (tracking_code, title, service_id, service_key, service_name, owner_id, company_id, answers)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING ${REQUEST_COLUMNS}`,
-        [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, JSON.stringify(input.answers)],
+        [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, input.companyId ?? null, JSON.stringify(input.answers)],
       )
       await client.query('COMMIT')
       const created = rows[0]

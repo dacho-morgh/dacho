@@ -13,6 +13,7 @@ export type RequestAction = (typeof REQUEST_ACTIONS)[number]
 
 export interface RequestForPolicy {
   ownerId: string
+  companyId?: string | null
   status: string
 }
 
@@ -23,6 +24,7 @@ export interface RequestForPolicy {
 export type RequestScope =
   | { kind: 'all' }
   | { kind: 'owner'; userId: string }
+  | { kind: 'company'; companyId: string }
   | { kind: 'assigned'; userId: string; role: CaseAssignmentRole }
   | { kind: 'none' }
 
@@ -32,7 +34,7 @@ export function requestScopeFor(role: OperationalRole): RequestScope {
     case 'central-secretariat':
       return { kind: 'all' }
     case 'representative':
-      return { kind: 'owner', userId: '' }
+      return { kind: 'company', companyId: '' }
     case 'chief-reviewer':
     case 'reviewer':
     case 'employer-reviewer':
@@ -41,9 +43,17 @@ export function requestScopeFor(role: OperationalRole): RequestScope {
   }
 }
 
-/** Bind a role-only scope to the current actor id. */
-export function bindRequestScope(scope: RequestScope, userId: string): RequestScope {
-  if (scope.kind === 'owner' || scope.kind === 'assigned') return { ...scope, userId }
+/** Bind a role-only scope to the current actor id and optional company id. */
+export function bindRequestScope(
+  scope: RequestScope,
+  userId: string,
+  companyId?: string | null,
+): RequestScope {
+  if (scope.kind === 'owner') return { ...scope, userId }
+  if (scope.kind === 'company') {
+    return companyId ? { ...scope, companyId } : { kind: 'none' }
+  }
+  if (scope.kind === 'assigned') return { ...scope, userId }
   return scope
 }
 
@@ -56,6 +66,7 @@ export function allowedRequestActions(
   role: OperationalRole,
   request: RequestForPolicy,
   actorId: string,
+  actorCompanyId?: string | null,
 ): RequestAction[] {
   switch (role) {
     case 'system-owner':
@@ -70,7 +81,10 @@ export function allowedRequestActions(
       // advertise routes that do not exist yet.
       return ['read']
     case 'representative': {
-      if (request.ownerId !== actorId) return []
+      const belongsToCompany = Boolean(
+        request.companyId && actorCompanyId && request.companyId === actorCompanyId,
+      ) || (!request.companyId && request.ownerId === actorId)
+      if (!belongsToCompany) return []
       const actions: RequestAction[] = ['read']
       if (request.status === 'draft') actions.push('submit', 'uploadDocument', 'deleteDocument')
       return actions
@@ -83,8 +97,9 @@ export function canRequestAction(
   request: RequestForPolicy,
   actorId: string,
   action: RequestAction,
+  actorCompanyId?: string | null,
 ): boolean {
-  return allowedRequestActions(role, request, actorId).includes(action)
+  return allowedRequestActions(role, request, actorId, actorCompanyId).includes(action)
 }
 
 /* ── Private document policy (docs/system/document-policy.json) ─────────── */

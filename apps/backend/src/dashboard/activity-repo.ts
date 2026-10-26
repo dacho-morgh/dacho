@@ -63,6 +63,13 @@ export class ActivityRepository {
         params.push(scope.userId)
         whereSql = `a.owner_id = $${params.length}`
         break
+      case 'company':
+        params.push(scope.companyId)
+        whereSql = `a.request_id IN (
+          SELECT r.id FROM dashboard.requests r
+          WHERE r.company_id = $${params.length}
+        )`
+        break
       case 'assigned':
         params.push(scope.userId)
         const userParam = params.length
