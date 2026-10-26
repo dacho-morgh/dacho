@@ -32,13 +32,14 @@ const TRACKING = '1780511400005_safe-request-tracking'
 const LATER = [
   '1780511400006_shared_access_and_private_documents',
   '1780511400007_transition_history',
+  '1780511400008_booth_catalogue',
 ]
 
 /**
  * Rehearse the tracking migration against the pre-sequence schema. Later
  * migrations are temporarily reverted too: node-pg-migrate rejects an unapplied
  * earlier migration when a later one is recorded, even for a file-scoped run.
- * The disposable suite restores all of them after each case.
+ * The disposable suite restores all migrations after each case.
  */
 const trackingMigration = (direction: 'up' | 'down') => migration(TRACKING, direction)
 

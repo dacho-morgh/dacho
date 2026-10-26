@@ -6,6 +6,7 @@ import { loadConfig } from './config.js'
 import { createPool } from './db.js'
 import { runMigrations } from './db/migrate.js'
 import { PrivateDocumentStorage } from './documents/storage.js'
+import { PayloadExhibitionStore } from './exhibitions/exhibition-store.js'
 import { JwtSigner } from './jwt.js'
 import { ConsoleOtpDelivery } from './otp/console-delivery.js'
 import { KavenegarOtpDelivery } from './otp/kavenegar-delivery.js'
@@ -35,6 +36,7 @@ const app = createApp({
   serviceCatalog: new PayloadServiceCatalog({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
   proxySecret: config.internalProxySecret,
   privateDocumentStorage,
+  exhibitionStore: new PayloadExhibitionStore({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
 })
 
 app.listen(config.port, () => {

@@ -75,7 +75,13 @@ never treated as an access check.
 | `GET /admin/companies`, `GET /admin/companies/:id` | System Owner / Central Secretariat; explicit projection with no raw user, credential, API key, session or personnel history |
 | `GET /admin/employees` | System Owner / Central Secretariat; id/name/role/active only |
 | `GET /support`, `POST /support`, responses and close | representative's own ticket or System Owner / Central Secretariat |
+| `GET /exhibitions/:id/catalogue` | any active operational role; active booths and public catalogue fields only |
+| `GET /admin/exhibitions/:id/catalogue` | System Owner only; includes inactive booths |
+| `PUT /admin/exhibitions/:id/settings`, `POST|PATCH /admin/exhibitions/:id/booths` | System Owner only; validated catalogue writes |
 | `GET/PATCH /profile` and addresses | active representative with an existing company; identity fields remain protected |
+
+The booth catalogue contract, explicit toman unit and immutable price-version
+snapshot are documented in [exhibition booth catalogue](exhibition-booth-catalogue.md).
 
 Inaccessible request ids return `404`, so a guessed id does not confirm
 existence. Privileged adapters return explicit projections rather than raw CMS
@@ -102,8 +108,10 @@ records.
 These resource types have no implemented prerequisite, so their operations are
 absent or denied rather than stubbed permissively:
 
-- Event, subtopic, RFP, event-team and booth definition workflows (T16–T18,
-  T47). The existing `events`/`exhibitions` collections are public content only.
+- Event, subtopic, RFP and event-team definition workflows (T16–T18). The
+  existing `events`/`exhibitions` collections are public content only. T47
+  booth definition and catalogue reads are implemented separately in the
+  backend, as documented in [exhibition booth catalogue](exhibition-booth-catalogue.md).
 - Application revisions, triage, review rounds, four evaluations, replacement
   and chief decisions (T19–T28).
 - Financial package completeness/handoff, investment memo and publication
