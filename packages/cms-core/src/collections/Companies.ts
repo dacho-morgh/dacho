@@ -98,6 +98,14 @@ export const Companies: CollectionConfig = {
       index: true,
       access: { update: adminOnlyIdentity },
     },
+    // Stage 1 asks for the business activity domain. The vocabulary is still
+    // open (`docs/system/fixed-form-contracts.md`), so it is text; the
+    // self-signup endpoint enforces its presence at submit.
+    {
+      name: 'activityDomain',
+      type: 'text',
+      label: 'حوزه فعالیت',
+    },
     {
       name: 'registrationNumber',
       type: 'text',

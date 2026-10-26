@@ -1335,6 +1335,7 @@ export interface Company {
   id: number;
   name: string;
   nationalId: string;
+  activityDomain?: string | null;
   registrationNumber?: string | null;
   type?: ('سهامی خاص' | 'سهامی عام' | 'مسئولیت محدود' | 'دانش‌بنیان' | 'استارتاپ' | 'سایر') | null;
   province?: string | null;
@@ -2184,6 +2185,7 @@ export interface UsersSelect<T extends boolean = true> {
 export interface CompaniesSelect<T extends boolean = true> {
   name?: T;
   nationalId?: T;
+  activityDomain?: T;
   registrationNumber?: T;
   type?: T;
   province?: T;

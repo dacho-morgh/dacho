@@ -28,6 +28,7 @@ export interface User {
 export type CompanyFields = {
   name?: string
   nationalId?: string
+  activityDomain?: string
   registrationNumber?: string
   type?: string
   province?: string

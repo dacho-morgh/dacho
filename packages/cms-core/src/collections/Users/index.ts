@@ -24,6 +24,8 @@ import {
   isDuplicateNationalId,
   missingCompanyFields,
   missingUserFields,
+  normalizeDigits,
+  normalizeLoginIdentifier,
   pickCompanyFields,
   pickUserFields,
   type SelfSignupBody,
@@ -89,6 +91,17 @@ export const Users: CollectionConfig = {
     update: canUpdateUser,
   },
   hooks: {
+    beforeOperation: [
+      ({ args, operation }) => {
+        // Phone login must accept the digits a Persian/Arabic keyboard emits.
+        // Payload lower-cases email/username itself; only the phone form needs
+        // canonicalizing, and an email identifier is left untouched.
+        if (operation !== 'login') return
+        const data = (args as { data?: Record<string, unknown> }).data
+        if (data && typeof data.username === 'string' && data.username.trim() !== '')
+          data.username = normalizeLoginIdentifier(data.username)
+      },
+    ],
     beforeLogin: [
       ({ user }) => {
         if (!isActiveAccount(user) || user.backendService)
@@ -97,8 +110,10 @@ export const Users: CollectionConfig = {
     ],
     beforeChange: [
       ({ data, originalDoc, req, context, operation }) => {
-        if (typeof data.phone === 'string' && data.phone.trim() !== '')
-          data.username = data.phone.trim()
+        if (typeof data.phone === 'string' && data.phone.trim() !== '') {
+          data.phone = normalizeDigits(data.phone.trim())
+          data.username = data.phone
+        }
         const provision = !req.user && context.allowPersonnelProvisioning === true
         const owner = isInternalAdmin(req.user)
         const selfSignup =
@@ -237,7 +252,7 @@ export const Users: CollectionConfig = {
           )
         }
 
-        const nationalId = String(body.companyNationalId).trim()
+        const nationalId = normalizeDigits(String(body.companyNationalId).trim())
 
         // Fail fast before creating anything: a national id already enrolled
         // must not produce a person record we then cannot attach.
