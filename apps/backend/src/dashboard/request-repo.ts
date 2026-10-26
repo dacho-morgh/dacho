@@ -290,8 +290,11 @@ export class RequestRepository {
         // A competing submit may have won while this UPDATE waited on its row.
         // Only the caller that changed the draft receives a successful transition.
         await client.query('ROLLBACK')
-        const existing = await this.findById(id, ownerId)
-        return existing ? 'already_submitted' : 'not_found'
+        const existing = await client.query<RequestRow>(
+          `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1 AND owner_id = $2`,
+          [id, ownerId],
+        )
+        return existing.rows[0] ? 'already_submitted' : 'not_found'
       }
       await appendTransition(client, {
         requestId: updated.id,

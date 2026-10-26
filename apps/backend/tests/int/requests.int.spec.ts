@@ -287,6 +287,25 @@ describe('requests API', () => {
       expect(count.rows[0]?.total).toBe(1)
     })
 
+    it('handles a losing submit without borrowing a second connection', async () => {
+      const app = await createAppUnderTest()
+      const created = await request(app)
+        .post('/requests')
+        .set(authHeaders(OWNER))
+        .send({ serviceId: '1', title: 'single connection', answers: { company_name: 'آینده' } })
+        .expect(201)
+      const id = created.body.request.id as string
+      const singlePool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 2000 })
+      try {
+        const repo = new RequestRepository(singlePool)
+        expect(await repo.submit(id, OTHER)).toBe('not_found')
+        expect(await repo.submit(id, OWNER)).toMatchObject({ status: 'in_review' })
+        expect(await repo.submit(id, OWNER)).toBe('already_submitted')
+      } finally {
+        await singlePool.end()
+      }
+    })
+
     it('rolls back the business change when history cannot be written', async () => {
       const app = await createAppUnderTest()
       const created = await request(app)
