@@ -17,7 +17,8 @@ export function canOpenDashboardDestination(role: OperationalRole, value: string
   if (path === '/dashboard/requests' || path.startsWith('/dashboard/requests/')) {
     return true
   }
-  if (path === '/dashboard/letters' || path.startsWith('/dashboard/letters/')) {
+  if (path === '/dashboard/letters' || path.startsWith('/dashboard/letters/') ||
+      path === '/dashboard/inbox' || path.startsWith('/dashboard/inbox/')) {
     return true
   }
   if (path === '/dashboard/profile' || path === '/dashboard/profile/account') return true

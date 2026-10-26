@@ -1335,6 +1335,7 @@ export interface Company {
   id: number;
   name: string;
   nationalId: string;
+  activityDomain?: string | null;
   registrationNumber?: string | null;
   type?: ('سهامی خاص' | 'سهامی عام' | 'مسئولیت محدود' | 'دانش‌بنیان' | 'استارتاپ' | 'سایر') | null;
   province?: string | null;
@@ -1360,6 +1361,49 @@ export interface Company {
         id?: string | null;
       }[]
     | null;
+  legalEntityType?: string | null;
+  knowledgeBasedStatus?: string | null;
+  classification?: string | null;
+  foundingYear?: string | null;
+  website?: string | null;
+  centerEstablishment?: string | null;
+  insuredEmployeeCount?: number | null;
+  productsServices?:
+    | {
+        title: string;
+        id?: string | null;
+      }[]
+    | null;
+  keyMembers?:
+    | {
+        name: string;
+        role: string;
+        id?: string | null;
+      }[]
+    | null;
+  pastProjectsCustomers?:
+    | {
+        project: string;
+        customer?: string | null;
+        summary?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  requestedServices?:
+    | {
+        service: string;
+        id?: string | null;
+      }[]
+    | null;
+  certificatesLicenses?:
+    | {
+        title: string;
+        issuer?: string | null;
+        reference?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  notAvailable?: unknown;
   updatedAt: string;
   createdAt: string;
 }
@@ -2184,6 +2228,7 @@ export interface UsersSelect<T extends boolean = true> {
 export interface CompaniesSelect<T extends boolean = true> {
   name?: T;
   nationalId?: T;
+  activityDomain?: T;
   registrationNumber?: T;
   type?: T;
   province?: T;

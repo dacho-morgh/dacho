@@ -1,6 +1,6 @@
 # System documentation
 
-Updated: 2026-10-24. This is the English specification for the event, review, investment and exhibition system. It records approved product decisions; it does not claim those features are implemented.
+Updated: 2026-10-26. This is the English specification for the event, review, investment and exhibition system. It records approved product decisions; it does not claim those features are implemented.
 
 | Document | Purpose |
 | --- | --- |

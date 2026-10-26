@@ -3,6 +3,16 @@ import { canOpenDashboardDestination } from '../src/dashboard/destination-access
 import { dashboardSelfProfile } from '../src/dashboard/self-profile.js'
 
 describe('current-role dashboard destinations', () => {
+  it('preserves inbox list and detail aliases for every operational role', () => {
+    const roles = ['system-owner', 'central-secretariat', 'chief-reviewer', 'reviewer',
+      'employer-reviewer', 'investment-reviewer', 'representative'] as const
+    for (const role of roles) {
+      expect(canOpenDashboardDestination(role, '/dashboard/inbox')).toBe(true)
+      expect(canOpenDashboardDestination(role, '/dashboard/inbox/letter-id')).toBe(true)
+      expect(canOpenDashboardDestination(role, '/dashboard/inbox-other')).toBe(false)
+    }
+  })
+
   it('allows the shared dashboard exactly without treating it as a route prefix', () => {
     expect(canOpenDashboardDestination('reviewer', '/dashboard')).toBe(true)
     expect(canOpenDashboardDestination('reviewer', '/dashboard/companies')).toBe(false)

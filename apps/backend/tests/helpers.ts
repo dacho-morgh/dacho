@@ -4,7 +4,14 @@ import { Pool } from 'pg'
 import { InMemoryCompanyStore } from '../src/auth/company-store.js'
 import { InMemoryUserStore, type UserStore } from '../src/auth/user-store.js'
 import { createApp } from '../src/app.js'
+import type { EventStore } from '../src/dashboard/event-repo.js'
 import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
+import { InMemoryDossierDocumentSource } from '../src/dashboard/dossier.js'
+import {
+  InMemoryBoothCatalogueRepository,
+  type BoothCatalogueRepository,
+} from '../src/exhibitions/catalogue-repo.js'
+import type { ExhibitionStore } from '../src/exhibitions/exhibition-store.js'
 import { JwtSigner } from '../src/jwt.js'
 import { InMemoryCodeStore } from '../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../src/otp/console-delivery.js'
@@ -15,12 +22,19 @@ export interface TestApp {
   codeStore: InMemoryCodeStore
   userStore: UserStore
   companyStore: InMemoryCompanyStore
+  dossierDocuments: InMemoryDossierDocumentSource
+  boothCatalogue: BoothCatalogueRepository
   jwt: JwtSigner
 }
 
 export interface TestAppOptions {
   /** Swap the in-memory identity store for a remote-backed implementation. */
   userStore?: UserStore
+  /** Keep event authorization/validation tests independent of Postgres. */
+  eventStore?: EventStore
+  boothCatalogue?: BoothCatalogueRepository
+  exhibitionStore?: ExhibitionStore
+  pool?: Pool
 }
 
 export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
@@ -28,19 +42,24 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const codeStore = new InMemoryCodeStore()
   const userStore = options.userStore ?? new InMemoryUserStore()
   const companyStore = new InMemoryCompanyStore()
+  const dossierDocuments = new InMemoryDossierDocumentSource()
+  const boothCatalogue = options.boothCatalogue ?? new InMemoryBoothCatalogueRepository()
   const jwt = await JwtSigner.create('test-kid')
-  // Unit tests never touch the dashboard routes, so the pool is never queried;
-  // a lazy, unconnected pool satisfies the type without requiring a live DB.
-  const pool = new Pool()
+  // Tests that query dashboard routes inject a pool stub; default stays unconnected.
+  const pool = options.pool ?? new Pool()
   const app = createApp({
     codeStore,
     delivery,
     jwt,
     userStore,
     companyStore,
+    dossierDocuments,
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret: 'test-proxy-secret',
+    eventStore: options.eventStore,
+    boothCatalogue,
+    exhibitionStore: options.exhibitionStore,
   })
-  return { app, delivery, codeStore, userStore, companyStore, jwt }
+  return { app, delivery, codeStore, userStore, companyStore, dossierDocuments, boothCatalogue, jwt }
 }
