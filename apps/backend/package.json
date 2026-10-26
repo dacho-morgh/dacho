@@ -13,6 +13,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "migrate": "tsx src/db/migrate-cli.ts",
+    "inventory": "tsx src/db/migration-inventory-cli.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --config ./vitest.config.mts",
     "test:int": "vitest run --config ./vitest.int.config.mts"
