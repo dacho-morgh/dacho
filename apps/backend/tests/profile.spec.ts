@@ -148,4 +148,135 @@ describe('Dashboard Profile Endpoints', () => {
     expect(response.status).toBe(404)
     expect(response.body.error).toBe('company_not_found')
   })
+
+  describe('company dossier', () => {
+    const requiredValues = {
+      legalEntityType: 'سهامی خاص',
+      knowledgeBasedStatus: 'دانش‌بنیان نوع یک',
+      classification: 'فناوری اطلاعات',
+      foundingYear: '1398',
+      activityDomain: 'نرم‌افزار',
+      productsServices: ['سامانه ابری'],
+      keyMembers: [{ name: 'نام عضو', role: 'فنی' }],
+    }
+    const optionalAbsent = [
+      'centerEstablishment',
+      'website',
+      'insuredEmployeeCount',
+      'pastProjectsCustomers',
+      'requestedServices',
+      'catalogues',
+      'certificatesLicenses',
+      'amendmentNotices',
+    ] as const
+
+    async function createDossierTestApp() {
+      const testApp = await createProfileTestApp()
+      const user = await testApp.userStore.findOrCreateByPhone('09120000001')
+      const company = await testApp.companyStore.create({ name: 'شرکت دوسیه', representativeId: user.id })
+      await testApp.companyStore.update(company.id, {
+        registrationNumber: '12345',
+        status: 'فعال',
+        addresses: [{ title: 'دفتر', province: 'بوشهر', city: 'بوشهر', postalCode: '7514', address: 'نشانی' }],
+      })
+      testApp.dossierDocuments.add(company.id, 'articlesOfAssociation')
+      testApp.dossierDocuments.add(company.id, 'establishmentNotices')
+      return {
+        ...testApp,
+        company,
+        headers: {
+          'x-internal-proxy-secret': 'test-proxy-secret',
+          'x-user-id': user.id,
+          'x-user-roles': 'representative',
+        },
+      }
+    }
+
+    it('GET /profile/dossier reports required gaps and missing optional answers', async () => {
+      const { app, headers } = await createDossierTestApp()
+
+      const res = await request(app).get('/profile/dossier').set(headers)
+
+      expect(res.status).toBe(200)
+      expect(res.body.dossier).toMatchObject({ legalEntityType: '', productsServices: [], notAvailable: [] })
+      expect(res.body.documents).toHaveLength(2)
+      expect(res.body.missing.required).toEqual(
+        expect.arrayContaining(['legalEntityType', 'foundingYear', 'knowledgeBasedStatus', 'productsServices', 'keyMembers']),
+      )
+      expect(res.body.missing.required).not.toContain('registrationNumber')
+      expect(res.body.missing.optional).toContain('website')
+      expect(res.body.missing.canRequestVerification).toBe(false)
+    })
+
+    it('persists dossier values, keeps legal entity type separate, and records permitted absence', async () => {
+      const { app, headers } = await createDossierTestApp()
+
+      const patch = await request(app)
+        .patch('/profile/dossier')
+        .set(headers)
+        .send({ ...requiredValues, notAvailable: optionalAbsent })
+
+      expect(patch.status, JSON.stringify(patch.body)).toBe(200)
+      expect(patch.body.dossier).toMatchObject(requiredValues)
+      expect(patch.body.dossier.legalEntityType).toBe('سهامی خاص')
+      expect(patch.body.dossier.knowledgeBasedStatus).toBe('دانش‌بنیان نوع یک')
+      expect(patch.body.dossier.notAvailable).toEqual([...optionalAbsent])
+      expect(patch.body.missing.required).toEqual([])
+      expect(patch.body.missing.optional).toEqual([])
+      expect(patch.body.missing.canRequestVerification).toBe(true)
+
+      const get = await request(app).get('/profile/dossier').set(headers)
+      expect(get.body.dossier).toMatchObject({ ...requiredValues, notAvailable: [...optionalAbsent] })
+    })
+
+    it('clears a value when it is declared absent and restores it when a value returns', async () => {
+      const { app, headers } = await createDossierTestApp()
+
+      await request(app).patch('/profile/dossier').set(headers).send({ website: 'https://example.invalid' })
+      let res = await request(app).patch('/profile/dossier').set(headers).send({ notAvailable: ['website'] })
+      expect(res.status, JSON.stringify(res.body)).toBe(200)
+      expect(res.body.dossier.website).toBe('')
+      expect(res.body.dossier.notAvailable).toContain('website')
+
+      res = await request(app).patch('/profile/dossier').set(headers).send({ website: 'https://example.invalid' })
+      expect(res.body.dossier.website).toBe('https://example.invalid')
+      expect(res.body.dossier.notAvailable).not.toContain('website')
+    })
+
+    it('rejects conflicting or invalid absence answers without changing the dossier', async () => {
+      const { app, headers } = await createDossierTestApp()
+      await request(app).patch('/profile/dossier').set(headers).send({ website: 'https://example.invalid' })
+
+      const conflict = await request(app)
+        .patch('/profile/dossier')
+        .set(headers)
+        .send({ website: 'https://example.invalid', notAvailable: ['website'] })
+      expect(conflict.status).toBe(400)
+      expect(conflict.body.error).toBe('conflicting_absence')
+
+      const invalid = await request(app)
+        .patch('/profile/dossier')
+        .set(headers)
+        .send({ notAvailable: ['notAField'] })
+      expect(invalid.status).toBe(400)
+      expect(invalid.body.error).toBe('invalid_absence_field')
+
+      const get = await request(app).get('/profile/dossier').set(headers)
+      expect(get.body.dossier.website).toBe('https://example.invalid')
+      expect(get.body.dossier.notAvailable).not.toContain('website')
+    })
+
+    it('also accepts dossier fields through PATCH /profile', async () => {
+      const { app, headers } = await createDossierTestApp()
+
+      const res = await request(app)
+        .patch('/profile')
+        .set(headers)
+        .send({ company: { name: 'شرکت به‌روز' }, legalEntityType: 'سهامی خاص' })
+
+      expect(res.status).toBe(200)
+      expect(res.body.company.name).toBe('شرکت به‌روز')
+      expect(res.body.dossier.legalEntityType).toBe('سهامی خاص')
+    })
+  })
 })

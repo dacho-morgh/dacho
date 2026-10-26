@@ -5,6 +5,7 @@ import { InMemoryCompanyStore } from '../src/auth/company-store.js'
 import { InMemoryUserStore, type UserStore } from '../src/auth/user-store.js'
 import { createApp } from '../src/app.js'
 import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
+import { InMemoryDossierDocumentSource } from '../src/dashboard/dossier.js'
 import { JwtSigner } from '../src/jwt.js'
 import { InMemoryCodeStore } from '../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../src/otp/console-delivery.js'
@@ -15,6 +16,7 @@ export interface TestApp {
   codeStore: InMemoryCodeStore
   userStore: UserStore
   companyStore: InMemoryCompanyStore
+  dossierDocuments: InMemoryDossierDocumentSource
   jwt: JwtSigner
 }
 
@@ -28,6 +30,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const codeStore = new InMemoryCodeStore()
   const userStore = options.userStore ?? new InMemoryUserStore()
   const companyStore = new InMemoryCompanyStore()
+  const dossierDocuments = new InMemoryDossierDocumentSource()
   const jwt = await JwtSigner.create('test-kid')
   // Unit tests never touch the dashboard routes, so the pool is never queried;
   // a lazy, unconnected pool satisfies the type without requiring a live DB.
@@ -38,9 +41,10 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     jwt,
     userStore,
     companyStore,
+    dossierDocuments,
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret: 'test-proxy-secret',
   })
-  return { app, delivery, codeStore, userStore, companyStore, jwt }
+  return { app, delivery, codeStore, userStore, companyStore, dossierDocuments, jwt }
 }

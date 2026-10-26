@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import type { Address as StoredAddress, Executive as StoredExecutive, UserStore } from '../auth/user-store.js'
+import type { Address as StoredAddress, CompanyFields, Executive as StoredExecutive, UserStore } from '../auth/user-store.js'
 import type { Company, CompanyStore } from '../auth/company-store.js'
+import {
+  dossierFields,
+  dossierOfCompany,
+  EMPTY_DOSSIER,
+  mergeDossier,
+  type CompanyDossier,
+} from './dossier.js'
 
 export interface CompanyInfo { name: string; establishmentDate: string; status: string; type: string; registrationNumber: string; economicCode: string; nationalId: string }
 export interface ContactInfo { phone: string; email: string }
@@ -11,13 +18,15 @@ export interface UserProfile {
   contacts: ContactInfo
   executives: Executive[]
   addresses: Address[]
+  /** Stage-2 completion and resume data, kept separate from registration identity. */
+  dossier: CompanyDossier
   /** Server-resolved owning company for authorized document controls. */
   companyId: string | null
 }
 
 const EMPTY_PROFILE: UserProfile = {
   company: { name: '', establishmentDate: '', status: '', type: '', registrationNumber: '', economicCode: '', nationalId: '' },
-  contacts: { phone: '', email: '' }, executives: [], addresses: [], companyId: null,
+  contacts: { phone: '', email: '' }, executives: [], addresses: [], dossier: EMPTY_DOSSIER, companyId: null,
 }
 
 /**
@@ -64,6 +73,14 @@ export class ProfileRepository {
 
   async updateExecutives(userId: string, executives: Executive[]): Promise<UserProfile> {
     await this.updateCompany(userId, { executives: executives.map(toStoredExecutive) })
+    return this.getProfile(userId)
+  }
+
+  async updateDossier(userId: string, update: Partial<CompanyFields>): Promise<UserProfile> {
+    const company = await this.companies.findByRepresentative(userId)
+    if (!company) throw new Error(`Company not found for representative: ${userId}`)
+    const next = mergeDossier(dossierOfCompany(company), update)
+    await this.companies.update(company.id, dossierFields(next))
     return this.getProfile(userId)
   }
 
@@ -130,6 +147,7 @@ function fromUserAndCompany(
       postalCode: String(item.postalCode ?? ''),
       address: String(item.address ?? ''),
     })),
+    dossier: dossierOfCompany(company),
     companyId: company?.id ?? null,
   }
 }
