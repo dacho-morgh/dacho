@@ -72,9 +72,53 @@ describe('dashboard migrations', () => {
     )
   })
 
+  it('adds transition history fields without breaking the activity view', async () => {
+    const cols = await tableColumns('activities')
+    expect(cols).toEqual(
+      expect.arrayContaining(['actor_id', 'action', 'reason', 'from_state', 'to_state', 'revision']),
+    )
+    expect(await tableColumns('requests')).toEqual(expect.arrayContaining(['revision']))
+  })
+
   it('creates the support ticket messages table', async () => {
     const cols = await tableColumns('support_ticket_messages')
     expect(cols).toEqual(expect.arrayContaining(['id', 'ticket_id', 'author_id', 'author_role', 'body', 'created_at']))
+  })
+
+  it('creates the events table with the registration window and responsible people', async () => {
+    const cols = await tableColumns('events')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'title',
+        'description',
+        'registration_open_at',
+        'registration_close_at',
+        'responsible_chief_id',
+        'responsible_investment_id',
+        'revision',
+        'created_by',
+        'created_at',
+        'updated_at',
+      ]),
+    )
+  })
+
+  it('creates the event audit table with actor, reason, revision and snapshots', async () => {
+    const cols = await tableColumns('event_audit')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'event_id',
+        'revision',
+        'actor_id',
+        'reason',
+        'changed_fields',
+        'before_state',
+        'after_state',
+        'created_at',
+      ]),
+    )
   })
 
   it('types requests.status with the request_status enum', async () => {
