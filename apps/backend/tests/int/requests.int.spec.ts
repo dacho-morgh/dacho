@@ -67,6 +67,7 @@ describe('requests API', () => {
   })
 
   beforeEach(async () => {
+    await pool.query('DELETE FROM dashboard.activities')
     await pool.query('DELETE FROM dashboard.requests')
   })
 
@@ -262,6 +263,64 @@ describe('requests API', () => {
       const res = await request(app).post(`/requests/${id}/submit`).set(authHeaders(OWNER))
       expect(res.status).toBe(409)
       expect(res.body.error).toBe('already_submitted')
+    })
+
+    it('writes no history for rejected or repeated submits', async () => {
+      const app = await createAppUnderTest()
+      const created = await request(app)
+        .post('/requests')
+        .set(authHeaders(OWNER))
+        .send({ serviceId: '1', title: 'history once', answers: { company_name: 'آینده' } })
+      const id = created.body.request.id as string
+
+      await request(app).post(`/requests/${id}/submit`).set(authHeaders(OTHER)).expect(404)
+      let count = await pool.query<{ total: number }>(
+        'SELECT COUNT(*)::int AS total FROM dashboard.activities',
+      )
+      expect(count.rows[0]?.total).toBe(0)
+
+      await request(app).post(`/requests/${id}/submit`).set(authHeaders(OWNER)).expect(200)
+      await request(app).post(`/requests/${id}/submit`).set(authHeaders(OWNER)).expect(409)
+      count = await pool.query<{ total: number }>(
+        'SELECT COUNT(*)::int AS total FROM dashboard.activities',
+      )
+      expect(count.rows[0]?.total).toBe(1)
+    })
+
+    it('rolls back the business change when history cannot be written', async () => {
+      const app = await createAppUnderTest()
+      const created = await request(app)
+        .post('/requests')
+        .set(authHeaders(OWNER))
+        .send({ serviceId: '1', title: 'atomic history', answers: { company_name: 'آینده' } })
+        .expect(201)
+      const id = created.body.request.id as string
+      const repo = new RequestRepository(pool)
+
+      await pool.query('DROP TRIGGER IF EXISTS t36_fail_history ON dashboard.activities')
+      await pool.query('DROP FUNCTION IF EXISTS dashboard.t36_fail_history()')
+      await pool.query(`CREATE FUNCTION dashboard.t36_fail_history() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN RAISE EXCEPTION 'forced history failure'; END $$`)
+      await pool.query(`CREATE TRIGGER t36_fail_history BEFORE INSERT ON dashboard.activities
+        FOR EACH ROW EXECUTE FUNCTION dashboard.t36_fail_history()`)
+      try {
+        await expect(repo.submit(id, OWNER)).rejects.toThrow('forced history failure')
+      } finally {
+        await pool.query('DROP TRIGGER IF EXISTS t36_fail_history ON dashboard.activities')
+        await pool.query('DROP FUNCTION IF EXISTS dashboard.t36_fail_history()')
+      }
+
+      expect((await repo.findById(id, OWNER))?.status).toBe('draft')
+      const before = await pool.query<{ total: number }>(
+        'SELECT COUNT(*)::int AS total FROM dashboard.activities',
+      )
+      expect(before.rows[0]?.total).toBe(0)
+
+      await request(app).post(`/requests/${id}/submit`).set(authHeaders(OWNER)).expect(200)
+      const after = await pool.query<{ total: number }>(
+        'SELECT COUNT(*)::int AS total FROM dashboard.activities',
+      )
+      expect(after.rows[0]?.total).toBe(1)
     })
 
     it('allows exactly one concurrent HTTP submit and preserves its result on retry', async () => {

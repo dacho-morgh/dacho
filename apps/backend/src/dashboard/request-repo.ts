@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 
 import type { RequestScope } from '../access/policy.js'
+import { appendTransition } from './transition-history.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
@@ -273,20 +274,42 @@ export class RequestRepository {
     ownerId: string,
     step?: { assignedRole: string; currentStep: string },
   ): Promise<RequestDto | 'not_found' | 'already_submitted'> {
-    const { rows } = await this.pool.query<RequestRow>(
-      `UPDATE dashboard.requests
-       SET status = 'in_review', submission_date = now(), updated_at = now(),
-           assigned_role = $3, current_step = $4
-       WHERE id = $1 AND owner_id = $2 AND status = 'draft'
-       RETURNING ${REQUEST_COLUMNS}`,
-      [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null],
-    )
-    const updated = rows[0]
-    if (updated) return mapRequestRow(updated)
-
-    // A competing submit may have won while this UPDATE waited on its row.
-    // Only the caller that changed the draft receives a successful transition.
-    const existing = await this.findById(id, ownerId)
-    return existing ? 'already_submitted' : 'not_found'
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const { rows } = await client.query<RequestRow & { revision: number }>(
+        `UPDATE dashboard.requests
+         SET status = 'in_review', submission_date = now(), updated_at = now(),
+             assigned_role = $3, current_step = $4, revision = revision + 1
+         WHERE id = $1 AND owner_id = $2 AND status = 'draft'
+         RETURNING ${REQUEST_COLUMNS}, revision`,
+        [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null],
+      )
+      const updated = rows[0]
+      if (!updated) {
+        // A competing submit may have won while this UPDATE waited on its row.
+        // Only the caller that changed the draft receives a successful transition.
+        await client.query('ROLLBACK')
+        const existing = await this.findById(id, ownerId)
+        return existing ? 'already_submitted' : 'not_found'
+      }
+      await appendTransition(client, {
+        requestId: updated.id,
+        ownerId: updated.owner_id,
+        actorId: ownerId,
+        action: 'submit',
+        fromState: 'draft',
+        toState: updated.status,
+        revision: updated.revision,
+        reason: null,
+      })
+      await client.query('COMMIT')
+      return mapRequestRow(updated)
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw err
+    } finally {
+      client.release()
+    }
   }
 }

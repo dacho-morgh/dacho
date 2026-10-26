@@ -29,13 +29,16 @@ const migration = (file: string, direction: 'up' | 'down') =>
   })
 
 const TRACKING = '1780511400005_safe-request-tracking'
-const LATER = '1780511400006_shared_access_and_private_documents'
+const LATER = [
+  '1780511400006_shared_access_and_private_documents',
+  '1780511400007_transition_history',
+]
 
 /**
- * Rehearse the tracking migration against the pre-sequence schema. A later
- * migration is temporarily reverted too: node-pg-migrate rejects an unapplied
+ * Rehearse the tracking migration against the pre-sequence schema. Later
+ * migrations are temporarily reverted too: node-pg-migrate rejects an unapplied
  * earlier migration when a later one is recorded, even for a file-scoped run.
- * The disposable suite restores both migrations after each case.
+ * The disposable suite restores all of them after each case.
  */
 const trackingMigration = (direction: 'up' | 'down') => migration(TRACKING, direction)
 
@@ -47,14 +50,14 @@ describe('request tracking migration on isolated synthetic data', () => {
   beforeEach(async () => {
     await pool.query('DELETE FROM dashboard.requests')
     // The shared integration setup has already verified the disposable marker.
-    await migration(LATER, 'down')
+    for (const file of [...LATER].reverse()) await migration(file, 'down')
     const reverted = await trackingMigration('down')
     expect(reverted.map((entry) => entry.name)).toEqual([TRACKING])
   })
 
   afterEach(async () => {
     await trackingMigration('up')
-    await migration(LATER, 'up')
+    for (const file of LATER) await migration(file, 'up')
     await pool.query('DELETE FROM dashboard.requests')
   })
 
