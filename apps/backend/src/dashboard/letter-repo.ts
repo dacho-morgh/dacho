@@ -62,20 +62,24 @@ function letterScopeClause(scope: RequestScope, params: unknown[], alias = 'l'):
             AND (${alias}.recipient_id = $${params.length} OR ${alias}.sender_id = $${params.length}))
       )`
     case 'company': {
-      params.push(scope.companyId)
-      const compParam = params.length
-      if (scope.userId) {
-        params.push(scope.userId)
-        const userParam = params.length
+      if (!scope.userId) return 'FALSE'
+      params.push(scope.userId)
+      const userParam = params.length
+      if (scope.companyId) {
+        params.push(scope.companyId)
+        const compParam = params.length
         return `(
-          (${alias}.request_id IS NULL AND (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam}))
-          OR (${alias}.request_id IN (
-            SELECT r.id FROM dashboard.requests r
-            WHERE r.company_id = $${compParam} OR (r.company_id IS NULL AND r.owner_id = $${userParam})
-          ))
+          (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam})
+          AND (
+            ${alias}.request_id IS NULL
+            OR ${alias}.request_id IN (
+              SELECT r.id FROM dashboard.requests r
+              WHERE r.company_id = $${compParam} OR (r.company_id IS NULL AND r.owner_id = $${userParam})
+            )
+          )
         )`
       }
-      return `(${alias}.request_id IN (SELECT r.id FROM dashboard.requests r WHERE r.company_id = $${compParam}))`
+      return `(${alias}.request_id IS NULL AND (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam}))`
     }
     case 'assigned':
       params.push(scope.userId)

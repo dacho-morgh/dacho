@@ -30,7 +30,10 @@ async function appUnderTest() {
       ...['user-1', 'user-2', 'company-1', 'company-2'].map((id) => ({ id, phone: id, roles: ['representative' as const], isActive: true })),
       { id: 'staff-1', phone: 'staff-1', roles: ['admin'], isActive: true },
     ]),
-    companyStore: new InMemoryCompanyStore(),
+    companyStore: new InMemoryCompanyStore([
+      { name: 'Company 1', nationalId: '10000000001', representativeId: 'user-1' },
+      { name: 'Company 2', nationalId: '10000000002', representativeId: 'user-2' },
+    ]),
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret,
@@ -49,7 +52,10 @@ async function appWithFailingUserLookup() {
     delivery: new ConsoleOtpDelivery(),
     jwt: await JwtSigner.create('test-kid'),
     userStore: new FailingLookupUserStore(),
-    companyStore: new InMemoryCompanyStore(),
+    companyStore: new InMemoryCompanyStore([
+      { name: 'Company 1', nationalId: '10000000001', representativeId: 'user-1' },
+      { name: 'Company 2', nationalId: '10000000002', representativeId: 'user-2' },
+    ]),
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret,

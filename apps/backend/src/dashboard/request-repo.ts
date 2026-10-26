@@ -208,12 +208,29 @@ export class RequestRepository {
       await client.query('BEGIN')
       const year = new Date().getFullYear()
       const trackingCode = await nextTrackingCode(client, year)
-      const { rows } = await client.query<RequestRow>(
-        `INSERT INTO dashboard.requests (tracking_code, title, service_id, service_key, service_name, owner_id, company_id, answers)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING ${REQUEST_COLUMNS}`,
-        [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, input.companyId ?? null, JSON.stringify(input.answers)],
-      )
+      const hasCompanyCol =
+        (
+          await client.query<{ exists: boolean }>(
+            `SELECT EXISTS (
+               SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'dashboard' AND table_name = 'requests' AND column_name = 'company_id'
+             ) AS exists`,
+          )
+        ).rows[0]?.exists ?? true
+
+      const { rows } = hasCompanyCol
+        ? await client.query<RequestRow>(
+            `INSERT INTO dashboard.requests (tracking_code, title, service_id, service_key, service_name, owner_id, company_id, answers)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING ${REQUEST_COLUMNS}`,
+            [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, input.companyId ?? null, JSON.stringify(input.answers)],
+          )
+        : await client.query<RequestRow>(
+            `INSERT INTO dashboard.requests (tracking_code, title, service_id, service_key, service_name, owner_id, answers)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING id, tracking_code, title, service_id, service_key, service_name, owner_id, NULL::text AS company_id, status, current_step_index, assigned_role, current_step, answers, submission_date, due_date, created_at, updated_at`,
+            [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, JSON.stringify(input.answers)],
+          )
       await client.query('COMMIT')
       const created = rows[0]
       if (!created) throw new Error('INSERT requests returned no row')

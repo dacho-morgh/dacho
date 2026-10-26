@@ -195,6 +195,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
 
     const companyId = await actorCompanyId(actor.id, actor.operationalRole)
+    if (actor.operationalRole === 'representative' && !companyId) {
+      res.status(403).json({ error: 'company_required' })
+      return
+    }
     const request = await repo.create({
       serviceId,
       serviceKey: service.key,
