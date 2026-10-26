@@ -68,7 +68,7 @@ function mapRow(row: DocumentRow): PrivateDocumentRecord {
     updatedAt: row.updated_at.toISOString(),
     requestOwnerId: row.request_owner_id,
     requestStatus: row.request_status,
-    requestCompanyId: row.request_company_id ?? row.company_id,
+    requestCompanyId: row.request_company_id,
   }
 }
 
