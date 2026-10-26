@@ -23,13 +23,14 @@ const TEST_EMAILS = [
   'int-registration-admin@example.com',
   'int-registration-result@example.com',
 ]
+const TEST_COMPANY_NATIONAL_ID = '99000000001'
 
 let payload: Payload
 
 const cleanup = async () => {
   await payload.delete({
     collection: 'companies',
-    where: { nationalId: { like: 'int-nid-' } },
+    where: { nationalId: { equals: TEST_COMPANY_NATIONAL_ID } },
   })
   await payload.delete({ collection: 'users', where: { email: { equals: 'int-duplicate@example.com' } } })
   await payload.delete({
@@ -101,8 +102,9 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[5],
         name: 'نماینده ایجادشده در نشست ادمین',
+        position: 'مدیرعامل',
         companyName: 'شرکت تست',
-        companyNationalId: 'int-nid-escalation',
+        companyNationalId: TEST_COMPANY_NATIONAL_ID,
         companyEstablishmentDate: '1375',
         companyStatus: 'فعال',
         companyEconomicCode: '1234567890',
@@ -142,7 +144,7 @@ describe('users roles & access control', () => {
   })
 
   it('rejects a duplicate national id with 409 and creates no user', async () => {
-    // The company created by the previous test owns 'int-nid-escalation'.
+    // The company created by the previous test owns TEST_COMPANY_NATIONAL_ID.
     // Other spec files create users concurrently; inspect only this attempt.
     const attemptedUser = { email: { equals: 'int-duplicate@example.com' } }
     expect((await payload.count({ collection: 'users', where: attemptedUser })).totalDocs).toBe(0)
@@ -154,8 +156,9 @@ describe('users roles & access control', () => {
         password: 'int-test-password',
         phone: TEST_PHONES[5],
         name: 'تکراری',
+        position: 'مدیرعامل',
         companyName: 'شرکت تکراری',
-        companyNationalId: 'int-nid-escalation',
+        companyNationalId: TEST_COMPANY_NATIONAL_ID,
       }),
     })
 
