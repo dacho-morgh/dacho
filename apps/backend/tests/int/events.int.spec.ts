@@ -6,6 +6,7 @@ import { createApp } from '../../src/app.js'
 import { InMemoryCompanyStore } from '../../src/auth/company-store.js'
 import { InMemoryUserStore, type User } from '../../src/auth/user-store.js'
 import { InMemoryServiceCatalog } from '../../src/catalog/service-catalog.js'
+import { EventRepository } from '../../src/dashboard/event-repo.js'
 import { runMigrations } from '../../src/db/migrate.js'
 import { JwtSigner } from '../../src/jwt.js'
 import { InMemoryCodeStore } from '../../src/otp/code-store.js'
@@ -122,5 +123,130 @@ describe('events API', () => {
     expect(list.body.items.map((event: { id: string }) => event.id)).toEqual([firstId])
     expect((await request(app).get(`/admin/events/${secondId}`).set(authHeaders('chief-1'))).status).toBe(404)
     expect((await request(app).get(`/admin/events/${firstId}`).set(authHeaders('chief-2'))).status).toBe(404)
+  })
+
+  it('records reassignment history atomically and survives a reload', async () => {
+    const app = await createAppUnderTest()
+    const created = await request(app)
+      .post('/admin/events')
+      .set(authHeaders('owner-1'))
+      .send(eventPayload())
+    expect(created.status).toBe(201)
+    const eventId = created.body.event.id as string
+
+    const reassigned = await request(app)
+      .patch(`/admin/events/${eventId}`)
+      .set(authHeaders('owner-1'))
+      .send({
+        responsibleChiefId: 'chief-2',
+        responsibleInvestmentId: 'investment-2',
+        revision: 1,
+        reason: 'Replace the event team',
+      })
+    expect(reassigned.status).toBe(200)
+    expect(reassigned.body.event).toMatchObject({
+      responsibleChiefId: 'chief-2',
+      responsibleInvestmentId: 'investment-2',
+      revision: 2,
+    })
+
+    const restartedApp = await createAppUnderTest()
+    const reloaded = await request(restartedApp)
+      .get(`/admin/events/${eventId}`)
+      .set(authHeaders('chief-2'))
+    expect(reloaded.status).toBe(200)
+    expect(reloaded.body.event).toMatchObject({
+      responsibleChiefId: 'chief-2',
+      responsibleInvestmentId: 'investment-2',
+      revision: 2,
+    })
+
+    const history = await new EventRepository(pool).listAudit(eventId)
+    expect(history).toHaveLength(1)
+    expect(history[0]).toMatchObject({
+      eventId,
+      revision: 2,
+      actorId: 'owner-1',
+      reason: 'Replace the event team',
+    })
+    expect(history[0]?.changedFields).toEqual(
+      expect.arrayContaining(['responsibleChiefId', 'responsibleInvestmentId']),
+    )
+    expect(history[0]?.before).toMatchObject({
+      responsibleChiefId: 'chief-1',
+      responsibleInvestmentId: 'investment-1',
+      revision: 1,
+    })
+    expect(history[0]?.after).toMatchObject({
+      responsibleChiefId: 'chief-2',
+      responsibleInvestmentId: 'investment-2',
+      revision: 2,
+    })
+  })
+
+  it('rejects a stale concurrent edit instead of restoring a revoked assignment', async () => {
+    const app = await createAppUnderTest()
+    const created = await request(app)
+      .post('/admin/events')
+      .set(authHeaders('owner-1'))
+      .send(eventPayload())
+    expect(created.status).toBe(201)
+    const eventId = created.body.event.id as string
+
+    const [reassignment, edit] = await Promise.all([
+      request(app)
+        .patch(`/admin/events/${eventId}`)
+        .set(authHeaders('owner-1'))
+        .send({
+          responsibleChiefId: 'chief-2',
+          responsibleInvestmentId: 'investment-2',
+          revision: 1,
+          reason: 'Reassign the event',
+        }),
+      request(app)
+        .patch(`/admin/events/${eventId}`)
+        .set(authHeaders('owner-1'))
+        .send({
+          title: 'ویرایش هم‌زمان',
+          revision: 1,
+          reason: 'Edit the title',
+        }),
+    ])
+
+    expect([reassignment.status, edit.status].sort()).toEqual([200, 409])
+    const reassignmentWon = reassignment.status === 200
+    const rejected = reassignmentWon ? edit : reassignment
+    expect(rejected.body).toEqual({ error: 'stale_event', revision: 2 })
+
+    const final = await request(app)
+      .get(`/admin/events/${eventId}`)
+      .set(authHeaders('owner-1'))
+    expect(final.status).toBe(200)
+    expect(final.body.event.revision).toBe(2)
+    expect(final.body.event.responsibleChiefId).toBe(reassignmentWon ? 'chief-2' : 'chief-1')
+    expect(final.body.event.responsibleInvestmentId).toBe(
+      reassignmentWon ? 'investment-2' : 'investment-1',
+    )
+    expect(final.body.event.title).toBe(
+      reassignmentWon ? 'رویداد سرمایه‌گذاری' : 'ویرایش هم‌زمان',
+    )
+
+    const { rows } = await pool.query(
+      `SELECT revision, actor_id, changed_fields, before_state, after_state
+       FROM dashboard.event_audit WHERE event_id = $1 ORDER BY revision`,
+      [eventId],
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      revision: 2,
+      actor_id: 'owner-1',
+      changed_fields: reassignmentWon
+        ? expect.arrayContaining(['responsibleChiefId', 'responsibleInvestmentId'])
+        : ['title'],
+    })
+    expect(rows[0].before_state.responsibleChiefId).toBe('chief-1')
+    expect(rows[0].after_state.responsibleChiefId).toBe(
+      reassignmentWon ? 'chief-2' : 'chief-1',
+    )
   })
 })

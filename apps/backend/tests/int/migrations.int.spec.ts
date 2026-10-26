@@ -88,9 +88,27 @@ describe('dashboard migrations', () => {
         'registration_close_at',
         'responsible_chief_id',
         'responsible_investment_id',
+        'revision',
         'created_by',
         'created_at',
         'updated_at',
+      ]),
+    )
+  })
+
+  it('creates the event audit table with actor, reason, revision and snapshots', async () => {
+    const cols = await tableColumns('event_audit')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'event_id',
+        'revision',
+        'actor_id',
+        'reason',
+        'changed_fields',
+        'before_state',
+        'after_state',
+        'created_at',
       ]),
     )
   })

@@ -18,7 +18,8 @@ const USERS: User[] = [
   { id: 'investment-1', phone: '09000000005', name: 'Investment One', operationalRole: 'investment-reviewer', isActive: true },
   { id: 'investment-2', phone: '09000000006', name: 'Investment Two', operationalRole: 'investment-reviewer', isActive: true },
   { id: 'reviewer-1', phone: '09000000007', name: 'Reviewer', operationalRole: 'reviewer', isActive: true },
-  { id: 'representative-1', phone: '09000000008', name: 'Representative', operationalRole: 'representative', isActive: true },
+  { id: 'employer-1', phone: '09000000008', name: 'Employer Reviewer', operationalRole: 'employer-reviewer', isActive: true },
+  { id: 'representative-1', phone: '09000000009', name: 'Representative', operationalRole: 'representative', isActive: true },
 ]
 
 interface EventTestApp extends TestApp {
@@ -66,6 +67,7 @@ describe('Event configuration', () => {
       title: 'رویداد سرمایه‌گذاری',
       responsibleChiefId: 'chief-1',
       responsibleInvestmentId: 'investment-1',
+      revision: 1,
       createdBy: 'owner-1',
       allowedActions: ['read', 'manage'],
     })
@@ -82,7 +84,12 @@ describe('Event configuration', () => {
     const updated = await request(app)
       .patch(`/admin/events/${eventId}`)
       .set(as('owner-1'))
-      .send({ title: 'رویداد به‌روزشده', registrationCloseAt: '2027-03-01T00:00:00.000Z' })
+      .send({
+        title: 'رویداد به‌روزشده',
+        registrationCloseAt: '2027-03-01T00:00:00.000Z',
+        revision: 1,
+        reason: 'Correct the event window',
+      })
 
     expect(updated.status).toBe(200)
     expect(updated.body.event).toMatchObject({
@@ -90,17 +97,122 @@ describe('Event configuration', () => {
       responsibleChiefId: 'chief-1',
       responsibleInvestmentId: 'investment-1',
       registrationCloseAt: '2027-03-01T00:00:00.000Z',
+      revision: 2,
     })
 
     const persisted = await eventStore.findById(eventId)
     expect(persisted?.title).toBe('رویداد به‌روزشده')
     expect(persisted?.responsibleChiefId).toBe('chief-1')
     expect(persisted?.responsibleInvestmentId).toBe('investment-1')
+    expect(persisted?.revision).toBe(2)
+  })
+
+  it('rejects a stale revision and keeps the newer reassignment and audit history', async () => {
+    const { app, eventStore, as } = await createEventTestApp()
+    const created = await request(app)
+      .post('/admin/events')
+      .set(as('owner-1'))
+      .send(eventPayload())
+    const eventId = created.body.event.id as string
+
+    const reassigned = await request(app)
+      .patch(`/admin/events/${eventId}`)
+      .set(as('owner-1'))
+      .send({
+        responsibleChiefId: 'chief-2',
+        responsibleInvestmentId: 'investment-2',
+        revision: 1,
+        reason: 'Replace the event team',
+      })
+    expect(reassigned.status).toBe(200)
+    expect(reassigned.body.event).toMatchObject({
+      responsibleChiefId: 'chief-2',
+      responsibleInvestmentId: 'investment-2',
+      revision: 2,
+    })
+
+    const staleEdit = await request(app)
+      .patch(`/admin/events/${eventId}`)
+      .set(as('owner-1'))
+      .send({
+        title: 'ویرایش قدیمی',
+        responsibleChiefId: 'chief-1',
+        revision: 1,
+        reason: 'Edit from a stale snapshot',
+      })
+    expect(staleEdit.status).toBe(409)
+    expect(staleEdit.body).toEqual({ error: 'stale_event', revision: 2 })
+
+    const persisted = await eventStore.findById(eventId)
+    expect(persisted).toMatchObject({
+      title: 'رویداد سرمایه‌گذاری',
+      responsibleChiefId: 'chief-2',
+      responsibleInvestmentId: 'investment-2',
+      revision: 2,
+    })
+
+    const history = await eventStore.listAudit(eventId)
+    expect(history).toHaveLength(1)
+    expect(history[0]).toMatchObject({
+      revision: 2,
+      actorId: 'owner-1',
+      reason: 'Replace the event team',
+    })
+    expect(history[0]?.changedFields).toEqual(
+      expect.arrayContaining(['responsibleChiefId', 'responsibleInvestmentId']),
+    )
+    expect(history[0]?.before.responsibleChiefId).toBe('chief-1')
+    expect(history[0]?.after.responsibleChiefId).toBe('chief-2')
+  })
+
+  it('requires revision and reason for event updates', async () => {
+    const { app, as } = await createEventTestApp()
+    const created = await request(app)
+      .post('/admin/events')
+      .set(as('owner-1'))
+      .send(eventPayload())
+    const eventId = created.body.event.id as string
+
+    const noRevision = await request(app)
+      .patch(`/admin/events/${eventId}`)
+      .set(as('owner-1'))
+      .send({ title: 'بدون نسخه', reason: 'Missing revision' })
+    expect(noRevision.status).toBe(400)
+    expect(noRevision.body).toEqual({ error: 'invalid_event', fields: ['revision'] })
+
+    const noReason = await request(app)
+      .patch(`/admin/events/${eventId}`)
+      .set(as('owner-1'))
+      .send({ title: 'بدون دلیل', revision: 1 })
+    expect(noReason.status).toBe(400)
+    expect(noReason.body).toEqual({ error: 'invalid_event', fields: ['reason'] })
+  })
+
+  it('returns a controlled not-found for malformed event ids', async () => {
+    const { app, as } = await createEventTestApp()
+
+    const read = await request(app).get('/admin/events/not-a-uuid').set(as('owner-1'))
+    expect(read.status).toBe(404)
+    expect(read.body).toEqual({ error: 'not_found' })
+
+    const write = await request(app)
+      .patch('/admin/events/not-a-uuid')
+      .set(as('owner-1'))
+      .send({ title: 'x', revision: 1, reason: 'x' })
+    expect(write.status).toBe(404)
+    expect(write.body).toEqual({ error: 'not_found' })
   })
 
   it('rejects event configuration writes from every non-owner role', async () => {
     const { app, eventStore, as } = await createEventTestApp()
-    const owners = ['secretariat-1', 'chief-1', 'investment-1', 'reviewer-1', 'representative-1']
+    const owners = [
+      'secretariat-1',
+      'chief-1',
+      'investment-1',
+      'reviewer-1',
+      'employer-1',
+      'representative-1',
+    ]
 
     for (const actor of owners) {
       const response = await request(app).post('/admin/events').set(as(actor)).send(eventPayload())
@@ -119,7 +231,7 @@ describe('Event configuration', () => {
       const response = await request(app)
         .patch(`/admin/events/${eventId}`)
         .set(as(actor))
-        .send({ title: 'تغییر غیرمجاز' })
+        .send({ title: 'تغییر غیرمجاز', revision: 1, reason: 'Unauthorized change' })
       expect(response.status).toBe(403)
       expect(response.body).toEqual({ error: 'forbidden' })
     }

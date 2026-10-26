@@ -23,6 +23,7 @@ import { ActivityRepository } from './activity-repo.js'
 import { AssignmentRepository } from './assignment-repo.js'
 import {
   EventRepository,
+  isEventId,
   type EventConfiguration,
   type EventInput,
   type EventStore,
@@ -59,6 +60,25 @@ function parseBoolean(value: unknown): boolean | undefined {
   if (value === 'true') return true
   if (value === 'false') return false
   return undefined
+}
+
+function eventUpdateBody(body: unknown): Record<string, unknown> | null {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return null
+  return body as Record<string, unknown>
+}
+
+function parseEventRevision(body: unknown): number | null {
+  const revision = eventUpdateBody(body)?.revision
+  return typeof revision === 'number' && Number.isInteger(revision) && revision > 0
+    ? revision
+    : null
+}
+
+function parseEventReason(body: unknown): string | null {
+  const reason = eventUpdateBody(body)?.reason
+  if (typeof reason !== 'string') return null
+  const trimmed = reason.trim()
+  return trimmed ? trimmed : null
 }
 
 function isRepresentative(role: string): boolean {
@@ -498,6 +518,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(403).json({ error: 'forbidden' })
       return
     }
+    if (!isEventId(req.params.id)) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
     const event = await eventStore.findById(req.params.id)
     if (!event || !canActOnEvent(actor.operationalRole, actor.id, event, 'read')) {
       res.status(404).json({ error: 'not_found' })
@@ -536,9 +560,27 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(403).json({ error: 'forbidden' })
       return
     }
+    if (!isEventId(req.params.id)) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
     const existing = await eventStore.findById(req.params.id)
     if (!existing) {
       res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const revision = parseEventRevision(req.body)
+    if (revision === null) {
+      res.status(400).json({ error: 'invalid_event', fields: ['revision'] })
+      return
+    }
+    const reason = parseEventReason(req.body)
+    if (reason === null) {
+      res.status(400).json({ error: 'invalid_event', fields: ['reason'] })
+      return
+    }
+    if (existing.revision !== revision) {
+      res.status(409).json({ error: 'stale_event', revision: existing.revision })
       return
     }
     const parsed = normalizeEventInput(req.body, existing)
@@ -555,12 +597,21 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(400).json({ error: 'ineligible_responsible_person', field: ineligible })
       return
     }
-    const event = await eventStore.update(existing.id, parsed.input)
-    if (!event) {
+    const updated = await eventStore.update(existing.id, {
+      ...parsed.input,
+      expectedRevision: revision,
+      actorId: actor.id,
+      reason,
+    })
+    if (!updated.ok) {
+      if (updated.error === 'stale') {
+        res.status(409).json({ error: 'stale_event', revision: updated.event.revision })
+        return
+      }
       res.status(404).json({ error: 'not_found' })
       return
     }
-    res.json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
+    res.json({ event: eventWithActions(actor.operationalRole, actor.id, updated.event) })
   })
 
   router.get('/letters', async (req, res) => {

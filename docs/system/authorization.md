@@ -50,6 +50,16 @@ writes every event; Central Secretariat reads every event; an assigned chief or
 investment reviewer reads only that event; every other role is denied. Event
 responsibility does not import request, dossier or document authority.
 
+Every event update is revision-checked and audited. `PATCH /admin/events/:id`
+requires the current `revision` plus a non-empty administrative `reason`; a
+stale revision returns `409 stale_event` without writing. The update and its
+`dashboard.event_audit` row commit in one transaction. The audit row stores the
+acting owner, reason, new revision, changed field names and full before/after
+snapshots. The existing `dashboard.activities` table is request/letter-specific
+and has no event or before/after shape, so event history uses a dedicated table.
+Client-supplied ids, actors and revisions are requests, never authority: the
+row lock and `WHERE revision = $n` check decide whether the write applies.
+
 ## Server-derived actions
 
 Request responses carry `allowedActions`, computed by the same
@@ -83,7 +93,7 @@ access check.
 | `DELETE /admin/requests/:id/assignments/:userId` | System Owner only; stores revoker, time and reason; access ends immediately |
 | `GET /admin/requests/:id/assignments` | System Owner / Central Secretariat |
 | `GET /admin/events`, `GET /admin/events/:id` | internal roles only; System Owner / Central Secretariat all, assigned chief/investment reviewer own event, other internal roles empty/404 |
-| `POST /admin/events`, `PATCH /admin/events/:id` | System Owner only; responsible people must be active and currently hold chief-reviewer / investment-reviewer respectively; registration close must be after open |
+| `POST /admin/events`, `PATCH /admin/events/:id` | System Owner only; responsible people must be active and currently hold chief-reviewer / investment-reviewer respectively; registration close must be after open; PATCH requires the current revision and a reason, records an atomic audit entry and returns `409` for a stale revision |
 | `GET /letters`, `GET /letters/:id`, `DELETE /letters/:id` | case letters require current case ownership/assignment and sender-or-recipient participation; deletion additionally requires recipient scope. Non-case personal letters retain sender/recipient scope; all-scope oversight remains explicit |
 | `GET /stats`, `GET /activities` | identical scope as the request list |
 | `GET /admin/companies`, `GET /admin/companies/:id` | System Owner / Central Secretariat; explicit projection with no raw user, credential, API key, session or personnel history |
@@ -134,11 +144,13 @@ absent or denied rather than stubbed permissively:
 
 ## Verification
 
-- Backend unit: 12 files / 70 tests, including the seven-role matrix,
-  allowedActions, revocation, document audience and event validation/scoping.
-- Backend Postgres integration: 9 files / 54 tests, including real persisted
-  requests, assignments, event configuration, role changes, deactivation,
-  lists/details/counts, letters, safe projections and file isolation.
+- Backend unit: 12 files / 73 tests, including the seven-role matrix,
+  allowedActions, revocation, document audience, event validation/scoping,
+  revision conflicts and audit history.
+- Backend Postgres integration: 9 files / 57 tests, including real persisted
+  requests, assignments, event configuration and audit history, concurrent
+  event updates, role changes, deactivation, lists/details/counts, letters,
+  safe projections and file isolation.
 - Frontend Postgres integration: 49 files passed + 1 skipped; 202 tests passed +
   1 skipped, including direct CMS/Local API dossier denial and the shared
   document controls.
