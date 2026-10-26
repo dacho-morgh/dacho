@@ -1,4 +1,4 @@
-import type { Address, CompanyFields, Executive, User } from './user-store.js'
+import { isAbsenceField, type Address, type CompanyFields, type Executive, type User } from './user-store.js'
 
 export interface Company extends CompanyFields {
   id: string
@@ -123,9 +123,37 @@ export class PayloadCompanyStore implements CompanyStore {
         'establishmentDate',
         'status',
         'economicCode',
+        'legalEntityType',
+        'knowledgeBasedStatus',
+        'classification',
+        'foundingYear',
+        'activityDomain',
+        'website',
+        'centerEstablishment',
       ]),
+      ...(typeof d.insuredEmployeeCount === 'number'
+        ? { insuredEmployeeCount: d.insuredEmployeeCount }
+        : {}),
       ...(Array.isArray(d.executives) ? { executives: d.executives as Executive[] } : {}),
       ...(Array.isArray(d.addresses) ? { addresses: d.addresses as Address[] } : {}),
+      ...(Array.isArray(d.productsServices)
+        ? { productsServices: d.productsServices.map(textEntry).filter(isPresent) }
+        : {}),
+      ...(Array.isArray(d.requestedServices)
+        ? { requestedServices: d.requestedServices.map(serviceEntry).filter(isPresent) }
+        : {}),
+      ...(Array.isArray(d.keyMembers)
+        ? { keyMembers: d.keyMembers as CompanyFields['keyMembers'] }
+        : {}),
+      ...(Array.isArray(d.pastProjectsCustomers)
+        ? { pastProjectsCustomers: d.pastProjectsCustomers as CompanyFields['pastProjectsCustomers'] }
+        : {}),
+      ...(Array.isArray(d.certificatesLicenses)
+        ? { certificatesLicenses: d.certificatesLicenses as CompanyFields['certificatesLicenses'] }
+        : {}),
+      ...(Array.isArray(d.notAvailable)
+        ? { notAvailable: d.notAvailable.filter(isAbsenceField) }
+        : {}),
     }
   }
 }
@@ -140,12 +168,42 @@ const COMPANY_FIELDS = [
   'establishmentDate',
   'status',
   'economicCode',
+  'legalEntityType',
+  'knowledgeBasedStatus',
+  'classification',
+  'foundingYear',
+  'activityDomain',
+  'website',
+  'centerEstablishment',
 ] as const
 
+function textEntry(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && typeof (value as { title?: unknown }).title === 'string') {
+    return (value as { title: string }).title
+  }
+  return undefined
+}
+
+function serviceEntry(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && typeof (value as { service?: unknown }).service === 'string') {
+    return (value as { service: string }).service
+  }
+  return undefined
+}
+
+function isPresent(value: string | undefined): value is string {
+  return value !== undefined
+}
+
 /** Keeps only the fields actually present, so PATCHes stay partial. */
-function mapFields(fields: CompanyFields): Partial<CompanyFields> {
+function mapFields(fields: CompanyFields): Record<string, unknown> {
   return {
     ...pickStrings(fields as Record<string, unknown>, COMPANY_FIELDS),
+    ...(fields.insuredEmployeeCount !== undefined
+      ? { insuredEmployeeCount: fields.insuredEmployeeCount }
+      : {}),
     ...(fields.executives !== undefined
       ? { executives: fields.executives.map(({ position, name }) => ({ position, name })) }
       : {}),
@@ -157,6 +215,34 @@ function mapFields(fields: CompanyFields): Partial<CompanyFields> {
           })),
         }
       : {}),
+    ...(fields.productsServices !== undefined
+      ? { productsServices: fields.productsServices.map((title) => ({ title })) }
+      : {}),
+    ...(fields.keyMembers !== undefined
+      ? { keyMembers: fields.keyMembers.map(({ name, role }) => ({ name, role })) }
+      : {}),
+    ...(fields.pastProjectsCustomers !== undefined
+      ? {
+          pastProjectsCustomers: fields.pastProjectsCustomers.map(({ project, customer, summary }) => ({
+            project,
+            ...(customer !== undefined ? { customer } : {}),
+            ...(summary !== undefined ? { summary } : {}),
+          })),
+        }
+      : {}),
+    ...(fields.requestedServices !== undefined
+      ? { requestedServices: fields.requestedServices.map((service) => ({ service })) }
+      : {}),
+    ...(fields.certificatesLicenses !== undefined
+      ? {
+          certificatesLicenses: fields.certificatesLicenses.map(({ title, issuer, reference }) => ({
+            title,
+            ...(issuer !== undefined ? { issuer } : {}),
+            ...(reference !== undefined ? { reference } : {}),
+          })),
+        }
+      : {}),
+    ...(fields.notAvailable !== undefined ? { notAvailable: fields.notAvailable } : {}),
   }
 }
 

@@ -9,6 +9,7 @@ import {
   hasOperationalRole,
 } from '@cms-core/access/roles'
 import { companyDirectory } from '@cms-core/endpoints/companyDirectory'
+import { validateCompanyAbsenceList } from './companyAbsence'
 
 /**
  * A Company (شرکت) — the organization that applies for the Innovation
@@ -170,6 +171,68 @@ export const Companies: CollectionConfig = {
         { name: 'postalCode', type: 'text', label: 'کد پستی' },
         { name: 'address', type: 'textarea', required: true, label: 'نشانی' },
       ],
+    },
+    // Stage 2 — company completion and resume. Legal entity type and
+    // knowledge-based status are deliberately separate attributes.
+    { name: 'legalEntityType', type: 'text', label: 'شخصیت حقوقی' },
+    { name: 'knowledgeBasedStatus', type: 'text', label: 'وضعیت دانش‌بنیان' },
+    { name: 'classification', type: 'text', label: 'طبقه‌بندی شرکت' },
+    { name: 'foundingYear', type: 'text', label: 'سال تأسیس' },
+    { name: 'activityDomain', type: 'text', label: 'حوزه فعالیت' },
+    { name: 'website', type: 'text', label: 'وب‌سایت' },
+    { name: 'centerEstablishment', type: 'text', label: 'استقرار در مرکز تحقیقات یا فناوری' },
+    {
+      name: 'insuredEmployeeCount',
+      type: 'number',
+      label: 'تعداد کارکنان بیمه‌شده',
+      min: 0,
+    },
+    {
+      name: 'productsServices',
+      type: 'array',
+      label: 'محصولات و خدمات',
+      fields: [{ name: 'title', type: 'text', required: true, label: 'عنوان' }],
+    },
+    {
+      name: 'keyMembers',
+      type: 'array',
+      label: 'اعضای کلیدی',
+      fields: [
+        { name: 'name', type: 'text', required: true, label: 'نام' },
+        { name: 'role', type: 'text', required: true, label: 'سمت' },
+      ],
+    },
+    {
+      name: 'pastProjectsCustomers',
+      type: 'array',
+      label: 'پروژه‌ها و مشتریان گذشته',
+      fields: [
+        { name: 'project', type: 'text', required: true, label: 'پروژه' },
+        { name: 'customer', type: 'text', label: 'مشتری' },
+        { name: 'summary', type: 'textarea', label: 'خلاصه' },
+      ],
+    },
+    {
+      name: 'requestedServices',
+      type: 'array',
+      label: 'خدمات درخواستی',
+      fields: [{ name: 'service', type: 'text', required: true, label: 'خدمت' }],
+    },
+    {
+      name: 'certificatesLicenses',
+      type: 'array',
+      label: 'گواهی‌ها و مجوزها',
+      fields: [
+        { name: 'title', type: 'text', required: true, label: 'عنوان' },
+        { name: 'issuer', type: 'text', label: 'صادرکننده' },
+        { name: 'reference', type: 'text', label: 'شماره یا مرجع' },
+      ],
+    },
+    {
+      name: 'notAvailable',
+      type: 'json',
+      label: 'موارد اعلام‌شده به‌عنوان نداشتن یا در دسترس نبودن',
+      validate: validateCompanyAbsenceList,
     },
   ],
   timestamps: true,

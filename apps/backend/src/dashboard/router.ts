@@ -22,6 +22,14 @@ import type { ServiceCatalog, ServiceDefinition } from '../catalog/service-catal
 import { ActivityRepository } from './activity-repo.js'
 import { AssignmentRepository } from './assignment-repo.js'
 import {
+  DossierValidationError,
+  dossierOfCompany,
+  missingDossierItems,
+  pickDossierUpdate,
+  SqlDossierDocumentSource,
+  type DossierDocumentSource,
+} from './dossier.js'
+import {
   EventRepository,
   isEventId,
   type EventConfiguration,
@@ -57,6 +65,8 @@ export interface DashboardDeps {
   userStore: UserStore
   companyStore: CompanyStore
   privateDocumentStorage: PrivateDocumentStorage
+  /** Test seam for the company dossier's document inventory. */
+  dossierDocuments?: DossierDocumentSource
   eventStore?: EventStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
@@ -257,6 +267,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const activities = new ActivityRepository(deps.pool)
   const stats = new StatsRepository(deps.pool)
   const profileRepo = new ProfileRepository(deps.userStore, deps.companyStore)
+  const dossierDocuments = deps.dossierDocuments ?? new SqlDossierDocumentSource(deps.pool)
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
   const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
@@ -715,6 +726,30 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(403).json({ error: 'protected_company_identity' })
       return
     }
+    let dossierUpdate
+    try {
+      dossierUpdate = pickDossierUpdate(req.body?.dossier ?? req.body)
+    } catch (error) {
+      if (error instanceof DossierValidationError) {
+        res.status(400).json({ error: error.code })
+        return
+      }
+      throw error
+    }
+    // Write the dossier first: its merge validation is the only 400-producing
+    // part of this combined PATCH, so a rejected request must not leave the
+    // company, contacts or executives partially updated.
+    if (Object.keys(dossierUpdate).length > 0) {
+      try {
+        profile = await profileRepo.updateDossier(actor.id, dossierUpdate)
+      } catch (error) {
+        if (error instanceof DossierValidationError) {
+          res.status(400).json({ error: error.code })
+          return
+        }
+        throw error
+      }
+    }
     if (company && typeof company === 'object') {
       profile = await profileRepo.updateBasicInfo(actor.id, company)
     }
@@ -725,6 +760,53 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       profile = await profileRepo.updateExecutives(actor.id, req.body.executives)
     }
     res.json(profile)
+  })
+
+  router.get('/profile/dossier', async (_req, res) => {
+    const actor = actorOf(res)
+    const company = await deps.companyStore.findByRepresentative(actor.id)
+    if (!company) {
+      res.status(404).json({ error: 'company_not_found' })
+      return
+    }
+    const dossier = dossierOfCompany(company)
+    const documents = await dossierDocuments.listCompanyDocuments(company.id)
+    res.json({ dossier, documents, missing: missingDossierItems(company, dossier, documents) })
+  })
+
+  router.patch('/profile/dossier', async (req, res) => {
+    const actor = actorOf(res)
+    let update
+    try {
+      update = pickDossierUpdate(req.body?.dossier ?? req.body)
+    } catch (error) {
+      if (error instanceof DossierValidationError) {
+        res.status(400).json({ error: error.code })
+        return
+      }
+      throw error
+    }
+    let profile
+    try {
+      profile = await profileRepo.updateDossier(actor.id, update)
+    } catch (error) {
+      if (error instanceof DossierValidationError) {
+        res.status(400).json({ error: error.code })
+        return
+      }
+      throw error
+    }
+    const company = await deps.companyStore.findByRepresentative(actor.id)
+    if (!company) {
+      res.status(404).json({ error: 'company_not_found' })
+      return
+    }
+    const documents = await dossierDocuments.listCompanyDocuments(company.id)
+    res.json({
+      dossier: profile.dossier,
+      documents,
+      missing: missingDossierItems(company, profile.dossier, documents),
+    })
   })
 
   router.post('/profile/addresses', async (req, res) => {

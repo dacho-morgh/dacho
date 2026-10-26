@@ -24,6 +24,41 @@ export interface User {
   companyId?: string
 }
 
+/** Stage-2 fields that may legitimately be answered "does not have". */
+export const ABSENCE_FIELDS = [
+  'centerEstablishment',
+  'website',
+  'insuredEmployeeCount',
+  'catalogues',
+  'pastProjectsCustomers',
+  'requestedServices',
+  'certificatesLicenses',
+  'amendmentNotices',
+] as const
+
+export type AbsenceField = (typeof ABSENCE_FIELDS)[number]
+
+export function isAbsenceField(value: unknown): value is AbsenceField {
+  return typeof value === 'string' && (ABSENCE_FIELDS as readonly string[]).includes(value)
+}
+
+export interface KeyMember {
+  name: string
+  role: string
+}
+
+export interface PastProjectCustomer {
+  project: string
+  customer?: string
+  summary?: string
+}
+
+export interface CertificateLicence {
+  title: string
+  issuer?: string
+  reference?: string
+}
+
 /** The subset of a company a representative may edit. */
 export type CompanyFields = {
   name?: string
@@ -37,6 +72,22 @@ export type CompanyFields = {
   economicCode?: string
   executives?: Executive[]
   addresses?: Address[]
+  // Stage 2 — company completion and resume.
+  legalEntityType?: string
+  knowledgeBasedStatus?: string
+  classification?: string
+  foundingYear?: string
+  activityDomain?: string
+  website?: string
+  centerEstablishment?: string
+  insuredEmployeeCount?: number | null
+  productsServices?: string[]
+  keyMembers?: KeyMember[]
+  pastProjectsCustomers?: PastProjectCustomer[]
+  requestedServices?: string[]
+  certificatesLicenses?: CertificateLicence[]
+  /** Explicit "does not have / not available" answers for permitted fields. */
+  notAvailable?: AbsenceField[]
 }
 
 export interface Executive {

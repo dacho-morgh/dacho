@@ -6,6 +6,7 @@ import { InMemoryUserStore, type UserStore } from '../src/auth/user-store.js'
 import { createApp } from '../src/app.js'
 import type { EventStore } from '../src/dashboard/event-repo.js'
 import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
+import { InMemoryDossierDocumentSource } from '../src/dashboard/dossier.js'
 import {
   InMemoryBoothCatalogueRepository,
   type BoothCatalogueRepository,
@@ -21,6 +22,7 @@ export interface TestApp {
   codeStore: InMemoryCodeStore
   userStore: UserStore
   companyStore: InMemoryCompanyStore
+  dossierDocuments: InMemoryDossierDocumentSource
   boothCatalogue: BoothCatalogueRepository
   jwt: JwtSigner
 }
@@ -40,6 +42,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const codeStore = new InMemoryCodeStore()
   const userStore = options.userStore ?? new InMemoryUserStore()
   const companyStore = new InMemoryCompanyStore()
+  const dossierDocuments = new InMemoryDossierDocumentSource()
   const boothCatalogue = options.boothCatalogue ?? new InMemoryBoothCatalogueRepository()
   const jwt = await JwtSigner.create('test-kid')
   // Tests that query dashboard routes inject a pool stub; default stays unconnected.
@@ -50,6 +53,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     jwt,
     userStore,
     companyStore,
+    dossierDocuments,
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret: 'test-proxy-secret',
@@ -57,5 +61,5 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     boothCatalogue,
     exhibitionStore: options.exhibitionStore,
   })
-  return { app, delivery, codeStore, userStore, companyStore, boothCatalogue, jwt }
+  return { app, delivery, codeStore, userStore, companyStore, dossierDocuments, boothCatalogue, jwt }
 }
