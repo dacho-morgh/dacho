@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import type { Request, Response } from 'express'
+import type { Request, RequestHandler, Response } from 'express'
 import multer from 'multer'
 import type { Pool } from 'pg'
 
@@ -17,6 +17,7 @@ import type { UserStore } from '../auth/user-store.js'
 import { AssignmentRepository } from '../dashboard/assignment-repo.js'
 import { actorOf } from '../dashboard/proxy-auth.js'
 import { RequestRepository } from '../dashboard/request-repo.js'
+import { isUuid } from '../exhibitions/catalogue.js'
 import {
   MAX_DOCUMENT_BYTES,
   validateDocumentFile,
@@ -33,6 +34,10 @@ export interface DocumentRouterDeps {
 }
 
 const MAX_MULTIPART_BYTES = MAX_DOCUMENT_BYTES + 1
+
+function asyncHandler(handler: (req: Request, res: Response) => Promise<void>): RequestHandler {
+  return (req, res, next) => { void handler(req, res).catch(next) }
+}
 
 function stringField(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : null
@@ -131,13 +136,17 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     )
   }
 
-  router.get('/documents', async (req: Request, res: Response) => {
+  router.get('/documents', asyncHandler(async (req: Request, res: Response) => {
     const actor = actorOf(res)
     const companyId = await actorCompanyId(actor.id, actor.operationalRole)
     const requestId = stringField(req.query.requestId)
     const requestedCompanyId = stringField(req.query.companyId)
 
     if (requestId) {
+      if (!isUuid(requestId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
       const request = await requests.findByIdScoped(
         requestId,
         bindRequestScope(requestScopeFor(actor.operationalRole), actor.id),
@@ -183,7 +192,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       .map((record) => present(record, actor.id, actor.operationalRole, companyId, false))
       .filter((record) => record.allowedActions.length > 0)
     res.json({ items })
-  })
+  }))
 
   router.post(
     '/documents',
@@ -204,7 +213,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         next()
       })
     },
-    async (req: Request, res: Response) => {
+    asyncHandler(async (req: Request, res: Response) => {
       const actor = actorOf(res)
       const category = req.body?.category
       if (!isDocumentCategory(category)) {
@@ -240,6 +249,10 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       let requestStatus: string | null = null
       let parentCompanyId: string | null = requestedCompanyId
       if (requestId) {
+        if (!isUuid(requestId)) {
+          res.status(404).json({ error: 'not_found' })
+          return
+        }
         const request = await requests.findByIdScoped(
           requestId,
           bindRequestScope(requestScopeFor(actor.operationalRole), actor.id),
@@ -358,13 +371,18 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       res.status(201).json({
         document: present(record, actor.id, actor.operationalRole, companyId, assigned),
       })
-    },
+    }),
   )
 
-  router.get('/documents/:id', async (req: Request, res: Response) => {
+  router.get('/documents/:id', asyncHandler(async (req: Request, res: Response) => {
     const actor = actorOf(res)
     const companyId = await actorCompanyId(actor.id, actor.operationalRole)
-    const record = await documents.findById(String(req.params.id))
+    const id = String(req.params.id)
+    if (!isUuid(id)) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const record = await documents.findById(id)
     if (!record || !(await authorizeRecord(record, actor.id, actor.operationalRole, companyId))) {
       res.status(404).json({ error: 'not_found' })
       return
@@ -375,12 +393,17 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     res.json({
       document: present(record, actor.id, actor.operationalRole, companyId, assigned),
     })
-  })
+  }))
 
-  router.get('/documents/:id/download', async (req: Request, res: Response) => {
+  router.get('/documents/:id/download', asyncHandler(async (req: Request, res: Response) => {
     const actor = actorOf(res)
     const companyId = await actorCompanyId(actor.id, actor.operationalRole)
-    const record = await documents.findById(String(req.params.id))
+    const id = String(req.params.id)
+    if (!isUuid(id)) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const record = await documents.findById(id)
     if (!record || !(await authorizeRecord(record, actor.id, actor.operationalRole, companyId))) {
       // Denied and absent ids are indistinguishable.
       res.status(404).json({ error: 'not_found' })
@@ -398,11 +421,16 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     res.setHeader('X-Content-Type-Options', 'nosniff')
     res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox")
     res.status(200).send(body)
-  })
+  }))
 
-  router.delete('/documents/:id', async (req: Request, res: Response) => {
+  router.delete('/documents/:id', asyncHandler(async (req: Request, res: Response) => {
     const actor = actorOf(res)
-    const record = await documents.findById(String(req.params.id))
+    const id = String(req.params.id)
+    if (!isUuid(id)) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const record = await documents.findById(id)
     if (!record || record.requestId === null) {
       res.status(404).json({ error: 'not_found' })
       return
@@ -440,7 +468,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     }
     await storage.remove(removed.storageKey)
     res.json({ success: true })
-  })
+  }))
 
   return router
 }

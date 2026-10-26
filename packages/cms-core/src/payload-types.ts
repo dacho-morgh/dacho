@@ -1361,6 +1361,49 @@ export interface Company {
         id?: string | null;
       }[]
     | null;
+  legalEntityType?: string | null;
+  knowledgeBasedStatus?: string | null;
+  classification?: string | null;
+  foundingYear?: string | null;
+  website?: string | null;
+  centerEstablishment?: string | null;
+  insuredEmployeeCount?: number | null;
+  productsServices?:
+    | {
+        title: string;
+        id?: string | null;
+      }[]
+    | null;
+  keyMembers?:
+    | {
+        name: string;
+        role: string;
+        id?: string | null;
+      }[]
+    | null;
+  pastProjectsCustomers?:
+    | {
+        project: string;
+        customer?: string | null;
+        summary?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  requestedServices?:
+    | {
+        service: string;
+        id?: string | null;
+      }[]
+    | null;
+  certificatesLicenses?:
+    | {
+        title: string;
+        issuer?: string | null;
+        reference?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  notAvailable?: unknown;
   updatedAt: string;
   createdAt: string;
 }
