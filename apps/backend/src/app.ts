@@ -9,6 +9,7 @@ import type { ServiceCatalog } from './catalog/service-catalog.js'
 import { createDashboardRouter } from './dashboard/router.js'
 import { PrivateDocumentStorage } from './documents/storage.js'
 import type { BoothCatalogueRepository } from './exhibitions/catalogue-repo.js'
+import type { ExhibitionStore } from './exhibitions/exhibition-store.js'
 
 export interface AppDeps extends AuthDeps {
   pool: Pool
@@ -18,6 +19,7 @@ export interface AppDeps extends AuthDeps {
   /** Required in production; tests may inject a disposable directory. */
   privateDocumentStorage?: PrivateDocumentStorage
   boothCatalogue?: BoothCatalogueRepository
+  exhibitionStore?: ExhibitionStore
 }
 
 export function createApp(deps: AppDeps): Express {

@@ -9,6 +9,7 @@ import {
   InMemoryBoothCatalogueRepository,
   type BoothCatalogueRepository,
 } from '../src/exhibitions/catalogue-repo.js'
+import type { ExhibitionStore } from '../src/exhibitions/exhibition-store.js'
 import { JwtSigner } from '../src/jwt.js'
 import { InMemoryCodeStore } from '../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../src/otp/console-delivery.js'
@@ -27,6 +28,7 @@ export interface TestAppOptions {
   /** Swap the in-memory identity store for a remote-backed implementation. */
   userStore?: UserStore
   boothCatalogue?: BoothCatalogueRepository
+  exhibitionStore?: ExhibitionStore
 }
 
 export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
@@ -49,6 +51,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret: 'test-proxy-secret',
     boothCatalogue,
+    exhibitionStore: options.exhibitionStore,
   })
   return { app, delivery, codeStore, userStore, companyStore, boothCatalogue, jwt }
 }

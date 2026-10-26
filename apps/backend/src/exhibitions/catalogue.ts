@@ -73,6 +73,10 @@ function isPositiveSafeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
+export function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
 export function parseSettingsInput(body: unknown): Validation<SettingsWrite> {
   if (!isRecord(body)) return { ok: false, error: 'invalid_settings' }
 
@@ -132,7 +136,7 @@ export function parseBoothCreate(body: unknown): Validation<BoothWrite> {
   const specification = parseSpecification(body.specification)
   if (specification === null) return { ok: false, error: 'invalid_booth_specification' }
 
-  const location = parseLocation(body.location)
+  const location = body.location === undefined ? null : parseLocation(body.location)
   if (location === undefined) return { ok: false, error: 'invalid_booth_location' }
 
   const status = body.status ?? 'available'

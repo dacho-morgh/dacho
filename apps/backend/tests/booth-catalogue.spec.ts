@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import request from 'supertest'
 
 import type { User } from '../src/auth/user-store.js'
+import { InMemoryExhibitionStore } from '../src/exhibitions/exhibition-store.js'
 import { createTestApp } from './helpers.js'
 
 const EXHIBITION = 'exhibition-1'
@@ -96,6 +97,32 @@ describe('booth catalogue', () => {
       identifier: 'B-2',
       available: false,
       priceAmount: 22_500_000,
+    })
+  })
+
+  it('creates a booth from the required fields only', async () => {
+    const { app, owner } = await setup()
+
+    const response = await request(app)
+      .post(`/admin/exhibitions/${EXHIBITION}/booths`)
+      .set(headers(owner))
+      .send({
+        identifier: 'ONLY-REQUIRED',
+        specification: '۲ متر × ۲ متر',
+        priceAmount: 7_500_000,
+        priceUnit: 'toman',
+      })
+
+    expect(response.status).toBe(201)
+    expect(response.body.booth).toMatchObject({
+      identifier: 'ONLY-REQUIRED',
+      specification: '۲ متر × ۲ متر',
+      location: null,
+      status: 'available',
+      active: true,
+      available: true,
+      priceAmount: 7_500_000,
+      priceUnit: 'toman',
     })
   })
 
@@ -198,6 +225,15 @@ describe('booth catalogue', () => {
       expect(response.status).toBe(400)
       expect(response.body.error).toBe('invalid_company_booth_limit')
     }
+
+    for (const location of [123, true, ['Hall']]) {
+      const response = await request(app)
+        .post(`/admin/exhibitions/${EXHIBITION}/booths`)
+        .set(headers(owner))
+        .send(boothBody({ location }))
+      expect(response.status).toBe(400)
+      expect(response.body.error).toBe('invalid_booth_location')
+    }
   })
 
   it('edits the current price without rewriting an already captured version', async () => {
@@ -289,5 +325,53 @@ describe('booth catalogue', () => {
       .send({})
     expect(empty.status).toBe(400)
     expect(empty.body.error).toBe('invalid_booth_update')
+  })
+
+  it('rejects a malformed booth id before touching the repository', async () => {
+    const { app, owner } = await setup()
+
+    const response = await request(app)
+      .patch(`/admin/exhibitions/${EXHIBITION}/booths/not-a-uuid`)
+      .set(headers(owner))
+      .send({ status: 'unavailable' })
+
+    expect(response.status).toBe(400)
+    expect(response.body.error).toBe('invalid_booth_id')
+  })
+
+  it('validates the exhibition before creating settings or booths', async () => {
+    const exhibitionStore = new InMemoryExhibitionStore()
+    const testApp = await createTestApp({ exhibitionStore })
+    const owner = await testApp.userStore.findOrCreateByPhone('09120000009')
+    owner.operationalRole = 'system-owner'
+    owner.roles = ['admin']
+
+    const missingSettings = await request(testApp.app)
+      .put(`/admin/exhibitions/${EXHIBITION}/settings`)
+      .set(headers(owner))
+      .send({ companyBoothLimit: 2 })
+    expect(missingSettings.status).toBe(404)
+    expect(missingSettings.body.error).toBe('exhibition_not_found')
+
+    const missingBooth = await request(testApp.app)
+      .post(`/admin/exhibitions/${EXHIBITION}/booths`)
+      .set(headers(owner))
+      .send(boothBody())
+    expect(missingBooth.status).toBe(404)
+    expect(missingBooth.body.error).toBe('exhibition_not_found')
+
+    exhibitionStore.add(EXHIBITION)
+
+    const settings = await request(testApp.app)
+      .put(`/admin/exhibitions/${EXHIBITION}/settings`)
+      .set(headers(owner))
+      .send({ companyBoothLimit: 2 })
+    expect(settings.status).toBe(200)
+
+    const booth = await request(testApp.app)
+      .post(`/admin/exhibitions/${EXHIBITION}/booths`)
+      .set(headers(owner))
+      .send(boothBody())
+    expect(booth.status).toBe(201)
   })
 })

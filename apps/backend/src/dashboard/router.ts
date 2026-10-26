@@ -26,11 +26,17 @@ import type { User, UserStore } from '../auth/user-store.js'
 import { SupportRepository } from './support-repo.js'
 import { createDocumentRouter } from '../documents/router.js'
 import type { PrivateDocumentStorage } from '../documents/storage.js'
-import { parseBoothCreate, parseBoothUpdate, parseSettingsInput } from '../exhibitions/catalogue.js'
+import {
+  isUuid,
+  parseBoothCreate,
+  parseBoothUpdate,
+  parseSettingsInput,
+} from '../exhibitions/catalogue.js'
 import {
   PostgresBoothCatalogueRepository,
   type BoothCatalogueRepository,
 } from '../exhibitions/catalogue-repo.js'
+import type { ExhibitionStore } from '../exhibitions/exhibition-store.js'
 
 export interface DashboardDeps {
   pool: Pool
@@ -40,6 +46,7 @@ export interface DashboardDeps {
   companyStore: CompanyStore
   privateDocumentStorage: PrivateDocumentStorage
   boothCatalogue?: BoothCatalogueRepository
+  exhibitionStore?: ExhibitionStore
 }
 
 function parsePositiveInt(value: unknown, fallback: number): number {
@@ -723,6 +730,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(400).json({ error: parsed.error })
       return
     }
+    if (deps.exhibitionStore && !(await deps.exhibitionStore.exists(req.params.exhibitionId))) {
+      res.status(404).json({ error: 'exhibition_not_found' })
+      return
+    }
     const settings = await catalogue.upsertSettings(
       req.params.exhibitionId,
       parsed.value,
@@ -742,6 +753,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(400).json({ error: parsed.error })
       return
     }
+    if (deps.exhibitionStore && !(await deps.exhibitionStore.exists(req.params.exhibitionId))) {
+      res.status(404).json({ error: 'exhibition_not_found' })
+      return
+    }
     const result = await catalogue.createBooth({
       ...parsed.value,
       exhibitionId: req.params.exhibitionId,
@@ -758,6 +773,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const actor = actorOf(res)
     if (actor.operationalRole !== 'system-owner') {
       res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    if (!isUuid(req.params.boothId)) {
+      res.status(400).json({ error: 'invalid_booth_id' })
       return
     }
     const parsed = parseBoothUpdate(req.body)
