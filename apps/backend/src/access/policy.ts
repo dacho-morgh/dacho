@@ -260,13 +260,18 @@ export function canReadDocument(
     case 'central-secretariat':
       return true
     case 'representative': {
-      const ownCompany = Boolean(
-        (document.companyId && actorCompanyId && document.companyId === actorCompanyId) ||
-        (document.requestCompanyId && actorCompanyId && document.requestCompanyId === actorCompanyId)
-      )
-      const legacyOwnsRequest = Boolean(!document.requestCompanyId && document.requestId && document.requestOwnerId === actorId)
-      if (audience === 'company') return Boolean(document.companyId && actorCompanyId && document.companyId === actorCompanyId)
-      return ownCompany || legacyOwnsRequest
+      if (document.requestId) {
+        if (document.requestCompanyId) {
+          return Boolean(actorCompanyId && document.requestCompanyId === actorCompanyId)
+        }
+        // Legacy unmigrated request without companyId: fallback to creator
+        return document.requestOwnerId === actorId
+      }
+      // Standalone dossier document:
+      if (audience === 'company') {
+        return Boolean(document.companyId && actorCompanyId && document.companyId === actorCompanyId)
+      }
+      return false
     }
     case 'chief-reviewer':
     case 'reviewer':
@@ -292,8 +297,8 @@ export function canDeleteDocument(
   if (role === 'system-owner') return true
   if (role !== 'representative') return false
   if (document.requestStatus !== 'draft') return false
-  if (document.requestCompanyId && actorCompanyId) {
-    return document.requestCompanyId === actorCompanyId
+  if (document.requestCompanyId) {
+    return Boolean(actorCompanyId && document.requestCompanyId === actorCompanyId)
   }
   return document.requestOwnerId === actorId
 }

@@ -98,8 +98,13 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       record.requestId &&
       canDeleteDocument(
         role,
-        { requestOwnerId: record.requestOwnerId, requestStatus: record.requestStatus },
+        {
+          requestOwnerId: record.requestOwnerId,
+          requestCompanyId: record.requestCompanyId,
+          requestStatus: record.requestStatus,
+        },
         actorId,
+        companyId,
       )
     ) {
       actions.push('delete')

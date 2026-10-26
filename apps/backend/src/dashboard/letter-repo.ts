@@ -61,9 +61,22 @@ function letterScopeClause(scope: RequestScope, params: unknown[], alias = 'l'):
         OR (${alias}.request_id IN (SELECT r.id FROM dashboard.requests r WHERE r.owner_id = $${params.length})
             AND (${alias}.recipient_id = $${params.length} OR ${alias}.sender_id = $${params.length}))
       )`
-    case 'company':
+    case 'company': {
       params.push(scope.companyId)
-      return `(${alias}.request_id IN (SELECT r.id FROM dashboard.requests r WHERE r.company_id = $${params.length}))`
+      const compParam = params.length
+      if (scope.userId) {
+        params.push(scope.userId)
+        const userParam = params.length
+        return `(
+          (${alias}.request_id IS NULL AND (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam}))
+          OR (${alias}.request_id IN (
+            SELECT r.id FROM dashboard.requests r
+            WHERE r.company_id = $${compParam} OR (r.company_id IS NULL AND r.owner_id = $${userParam})
+          ))
+        )`
+      }
+      return `(${alias}.request_id IN (SELECT r.id FROM dashboard.requests r WHERE r.company_id = $${compParam}))`
+    }
     case 'assigned':
       params.push(scope.userId)
       const userParam = params.length
@@ -83,9 +96,10 @@ function letterDeleteScopeClause(scope: RequestScope, params: unknown[], alias =
   switch (scope.kind) {
     case 'all': return 'TRUE'
     case 'none': return 'FALSE'
-    case 'company': return 'FALSE'
+    case 'company':
     case 'owner':
     case 'assigned':
+      if (!scope.userId) return 'FALSE'
       const readable = letterScopeClause(scope, params, alias)
       params.push(scope.userId)
       return `(${readable}) AND ${alias}.recipient_id = $${params.length}`

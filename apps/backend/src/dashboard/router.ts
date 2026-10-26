@@ -515,7 +515,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.delete('/letters/:id', async (req, res) => {
     const actor = actorOf(res)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const deleted = await letters.deleteScoped(req.params.id, scope)
     if (!deleted) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ success: true })

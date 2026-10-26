@@ -168,5 +168,30 @@ describe('T12: Company-owned applications and acting person separation', () => {
         'company-200',
       ),
     ).toBe(false)
+
+    // Unassociated former representative (actorCompanyId = null) CANNOT delete company document
+    expect(
+      canDeleteDocument(
+        'representative',
+        {
+          requestOwnerId: 'user-former',
+          requestCompanyId: 'company-100',
+          requestStatus: 'draft',
+        },
+        'user-former',
+        null,
+      ),
+    ).toBe(false)
+
+    // Document with conflicting companyId does not grant read when request belongs to another company
+    const conflictingDoc: DocumentForPolicy = {
+      category: 'proposal',
+      companyId: 'company-200',
+      requestId: 'req-1',
+      requestOwnerId: 'user-former',
+      requestCompanyId: 'company-100',
+      assigned: false,
+    }
+    expect(canReadDocument('representative', conflictingDoc, 'user-other', 'company-200')).toBe(false)
   })
 })
