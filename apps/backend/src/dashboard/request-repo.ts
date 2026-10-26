@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 
 import type { RequestScope } from '../access/policy.js'
+import { isUuid } from '../exhibitions/catalogue.js'
 import { appendTransition } from './transition-history.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
@@ -179,6 +180,7 @@ export class RequestRepository {
   }
 
   async findByIdScoped(id: string, scope: RequestScope): Promise<RequestDto | undefined> {
+    if (!isUuid(id)) return undefined
     const params: unknown[] = [id]
     const scopeSql = requestScopeClause(scope, params, 'r')
     const { rows } = await this.pool.query<RequestRow>(
@@ -254,6 +256,7 @@ export class RequestRepository {
   }
 
   async findById(id: string, ownerId: string): Promise<RequestDto | undefined> {
+    if (!isUuid(id)) return undefined
     const { rows } = await this.pool.query<RequestRow>(
       `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1 AND owner_id = $2`,
       [id, ownerId],
@@ -262,6 +265,7 @@ export class RequestRepository {
   }
 
   async findByIdAny(id: string): Promise<RequestDto | undefined> {
+    if (!isUuid(id)) return undefined
     const { rows } = await this.pool.query<RequestRow>(
       `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1`, [id],
     )
