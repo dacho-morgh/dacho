@@ -21,6 +21,7 @@ export interface TestApp {
 export interface TestAppOptions {
   /** Swap the in-memory identity store for a remote-backed implementation. */
   userStore?: UserStore
+  pool?: Pool
 }
 
 export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
@@ -29,9 +30,8 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const userStore = options.userStore ?? new InMemoryUserStore()
   const companyStore = new InMemoryCompanyStore()
   const jwt = await JwtSigner.create('test-kid')
-  // Unit tests never touch the dashboard routes, so the pool is never queried;
-  // a lazy, unconnected pool satisfies the type without requiring a live DB.
-  const pool = new Pool()
+  // Tests that query dashboard routes inject a pool stub; default stays unconnected.
+  const pool = options.pool ?? new Pool()
   const app = createApp({
     codeStore,
     delivery,

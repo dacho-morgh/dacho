@@ -331,6 +331,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.post('/admin/requests/:id/assignments', async (req, res) => {
     const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
     const request = await repo.findByIdAny(req.params.id)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     if (!canRequestAction(actor.operationalRole, request, actor.id, 'assign')) {
@@ -364,6 +368,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.delete('/admin/requests/:id/assignments/:userId', async (req, res) => {
     const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
     const request = await repo.findByIdAny(req.params.id)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     if (!canRequestAction(actor.operationalRole, request, actor.id, 'assign')) {

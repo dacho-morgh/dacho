@@ -20,6 +20,18 @@ do not rewrite company or request ownership. Deployment must mount and back up
 `PRIVATE_DOCUMENTS_DIR` together with the database; see
 [private documents](private-documents.md) and [test environment](test-environment.md).
 
+## Read-only aggregate inventory (T04 tooling slice)
+
+From repository root, run against a **sanitized disposable database copy**, using an account granted SELECT on every application table:
+
+```sh
+INVENTORY_ACK=read-only-inventory pnpm --filter @dacho/backend inventory
+```
+
+Supply `DATABASE_URL` through the operator's secret environment; never commit it or paste credentials into reports. The command uses one repeatable-read, read-only transaction and a 30-second per-statement timeout. JSON contains exact row counts as decimal strings for visible base tables in `public` and `dashboard`, ordered by schema/table; it never emits row contents, connection URLs, personal IDs or filenames. Other schemas are deliberately excluded. Read-only does not mean zero load: use the disposable copy, not production.
+
+PostgreSQL only exposes tables visible to the account in `information_schema`; restricted grants can omit tables. Compare names with the schema inventory and use an account with complete SELECT grants before treating counts as complete. Any query failure rejects the report rather than printing partial results. This is aggregate-count tooling only: migration journal contents, duplicate-ID checks, role/editor mapping, relationship audits, file backup manifests and restore rehearsal remain separate work. No real-data inventory or T04 completion is claimed.
+
 ## Existing data risks to resolve before a real rollout
 
 T07 adds the request tracking sequence without rewriting existing codes. Its initialization, old-writer exclusion, backup and rollback requirements are documented in [request tracking foundation](request-tracking-foundation.md). The isolated migration tests use synthetic data and do not complete the real-data inventory below.
