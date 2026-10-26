@@ -99,8 +99,9 @@ export const Companies: CollectionConfig = {
       access: { update: adminOnlyIdentity },
     },
     // Stage 1 asks for the business activity domain. The vocabulary is still
-    // open (`docs/system/fixed-form-contracts.md`), so it is text; the
-    // self-signup endpoint enforces its presence at submit.
+    // open (`docs/system/fixed-form-contracts.md`), so it is text. The
+    // self-signup endpoint persists it when supplied but does not require it
+    // until FE03 starts collecting it.
     {
       name: 'activityDomain',
       type: 'text',

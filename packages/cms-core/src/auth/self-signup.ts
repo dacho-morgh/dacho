@@ -147,12 +147,13 @@ export function missingUserFields(body: SelfSignupBody): string[] {
 }
 
 /**
- * Technical syntax rules agreed for the API boundary. They are deliberately
- * length/shape checks only: no national-ID checksum or other product rule is
- * inferred from them.
+ * Interim boundary syntax pending the T03 technical validation dictionary.
+ * The national ID is only required to be non-empty digits after normalization;
+ * no length or checksum rule is inferred. The phone shape matches the current
+ * client, but the exact phone dictionary is also pending T03.
  */
 export const IRANIAN_MOBILE_RE = /^09\d{9}$/
-export const NATIONAL_ID_RE = /^\d{10}$/
+export const NATIONAL_ID_RE = /^\d+$/
 
 /** Fields present but with the wrong normalized syntax; missing fields win. */
 export function invalidSignupFields(body: SelfSignupBody): string[] {
@@ -244,8 +245,8 @@ export interface SelfSignupCompany {
 
 /**
  * Minimal persistence seam for the signup use case. The CMS endpoint adapts
- * Payload to it; tests use an in-memory implementation and still exercise the
- * real HTTP handler and transaction/rollback decisions.
+ * Payload to it; unit tests use an in-memory implementation to exercise the
+ * use case and its transaction/rollback decisions.
  */
 export interface SelfSignupStore {
   companyNationalIdExists(nationalId: string): Promise<boolean>

@@ -1,5 +1,3 @@
-import express, { type Express } from 'express'
-import request from 'supertest'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -14,12 +12,14 @@ import {
   pickUserFields,
   runSelfSignup,
   type SelfSignupCompany,
+  type SelfSignupResponse,
   type SelfSignupStore,
   type SelfSignupUser,
 } from '@dacho/cms-core/auth/self-signup'
 
 type StoredUser = SelfSignupUser & Record<string, unknown>
 type StoredCompany = SelfSignupCompany & Record<string, unknown>
+type StoreCall = 'precheck' | 'begin' | 'user' | 'company' | 'commit' | 'rollback'
 
 function uniqueViolation(constraint: string): Error {
   return Object.assign(new Error(`duplicate key value violates unique constraint "${constraint}"`), {
@@ -28,34 +28,47 @@ function uniqueViolation(constraint: string): Error {
   })
 }
 
+function resultOf(response: SelfSignupResponse) {
+  if (!response.body.user || !response.body.company)
+    throw new Error(`Expected a successful signup, got ${response.status}`)
+  return { user: response.body.user, company: response.body.company }
+}
+
 /**
- * In-memory persistence behind the real signup use case. Transactions are
- * snapshot-based so the test can prove the person is removed when the company
- * write fails.
+ * In-memory implementation of the same persistence seam the Payload adapter
+ * implements. It records the call order so the unit tests can assert the
+ * pre-check, transaction and rollback decisions made by `runSelfSignup`.
  */
 class MemorySignupStore implements SelfSignupStore {
   users: StoredUser[] = []
   companies: StoredCompany[] = []
+  calls: StoreCall[] = []
   failCompanyCreate?: Error
   private sequence = 0
 
   async companyNationalIdExists(nationalId: string): Promise<boolean> {
+    this.calls.push('precheck')
     return this.companies.some((company) => company.nationalId === nationalId)
   }
 
   async inTransaction<T>(run: () => Promise<T>): Promise<T> {
     const users = [...this.users]
     const companies = [...this.companies]
+    this.calls.push('begin')
     try {
-      return await run()
+      const result = await run()
+      this.calls.push('commit')
+      return result
     } catch (error) {
       this.users = users
       this.companies = companies
+      this.calls.push('rollback')
       throw error
     }
   }
 
   async createUser(fields: Record<string, string>): Promise<StoredUser> {
+    this.calls.push('user')
     if (this.users.some((user) => user.phone === fields.phone))
       throw uniqueViolation('users_phone_unique')
     if (this.users.some((user) => user.email === fields.email))
@@ -66,6 +79,7 @@ class MemorySignupStore implements SelfSignupStore {
   }
 
   async createCompany(fields: Record<string, string | number>): Promise<StoredCompany> {
+    this.calls.push('company')
     if (this.failCompanyCreate) {
       const error = this.failCompanyCreate
       this.failCompanyCreate = undefined
@@ -77,36 +91,6 @@ class MemorySignupStore implements SelfSignupStore {
     this.companies.push(company)
     return company
   }
-
-  authenticate(identifier: string, password: string): StoredUser | undefined {
-    const normalized = identifier.includes('@') ? identifier.toLowerCase() : identifier
-    return this.users.find(
-      (user) => (user.phone === normalized || user.email === normalized) && user.password === password,
-    )
-  }
-}
-
-function createHarness(store: MemorySignupStore): Express {
-  const app = express()
-  app.use(express.json())
-
-  app.post('/api/users/self-signup', async (req, res) => {
-    const result = await runSelfSignup(req.body, store)
-    res.status(result.status).json(result.body)
-  })
-
-  app.post('/api/users/login', (req, res) => {
-    const username = typeof req.body?.username === 'string' ? req.body.username : ''
-    const password = typeof req.body?.password === 'string' ? req.body.password : ''
-    const user = store.authenticate(normalizeLoginIdentifier(username), password)
-    if (!user) {
-      res.status(401).json({ errors: [{ message: 'Invalid credentials.' }] })
-      return
-    }
-    res.json({ token: `session-${user.id}`, user: { id: user.id, phone: user.phone, email: user.email } })
-  })
-
-  return app
 }
 
 const validBody = {
@@ -120,134 +104,114 @@ const validBody = {
   activityDomain: 'انرژی‌های تجدیدپذیر',
 }
 
-describe('self-signup HTTP contract', () => {
-  it('creates person and company, persists activity domain, and issues a session after login', async () => {
+// These are unit tests of the exported signup contract. The production Payload
+// endpoint is a thin adapter over `runSelfSignup`; genuine endpoint/database
+// coverage remains in the CMS integration suite.
+describe('self-signup contract (unit)', () => {
+  it('creates person and company atomically and persists the activity domain', async () => {
     const store = new MemorySignupStore()
-    const app = createHarness(store)
 
-    const res = await request(app)
-      .post('/api/users/self-signup')
-      .send({ ...validBody, operationalRole: 'system-owner', isActive: true })
+    const response = await runSelfSignup(
+      { ...validBody, operationalRole: 'system-owner', isActive: true },
+      store,
+    )
 
-    expect(res.status).toBe(201)
-    expect(res.body.user.id).toBeTruthy()
-    expect(res.body.company).toMatchObject({
-      representative: res.body.user.id,
+    expect(response.status).toBe(201)
+    const { user, company } = resultOf(response)
+    expect(company).toMatchObject({
+      representative: user.id,
       activityDomain: 'انرژی‌های تجدیدپذیر',
     })
     expect(store.users).toHaveLength(1)
     expect(store.companies).toHaveLength(1)
     expect(store.users[0]?.operationalRole).toBeUndefined()
-
-    const login = await request(app)
-      .post('/api/users/login')
-      .send({ username: validBody.phone, password: validBody.password })
-    expect(login.status).toBe(200)
-    expect(login.body.token).toBeTruthy()
+    expect(store.calls).toEqual(['precheck', 'begin', 'user', 'company', 'commit'])
   })
 
   it('accepts an omitted activity domain during the temporary compatibility window', async () => {
     const store = new MemorySignupStore()
-    const app = createHarness(store)
     const { activityDomain: _omitted, ...bodyWithoutDomain } = validBody
 
-    const res = await request(app).post('/api/users/self-signup').send(bodyWithoutDomain)
+    const response = await runSelfSignup(bodyWithoutDomain, store)
 
-    expect(res.status).toBe(201)
+    expect(response.status).toBe(201)
     expect(store.companies).toHaveLength(1)
     expect(store.companies[0]?.activityDomain).toBeUndefined()
   })
 
-  it('returns a clear conflict for a duplicate national ID and leaves no orphan user', async () => {
+  it('returns a clear conflict for a duplicate national ID and never starts a transaction', async () => {
     const store = new MemorySignupStore()
     store.companies.push({ id: 'c-existing', nationalId: validBody.companyNationalId, name: 'Existing Co' })
-    const app = createHarness(store)
 
-    const res = await request(app).post('/api/users/self-signup').send(validBody)
+    const response = await runSelfSignup(validBody, store)
 
-    expect(res.status).toBe(409)
-    expect(res.body.errors[0]).toMatchObject({
+    expect(response.status).toBe(409)
+    expect(response.body.errors?.[0]).toMatchObject({
       code: 'duplicate_national_id',
       field: 'companyNationalId',
     })
     expect(store.users).toHaveLength(0)
     expect(store.companies).toHaveLength(1)
+    expect(store.calls).toEqual(['precheck'])
   })
 
   it('rolls the user creation back completely when the company write fails', async () => {
     const store = new MemorySignupStore()
     store.failCompanyCreate = new Error('database unavailable')
-    const app = createHarness(store)
 
-    const res = await request(app).post('/api/users/self-signup').send(validBody)
+    const response = await runSelfSignup(validBody, store)
 
-    expect(res.status).toBe(500)
-    expect(res.body.errors[0]?.code).toBe('signup_failed')
+    expect(response.status).toBe(500)
+    expect(response.body.errors?.[0]?.code).toBe('signup_failed')
     expect(store.users).toHaveLength(0)
     expect(store.companies).toHaveLength(0)
+    expect(store.calls).toEqual(['precheck', 'begin', 'user', 'company', 'rollback'])
   })
 
-  it('logs in with phone and with email plus password, including Persian digits', async () => {
+  it('rejects invalid phone and national-ID syntax before any write', async () => {
     const store = new MemorySignupStore()
-    const app = createHarness(store)
-    expect((await request(app).post('/api/users/self-signup').send(validBody)).status).toBe(201)
 
-    const byPhone = await request(app)
-      .post('/api/users/login')
-      .send({ username: validBody.phone, password: validBody.password })
-    expect(byPhone.status).toBe(200)
-
-    const byPersianPhone = await request(app)
-      .post('/api/users/login')
-      .send({ username: '۰۹۱۲۳۴۵۶۷۸۹', password: validBody.password })
-    expect(byPersianPhone.status).toBe(200)
-
-    const byEmail = await request(app)
-      .post('/api/users/login')
-      .send({ username: 'Representative@Example.com', password: validBody.password })
-    expect(byEmail.status).toBe(200)
-
-    const wrongPassword = await request(app)
-      .post('/api/users/login')
-      .send({ username: validBody.phone, password: 'wrong-password' })
-    expect(wrongPassword.status).toBe(401)
-  })
-
-  it('rejects invalid phone and national-ID syntax with 400 before any write', async () => {
-    const store = new MemorySignupStore()
-    const app = createHarness(store)
-
-    const badPhone = await request(app)
-      .post('/api/users/self-signup')
-      .send({ ...validBody, phone: '12345' })
+    const badPhone = await runSelfSignup({ ...validBody, phone: '12345' }, store)
     expect(badPhone.status).toBe(400)
-    expect(badPhone.body.errors[0]).toMatchObject({ code: 'invalid_field', field: 'phone' })
+    expect(badPhone.body.errors?.[0]).toMatchObject({ code: 'invalid_field', field: 'phone' })
 
-    const badNationalId = await request(app)
-      .post('/api/users/self-signup')
-      .send({ ...validBody, companyNationalId: '123456789' })
+    const badNationalId = await runSelfSignup(
+      { ...validBody, companyNationalId: '1234567890a' },
+      store,
+    )
     expect(badNationalId.status).toBe(400)
-    expect(badNationalId.body.errors[0]).toMatchObject({
+    expect(badNationalId.body.errors?.[0]).toMatchObject({
       code: 'invalid_field',
       field: 'companyNationalId',
     })
 
     expect(store.users).toHaveLength(0)
     expect(store.companies).toHaveLength(0)
+    expect(store.calls).toEqual([])
+  })
+
+  it('accepts an 11-digit national ID because the T03 dictionary is pending', async () => {
+    const store = new MemorySignupStore()
+
+    const response = await runSelfSignup(
+      { ...validBody, companyNationalId: '12345678901' },
+      store,
+    )
+
+    expect(response.status).toBe(201)
+    expect(store.companies[0]?.nationalId).toBe('12345678901')
   })
 
   it('does not turn a malformed national ID into a duplicate conflict', async () => {
     const store = new MemorySignupStore()
-    store.companies.push({ id: 'c-malformed', nationalId: '123', name: 'Legacy malformed row' })
-    const app = createHarness(store)
+    store.companies.push({ id: 'c-malformed', nationalId: '12a', name: 'Legacy malformed row' })
 
-    const res = await request(app)
-      .post('/api/users/self-signup')
-      .send({ ...validBody, companyNationalId: '123' })
+    const response = await runSelfSignup({ ...validBody, companyNationalId: '12a' }, store)
 
-    expect(res.status).toBe(400)
-    expect(res.body.errors[0]?.code).toBe('invalid_field')
+    expect(response.status).toBe(400)
+    expect(response.body.errors?.[0]?.code).toBe('invalid_field')
     expect(store.users).toHaveLength(0)
+    expect(store.calls).toEqual([])
   })
 
   it('does not reveal whether a phone or email account already exists', async () => {
@@ -258,15 +222,15 @@ describe('self-signup HTTP contract', () => {
       phone: '09120000000',
       password: 'existing-password',
     })
-    const app = createHarness(store)
 
-    const res = await request(app)
-      .post('/api/users/self-signup')
-      .send({ ...validBody, email: 'TAKEN@example.com', phone: '09129999999' })
+    const response = await runSelfSignup(
+      { ...validBody, email: 'TAKEN@example.com', phone: '09129999999' },
+      store,
+    )
 
-    expect(res.status).toBe(400)
-    expect(res.body.errors[0]?.code).toBe('signup_rejected')
-    const serialized = JSON.stringify(res.body).toLowerCase()
+    expect(response.status).toBe(400)
+    expect(response.body.errors?.[0]?.code).toBe('signup_rejected')
+    const serialized = JSON.stringify(response.body).toLowerCase()
     expect(serialized).not.toContain('taken@example.com')
     expect(serialized).not.toContain('duplicate')
     expect(serialized).not.toContain('already')
@@ -274,6 +238,7 @@ describe('self-signup HTTP contract', () => {
     expect(serialized).not.toContain('phone')
     expect(store.users).toHaveLength(1)
     expect(store.companies).toHaveLength(0)
+    expect(store.calls).toEqual(['precheck', 'begin', 'user', 'rollback'])
   })
 })
 
@@ -296,8 +261,16 @@ describe('self-signup helpers', () => {
   it('requires the stage-1 person fields and the two core company fields', () => {
     expect(missingUserFields({})).toEqual(['name', 'position', 'phone', 'email', 'password'])
     expect(missingCompanyFields({})).toEqual(['companyName', 'companyNationalId'])
-    expect(invalidSignupFields({ ...validBody, phone: '0912345678', companyNationalId: '12345678901' })).toEqual([
-      'phone',
+    expect(
+      invalidSignupFields({ ...validBody, phone: '0912345678', companyNationalId: '1234abc' }),
+    ).toEqual(['phone', 'companyNationalId'])
+  })
+
+  it('applies no national-ID length gate until T03 publishes the dictionary', () => {
+    expect(invalidSignupFields({ ...validBody, companyNationalId: '1' })).toEqual([])
+    expect(invalidSignupFields({ ...validBody, companyNationalId: '12345678901' })).toEqual([])
+    expect(invalidSignupFields({ ...validBody, companyNationalId: '۱۲۳۴۵۶۷۸۹۰۱' })).toEqual([])
+    expect(invalidSignupFields({ ...validBody, companyNationalId: '1234a' })).toEqual([
       'companyNationalId',
     ])
   })
@@ -315,12 +288,16 @@ describe('self-signup helpers', () => {
         errors: [{ path: 'national_id', message: 'Value must be unique' }],
       }),
     ).toBe(true)
-    expect(isDuplicateNationalId({ code: '23505', constraint: 'companies_national_id_unique' })).toBe(true)
+    expect(isDuplicateNationalId({ code: '23505', constraint: 'companies_national_id_unique' })).toBe(
+      true,
+    )
     expect(
       isDuplicateNationalId({
         errors: [{ path: 'national_id', message: 'Invalid national ID.' }],
       }),
     ).toBe(false)
-    expect(isDuplicateNationalId({ errors: [{ path: 'phone', message: 'Value must be unique' }] })).toBe(false)
+    expect(isDuplicateNationalId({ errors: [{ path: 'phone', message: 'Value must be unique' }] })).toBe(
+      false,
+    )
   })
 })
