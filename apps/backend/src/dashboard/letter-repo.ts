@@ -65,21 +65,24 @@ function letterScopeClause(scope: RequestScope, params: unknown[], alias = 'l'):
       if (!scope.userId) return 'FALSE'
       params.push(scope.userId)
       const userParam = params.length
+      let requestFilter: string
       if (scope.companyId) {
         params.push(scope.companyId)
         const compParam = params.length
-        return `(
-          (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam})
-          AND (
-            ${alias}.request_id IS NULL
-            OR ${alias}.request_id IN (
-              SELECT r.id FROM dashboard.requests r
-              WHERE r.company_id = $${compParam} OR (r.company_id IS NULL AND r.owner_id = $${userParam})
-            )
-          )
-        )`
+        requestFilter = `r.company_id = $${compParam} OR (r.company_id IS NULL AND r.owner_id = $${userParam})`
+      } else {
+        requestFilter = `r.company_id IS NULL AND r.owner_id = $${userParam}`
       }
-      return `(${alias}.request_id IS NULL AND (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam}))`
+      return `(
+        (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam})
+        AND (
+          ${alias}.request_id IS NULL
+          OR ${alias}.request_id IN (
+            SELECT r.id FROM dashboard.requests r
+            WHERE ${requestFilter}
+          )
+        )
+      )`
     }
     case 'assigned':
       params.push(scope.userId)
