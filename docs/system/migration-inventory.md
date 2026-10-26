@@ -1,11 +1,11 @@
 # Migration inventory and rehearsal concerns
 
-Inspected 2026-10-23. The inventory describes code in this checkout; no production migration was executed. See [test environment](test-environment.md) for the isolated synthetic rehearsal procedure.
+Inspected 2026-10-23; updated 2026-10-26 for T16. The inventory describes code in this checkout; no production migration was executed. See [test environment](test-environment.md) for the isolated synthetic rehearsal procedure.
 
 | Owner | Location / migration journal | Current files | Scope |
 | --- | --- | --- | --- |
 | Payload CMS | `packages/cms-core/src/migrations/`, imported in `index.ts`; Payload `payload_migrations` journal in `public` | 21 TypeScript migrations from `20260810_103455` through `20261024_200000_single_operational_role` (some generated JSON snapshots) | CMS content, users, companies, role evolution, events page content and editorial fields |
-| Backend | `apps/backend/migrations/`; `dashboard.pgmigrations` journal via node-pg-migrate | 7 TypeScript migrations `1780511400000`–`1780511400006` (T09/T10 update, 2026-10-24) | Requests, letters, activities, support tickets/messages, author-role rekey, safe tracking sequence, case assignments and private document metadata |
+| Backend | `apps/backend/migrations/`; `dashboard.pgmigrations` journal via node-pg-migrate | 11 TypeScript migrations: `1780511400000`–`1780511400008`, `1780511400011`–`1780511400012` (T16 update, 2026-10-26) | Requests, letters, activities, support tickets/messages, author-role rekey, safe tracking sequence, case assignments, private document metadata, transition history, booth catalogue, event configuration and event audit history |
 | Runtime-created OTP storage | `apps/backend/src/otp/postgres-code-store.ts` | No numbered migration | `dashboard.otp_codes` is ensured at runtime; inventory/restore must include it if present |
 
 Payload runs explicit migrations with schema push disabled in `packages/cms-core/src/payload.config.ts`. That configuration has **no schema override**, and its migrations use `public` explicitly; `public` is the observed CMS schema in this checkout. The approved [backend design](backend-design.md) uses `cms.*` as a conceptual ownership label, so a future migration must not assume a deployed `cms` SQL schema. Backend `runMigrations` uses the actual `dashboard` schema and an advisory lock. Both services share one database but their migration journals and ownership boundaries differ; applying just one side does not produce a fully usable test app. Initial CMS migrations are chronological by `index.ts`; future migration files must be added there.
@@ -20,6 +20,17 @@ do not rewrite company or request ownership. Deployment must mount and back up
 `PRIVATE_DOCUMENTS_DIR` together with the database; see
 [private documents](private-documents.md) and [test environment](test-environment.md).
 
+T16 adds `dashboard.events`: title, description, registration window,
+responsible chief, responsible investment reviewer, revision, creator and
+timestamps. A second additive migration adds its `revision` column and
+`dashboard.event_audit` rows with actor, reason, revision, changed fields and
+before/after snapshots. The database enforces a non-empty title, non-empty
+responsible ids, an ordered registration window, distinct responsible people
+and one audit row per event revision. It creates no rows and does not rewrite
+public `events`/`exhibitions` CMS content. Event commands are owner-only;
+updates are revision-checked and audited atomically, and assigned responsibility
+is read scope for the current chief or investment reviewer only.
+
 ## Read-only aggregate inventory (T04 tooling slice)
 
 From repository root, run against a **sanitized disposable database copy**, using an account granted SELECT on every application table:
@@ -31,7 +42,6 @@ INVENTORY_ACK=read-only-inventory pnpm --filter @dacho/backend inventory
 Supply `DATABASE_URL` through the operator's secret environment; never commit it or paste credentials into reports. The command uses one repeatable-read, read-only transaction and a 30-second per-statement timeout. JSON contains exact row counts as decimal strings for visible base tables in `public` and `dashboard`, ordered by schema/table; it never emits row contents, connection URLs, personal IDs or filenames. Other schemas are deliberately excluded. Read-only does not mean zero load: use the disposable copy, not production.
 
 PostgreSQL only exposes tables visible to the account in `information_schema`; restricted grants can omit tables. Compare names with the schema inventory and use an account with complete SELECT grants before treating counts as complete. Any query failure rejects the report rather than printing partial results. This is aggregate-count tooling only: migration journal contents, duplicate-ID checks, role/editor mapping, relationship audits, file backup manifests and restore rehearsal remain separate work. No real-data inventory or T04 completion is claimed.
-
 ## Existing data risks to resolve before a real rollout
 
 T07 adds the request tracking sequence without rewriting existing codes. Its initialization, old-writer exclusion, backup and rollback requirements are documented in [request tracking foundation](request-tracking-foundation.md). The isolated migration tests use synthetic data and do not complete the real-data inventory below.

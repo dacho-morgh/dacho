@@ -85,6 +85,42 @@ describe('dashboard migrations', () => {
     expect(cols).toEqual(expect.arrayContaining(['id', 'ticket_id', 'author_id', 'author_role', 'body', 'created_at']))
   })
 
+  it('creates the events table with the registration window and responsible people', async () => {
+    const cols = await tableColumns('events')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'title',
+        'description',
+        'registration_open_at',
+        'registration_close_at',
+        'responsible_chief_id',
+        'responsible_investment_id',
+        'revision',
+        'created_by',
+        'created_at',
+        'updated_at',
+      ]),
+    )
+  })
+
+  it('creates the event audit table with actor, reason, revision and snapshots', async () => {
+    const cols = await tableColumns('event_audit')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'event_id',
+        'revision',
+        'actor_id',
+        'reason',
+        'changed_fields',
+        'before_state',
+        'after_state',
+        'created_at',
+      ]),
+    )
+  })
+
   it('types requests.status with the request_status enum', async () => {
     const { rows } = await pool.query(
       `SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'requests' AND table_schema = 'dashboard' AND column_name = 'status'`,
