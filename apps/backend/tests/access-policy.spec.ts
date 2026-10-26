@@ -48,7 +48,7 @@ describe('seven-role row scope', () => {
     expect(requestScopeFor('system-owner')).toEqual({ kind: 'all' })
     expect(requestScopeFor('central-secretariat')).toEqual({ kind: 'all' })
     expect(bindRequestScope(requestScopeFor('representative'), 'p1', 'comp-1')).toEqual({ kind: 'company', companyId: 'comp-1', userId: 'p1' })
-    expect(bindRequestScope(requestScopeFor('representative'), 'p1')).toEqual({ kind: 'none' })
+    expect(bindRequestScope(requestScopeFor('representative'), 'p1')).toEqual({ kind: 'company', companyId: '', userId: 'p1' })
     expect(bindRequestScope(requestScopeFor('chief-reviewer'), 'c1')).toEqual({ kind: 'assigned', userId: 'c1', role: 'chief-reviewer' })
     expect(bindRequestScope(requestScopeFor('reviewer'), 'r1')).toEqual({ kind: 'assigned', userId: 'r1', role: 'reviewer' })
     expect(bindRequestScope(requestScopeFor('employer-reviewer'), 'e1')).toEqual({ kind: 'assigned', userId: 'e1', role: 'employer-reviewer' })

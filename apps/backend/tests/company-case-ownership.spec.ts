@@ -24,8 +24,8 @@ describe('T12: Company-owned applications and acting person separation', () => {
       companyId: 'company-100',
       userId: 'user-1',
     })
-    expect(bindRequestScope(scope, 'user-1', null)).toEqual({ kind: 'none' })
-    expect(bindRequestScope(scope, 'user-1', undefined)).toEqual({ kind: 'none' })
+    expect(bindRequestScope(scope, 'user-1', null)).toEqual({ kind: 'company', companyId: '', userId: 'user-1' })
+    expect(bindRequestScope(scope, 'user-1', undefined)).toEqual({ kind: 'company', companyId: '', userId: 'user-1' })
   })
 
   it('generates company_id SQL filter and includes legacy unmigrated fallback when userId is bound', () => {

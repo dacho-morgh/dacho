@@ -51,7 +51,7 @@ export function bindRequestScope(
 ): RequestScope {
   if (scope.kind === 'owner') return { ...scope, userId }
   if (scope.kind === 'company') {
-    return companyId ? { ...scope, companyId, userId } : { kind: 'none' }
+    return { ...scope, companyId: companyId ?? '', userId }
   }
   if (scope.kind === 'assigned') return { ...scope, userId }
   return scope

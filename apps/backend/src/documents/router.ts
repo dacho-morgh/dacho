@@ -417,8 +417,8 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     let removed: PrivateDocumentRecord | undefined
     try {
       await client.query('BEGIN')
-      const { rows } = await client.query<{ owner_id: string; status: string; company_id: string | null }>(
-        'SELECT owner_id, status::text AS status, company_id FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+      const { rows } = await client.query<{ owner_id: string; status: string }>(
+        'SELECT owner_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
         [record.requestId],
       )
       const current = rows[0]
@@ -431,7 +431,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       if (
         !canDeleteDocument(
           actor.operationalRole,
-          { requestOwnerId: current.owner_id, requestCompanyId: current.company_id, requestStatus: current.status },
+          { requestOwnerId: current.owner_id, requestCompanyId: record.requestCompanyId, requestStatus: current.status },
           actor.id,
           companyId,
         )
