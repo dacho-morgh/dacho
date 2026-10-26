@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import request from 'supertest'
 
 import type { User } from '../src/auth/user-store.js'
@@ -43,6 +43,24 @@ async function setup() {
 }
 
 describe('booth catalogue', () => {
+  it.each([
+    ['get', `/exhibitions/${EXHIBITION}/catalogue`, 'getSettings', undefined],
+    ['get', `/exhibitions/${EXHIBITION}/catalogue`, 'listBooths', undefined],
+    ['get', `/admin/exhibitions/${EXHIBITION}/catalogue`, 'getSettings', undefined],
+    ['get', `/admin/exhibitions/${EXHIBITION}/catalogue`, 'listBooths', undefined],
+    ['put', `/admin/exhibitions/${EXHIBITION}/settings`, 'upsertSettings', { companyBoothLimit: 2 }],
+    ['post', `/admin/exhibitions/${EXHIBITION}/booths`, 'createBooth', boothBody()],
+    ['patch', `/admin/exhibitions/${EXHIBITION}/booths/11111111-1111-4111-8111-111111111111`, 'updateBooth', { identifier: 'B-2' }],
+  ] as const)('returns HTTP 500 when %s %s rejects in %s', async (method, path, operation, body) => {
+    const { app, owner, boothCatalogue } = await setup()
+    vi.spyOn(boothCatalogue, operation).mockRejectedValueOnce(new Error('connection terminated unexpectedly'))
+    const response = await request(app)[method](path)
+      .set(headers(owner))
+      .send(body)
+      .timeout({ response: 500, deadline: 1000 })
+    expect(response.status).toBe(500)
+  })
+
   it('lets the owner configure the limit, guide map and fixed toman prices', async () => {
     const { app, owner, representative } = await setup()
 

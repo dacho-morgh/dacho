@@ -718,7 +718,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json({ ticket })
   })
 
-  router.get('/exhibitions/:exhibitionId/catalogue', async (req, res) => {
+  router.get('/exhibitions/:exhibitionId/catalogue', async (req, res, next) => {
+    try {
     const [settings, booths] = await Promise.all([
       catalogue.getSettings(req.params.exhibitionId),
       catalogue.listBooths(req.params.exhibitionId),
@@ -729,9 +730,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       guideMapReference: settings?.guideMapReference ?? null,
       booths,
     })
+    } catch (error) { next(error) }
   })
 
-  router.get('/admin/exhibitions/:exhibitionId/catalogue', async (req, res) => {
+  router.get('/admin/exhibitions/:exhibitionId/catalogue', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (actor.operationalRole !== 'system-owner') {
       res.status(403).json({ error: 'forbidden' })
@@ -747,9 +750,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       guideMapReference: settings?.guideMapReference ?? null,
       booths,
     })
+    } catch (error) { next(error) }
   })
 
-  router.put('/admin/exhibitions/:exhibitionId/settings', async (req, res) => {
+  router.put('/admin/exhibitions/:exhibitionId/settings', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (actor.operationalRole !== 'system-owner') {
       res.status(403).json({ error: 'forbidden' })
@@ -775,9 +780,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       actor.id,
     )
     res.json({ settings })
+    } catch (error) { next(error) }
   })
 
-  router.post('/admin/exhibitions/:exhibitionId/booths', async (req, res) => {
+  router.post('/admin/exhibitions/:exhibitionId/booths', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (actor.operationalRole !== 'system-owner') {
       res.status(403).json({ error: 'forbidden' })
@@ -807,9 +814,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     res.status(201).json({ booth: result.booth })
+    } catch (error) { next(error) }
   })
 
-  router.patch('/admin/exhibitions/:exhibitionId/booths/:boothId', async (req, res) => {
+  router.patch('/admin/exhibitions/:exhibitionId/booths/:boothId', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (actor.operationalRole !== 'system-owner') {
       res.status(403).json({ error: 'forbidden' })
@@ -835,6 +844,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     res.json({ booth: result.booth })
+    } catch (error) { next(error) }
   })
 
   return router
