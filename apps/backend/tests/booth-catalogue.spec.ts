@@ -374,4 +374,31 @@ describe('booth catalogue', () => {
       .send(boothBody())
     expect(booth.status).toBe(201)
   })
+
+  it('returns a controlled error when the exhibition lookup rejects', async () => {
+    const testApp = await createTestApp({
+      exhibitionStore: {
+        async exists(): Promise<boolean> {
+          throw new Error('cms unavailable')
+        },
+      },
+    })
+    const owner = await testApp.userStore.findOrCreateByPhone('09120000010')
+    owner.operationalRole = 'system-owner'
+    owner.roles = ['admin']
+
+    const settings = await request(testApp.app)
+      .put(`/admin/exhibitions/${EXHIBITION}/settings`)
+      .set(headers(owner))
+      .send({ companyBoothLimit: 2 })
+    expect(settings.status).toBe(503)
+    expect(settings.body.error).toBe('exhibition_lookup_failed')
+
+    const booth = await request(testApp.app)
+      .post(`/admin/exhibitions/${EXHIBITION}/booths`)
+      .set(headers(owner))
+      .send(boothBody())
+    expect(booth.status).toBe(503)
+    expect(booth.body.error).toBe('exhibition_lookup_failed')
+  })
 })

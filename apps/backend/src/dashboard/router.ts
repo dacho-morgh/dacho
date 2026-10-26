@@ -145,6 +145,17 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const catalogue =
     deps.boothCatalogue ?? new PostgresBoothCatalogueRepository(deps.pool)
 
+  async function checkExhibition(
+    exhibitionId: string,
+  ): Promise<{ ok: true; exists: boolean } | { ok: false }> {
+    if (!deps.exhibitionStore) return { ok: true, exists: true }
+    try {
+      return { ok: true, exists: await deps.exhibitionStore.exists(exhibitionId) }
+    } catch {
+      return { ok: false }
+    }
+  }
+
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps }))
 
@@ -730,7 +741,12 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(400).json({ error: parsed.error })
       return
     }
-    if (deps.exhibitionStore && !(await deps.exhibitionStore.exists(req.params.exhibitionId))) {
+    const exhibition = await checkExhibition(req.params.exhibitionId)
+    if (!exhibition.ok) {
+      res.status(503).json({ error: 'exhibition_lookup_failed' })
+      return
+    }
+    if (!exhibition.exists) {
       res.status(404).json({ error: 'exhibition_not_found' })
       return
     }
@@ -753,7 +769,12 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(400).json({ error: parsed.error })
       return
     }
-    if (deps.exhibitionStore && !(await deps.exhibitionStore.exists(req.params.exhibitionId))) {
+    const exhibition = await checkExhibition(req.params.exhibitionId)
+    if (!exhibition.ok) {
+      res.status(503).json({ error: 'exhibition_lookup_failed' })
+      return
+    }
+    if (!exhibition.exists) {
       res.status(404).json({ error: 'exhibition_not_found' })
       return
     }
