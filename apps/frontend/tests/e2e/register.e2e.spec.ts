@@ -266,6 +266,7 @@ test.describe('Register', () => {
         phone,
         password: 'password123',
         name: 'Applicant created during admin session',
+        position: 'Company representative',
         companyName: 'Test company',
         companyNationalId: `20${suffix}`,
         companyRegistrationNumber: suffix,

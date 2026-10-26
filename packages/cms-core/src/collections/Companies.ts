@@ -99,6 +99,15 @@ export const Companies: CollectionConfig = {
       index: true,
       access: { update: adminOnlyIdentity },
     },
+    // Stage 1 asks for the business activity domain. The vocabulary is still
+    // open (`docs/system/fixed-form-contracts.md`), so it is text. The
+    // self-signup endpoint persists it when supplied but does not require it
+    // until FE03 starts collecting it.
+    {
+      name: 'activityDomain',
+      type: 'text',
+      label: 'حوزه فعالیت',
+    },
     {
       name: 'registrationNumber',
       type: 'text',
@@ -178,7 +187,6 @@ export const Companies: CollectionConfig = {
     { name: 'knowledgeBasedStatus', type: 'text', label: 'وضعیت دانش‌بنیان' },
     { name: 'classification', type: 'text', label: 'طبقه‌بندی شرکت' },
     { name: 'foundingYear', type: 'text', label: 'سال تأسیس' },
-    { name: 'activityDomain', type: 'text', label: 'حوزه فعالیت' },
     { name: 'website', type: 'text', label: 'وب‌سایت' },
     { name: 'centerEstablishment', type: 'text', label: 'استقرار در مرکز تحقیقات یا فناوری' },
     {

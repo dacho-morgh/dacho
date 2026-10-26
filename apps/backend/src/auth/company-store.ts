@@ -116,6 +116,7 @@ export class PayloadCompanyStore implements CompanyStore {
       ...pickStrings(d, [
         'name',
         'nationalId',
+        'activityDomain',
         'registrationNumber',
         'type',
         'province',
@@ -127,7 +128,6 @@ export class PayloadCompanyStore implements CompanyStore {
         'knowledgeBasedStatus',
         'classification',
         'foundingYear',
-        'activityDomain',
         'website',
         'centerEstablishment',
       ]),
@@ -161,6 +161,7 @@ export class PayloadCompanyStore implements CompanyStore {
 const COMPANY_FIELDS = [
   'name',
   'nationalId',
+  'activityDomain',
   'registrationNumber',
   'type',
   'province',
@@ -172,7 +173,6 @@ const COMPANY_FIELDS = [
   'knowledgeBasedStatus',
   'classification',
   'foundingYear',
-  'activityDomain',
   'website',
   'centerEstablishment',
 ] as const

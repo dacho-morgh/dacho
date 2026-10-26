@@ -63,6 +63,7 @@ export interface CertificateLicence {
 export type CompanyFields = {
   name?: string
   nationalId?: string
+  activityDomain?: string
   registrationNumber?: string
   type?: string
   province?: string
@@ -77,7 +78,6 @@ export type CompanyFields = {
   knowledgeBasedStatus?: string
   classification?: string
   foundingYear?: string
-  activityDomain?: string
   website?: string
   centerEstablishment?: string
   insuredEmployeeCount?: number | null
