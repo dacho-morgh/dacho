@@ -422,7 +422,6 @@ export function missingDossierItems(
   requireValue('knowledgeBasedStatus', nonEmpty(dossier.knowledgeBasedStatus))
   requireValue('activityDomain', nonEmpty(dossier.activityDomain))
   requireValue('productsServices', dossier.productsServices.length > 0)
-  requireValue('keyMembers', dossier.keyMembers.length > 0)
   requireValue('addresses', (company.addresses ?? []).length > 0)
   for (const category of REQUIRED_DOCUMENT_CATEGORIES) {
     requireValue(category, documentCategories.has(category))

@@ -201,7 +201,7 @@ describe('Dashboard Profile Endpoints', () => {
       expect(res.body.dossier).toMatchObject({ legalEntityType: '', productsServices: [], notAvailable: [] })
       expect(res.body.documents).toHaveLength(2)
       expect(res.body.missing.required).toEqual(
-        expect.arrayContaining(['legalEntityType', 'foundingYear', 'knowledgeBasedStatus', 'productsServices', 'keyMembers']),
+        expect.arrayContaining(['legalEntityType', 'foundingYear', 'knowledgeBasedStatus', 'productsServices']),
       )
       expect(res.body.missing.required).not.toContain('registrationNumber')
       expect(res.body.missing.optional).toContain('website')
@@ -227,6 +227,21 @@ describe('Dashboard Profile Endpoints', () => {
 
       const get = await request(app).get('/profile/dossier').set(headers)
       expect(get.body.dossier).toMatchObject({ ...requiredValues, notAvailable: [...optionalAbsent] })
+    })
+
+    it('does not block verification when the key-member list is empty', async () => {
+      const { app, headers } = await createDossierTestApp()
+
+      const patch = await request(app)
+        .patch('/profile/dossier')
+        .set(headers)
+        .send({ ...requiredValues, keyMembers: [], notAvailable: optionalAbsent })
+
+      expect(patch.status, JSON.stringify(patch.body)).toBe(200)
+      expect(patch.body.dossier.keyMembers).toEqual([])
+      expect(patch.body.missing.required).not.toContain('keyMembers')
+      expect(patch.body.missing.required).toEqual([])
+      expect(patch.body.missing.canRequestVerification).toBe(true)
     })
 
     it('clears a value when it is declared absent and restores it when a value returns', async () => {
