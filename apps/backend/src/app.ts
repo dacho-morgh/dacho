@@ -6,6 +6,7 @@ import type { Pool } from 'pg'
 import { createAuthRouter, type AuthDeps } from './auth/router.js'
 import type { CompanyStore } from './auth/company-store.js'
 import type { ServiceCatalog } from './catalog/service-catalog.js'
+import type { EventStore } from './dashboard/event-repo.js'
 import { createDashboardRouter } from './dashboard/router.js'
 import { PrivateDocumentStorage } from './documents/storage.js'
 
@@ -16,6 +17,8 @@ export interface AppDeps extends AuthDeps {
   companyStore: CompanyStore
   /** Required in production; tests may inject a disposable directory. */
   privateDocumentStorage?: PrivateDocumentStorage
+  /** Tests may inject an in-memory store; production always uses Postgres. */
+  eventStore?: EventStore
 }
 
 export function createApp(deps: AppDeps): Express {

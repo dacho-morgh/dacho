@@ -4,6 +4,7 @@ import { Pool } from 'pg'
 import { InMemoryCompanyStore } from '../src/auth/company-store.js'
 import { InMemoryUserStore, type UserStore } from '../src/auth/user-store.js'
 import { createApp } from '../src/app.js'
+import type { EventStore } from '../src/dashboard/event-repo.js'
 import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
 import { JwtSigner } from '../src/jwt.js'
 import { InMemoryCodeStore } from '../src/otp/code-store.js'
@@ -21,6 +22,8 @@ export interface TestApp {
 export interface TestAppOptions {
   /** Swap the in-memory identity store for a remote-backed implementation. */
   userStore?: UserStore
+  /** Keep event authorization/validation tests independent of Postgres. */
+  eventStore?: EventStore
 }
 
 export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
@@ -41,6 +44,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     pool,
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret: 'test-proxy-secret',
+    eventStore: options.eventStore,
   })
   return { app, delivery, codeStore, userStore, companyStore, jwt }
 }

@@ -2,6 +2,11 @@ import { Router } from 'express'
 import type { Pool } from 'pg'
 
 import {
+  allowedEventActions,
+  canActOnEvent,
+  canManageEvents,
+} from '../access/events.js'
+import {
   allowedRequestActions,
   bindRequestScope,
   canRequestAction,
@@ -16,6 +21,12 @@ import {
 import type { ServiceCatalog, ServiceDefinition } from '../catalog/service-catalog.js'
 import { ActivityRepository } from './activity-repo.js'
 import { AssignmentRepository } from './assignment-repo.js'
+import {
+  EventRepository,
+  type EventConfiguration,
+  type EventInput,
+  type EventStore,
+} from './event-repo.js'
 import { LetterRepository } from './letter-repo.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
@@ -34,6 +45,7 @@ export interface DashboardDeps {
   userStore: UserStore
   companyStore: CompanyStore
   privateDocumentStorage: PrivateDocumentStorage
+  eventStore?: EventStore
 }
 
 function parsePositiveInt(value: unknown, fallback: number): number {
@@ -75,6 +87,91 @@ function requestWithActions(
     ...request,
     allowedActions: allowedRequestActions(role, request, actorId),
   }
+}
+
+type EventValidation =
+  | { ok: true; input: EventInput }
+  | { ok: false; error: 'invalid_event'; fields: string[] }
+  | { ok: false; error: 'invalid_registration_window' }
+
+function normalizeEventInput(body: unknown, existing?: EventConfiguration): EventValidation {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'invalid_event', fields: [] }
+  }
+  const source = body as Record<string, unknown>
+  const valueOf = (key: keyof EventInput, fallback: unknown): unknown =>
+    key in source ? source[key] : fallback
+
+  const titleValue = valueOf('title', existing?.title)
+  const title = typeof titleValue === 'string' ? titleValue.trim() : ''
+  const descriptionValue = valueOf('description', existing?.description ?? '')
+  const description = typeof descriptionValue === 'string' ? descriptionValue.trim() : null
+  const openValue = valueOf('registrationOpenAt', existing?.registrationOpenAt)
+  const openText = typeof openValue === 'string' ? openValue.trim() : ''
+  const closeValue = valueOf('registrationCloseAt', existing?.registrationCloseAt)
+  const closeText = typeof closeValue === 'string' ? closeValue.trim() : ''
+  const chiefValue = valueOf('responsibleChiefId', existing?.responsibleChiefId)
+  const chiefId = typeof chiefValue === 'string' ? chiefValue.trim() : ''
+  const investmentValue = valueOf('responsibleInvestmentId', existing?.responsibleInvestmentId)
+  const investmentId = typeof investmentValue === 'string' ? investmentValue.trim() : ''
+
+  const fields: string[] = []
+  if (!title) fields.push('title')
+  if (description === null) fields.push('description')
+  if (!openText) fields.push('registrationOpenAt')
+  if (!closeText) fields.push('registrationCloseAt')
+  if (!chiefId) fields.push('responsibleChiefId')
+  if (!investmentId) fields.push('responsibleInvestmentId')
+  if (fields.length > 0) return { ok: false, error: 'invalid_event', fields }
+
+  const open = Date.parse(openText)
+  const close = Date.parse(closeText)
+  if (!Number.isFinite(open) || !Number.isFinite(close) || close <= open) {
+    return { ok: false, error: 'invalid_registration_window' }
+  }
+
+  return {
+    ok: true,
+    input: {
+      title,
+      description: description ?? '',
+      registrationOpenAt: new Date(open).toISOString(),
+      registrationCloseAt: new Date(close).toISOString(),
+      responsibleChiefId: chiefId,
+      responsibleInvestmentId: investmentId,
+    },
+  }
+}
+
+function eventWithActions(
+  role: Parameters<typeof allowedEventActions>[0],
+  actorId: string,
+  event: EventConfiguration,
+) {
+  return {
+    ...event,
+    allowedActions: allowedEventActions(role, actorId, event),
+  }
+}
+
+async function ineligibleResponsibleField(
+  userStore: UserStore,
+  input: EventInput,
+): Promise<'responsibleChiefId' | 'responsibleInvestmentId' | null> {
+  const [chief, investment] = await Promise.all(
+    [input.responsibleChiefId, input.responsibleInvestmentId].map(async (id) => {
+      try {
+        return await userStore.findById(id)
+      } catch {
+        return undefined
+      }
+    }),
+  )
+  if (!chief || operationalRoleOf(chief) !== 'chief-reviewer') return 'responsibleChiefId'
+  if (!investment || operationalRoleOf(investment) !== 'investment-reviewer') {
+    return 'responsibleInvestmentId'
+  }
+  return null
 }
 
 async function resolveRequesterNames(userStore: UserStore, requesterIds: string[]): Promise<Map<string, string>> {
@@ -129,6 +226,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const profileRepo = new ProfileRepository(deps.userStore, deps.companyStore)
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
+  const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
 
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps }))
@@ -379,6 +477,90 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     })
     if (!revoked) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ assignment: revoked })
+  })
+
+  router.get('/admin/events', async (_req, res) => {
+    const actor = actorOf(res)
+    if (!isInternalOperationalRole(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const events = await eventStore.list()
+    const items = events
+      .filter((event) => canActOnEvent(actor.operationalRole, actor.id, event, 'read'))
+      .map((event) => eventWithActions(actor.operationalRole, actor.id, event))
+    res.json({ items })
+  })
+
+  router.get('/admin/events/:id', async (req, res) => {
+    const actor = actorOf(res)
+    if (!isInternalOperationalRole(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const event = await eventStore.findById(req.params.id)
+    if (!event || !canActOnEvent(actor.operationalRole, actor.id, event, 'read')) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    res.json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
+  })
+
+  router.post('/admin/events', async (req, res) => {
+    const actor = actorOf(res)
+    if (!canManageEvents(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const parsed = normalizeEventInput(req.body)
+    if (!parsed.ok) {
+      res.status(400).json(
+        parsed.error === 'invalid_event'
+          ? { error: parsed.error, fields: parsed.fields }
+          : { error: parsed.error },
+      )
+      return
+    }
+    const ineligible = await ineligibleResponsibleField(deps.userStore, parsed.input)
+    if (ineligible) {
+      res.status(400).json({ error: 'ineligible_responsible_person', field: ineligible })
+      return
+    }
+    const event = await eventStore.create({ ...parsed.input, createdBy: actor.id })
+    res.status(201).json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
+  })
+
+  router.patch('/admin/events/:id', async (req, res) => {
+    const actor = actorOf(res)
+    if (!canManageEvents(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const existing = await eventStore.findById(req.params.id)
+    if (!existing) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const parsed = normalizeEventInput(req.body, existing)
+    if (!parsed.ok) {
+      res.status(400).json(
+        parsed.error === 'invalid_event'
+          ? { error: parsed.error, fields: parsed.fields }
+          : { error: parsed.error },
+      )
+      return
+    }
+    const ineligible = await ineligibleResponsibleField(deps.userStore, parsed.input)
+    if (ineligible) {
+      res.status(400).json({ error: 'ineligible_responsible_person', field: ineligible })
+      return
+    }
+    const event = await eventStore.update(existing.id, parsed.input)
+    if (!event) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    res.json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
   })
 
   router.get('/letters', async (req, res) => {
