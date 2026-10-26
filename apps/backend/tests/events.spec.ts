@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { ErrorRequestHandler } from 'express'
 import request from 'supertest'
 
 import {
@@ -54,6 +55,33 @@ function eventPayload(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Event configuration', () => {
+  it.each([
+    ['get', false, 'list'],
+    ['get', true, 'findById'],
+    ['post', false, 'create'],
+    ['patch', true, 'findById'],
+    ['patch', true, 'update'],
+  ] as const)('forwards %s event repository failure (%s, %s)', async (method, detail, operation) => {
+    const { app, eventStore, as } = await createEventTestApp()
+    const event = await eventStore.create({ ...eventPayload(), createdBy: 'owner-1' })
+    const failure = new Error('database unavailable')
+    const errorHandler = vi.fn<ErrorRequestHandler>((error, _req, res, _next) => {
+      res.status(503).json({ error: error.message })
+    })
+    app.use(errorHandler)
+    vi.spyOn(eventStore, operation).mockRejectedValueOnce(failure)
+
+    const response = await request(app)[method](`/admin/events${detail ? `/${event.id}` : ''}`)
+      .set(as('owner-1'))
+      .send({ ...eventPayload(), revision: 1, reason: 'Correct event' })
+      .timeout({ response: 500, deadline: 1000 })
+
+    expect(response.status).toBe(503)
+    expect(response.body).toEqual({ error: failure.message })
+    expect(errorHandler).toHaveBeenCalledOnce()
+    expect(errorHandler.mock.calls[0]?.[0]).toBe(failure)
+  })
+
   it('lets the owner create, reload and update an event with its assignments', async () => {
     const { app, eventStore, as } = await createEventTestApp()
 

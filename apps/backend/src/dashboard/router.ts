@@ -544,7 +544,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json({ assignment: revoked })
   })
 
-  router.get('/admin/events', async (_req, res) => {
+  router.get('/admin/events', async (_req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!isInternalOperationalRole(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
@@ -555,9 +556,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       .filter((event) => canActOnEvent(actor.operationalRole, actor.id, event, 'read'))
       .map((event) => eventWithActions(actor.operationalRole, actor.id, event))
     res.json({ items })
+    } catch (error) { next(error) }
   })
 
-  router.get('/admin/events/:id', async (req, res) => {
+  router.get('/admin/events/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!isInternalOperationalRole(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
@@ -573,9 +576,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     res.json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
+    } catch (error) { next(error) }
   })
 
-  router.post('/admin/events', async (req, res) => {
+  router.post('/admin/events', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!canManageEvents(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
@@ -597,9 +602,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
     const event = await eventStore.create({ ...parsed.input, createdBy: actor.id })
     res.status(201).json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
+    } catch (error) { next(error) }
   })
 
-  router.patch('/admin/events/:id', async (req, res) => {
+  router.patch('/admin/events/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!canManageEvents(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
@@ -657,6 +664,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     res.json({ event: eventWithActions(actor.operationalRole, actor.id, updated.event) })
+    } catch (error) { next(error) }
   })
 
   router.get('/letters', async (req, res) => {
