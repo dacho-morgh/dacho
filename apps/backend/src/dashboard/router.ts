@@ -450,6 +450,20 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
       throw error
     }
+    // Write the dossier first: its merge validation is the only 400-producing
+    // part of this combined PATCH, so a rejected request must not leave the
+    // company, contacts or executives partially updated.
+    if (Object.keys(dossierUpdate).length > 0) {
+      try {
+        profile = await profileRepo.updateDossier(actor.id, dossierUpdate)
+      } catch (error) {
+        if (error instanceof DossierValidationError) {
+          res.status(400).json({ error: error.code })
+          return
+        }
+        throw error
+      }
+    }
     if (company && typeof company === 'object') {
       profile = await profileRepo.updateBasicInfo(actor.id, company)
     }
@@ -458,9 +472,6 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
     if (Array.isArray(req.body?.executives)) {
       profile = await profileRepo.updateExecutives(actor.id, req.body.executives)
-    }
-    if (Object.keys(dossierUpdate).length > 0) {
-      profile = await profileRepo.updateDossier(actor.id, dossierUpdate)
     }
     res.json(profile)
   })

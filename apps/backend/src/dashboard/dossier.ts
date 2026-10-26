@@ -134,6 +134,12 @@ export function pickDossierUpdate(input: unknown): Partial<CompanyFields> {
     if (typeof value !== 'string') throw new DossierValidationError(`invalid_${field}`)
     update[field] = value.trim()
   }
+  if (update.foundingYear !== undefined && update.foundingYear !== '') {
+    const year = Number(update.foundingYear)
+    if (!/^\d{4}$/.test(update.foundingYear) || year < 1200 || year > 2100) {
+      throw new DossierValidationError('invalid_foundingYear')
+    }
+  }
 
   if ('insuredEmployeeCount' in input) {
     const value = input.insuredEmployeeCount
@@ -207,7 +213,9 @@ export function dossierOfCompany(company: Company | undefined): CompanyDossier {
     pastProjectsCustomers: [...(company?.pastProjectsCustomers ?? [])],
     requestedServices: [...(company?.requestedServices ?? [])],
     certificatesLicenses: [...(company?.certificatesLicenses ?? [])],
-    notAvailable: [...(company?.notAvailable ?? [])],
+    notAvailable: Array.isArray(company?.notAvailable)
+      ? company.notAvailable.filter(isAbsenceField)
+      : [],
   }
 }
 
@@ -292,23 +300,39 @@ export function mergeDossier(
   return next
 }
 
-export function dossierFields(dossier: CompanyDossier): Partial<CompanyFields> {
-  return {
-    legalEntityType: dossier.legalEntityType,
-    knowledgeBasedStatus: dossier.knowledgeBasedStatus,
-    classification: dossier.classification,
-    foundingYear: dossier.foundingYear,
-    activityDomain: dossier.activityDomain,
-    website: dossier.website,
-    centerEstablishment: dossier.centerEstablishment,
-    insuredEmployeeCount: dossier.insuredEmployeeCount,
-    productsServices: dossier.productsServices,
-    keyMembers: dossier.keyMembers,
-    pastProjectsCustomers: dossier.pastProjectsCustomers,
-    requestedServices: dossier.requestedServices,
-    certificatesLicenses: dossier.certificatesLicenses,
-    notAvailable: dossier.notAvailable,
+const DOSSIER_KEYS = [
+  'legalEntityType',
+  'knowledgeBasedStatus',
+  'classification',
+  'foundingYear',
+  'activityDomain',
+  'website',
+  'centerEstablishment',
+  'insuredEmployeeCount',
+  'productsServices',
+  'keyMembers',
+  'pastProjectsCustomers',
+  'requestedServices',
+  'certificatesLicenses',
+  'notAvailable',
+] as const
+
+/**
+ * Only the fields that actually changed. This keeps independent concurrent
+ * saves from overwriting each other and leaves untouched arrays intact.
+ */
+export function dossierPatch(
+  current: CompanyDossier,
+  next: CompanyDossier,
+): Partial<CompanyFields> {
+  const patch: Partial<CompanyFields> = {}
+  for (const key of DOSSIER_KEYS) {
+    if (JSON.stringify(current[key]) !== JSON.stringify(next[key])) {
+      const writable = patch as Record<string, unknown>
+      writable[key] = next[key]
+    }
   }
+  return patch
 }
 
 export interface DossierDocument {

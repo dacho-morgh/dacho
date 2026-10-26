@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto'
 import type { Address as StoredAddress, CompanyFields, Executive as StoredExecutive, UserStore } from '../auth/user-store.js'
 import type { Company, CompanyStore } from '../auth/company-store.js'
 import {
-  dossierFields,
   dossierOfCompany,
+  dossierPatch,
   EMPTY_DOSSIER,
   mergeDossier,
   type CompanyDossier,
@@ -35,10 +35,32 @@ const EMPTY_PROFILE: UserProfile = {
  * which remains the identity store.
  */
 export class ProfileRepository {
+  /**
+   * Dossier value/absence changes are coupled, so read-merge-write must be
+   * serialized per representative inside this process. Independent field
+   * writes then remain independent because only changed fields are persisted.
+   */
+  private readonly dossierQueues = new Map<string, Promise<void>>()
+
   constructor(
     private readonly users: UserStore,
     private readonly companies: CompanyStore,
   ) {}
+
+  private async withDossierLock<T>(userId: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.dossierQueues.get(userId) ?? Promise.resolve()
+    let release!: () => void
+    const current = new Promise<void>((resolve) => { release = resolve })
+    const queued = previous.then(() => current)
+    this.dossierQueues.set(userId, queued)
+    await previous
+    try {
+      return await task()
+    } finally {
+      release()
+      if (this.dossierQueues.get(userId) === queued) this.dossierQueues.delete(userId)
+    }
+  }
 
   async getProfile(userId: string): Promise<UserProfile> {
     const user = await this.users.findById(userId)
@@ -77,11 +99,15 @@ export class ProfileRepository {
   }
 
   async updateDossier(userId: string, update: Partial<CompanyFields>): Promise<UserProfile> {
-    const company = await this.companies.findByRepresentative(userId)
-    if (!company) throw new Error(`Company not found for representative: ${userId}`)
-    const next = mergeDossier(dossierOfCompany(company), update)
-    await this.companies.update(company.id, dossierFields(next))
-    return this.getProfile(userId)
+    return this.withDossierLock(userId, async () => {
+      const company = await this.companies.findByRepresentative(userId)
+      if (!company) throw new Error(`Company not found for representative: ${userId}`)
+      const current = dossierOfCompany(company)
+      const next = mergeDossier(current, update)
+      const patch = dossierPatch(current, next)
+      if (Object.keys(patch).length > 0) await this.companies.update(company.id, patch)
+      return this.getProfile(userId)
+    })
   }
 
   async addAddress(userId: string, input: Omit<Address, 'id'>): Promise<Address> {

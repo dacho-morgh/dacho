@@ -278,5 +278,39 @@ describe('Dashboard Profile Endpoints', () => {
       expect(res.body.company.name).toBe('شرکت به‌روز')
       expect(res.body.dossier.legalEntityType).toBe('سهامی خاص')
     })
+
+    it('rejects an invalid combined PATCH before persisting company, contacts or executives', async () => {
+      const { app, headers } = await createDossierTestApp()
+
+      const res = await request(app)
+        .patch('/profile')
+        .set(headers)
+        .send({
+          company: { name: 'نباید ذخیره شود' },
+          contacts: { email: 'should-not-save@example.invalid' },
+          executives: [{ position: 'مدیرعامل', name: 'نباید ذخیره شود' }],
+          website: 'https://example.invalid',
+          notAvailable: ['website'],
+        })
+
+      expect(res.status).toBe(400)
+      expect(res.body.error).toBe('conflicting_absence')
+
+      const profile = await request(app).get('/profile').set(headers)
+      expect(profile.body.company.name).toBe('شرکت دوسیه')
+      expect(profile.body.contacts.email).toBe('')
+      expect(profile.body.executives).toEqual([])
+      expect(profile.body.dossier.website).toBe('')
+    })
+
+    it('rejects a founding year that is not a plausible four-digit year', async () => {
+      const { app, headers } = await createDossierTestApp()
+
+      for (const foundingYear of ['139', 'abcd', '9999']) {
+        const res = await request(app).patch('/profile/dossier').set(headers).send({ foundingYear })
+        expect(res.status).toBe(400)
+        expect(res.body.error).toBe('invalid_foundingYear')
+      }
+    })
   })
 })

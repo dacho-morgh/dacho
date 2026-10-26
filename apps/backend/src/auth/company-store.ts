@@ -1,4 +1,4 @@
-import type { Address, CompanyFields, Executive, User } from './user-store.js'
+import { isAbsenceField, type Address, type CompanyFields, type Executive, type User } from './user-store.js'
 
 export interface Company extends CompanyFields {
   id: string
@@ -152,7 +152,7 @@ export class PayloadCompanyStore implements CompanyStore {
         ? { certificatesLicenses: d.certificatesLicenses as CompanyFields['certificatesLicenses'] }
         : {}),
       ...(Array.isArray(d.notAvailable)
-        ? { notAvailable: d.notAvailable as CompanyFields['notAvailable'] }
+        ? { notAvailable: d.notAvailable.filter(isAbsenceField) }
         : {}),
     }
   }

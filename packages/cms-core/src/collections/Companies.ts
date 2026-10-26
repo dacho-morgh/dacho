@@ -9,6 +9,7 @@ import {
   hasOperationalRole,
 } from '@cms-core/access/roles'
 import { companyDirectory } from '@cms-core/endpoints/companyDirectory'
+import { validateCompanyAbsenceList } from './companyAbsence'
 
 /**
  * A Company (شرکت) — the organization that applies for the Innovation
@@ -231,6 +232,7 @@ export const Companies: CollectionConfig = {
       name: 'notAvailable',
       type: 'json',
       label: 'موارد اعلام‌شده به‌عنوان نداشتن یا در دسترس نبودن',
+      validate: validateCompanyAbsenceList,
     },
   ],
   timestamps: true,
