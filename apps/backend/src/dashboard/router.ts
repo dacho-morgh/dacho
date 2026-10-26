@@ -26,6 +26,11 @@ import type { User, UserStore } from '../auth/user-store.js'
 import { SupportRepository } from './support-repo.js'
 import { createDocumentRouter } from '../documents/router.js'
 import type { PrivateDocumentStorage } from '../documents/storage.js'
+import { parseBoothCreate, parseBoothUpdate, parseSettingsInput } from '../exhibitions/catalogue.js'
+import {
+  PostgresBoothCatalogueRepository,
+  type BoothCatalogueRepository,
+} from '../exhibitions/catalogue-repo.js'
 
 export interface DashboardDeps {
   pool: Pool
@@ -34,6 +39,7 @@ export interface DashboardDeps {
   userStore: UserStore
   companyStore: CompanyStore
   privateDocumentStorage: PrivateDocumentStorage
+  boothCatalogue?: BoothCatalogueRepository
 }
 
 function parsePositiveInt(value: unknown, fallback: number): number {
@@ -129,6 +135,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const profileRepo = new ProfileRepository(deps.userStore, deps.companyStore)
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
+  const catalogue =
+    deps.boothCatalogue ?? new PostgresBoothCatalogueRepository(deps.pool)
 
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps }))
@@ -671,6 +679,103 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const ticket = await support.close(req.params.id, actor.id, isCompanyAdministrator(actor.operationalRole) ? 'admin' : 'representative')
     if (!ticket) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ ticket })
+  })
+
+  router.get('/exhibitions/:exhibitionId/catalogue', async (req, res) => {
+    const [settings, booths] = await Promise.all([
+      catalogue.getSettings(req.params.exhibitionId),
+      catalogue.listBooths(req.params.exhibitionId),
+    ])
+    res.json({
+      exhibitionId: req.params.exhibitionId,
+      companyBoothLimit: settings?.companyBoothLimit ?? null,
+      guideMapReference: settings?.guideMapReference ?? null,
+      booths,
+    })
+  })
+
+  router.get('/admin/exhibitions/:exhibitionId/catalogue', async (req, res) => {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const [settings, booths] = await Promise.all([
+      catalogue.getSettings(req.params.exhibitionId),
+      catalogue.listBooths(req.params.exhibitionId, { includeInactive: true }),
+    ])
+    res.json({
+      exhibitionId: req.params.exhibitionId,
+      companyBoothLimit: settings?.companyBoothLimit ?? null,
+      guideMapReference: settings?.guideMapReference ?? null,
+      booths,
+    })
+  })
+
+  router.put('/admin/exhibitions/:exhibitionId/settings', async (req, res) => {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const parsed = parseSettingsInput(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error })
+      return
+    }
+    const settings = await catalogue.upsertSettings(
+      req.params.exhibitionId,
+      parsed.value,
+      actor.id,
+    )
+    res.json({ settings })
+  })
+
+  router.post('/admin/exhibitions/:exhibitionId/booths', async (req, res) => {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const parsed = parseBoothCreate(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error })
+      return
+    }
+    const result = await catalogue.createBooth({
+      ...parsed.value,
+      exhibitionId: req.params.exhibitionId,
+      createdBy: actor.id,
+    })
+    if (!result.ok) {
+      res.status(409).json({ error: result.error })
+      return
+    }
+    res.status(201).json({ booth: result.booth })
+  })
+
+  router.patch('/admin/exhibitions/:exhibitionId/booths/:boothId', async (req, res) => {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const parsed = parseBoothUpdate(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error })
+      return
+    }
+    const result = await catalogue.updateBooth({
+      ...parsed.value,
+      exhibitionId: req.params.exhibitionId,
+      boothId: req.params.boothId,
+      updatedBy: actor.id,
+    })
+    if (!result.ok) {
+      res.status(result.error === 'booth_not_found' ? 404 : 409).json({ error: result.error })
+      return
+    }
+    res.json({ booth: result.booth })
   })
 
   return router
