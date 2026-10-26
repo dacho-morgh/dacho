@@ -2,12 +2,19 @@
 
 import { AppSidebar, type SidebarUser } from '@/components/dashboard/app-sidebar'
 
+export interface DashboardNavigation {
+  role: string
+  roleLabel: string
+  responsibilities: string[]
+  destinations: string[]
+}
+
 export function DashboardSidebar({
   user,
-  isSeniorManager,
+  navigation,
 }: {
   user?: SidebarUser | null
-  isSeniorManager?: boolean
+  navigation: DashboardNavigation
 }) {
-  return <AppSidebar user={user} isSeniorManager={isSeniorManager} />
+  return <AppSidebar user={user} navigation={navigation} />
 }

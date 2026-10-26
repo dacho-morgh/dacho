@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
 
@@ -19,20 +20,27 @@ const staffProfileRoutes = [
 
 export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }) {
   const pathname = usePathname()
-  const router = useRouter()
   const [isLogoutOpen, setIsLogoutOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [logoutError, setLogoutError] = useState<string | null>(null)
   const profileRoutes = staffMode ? staffProfileRoutes : applicantProfileRoutes
 
   const handleLogout = async () => {
+    setIsLoggingOut(true)
+    setLogoutError(null)
     try {
-      await fetch('/api/users/logout', { method: 'POST' })
+      const response = await fetch('/api/users/logout', { method: 'POST', cache: 'no-store' })
+      if (!response.ok) throw new Error('logout_failed')
+      window.location.replace('/login?loggedOut=1')
+    } catch {
+      setLogoutError('خروج از حساب انجام نشد. ارتباط را بررسی کنید و دوباره تلاش کنید.')
     } finally {
-      router.push('/login')
+      setIsLoggingOut(false)
     }
   }
 
   return (
-    <>
+    <Sheet open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
       <nav
         aria-label="بخش‌های پروفایل"
         className="grid shrink-0 grid-cols-2 gap-3 border-b border-neutral-100 pb-4 sm:grid-cols-4 lg:flex lg:w-52 lg:flex-col lg:gap-4 lg:border-e lg:border-b-0 lg:pe-3 lg:pb-0"
@@ -63,47 +71,50 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
             </Typography>
           )
         })}
-        <Button
-          type="button"
-          variant="text-gray"
-          size="40"
-          className="text-error-500"
-          onClick={() => setIsLogoutOpen(true)}
-        >
-          خروج از حساب کاربری
-        </Button>
+        <SheetTrigger asChild>
+          <Button
+            type="button"
+            variant="text-gray"
+            size="40"
+            className="text-error-500"
+            onClick={() => setLogoutError(null)}
+          >
+            خروج از حساب کاربری
+          </Button>
+        </SheetTrigger>
       </nav>
 
-      {isLogoutOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="profile-logout-title"
-        >
-          <section className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-5 shadow-xl">
-            <Typography id="profile-logout-title" as="h2" variant="20/bold" color="neutral-600">
-              خروج از حساب کاربری
-            </Typography>
-            <Typography variant="16/semibold" color="neutral-500">
-              آیا می‌خواهید از حساب کاربری خود خارج شوید؟
-            </Typography>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline-gray"
-                className="flex-1"
-                onClick={() => setIsLogoutOpen(false)}
-              >
-                انصراف
-              </Button>
-              <Button type="button" variant="destructive" className="flex-1" onClick={handleLogout}>
-                خروج از حساب
-              </Button>
-            </div>
-          </section>
+      <SheetContent side="center" showCloseButton={false} overlayClassName="bg-black/40" className="gap-5">
+        <SheetTitle asChild>
+          <Typography as="h2" variant="20/bold" color="neutral-600">
+            خروج از حساب کاربری
+          </Typography>
+        </SheetTitle>
+        <SheetDescription asChild>
+          <Typography variant="16/semibold" color="neutral-500">
+            آیا می‌خواهید از حساب کاربری خود خارج شوید؟
+          </Typography>
+        </SheetDescription>
+        {logoutError && (
+          <Typography role="alert" variant="14/regular" color="error" className="rounded-lg bg-error-50 p-3">
+            {logoutError}
+          </Typography>
+        )}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline-gray"
+            className="flex-1"
+            disabled={isLoggingOut}
+            onClick={() => setIsLogoutOpen(false)}
+          >
+            انصراف
+          </Button>
+          <Button type="button" variant="destructive" className="flex-1" loading={isLoggingOut} onClick={handleLogout}>
+            خروج از حساب
+          </Button>
         </div>
-      )}
-    </>
+      </SheetContent>
+    </Sheet>
   )
 }

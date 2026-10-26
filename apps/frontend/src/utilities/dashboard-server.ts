@@ -35,6 +35,29 @@ export async function serverDashboardFetch<T>(path: string): Promise<T | undefin
   }
 }
 
+export type DashboardFetchResult<T> =
+  | { kind: 'ok'; data: T }
+  | { kind: 'unauthenticated' }
+  | { kind: 'denied' }
+  | { kind: 'unavailable' }
+
+/** Preserves auth/permission failures so protected routes never look empty. */
+export async function serverDashboardFetchResult<T>(path: string): Promise<DashboardFetchResult<T>> {
+  try {
+    const cookie = (await cookies()).toString()
+    const res = await fetch(`${getServerSideURL()}/api/dashboard${path}`, {
+      headers: { cookie, 'sec-fetch-site': 'same-origin' },
+      cache: 'no-store',
+    })
+    if (res.status === 401) return { kind: 'unauthenticated' }
+    if (res.status === 403) return { kind: 'denied' }
+    if (!res.ok) return { kind: 'unavailable' }
+    return { kind: 'ok', data: (await res.json()) as T }
+  } catch {
+    return { kind: 'unavailable' }
+  }
+}
+
 export type SeniorManagerCandidate =
   | User
   | {

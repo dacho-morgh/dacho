@@ -15,6 +15,7 @@ import {
 import {
   isCaseAssignmentRole,
   isInternalOperationalRole,
+  isOperationalRole,
   operationalRoleOf,
   type CaseAssignmentRole,
 } from '../access/roles.js'
@@ -46,6 +47,8 @@ import type { User, UserStore } from '../auth/user-store.js'
 import { SupportRepository } from './support-repo.js'
 import { createDocumentRouter } from '../documents/router.js'
 import type { PrivateDocumentStorage } from '../documents/storage.js'
+import { canOpenDashboardDestination } from './destination-access.js'
+import { dashboardSelfProfile } from './self-profile.js'
 import {
   isUuid,
   parseBoothCreate,
@@ -71,6 +74,44 @@ export interface DashboardDeps {
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
 }
+
+const dashboardRoles = {
+  'system-owner': {
+    label: 'صاحب سیستم',
+    responsibilities: ['مدیریت دسترسی‌های سامانه', 'پیگیری همه درخواست‌ها و نامه‌ها'],
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  'central-secretariat': {
+    label: 'دبیرخانه مرکزی',
+    responsibilities: ['پیگیری درخواست‌های ارجاع‌شده در محدوده دبیرخانه', 'مدیریت اطلاعات شرکت‌ها'],
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  'chief-reviewer': {
+    label: 'سردبیر داوری',
+    responsibilities: ['رسیدگی به درخواست‌های منتسب'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  reviewer: {
+    label: 'داور',
+    responsibilities: ['مطالعه درخواست‌های منتسب'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  'employer-reviewer': {
+    label: 'کارشناس کارفرما',
+    responsibilities: ['رسیدگی به درخواست‌های منتسب کارفرما'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  'investment-reviewer': {
+    label: 'کارشناس سرمایه‌گذاری',
+    responsibilities: ['رسیدگی به درخواست‌های منتسب سرمایه‌گذاری'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  representative: {
+    label: 'نماینده شرکت',
+    responsibilities: ['مدیریت درخواست‌های شرکت خود', 'پیگیری نامه‌ها و رویدادهای در دسترس'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/events', '/dashboard/profile'],
+  },
+} as const
 
 function parsePositiveInt(value: unknown, fallback: number): number {
   if (typeof value !== 'string') return fallback
@@ -288,11 +329,51 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps }))
 
+  router.get('/capabilities', (_req, res) => {
+    const actor = actorOf(res)
+    const role = actor.user.operationalRole
+    if (!isOperationalRole(role)) {
+      res.set('Cache-Control', 'private, no-store, max-age=0').status(403).json({ error: 'forbidden' })
+      return
+    }
+    const definition = dashboardRoles[role]
+    res.set('Cache-Control', 'private, no-store, max-age=0')
+    res.set('Vary', 'Cookie')
+    res.json({
+      role,
+      roleLabel: definition.label,
+      responsibilities: [...definition.responsibilities],
+      destinations: [...definition.destinations],
+      // Scope identifiers reveal no assignments or personnel records. Request
+      // APIs continue to resolve the current scope independently on every call.
+      requestScope: role === 'system-owner' || role === 'central-secretariat'
+        ? 'all'
+        : role === 'representative' ? 'owned' : 'assigned',
+      eventScope: null,
+    })
+  })
+
+  router.get('/access', (req, res) => {
+    const actor = actorOf(res)
+    const requestedPath = typeof req.query.path === 'string' ? req.query.path : ''
+    const role = actor.user.operationalRole
+    res.set('Cache-Control', 'private, no-store, max-age=0')
+    if (!isOperationalRole(role)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    res.json({ allowed: canOpenDashboardDestination(role, requestedPath) })
+  })
+
   // The company profile adapter is privileged; only the current representative
   // of an existing company reaches it.
   router.use('/profile', async (_req, res, next) => {
     try {
       const actor = actorOf(res)
+      if (_req.path === '/me') {
+        next()
+        return
+      }
       if (!isRepresentative(actor.operationalRole)) {
         res.status(403).json({ error: 'forbidden' })
         return
@@ -716,6 +797,12 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const actor = actorOf(res)
     const profile = await profileRepo.getProfile(actor.id)
     res.json(profile)
+  })
+
+  router.get('/profile/me', (_req, res) => {
+    const actor = actorOf(res)
+    res.set('Cache-Control', 'private, no-store, max-age=0')
+    res.json(dashboardSelfProfile(actor.user, actor.operationalRole))
   })
 
   router.patch('/profile', async (req, res) => {

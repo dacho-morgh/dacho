@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { randomInt } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import { getPayload } from 'payload'
 import config from '../../src/payload.config.js'
 
@@ -7,6 +7,7 @@ test.use({ channel: 'chrome' })
 
 const password = 'mobile-dashboard-test-only'
 const suffix = `${Date.now()}${randomInt(100, 999)}`.slice(-9)
+const mobileRequestId = randomUUID()
 const applicant = {
   email: `mobile-applicant-${suffix}@example.invalid`,
   phone: `09${suffix}`,
@@ -170,10 +171,105 @@ test('manager dashboard pages fit phone widths', async ({ page }) => {
     '/dashboard/companies',
     '/dashboard/employees',
     '/dashboard/requests',
-    `/dashboard/requests/mobile-request-${suffix}`,
-    `/dashboard/requests/mobile-request-${suffix}/evaluation`,
+    `/dashboard/requests/${mobileRequestId}`,
+    `/dashboard/requests/${mobileRequestId}/evaluation`,
     '/dashboard/letters',
     '/dashboard/letters/new',
     `/dashboard/companies/${managerId}`,
   ])
+})
+
+test('closes the mobile sidebar after selecting a destination', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await signIn(page, manager.phone)
+  await page.goto('http://localhost:3000/dashboard')
+
+  await page.getByRole('button', { name: 'باز کردن منو' }).click()
+  const mobileSidebar = page.locator('[data-sidebar="sidebar"][data-mobile="true"]')
+  await expect(mobileSidebar).toBeVisible()
+  await mobileSidebar.getByRole('link', { name: 'درخواست‌ها', exact: true }).click()
+
+  await expect(page).toHaveURL('http://localhost:3000/dashboard/requests')
+  await expect(mobileSidebar).toHaveCount(0)
+})
+
+test('rechecks revoked role access on client navigation and direct entry', async ({ page }) => {
+  test.setTimeout(90_000)
+  await signIn(page, manager.phone)
+  await page.goto('http://localhost:3000/dashboard')
+
+  const companyLink = page.getByRole('link', { name: 'شرکت‌ها', exact: true })
+  await expect(companyLink).toBeVisible()
+
+  try {
+    await payload.update({
+      collection: 'users',
+      id: managerId,
+      data: { operationalRole: 'reviewer' },
+      overrideAccess: true,
+      // The Users beforeChange hook drops role fields for local calls that do
+      // not opt in, even with overrideAccess.
+      context: { allowPersonnelProvisioning: true },
+    })
+
+    // The shared layout still has its former sidebar instance. Clicking its
+    // stale management link must reach the request-time guard before the page.
+    await companyLink.click()
+    await expect(page).toHaveURL('http://localhost:3000/dashboard?access=denied')
+    await expect(page.getByText('به نشانی درخواستی دسترسی ندارید', { exact: false })).toBeVisible()
+
+    await page.goto('http://localhost:3000/dashboard/companies')
+    await expect(page).toHaveURL('http://localhost:3000/dashboard?access=denied')
+  } finally {
+    await payload.update({
+      collection: 'users',
+      id: managerId,
+      data: { operationalRole: 'system-owner' },
+      overrideAccess: true,
+      context: { allowPersonnelProvisioning: true },
+    })
+  }
+})
+
+test('separates management-list loading, empty, expired, denied, and unavailable states', async ({ page }) => {
+  test.setTimeout(90_000)
+  await signIn(page, manager.phone)
+
+  let status = 503
+  let isFirstRequest = true
+  let releaseFirstResponse!: () => void
+  let markFirstRequestSeen!: () => void
+  const firstResponseGate = new Promise<void>((resolve) => { releaseFirstResponse = resolve })
+  const firstRequestSeen = new Promise<void>((resolve) => { markFirstRequestSeen = resolve })
+  await page.route('**/api/dashboard/admin/companies*', async (route) => {
+    if (isFirstRequest) {
+      isFirstRequest = false
+      markFirstRequestSeen()
+      await firstResponseGate
+    }
+    await route.fulfill({ status, json: status === 200 ? { items: [] } : { error: 'test response' } })
+  })
+
+  await page.goto('http://localhost:3000/dashboard')
+  await firstRequestSeen
+  await expect(page.getByRole('status').filter({ hasText: 'در حال دریافت اطلاعات' })).toBeVisible()
+  releaseFirstResponse()
+  await expect(page.getByRole('alert').filter({ hasText: 'دریافت اطلاعات انجام نشد' })).toBeVisible()
+
+  status = 200
+  await page.getByRole('button', { name: 'تلاش دوباره' }).click()
+  await expect(page.getByText('هنوز موردی برای نمایش وجود ندارد')).toBeVisible()
+
+  status = 401
+  await page.reload()
+  await expect(page.getByRole('alert').filter({ hasText: 'نشست شما پایان یافته است' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'ورود دوباره' })).toHaveAttribute(
+    'href',
+    /\/login\?.*expired=1/,
+  )
+
+  status = 403
+  await page.reload()
+  await expect(page.getByRole('alert').filter({ hasText: 'دسترسی به این اطلاعات مجاز نیست' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'بازگشت به پیشخوان' })).toHaveAttribute('href', '/dashboard')
 })

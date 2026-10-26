@@ -1,6 +1,7 @@
 import type { Pool } from 'pg'
 
 import type { RequestScope } from '../access/policy.js'
+import { isUuid } from '../db/uuid.js'
 
 export type LetterType = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -225,6 +226,7 @@ export class LetterRepository {
   }
 
   async findByIdScoped(id: string, scope: RequestScope): Promise<LetterDto | undefined> {
+    if (!isUuid(id)) return undefined
     const params: unknown[] = [id]
     const whereSql = letterScopeClause(scope, params, 'l')
     const { rows } = await this.pool.query<LetterRow>(
@@ -254,6 +256,7 @@ export class LetterRepository {
   }
 
   async deleteScoped(id: string, scope: RequestScope): Promise<boolean> {
+    if (!isUuid(id)) return false
     const params: unknown[] = [id]
     const whereSql = letterDeleteScopeClause(scope, params, 'l')
     const result = await this.pool.query(
@@ -265,6 +268,7 @@ export class LetterRepository {
 
   /** Owner-scoped detail that also marks the letter read (idempotent). */
   async findByIdAndMarkRead(id: string, ownerId: string): Promise<LetterDto | undefined> {
+    if (!isUuid(id)) return undefined
     const { rows } = await this.pool.query<LetterRow>(
       `UPDATE dashboard.letters SET read = true, updated_at = now()
        WHERE id = $1 AND recipient_id = $2
@@ -276,11 +280,13 @@ export class LetterRepository {
   }
 
   async findById(id: string): Promise<LetterDto | undefined> {
+    if (!isUuid(id)) return undefined
     const { rows } = await this.pool.query<LetterRow>(`SELECT ${LETTER_COLUMNS} FROM dashboard.letters WHERE id = $1`, [id])
     return rows[0] ? mapRow(rows[0]) : undefined
   }
 
   async delete(id: string, ownerId: string, staff = false): Promise<boolean> {
+    if (!isUuid(id)) return false
     const result = await this.pool.query('DELETE FROM dashboard.letters WHERE id = $1 AND ($2::boolean OR recipient_id = $3)', [id, staff, ownerId])
     return (result.rowCount ?? 0) > 0
   }

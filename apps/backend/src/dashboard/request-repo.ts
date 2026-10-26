@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 
 import type { RequestScope } from '../access/policy.js'
-import { isUuid } from '../exhibitions/catalogue.js'
+import { isUuid } from '../db/uuid.js'
 import { appendTransition } from './transition-history.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
@@ -278,6 +278,7 @@ export class RequestRepository {
     ownerId: string,
     step?: { assignedRole: string; currentStep: string },
   ): Promise<RequestDto | 'not_found' | 'already_submitted'> {
+    if (!isUuid(id)) return 'not_found'
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')

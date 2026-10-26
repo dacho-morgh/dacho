@@ -15,6 +15,7 @@ import {
   BrandSandoqLogomark,
   BrandSandoqLogotype,
 } from '@/components/icons'
+import { Typography } from '@/components/ui/typography'
 import {
   Sidebar,
   SidebarContent,
@@ -23,7 +24,9 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from '@/components/ui/sidebar'
+import type { DashboardNavigation } from './sidebar-shell'
 
 export interface NavItem {
   title: string
@@ -32,138 +35,36 @@ export interface NavItem {
   exact?: boolean
 }
 
-const applicantNavItems: NavItem[] = [
-  {
-    title: 'داشبورد',
-    href: '/dashboard',
-    icon: DashboardIcon,
-    exact: true,
-  },
-  {
-    title: 'درخواست ها',
-    href: '/dashboard/requests',
-    icon: RequestsIcon,
-  },
-  {
-    title: 'کارتابل نامه',
-    href: '/dashboard/letters',
-    icon: LettersIcon,
-  },
-  {
-    title: 'رویدادها و نمایشگاه‌ها',
-    href: '/dashboard/events',
-    icon: EventsIcon,
-  },
-]
-
-const seniorManagerNavItems: NavItem[] = [
-  {
-    title: 'داشبورد',
-    href: '/dashboard',
-    icon: DashboardIcon,
-    exact: true,
-  },
-  {
-    title: 'شرکت ها',
-    href: '/dashboard/companies',
-    icon: EventsIcon,
-  },
-  {
-    title: 'کارکنان',
-    href: '/dashboard/employees',
-    icon: PeopleIcon,
-  },
-  {
-    title: 'درخواست ها',
-    href: '/dashboard/requests',
-    icon: RequestsIcon,
-  },
-  {
-    title: 'نامه‌ها',
-    href: '/dashboard/letters',
-    icon: LettersIcon,
-  },
-  // {
-  //   title: 'رویدادها و نمایشگاه‌ها',
-  //   href: '/dashboard/events',
-  //   icon: EventsIcon,
-  // },
-]
-
-const reviewerNavItems: NavItem[] = [
-  {
-    title: 'داشبورد',
-    href: '/dashboard',
-    icon: DashboardIcon,
-    exact: true,
-  },
-  {
-    title: 'درخواست‌های منتسب',
-    href: '/dashboard/requests',
-    icon: RequestsIcon,
-  },
-  {
-    title: 'نامه‌ها',
-    href: '/dashboard/letters',
-    icon: LettersIcon,
-  },
-]
+const knownDestinations: Record<string, Omit<NavItem, 'href'>> = {
+  '/dashboard': { title: 'داشبورد', icon: DashboardIcon, exact: true },
+  '/dashboard/companies': { title: 'شرکت‌ها', icon: EventsIcon },
+  '/dashboard/employees': { title: 'کارکنان', icon: PeopleIcon },
+  '/dashboard/requests': { title: 'درخواست‌ها', icon: RequestsIcon },
+  '/dashboard/letters': { title: 'نامه‌ها', icon: LettersIcon },
+  '/dashboard/events': { title: 'رویدادها و نمایشگاه‌ها', icon: EventsIcon },
+  '/dashboard/profile': { title: 'پروفایل', icon: MoreOptionsIcon },
+}
 
 export interface SidebarUser {
   name?: string | null
   email?: string | null
-  /** Compatibility projection; never used as authority. */
-  roles?: string[] | null
-  /** The current scalar operational role. */
-  operationalRole?: string | null
-  isActive?: boolean | null
-  backendService?: boolean | null
-  position?: string | null
-  companyName?: string | null
 }
 
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: SidebarUser | null
-  isSeniorManager?: boolean
+  navigation: DashboardNavigation
   companyName?: string
-  fundName?: string
 }
 
-export function AppSidebar({
-  user,
-  isSeniorManager: isSeniorManagerProp,
-  companyName: companyNameProp,
-  className,
-  ...props
-}: AppSidebarProps) {
+export function AppSidebar({ user, navigation, companyName, className, ...props }: AppSidebarProps) {
   const pathname = usePathname()
-
-  const role = user?.operationalRole
-  const isCompanyAdministrator =
-    role === 'system-owner' || role === 'central-secretariat'
-  const isInternal = Boolean(role && role !== 'representative')
-  const isSeniorManager =
-    isCompanyAdministrator ||
-    (!role && (isSeniorManagerProp ?? (Array.isArray(user?.roles) && user.roles.includes('admin'))))
-
-  const navItems = isCompanyAdministrator
-    ? seniorManagerNavItems
-    : isInternal
-      ? reviewerNavItems
-      : applicantNavItems
-  const displayName = isInternal
-    ? user?.name || user?.email || 'کاربر داخلی'
-    : companyNameProp || user?.name || 'پروفایل شرکت'
-  const roleLabel: Record<string, string> = {
-    'system-owner': 'صاحب سیستم',
-    'central-secretariat': 'دبیرخانه مرکزی',
-    'chief-reviewer': 'سردبیر داوری',
-    reviewer: 'داور',
-    'employer-reviewer': 'کارفرما',
-    'investment-reviewer': 'کمیته سرمایه‌گذاری',
-    representative: 'نماینده شرکت',
-  }
-  const roleCaption = role ? roleLabel[role] : isSeniorManager ? 'مدیر ارشد' : null
+  const { isMobile, setOpenMobile } = useSidebar()
+  const navItems = navigation.destinations.flatMap((href) => {
+    const item = knownDestinations[href]
+    return item ? [{ ...item, href }] : []
+  })
+  const displayName = companyName || user?.name || user?.email || 'حساب کاربری'
+  const responsibility = navigation.responsibilities[0]
 
   return (
     <Sidebar
@@ -174,66 +75,55 @@ export function AppSidebar({
       {...props}
     >
       <div className="flex h-full w-[268px] flex-col justify-between px-4 py-10">
-        {/* Top Section: Header / Logo & Navigation Menu */}
         <div className="flex flex-col gap-6">
-          {/* Header / Brand Logo & Logotype */}
           <SidebarHeader className="p-0">
             <Link
               href="/dashboard"
               className="flex items-center justify-start gap-2.5 px-1 transition-opacity hover:opacity-90"
               title="صفحه اصلی داشبورد"
             >
-              {/* Logomark (46x40) */}
               <BrandSandoqLogomark className="h-10 w-[46px] shrink-0" />
-              {/* Logotype (113x40) */}
               <BrandSandoqLogotype className="h-10 w-[113px] shrink-0" />
             </Link>
           </SidebarHeader>
 
-          {/* Divider Line */}
           <div className="h-px w-full bg-neutral-200" />
 
-          {/* Navigation Menu */}
           <SidebarContent className="overflow-visible p-0">
             <SidebarMenu className="flex flex-col gap-2">
               {navItems.map((item) => {
                 const isActive = item.exact
                   ? pathname === item.href
-                  : pathname.startsWith(item.href)
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`)
                 const Icon = item.icon
 
                 return (
                   <SidebarMenuItem key={item.href} className="relative">
                     <div className="flex w-full items-center gap-2">
-                      {/* Active Indicator Bar (Rectangle 2 - 4x28px rounded pill) on right side in RTL */}
                       <span
-                        className={`h-7 w-1 shrink-0 rounded-full transition-all duration-200 ${
-                          isActive ? 'bg-[#2563EB] opacity-100' : 'bg-transparent opacity-0'
-                        }`}
+                        className={`h-7 w-1 shrink-0 rounded-full ${isActive ? 'bg-brand-500' : 'bg-transparent'}`}
                         aria-hidden="true"
                       />
-
-                      {/* Menu Button Container: active selected is #2563EB, active hover bg is #DBEAFE */}
                       <SidebarMenuButton
                         asChild
                         isActive={isActive}
-                        className={`group relative flex h-10 w-full flex-1 items-center rounded-[12px] px-3 py-2 transition-all duration-150 ${
+                        onClick={() => { if (isMobile) setOpenMobile(false) }}
+                        className={`group relative flex h-10 w-full flex-1 items-center rounded-xl px-3 py-2 transition-colors ${
                           isActive
-                            ? 'bg-[#EEF2FF] font-semibold text-[#2563EB] hover:bg-[#DBEAFE] hover:text-[#2563EB] active:bg-[#BFDBFE]'
-                            : 'bg-transparent font-normal text-[#525252] hover:bg-neutral-100 hover:text-neutral-900'
+                            ? 'bg-brand-50 font-normal text-brand-600 hover:bg-brand-100 hover:text-brand-600 active:bg-brand-200'
+                            : 'bg-transparent font-normal text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                         }`}
                       >
                         <Link href={item.href} className="flex w-full items-center gap-2.5">
-                          {/* Icon (24x24px): Bulk/Fill when active (#2563EB), Linear when inactive */}
                           <Icon
                             variant={isActive ? 'bulk' : 'linear'}
                             className={`size-6 shrink-0 transition-colors ${
-                              isActive
-                                ? 'text-[#2563EB] group-hover:text-[#2563EB]'
-                                : 'text-[#525252] group-hover:text-neutral-900'
+                              isActive ? 'text-brand-600' : 'text-neutral-600'
                             }`}
                           />
-                          <span className="truncate text-base leading-7">{item.title}</span>
+                          <Typography as="span" variant="16/regular" className="truncate leading-7">
+                            {item.title}
+                          </Typography>
                         </Link>
                       </SidebarMenuButton>
                     </div>
@@ -244,44 +134,39 @@ export function AppSidebar({
           </SidebarContent>
         </div>
 
-        {/* Bottom Section: User / Company Card */}
         <SidebarFooter className="p-0">
-          <div className="flex h-10 w-full items-center justify-between">
-            {/* Right: Company Avatar & Name */}
+          <div className="flex min-h-10 w-full items-center justify-between gap-2">
             <Link
               href="/dashboard/profile"
-              className="flex items-center gap-2.5 overflow-hidden transition-opacity hover:opacity-85"
-              title="مشاهده و ویرایش پروفایل"
+              className="flex min-w-0 items-center gap-2.5 overflow-hidden transition-opacity hover:opacity-85"
+              title="مشاهده پروفایل"
             >
               <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-neutral-200/80 shadow-2xs">
                 <Image
                   src="/figma/dashboard/company-avatar.png"
-                  alt={displayName}
+                  alt=""
                   width={40}
                   height={40}
                   className="size-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none'
-                  }}
+                  onError={(event) => event.currentTarget.remove()}
                 />
               </div>
               <span className="flex min-w-0 flex-col">
-                <span className="truncate text-sm leading-6 font-semibold text-neutral-600">
+                <Typography as="span" variant="14/semibold" color="neutral-600" className="truncate">
                   {displayName}
-                </span>
-                {roleCaption ? (
-                  <span className="truncate text-xs leading-5 text-neutral-400">{roleCaption}</span>
-                ) : null}
+                </Typography>
+                <Typography as="span" variant="12/regular" color="neutral-400" className="truncate">
+                  {navigation.roleLabel}{responsibility ? ` · ${responsibility}` : ''}
+                </Typography>
               </span>
             </Link>
 
-            {/* Left: Three Dots Action Button */}
             <Link
               href="/dashboard/profile"
-              className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
               title="تنظیمات و گزینه‌ها"
             >
-              <MoreOptionsIcon className="size-6 text-[#525252]" />
+              <MoreOptionsIcon className="size-6 text-neutral-600" />
               <span className="sr-only">گزینه‌های بیشتر</span>
             </Link>
           </div>
