@@ -4,6 +4,7 @@ import { Pool } from 'pg'
 import { InMemoryCompanyStore } from '../src/auth/company-store.js'
 import { InMemoryUserStore, type UserStore } from '../src/auth/user-store.js'
 import { createApp } from '../src/app.js'
+import type { EventCategoryStore } from '../src/dashboard/event-category-repo.js'
 import type { EventStore } from '../src/dashboard/event-repo.js'
 import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
 import { InMemoryDossierDocumentSource } from '../src/dashboard/dossier.js'
@@ -30,8 +31,10 @@ export interface TestApp {
 export interface TestAppOptions {
   /** Swap the in-memory identity store for a remote-backed implementation. */
   userStore?: UserStore
+  companyStore?: InMemoryCompanyStore
   /** Keep event authorization/validation tests independent of Postgres. */
   eventStore?: EventStore
+  eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
   pool?: Pool
@@ -41,7 +44,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const delivery = new ConsoleOtpDelivery()
   const codeStore = new InMemoryCodeStore()
   const userStore = options.userStore ?? new InMemoryUserStore()
-  const companyStore = new InMemoryCompanyStore([
+  const companyStore = options.companyStore ?? new InMemoryCompanyStore([
     { name: 'Company 1', nationalId: '10000000001', representativeId: 'user-1' },
     { name: 'Company 2', nationalId: '10000000002', representativeId: 'user-2' },
   ])
@@ -61,6 +64,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret: 'test-proxy-secret',
     eventStore: options.eventStore,
+    eventCategoryStore: options.eventCategoryStore,
     boothCatalogue,
     exhibitionStore: options.exhibitionStore,
   })

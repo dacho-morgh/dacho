@@ -33,6 +33,10 @@ import {
   type DossierDocumentSource,
 } from './dossier.js'
 import {
+  EventCategoryRepository,
+  type EventCategoryStore,
+} from './event-category-repo.js'
+import {
   EventRepository,
   isEventId,
   type EventConfiguration,
@@ -73,6 +77,7 @@ export interface DashboardDeps {
   /** Test seam for the company dossier's document inventory. */
   dossierDocuments?: DossierDocumentSource
   eventStore?: EventStore
+  eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
 }
@@ -315,6 +320,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
   const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
+  const categoryStore =
+    deps.eventCategoryStore ?? new EventCategoryRepository(deps.pool)
   const catalogue =
     deps.boothCatalogue ?? new PostgresBoothCatalogueRepository(deps.pool)
 
@@ -792,6 +799,167 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     res.json({ event: eventWithActions(actor.operationalRole, actor.id, updated.event) })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/events/:eventId/categories', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!canManageEvents(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const title = typeof req.body?.title === 'string' ? req.body.title.trim() : ''
+      if (!title) {
+        res.status(400).json({ error: 'invalid_category' })
+        return
+      }
+      const category = await categoryStore.createCategory(req.params.eventId, title)
+      res.status(201).json({ category })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/events/:eventId/categories', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isInternalOperationalRole(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event || !canActOnEvent(actor.operationalRole, actor.id, event, 'read')) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const items = await categoryStore.listCategories(req.params.eventId)
+      res.json({ items })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/events/:eventId/categories', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const admin = actor.operationalRole === 'system-owner' || actor.operationalRole === 'central-secretariat'
+      const company = actor.operationalRole === 'representative' && (await deps.companyStore.findByRepresentative(actor.id))
+      if (!admin && !company) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const items = await categoryStore.listCategories(req.params.eventId)
+      res.json({ items })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/events/:eventId/subtopics', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!canManageEvents(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const title = typeof req.body?.title === 'string' ? req.body.title.trim() : ''
+      const categoryId = typeof req.body?.categoryId === 'string' ? req.body.categoryId.trim() : ''
+      const employerId = typeof req.body?.employerId === 'string' ? req.body.employerId.trim() : ''
+      if (!title || !categoryId || !isUuid(categoryId) || !employerId) {
+        res.status(400).json({ error: 'invalid_subtopic' })
+        return
+      }
+      const category = await categoryStore.findCategoryById(categoryId)
+      if (!category || category.eventId !== req.params.eventId) {
+        res.status(400).json({ error: 'invalid_category_event' })
+        return
+      }
+      const user = await deps.userStore.findById(employerId)
+      if (!user || user.companyId || (await deps.companyStore.findById(employerId))) {
+        res.status(400).json({ error: 'ineligible_employer' })
+        return
+      }
+      if (operationalRoleOf(user) !== 'employer-reviewer') {
+        res.status(400).json({ error: 'ineligible_employer' })
+        return
+      }
+      const subtopic = await categoryStore.createSubtopic({
+        eventId: req.params.eventId,
+        categoryId,
+        title,
+        employerId,
+      })
+      res.status(201).json({ subtopic })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/events/:eventId/subtopics', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isInternalOperationalRole(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event || !canActOnEvent(actor.operationalRole, actor.id, event, 'read')) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const items = await categoryStore.listSubtopics(req.params.eventId)
+      res.json({ items })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/events/:eventId/subtopics', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const admin = actor.operationalRole === 'system-owner' || actor.operationalRole === 'central-secretariat'
+      const company = actor.operationalRole === 'representative' && (await deps.companyStore.findByRepresentative(actor.id))
+      if (!admin && !company) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const items = await categoryStore.listSubtopics(req.params.eventId)
+      res.json({ items })
     } catch (error) { next(error) }
   })
 
