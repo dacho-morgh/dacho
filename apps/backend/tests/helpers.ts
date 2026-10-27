@@ -12,6 +12,7 @@ import {
   type BoothCatalogueRepository,
 } from '../src/exhibitions/catalogue-repo.js'
 import type { ExhibitionStore } from '../src/exhibitions/exhibition-store.js'
+import type { EvaluationStore } from '../src/reviews/evaluation-repo.js'
 import { JwtSigner } from '../src/jwt.js'
 import { InMemoryCodeStore } from '../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../src/otp/console-delivery.js'
@@ -34,6 +35,7 @@ export interface TestAppOptions {
   eventStore?: EventStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
+  evaluationStore?: EvaluationStore
   pool?: Pool
 }
 
@@ -63,6 +65,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     eventStore: options.eventStore,
     boothCatalogue,
     exhibitionStore: options.exhibitionStore,
+    evaluationStore: options.evaluationStore,
   })
   return { app, delivery, codeStore, userStore, companyStore, dossierDocuments, boothCatalogue, jwt }
 }

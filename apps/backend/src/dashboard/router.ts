@@ -62,6 +62,11 @@ import {
   type BoothCatalogueRepository,
 } from '../exhibitions/catalogue-repo.js'
 import type { ExhibitionStore } from '../exhibitions/exhibition-store.js'
+import {
+  PostgresEvaluationRepository,
+  type EvaluationStore,
+} from '../reviews/evaluation-repo.js'
+import { validateAndScoreReview } from '../reviews/scoring.js'
 
 export interface DashboardDeps {
   pool: Pool
@@ -75,6 +80,7 @@ export interface DashboardDeps {
   eventStore?: EventStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
+  evaluationStore?: EvaluationStore
 }
 
 const dashboardRoles = {
@@ -314,6 +320,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const dossierDocuments = deps.dossierDocuments ?? new SqlDossierDocumentSource(deps.pool)
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
+  const evaluations =
+    deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool)
   const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
   const catalogue =
     deps.boothCatalogue ?? new PostgresBoothCatalogueRepository(deps.pool)
@@ -670,6 +678,158 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     })
     if (!revoked) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ assignment: revoked })
+  })
+
+  /* ── Evaluation routes (T25) ────────────────────────────────────────── */
+
+  router.get('/requests/:id/evaluation', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'reviewer' && actor.operationalRole !== 'employer-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const request = await repo.findByIdAny(req.params.id)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const assignment = await assignments.findActiveForUser(request.id, actor.id)
+      if (!assignment || assignment.role !== actor.operationalRole) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const revision = (request as unknown as { revision?: number }).revision ?? 1
+      const evaluation = await evaluations.findByRequestAndUser(request.id, actor.id, revision)
+      const completedCount = await evaluations.countFinalized(request.id, revision)
+      res.json({ evaluation, completedEvaluationsCount: completedCount })
+    } catch (error) { next(error) }
+  })
+
+  router.put('/requests/:id/evaluation', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'reviewer' && actor.operationalRole !== 'employer-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const request = await repo.findByIdAny(req.params.id)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const assignment = await assignments.findActiveForUser(request.id, actor.id)
+      if (!assignment || assignment.role !== actor.operationalRole) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const variant = actor.operationalRole === 'employer-reviewer' ? 'employer' : 'ordinary'
+      const scores = req.body?.scores ?? {}
+      const answers = req.body?.answers ?? {}
+      const validation = validateAndScoreReview({
+        variant,
+        state: 'draft',
+        scores,
+        answers,
+        ...(req.body?.calculatedScores ? { calculatedScores: req.body.calculatedScores } : {}),
+      })
+      if (!validation.valid) {
+        res.status(400).json({ error: 'validation_failed', errors: validation.errors })
+        return
+      }
+      const revision = (request as unknown as { revision?: number }).revision ?? 1
+      const result = await evaluations.saveDraft({
+        requestId: request.id,
+        userId: actor.id,
+        role: actor.operationalRole,
+        variant,
+        revision,
+        scores,
+        scoreA: validation.scores.a,
+        scoreB: validation.scores.b,
+        scoreC: validation.scores.c,
+        weightedHundredths: validation.scores.weightedHundredths,
+        answers,
+      })
+      if (!result.ok) {
+        res.status(409).json({ error: 'evaluation_locked' })
+        return
+      }
+      res.json({ evaluation: result.evaluation })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/requests/:id/evaluation/finalize', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'reviewer' && actor.operationalRole !== 'employer-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const request = await repo.findByIdAny(req.params.id)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const assignment = await assignments.findActiveForUser(request.id, actor.id)
+      if (!assignment || assignment.role !== actor.operationalRole) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const variant = actor.operationalRole === 'employer-reviewer' ? 'employer' : 'ordinary'
+      const scores = req.body?.scores ?? {}
+      const answers = req.body?.answers ?? {}
+      const validation = validateAndScoreReview({
+        variant,
+        state: 'final',
+        scores,
+        answers,
+        ...(req.body?.calculatedScores ? { calculatedScores: req.body.calculatedScores } : {}),
+      })
+      if (!validation.valid) {
+        res.status(400).json({ error: 'validation_failed', errors: validation.errors })
+        return
+      }
+      const revision = (request as unknown as { revision?: number }).revision ?? 1
+      const result = await evaluations.finalize({
+        requestId: request.id,
+        userId: actor.id,
+        role: actor.operationalRole,
+        variant,
+        revision,
+        scores,
+        scoreA: validation.scores.a,
+        scoreB: validation.scores.b,
+        scoreC: validation.scores.c,
+        weightedHundredths: validation.scores.weightedHundredths,
+        answers,
+      })
+      if (!result.ok) {
+        res.status(409).json({ error: 'evaluation_locked' })
+        return
+      }
+      res.json({ evaluation: result.evaluation })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/requests/:id/evaluations', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const allowedRoles: OperationalRole[] = ['system-owner', 'chief-reviewer', 'central-secretariat']
+      if (!allowedRoles.includes(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const request = await repo.findByIdAny(req.params.id)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const revision = (request as unknown as { revision?: number }).revision ?? 1
+      const items = await evaluations.listForRequest(request.id, revision)
+      const completedCount = await evaluations.countFinalized(request.id, revision)
+      res.json({ items, completedCount })
+    } catch (error) { next(error) }
   })
 
   router.get('/admin/events', async (_req, res, next) => {

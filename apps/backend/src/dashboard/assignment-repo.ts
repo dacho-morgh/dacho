@@ -116,6 +116,16 @@ export class AssignmentRepository {
     return rows[0]?.present === true
   }
 
+  async findActiveForUser(requestId: string, userId: string): Promise<CaseAssignmentDto | null> {
+    const { rows } = await this.pool.query<AssignmentRow>(
+      `SELECT ${ASSIGNMENT_COLUMNS} FROM dashboard.case_assignments
+       WHERE request_id = $1 AND user_id = $2 AND active LIMIT 1`,
+      [requestId, userId],
+    )
+    const row = rows[0]
+    return row ? mapRow(row) : null
+  }
+
   async listForUser(userId: string): Promise<CaseAssignmentDto[]> {
     const { rows } = await this.pool.query<AssignmentRow>(
       `SELECT ${ASSIGNMENT_COLUMNS} FROM dashboard.case_assignments
