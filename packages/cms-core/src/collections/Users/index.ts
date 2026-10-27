@@ -21,12 +21,9 @@ import {
 } from '@cms-core/access/roles'
 import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
 import {
-  isDuplicateNationalId,
-  missingCompanyFields,
-  missingUserFields,
-  pickCompanyFields,
-  pickUserFields,
-  type SelfSignupBody,
+  normalizeDigits,
+  normalizeLoginIdentifier,
+  runSelfSignup,
 } from '@cms-core/auth/self-signup'
 
 /**
@@ -89,6 +86,17 @@ export const Users: CollectionConfig = {
     update: canUpdateUser,
   },
   hooks: {
+    beforeOperation: [
+      ({ args, operation }) => {
+        // Phone login must accept the digits a Persian/Arabic keyboard emits.
+        // Payload lower-cases email/username itself; only the phone form needs
+        // canonicalizing, and an email identifier is left untouched.
+        if (operation !== 'login') return
+        const data = (args as { data?: Record<string, unknown> }).data
+        if (data && typeof data.username === 'string' && data.username.trim() !== '')
+          data.username = normalizeLoginIdentifier(data.username)
+      },
+    ],
     beforeLogin: [
       ({ user }) => {
         if (!isActiveAccount(user) || user.backendService)
@@ -97,8 +105,10 @@ export const Users: CollectionConfig = {
     ],
     beforeChange: [
       ({ data, originalDoc, req, context, operation }) => {
-        if (typeof data.phone === 'string' && data.phone.trim() !== '')
-          data.username = data.phone.trim()
+        if (typeof data.phone === 'string' && data.phone.trim() !== '') {
+          data.phone = normalizeDigits(data.phone.trim())
+          data.username = data.phone
+        }
         const provision = !req.user && context.allowPersonnelProvisioning === true
         const owner = isInternalAdmin(req.user)
         const selfSignup =
@@ -212,114 +222,61 @@ export const Users: CollectionConfig = {
       path: '/self-signup',
       method: 'post',
       handler: async (req) => {
-        const body = (
-          typeof req.json === 'function' ? await req.json().catch(() => null) : req.json
-        ) as SelfSignupBody | null
+        const body = typeof req.json === 'function' ? await req.json().catch(() => null) : req.json
 
-        if (!body || typeof body !== 'object' || Array.isArray(body)) {
-          return Response.json(
-            { errors: [{ message: 'Invalid registration data.' }] },
-            { status: 400 },
-          )
-        }
-
-        const missing = [...missingUserFields(body), ...missingCompanyFields(body)]
-        if (missing.length > 0) {
-          return Response.json(
-            {
-              errors: missing.map((field) => ({
-                code: 'missing_field',
-                field,
-                message: `Missing required field: ${field}`,
-              })),
+        const result = await runSelfSignup(
+          body,
+          {
+            companyNationalIdExists: async (nationalId) => {
+              const existing = await req.payload.find({
+                collection: 'companies',
+                where: { nationalId: { equals: nationalId } },
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+              })
+              return existing.docs.length > 0
             },
-            { status: 400 },
-          )
-        }
-
-        const nationalId = String(body.companyNationalId).trim()
-
-        // Fail fast before creating anything: a national id already enrolled
-        // must not produce a person record we then cannot attach.
-        const existing = await req.payload.find({
-          collection: 'companies',
-          where: { nationalId: { equals: nationalId } },
-          limit: 1,
-          depth: 0,
-          overrideAccess: true,
-        })
-        if (existing.docs.length > 0) {
-          return Response.json(
-            {
-              errors: [
-                {
-                  code: 'duplicate_national_id',
-                  field: 'companyNationalId',
-                  message: 'This company is already registered.',
-                },
-              ],
+            inTransaction: async (run) => {
+              // One transaction: the person and the company they represent are
+              // created together or not at all. Both writes share `req`, so
+              // Payload binds them to the same transaction.
+              await initTransaction(req)
+              try {
+                const value = await run()
+                await commitTransaction(req)
+                return value
+              } catch (error) {
+                // Nothing is persisted: the person is not left orphaned.
+                if (req.transactionID !== undefined) {
+                  await req.payload.db.rollbackTransaction(req.transactionID)
+                }
+                throw error
+              }
             },
-            { status: 409 },
-          )
-        }
+            createUser: async (data) =>
+              req.payload.create({
+                collection: 'users',
+                data: data as never,
+                overrideAccess: false,
+                req,
+                context: { ...req.context, forceRepresentativeSignup: true },
+              }),
+            createCompany: async (data) =>
+              req.payload.create({
+                collection: 'companies',
+                data: data as never,
+                // The handler selected every field explicitly and no role is
+                // among them; `allowCompanySignup` is what the collection's
+                // create access checks, so no access is overridden here.
+                req,
+                context: { ...req.context, allowCompanySignup: true },
+              }),
+          },
+          (error) => console.error('[users] self-signup failed', error),
+        )
 
-        // One transaction: the person and the company they represent are created
-        // together or not at all. Both writes share `req`, so Payload binds them
-        // to the same transaction.
-        await initTransaction(req)
-
-        try {
-          const user = await req.payload.create({
-            collection: 'users',
-            data: pickUserFields(body) as never,
-            overrideAccess: false,
-            req,
-            context: { ...req.context, forceRepresentativeSignup: true },
-          })
-
-          const company = await req.payload.create({
-            collection: 'companies',
-            data: pickCompanyFields(body, user.id) as never,
-            // The handler selected every field explicitly and no role is among
-            // them; `allowCompanySignup` is what the collection's create access
-            // checks, so no access is overridden here.
-            req,
-            context: { ...req.context, allowCompanySignup: true },
-          })
-
-          await commitTransaction(req)
-
-          return Response.json({ user, company }, { status: 201 })
-        } catch (error) {
-          // Nothing is persisted: the person is not left orphaned.
-          if (req.transactionID !== undefined) {
-            await req.payload.db.rollbackTransaction(req.transactionID)
-          }
-
-          if (isDuplicateNationalId(error)) {
-            return Response.json(
-              {
-                errors: [
-                  {
-                    code: 'duplicate_national_id',
-                    field: 'companyNationalId',
-                    message: 'This company is already registered.',
-                  },
-                ],
-              },
-              { status: 409 },
-            )
-          }
-          console.error('[users] self-signup failed', error)
-          const payloadErrors = (error as { errors?: unknown[] })?.errors
-          if (Array.isArray(payloadErrors) && payloadErrors.length > 0) {
-            return Response.json({ errors: payloadErrors }, { status: 400 })
-          }
-          return Response.json(
-            { errors: [{ message: 'Registration failed. Please try again.' }] },
-            { status: 500 },
-          )
-        }
+        return Response.json(result.body, { status: result.status })
       },
     },
   ],

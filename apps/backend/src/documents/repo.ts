@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
 
+import { isUuid } from '../db/uuid.js'
 import type { DocumentCategory } from './policy.js'
 
 export interface PrivateDocumentDto {
@@ -133,6 +134,7 @@ export class DocumentRepository {
   }
 
   async findById(id: string): Promise<PrivateDocumentRecord | undefined> {
+    if (!isUuid(id)) return undefined
     const { rows } = await this.pool.query<DocumentRow>(
       `SELECT ${DOCUMENT_COLUMNS} ${DOCUMENT_FROM} WHERE d.id = $1`,
       [id],
@@ -141,6 +143,7 @@ export class DocumentRepository {
   }
 
   async listForRequest(requestId: string): Promise<PrivateDocumentRecord[]> {
+    if (!isUuid(requestId)) return []
     const { rows } = await this.pool.query<DocumentRow>(
       `SELECT ${DOCUMENT_COLUMNS} ${DOCUMENT_FROM} WHERE d.request_id = $1 ORDER BY d.logical_version DESC, d.created_at ASC`,
       [requestId],

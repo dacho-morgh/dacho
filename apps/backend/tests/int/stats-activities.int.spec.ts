@@ -115,20 +115,81 @@ describe('stats & activities API', () => {
   })
 
   describe('GET /activities and the request timeline', () => {
-    it('returns no activities and an empty timeline', async () => {
-      // Activities were only ever written by the removed workflow engine, so the
-      // surface is now empty until request status changes are recorded.
+    it('records the submit transition once and serves it in the timeline', async () => {
       const app = await createAppUnderTest()
       const id = await createRequest(app, 'با تایم‌لاین')
       await submit(app, id)
 
       const acts = await request(app).get('/activities').set(ownerHeaders())
       expect(acts.status).toBe(200)
-      expect(acts.body.total).toBe(0)
+      expect(acts.body.total).toBe(1)
+      expect(acts.body.items[0]).toMatchObject({
+        requestId: id,
+        ownerId: OWNER,
+        actorId: OWNER,
+        type: 'transition',
+        action: 'submit',
+        reason: null,
+        fromState: 'draft',
+        toState: 'in_review',
+        revision: 2,
+      })
+      expect(acts.body.items[0].at).toBeTruthy()
 
       const detail = await request(app).get(`/requests/${id}`).set(ownerHeaders())
       expect(detail.status).toBe(200)
-      expect(detail.body.timeline).toEqual([])
+      expect(detail.body.timeline).toHaveLength(1)
+      expect(detail.body.timeline[0].id).toBe(acts.body.items[0].id)
+      expect(detail.body.timeline[0].action).toBe('submit')
+    })
+
+    it('scopes history to the case owner and authorized staff', async () => {
+      const app = await createAppUnderTest()
+      const id = await createRequest(app, 'خصوصی')
+      await submit(app, id)
+
+      const mine = await request(app).get(`/requests/${id}/history`).set(ownerHeaders())
+      expect(mine.status).toBe(200)
+      expect(mine.body.items).toHaveLength(1)
+
+      const other = await request(app)
+        .get(`/requests/${id}/history`)
+        .set({ 'x-internal-proxy-secret': PROXY_SECRET, 'x-user-id': 'someone-else' })
+      expect(other.status).toBe(404)
+      expect(other.body.error).toBe('not_found')
+
+      const otherActivities = await request(app)
+        .get('/activities')
+        .set({ 'x-internal-proxy-secret': PROXY_SECRET, 'x-user-id': 'someone-else' })
+      expect(otherActivities.body.total).toBe(0)
+
+      const staff = await request(app)
+        .get(`/requests/${id}/history`)
+        .set({ 'x-internal-proxy-secret': PROXY_SECRET, 'x-user-id': 'staff-1' })
+      expect(staff.status).toBe(200)
+      expect(staff.body.items).toHaveLength(1)
+    })
+
+    it('keeps workflow history after the displayed letter is deleted', async () => {
+      const app = await createAppUnderTest()
+      const id = await createRequest(app, 'با نامه')
+      await submit(app, id)
+
+      const { rows } = await pool.query<{ id: string }>(
+        `INSERT INTO dashboard.letters (type, title, body, recipient_id, request_id)
+         VALUES ('official', 'نامه', 'متن نامه', $1, $2) RETURNING id`,
+        [OWNER, id],
+      )
+      const letterId = rows[0]!.id
+      await request(app).delete(`/letters/${letterId}`).set(ownerHeaders()).expect(200)
+
+      const history = await request(app).get(`/requests/${id}/history`).set(ownerHeaders())
+      expect(history.status).toBe(200)
+      expect(history.body.items).toHaveLength(1)
+      expect(history.body.items[0].letterId).toBeNull()
+
+      const acts = await request(app).get('/activities').set(ownerHeaders())
+      expect(acts.body.total).toBe(1)
     })
   })
 })

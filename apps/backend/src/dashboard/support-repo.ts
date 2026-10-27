@@ -1,5 +1,7 @@
 import type { Pool } from 'pg'
 
+import { isUuid } from '../db/uuid.js'
+
 export type TicketStatus = 'open' | 'answered' | 'closed'
 /** The author of a ticket message: the company side or the internal side. */
 export type SupportAuthorRole = 'representative' | 'admin'
@@ -57,12 +59,14 @@ export class SupportRepository {
     return { items: result.rows.map((row) => map(row)), total, page: input.page, totalPages: Math.max(1, Math.ceil(total / input.limit)) }
   }
   async findById(id: string): Promise<SupportTicket | undefined> {
+    if (!isUuid(id)) return undefined
     const { rows } = await this.pool.query<TicketRow>(`SELECT ${COLUMNS} FROM dashboard.support_tickets WHERE id = $1`, [id])
     if (!rows[0]) return undefined
     const messageResult = await this.pool.query<MessageRow>(`SELECT id, author_id, author_role, body, created_at FROM dashboard.support_ticket_messages WHERE ticket_id = $1 ORDER BY created_at, id`, [id])
     return map(rows[0], messageResult.rows.map(mapMessage))
   }
   async respond(id: string, authorId: string, authorRole: SupportAuthorRole, response: string): Promise<SupportTicket | undefined> {
+    if (!isUuid(id)) return undefined
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
@@ -85,6 +89,7 @@ export class SupportRepository {
     }
   }
   async close(id: string, actorId: string, actorRole: SupportAuthorRole): Promise<SupportTicket | undefined> {
+    if (!isUuid(id)) return undefined
     const { rows } = await this.pool.query<TicketRow>(`UPDATE dashboard.support_tickets SET status = 'closed', responded_by = CASE WHEN $3 = 'admin' THEN COALESCE(responded_by, $2) ELSE responded_by END, updated_at = now() WHERE id = $1 RETURNING ${COLUMNS}`, [id, actorId, actorRole])
     return rows[0] ? this.findById(id) : undefined
   }

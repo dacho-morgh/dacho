@@ -2,6 +2,11 @@ import { Router } from 'express'
 import type { Pool } from 'pg'
 
 import {
+  allowedEventActions,
+  canActOnEvent,
+  canManageEvents,
+} from '../access/events.js'
+import {
   allowedRequestActions,
   bindRequestScope,
   canRequestAction,
@@ -11,6 +16,7 @@ import {
 import {
   isCaseAssignmentRole,
   isInternalOperationalRole,
+  isOperationalRole,
   operationalRoleOf,
   type CaseAssignmentRole,
   type OperationalRole,
@@ -18,6 +24,21 @@ import {
 import type { ServiceCatalog, ServiceDefinition } from '../catalog/service-catalog.js'
 import { ActivityRepository } from './activity-repo.js'
 import { AssignmentRepository } from './assignment-repo.js'
+import {
+  DossierValidationError,
+  dossierOfCompany,
+  missingDossierItems,
+  pickDossierUpdate,
+  SqlDossierDocumentSource,
+  type DossierDocumentSource,
+} from './dossier.js'
+import {
+  EventRepository,
+  isEventId,
+  type EventConfiguration,
+  type EventInput,
+  type EventStore,
+} from './event-repo.js'
 import { LetterRepository } from './letter-repo.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
@@ -28,6 +49,19 @@ import type { User, UserStore } from '../auth/user-store.js'
 import { SupportRepository } from './support-repo.js'
 import { createDocumentRouter } from '../documents/router.js'
 import type { PrivateDocumentStorage } from '../documents/storage.js'
+import { canOpenDashboardDestination } from './destination-access.js'
+import { dashboardSelfProfile } from './self-profile.js'
+import {
+  isUuid,
+  parseBoothCreate,
+  parseBoothUpdate,
+  parseSettingsInput,
+} from '../exhibitions/catalogue.js'
+import {
+  PostgresBoothCatalogueRepository,
+  type BoothCatalogueRepository,
+} from '../exhibitions/catalogue-repo.js'
+import type { ExhibitionStore } from '../exhibitions/exhibition-store.js'
 
 export interface DashboardDeps {
   pool: Pool
@@ -36,7 +70,50 @@ export interface DashboardDeps {
   userStore: UserStore
   companyStore: CompanyStore
   privateDocumentStorage: PrivateDocumentStorage
+  /** Test seam for the company dossier's document inventory. */
+  dossierDocuments?: DossierDocumentSource
+  eventStore?: EventStore
+  boothCatalogue?: BoothCatalogueRepository
+  exhibitionStore?: ExhibitionStore
 }
+
+const dashboardRoles = {
+  'system-owner': {
+    label: 'صاحب سیستم',
+    responsibilities: ['مدیریت دسترسی‌های سامانه', 'پیگیری همه درخواست‌ها و نامه‌ها'],
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  'central-secretariat': {
+    label: 'دبیرخانه مرکزی',
+    responsibilities: ['پیگیری درخواست‌های ارجاع‌شده در محدوده دبیرخانه', 'مدیریت اطلاعات شرکت‌ها'],
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  'chief-reviewer': {
+    label: 'سردبیر داوری',
+    responsibilities: ['رسیدگی به درخواست‌های منتسب'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  reviewer: {
+    label: 'داور',
+    responsibilities: ['مطالعه درخواست‌های منتسب'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  'employer-reviewer': {
+    label: 'کارشناس کارفرما',
+    responsibilities: ['رسیدگی به درخواست‌های منتسب کارفرما'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  'investment-reviewer': {
+    label: 'کارشناس سرمایه‌گذاری',
+    responsibilities: ['رسیدگی به درخواست‌های منتسب سرمایه‌گذاری'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+  },
+  representative: {
+    label: 'نماینده شرکت',
+    responsibilities: ['مدیریت درخواست‌های شرکت خود', 'پیگیری نامه‌ها و رویدادهای در دسترس'],
+    destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/events', '/dashboard/profile'],
+  },
+} as const
 
 function parsePositiveInt(value: unknown, fallback: number): number {
   if (typeof value !== 'string') return fallback
@@ -49,6 +126,25 @@ function parseBoolean(value: unknown): boolean | undefined {
   if (value === 'true') return true
   if (value === 'false') return false
   return undefined
+}
+
+function eventUpdateBody(body: unknown): Record<string, unknown> | null {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return null
+  return body as Record<string, unknown>
+}
+
+function parseEventRevision(body: unknown): number | null {
+  const revision = eventUpdateBody(body)?.revision
+  return typeof revision === 'number' && Number.isInteger(revision) && revision > 0
+    ? revision
+    : null
+}
+
+function parseEventReason(body: unknown): string | null {
+  const reason = eventUpdateBody(body)?.reason
+  if (typeof reason !== 'string') return null
+  const trimmed = reason.trim()
+  return trimmed ? trimmed : null
 }
 
 function isRepresentative(role: string): boolean {
@@ -78,6 +174,91 @@ function requestWithActions(
     ...request,
     allowedActions: allowedRequestActions(role, request, actorId, companyId),
   }
+}
+
+type EventValidation =
+  | { ok: true; input: EventInput }
+  | { ok: false; error: 'invalid_event'; fields: string[] }
+  | { ok: false; error: 'invalid_registration_window' }
+
+function normalizeEventInput(body: unknown, existing?: EventConfiguration): EventValidation {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'invalid_event', fields: [] }
+  }
+  const source = body as Record<string, unknown>
+  const valueOf = (key: keyof EventInput, fallback: unknown): unknown =>
+    key in source ? source[key] : fallback
+
+  const titleValue = valueOf('title', existing?.title)
+  const title = typeof titleValue === 'string' ? titleValue.trim() : ''
+  const descriptionValue = valueOf('description', existing?.description ?? '')
+  const description = typeof descriptionValue === 'string' ? descriptionValue.trim() : null
+  const openValue = valueOf('registrationOpenAt', existing?.registrationOpenAt)
+  const openText = typeof openValue === 'string' ? openValue.trim() : ''
+  const closeValue = valueOf('registrationCloseAt', existing?.registrationCloseAt)
+  const closeText = typeof closeValue === 'string' ? closeValue.trim() : ''
+  const chiefValue = valueOf('responsibleChiefId', existing?.responsibleChiefId)
+  const chiefId = typeof chiefValue === 'string' ? chiefValue.trim() : ''
+  const investmentValue = valueOf('responsibleInvestmentId', existing?.responsibleInvestmentId)
+  const investmentId = typeof investmentValue === 'string' ? investmentValue.trim() : ''
+
+  const fields: string[] = []
+  if (!title) fields.push('title')
+  if (description === null) fields.push('description')
+  if (!openText) fields.push('registrationOpenAt')
+  if (!closeText) fields.push('registrationCloseAt')
+  if (!chiefId) fields.push('responsibleChiefId')
+  if (!investmentId) fields.push('responsibleInvestmentId')
+  if (fields.length > 0) return { ok: false, error: 'invalid_event', fields }
+
+  const open = Date.parse(openText)
+  const close = Date.parse(closeText)
+  if (!Number.isFinite(open) || !Number.isFinite(close) || close <= open) {
+    return { ok: false, error: 'invalid_registration_window' }
+  }
+
+  return {
+    ok: true,
+    input: {
+      title,
+      description: description ?? '',
+      registrationOpenAt: new Date(open).toISOString(),
+      registrationCloseAt: new Date(close).toISOString(),
+      responsibleChiefId: chiefId,
+      responsibleInvestmentId: investmentId,
+    },
+  }
+}
+
+function eventWithActions(
+  role: Parameters<typeof allowedEventActions>[0],
+  actorId: string,
+  event: EventConfiguration,
+) {
+  return {
+    ...event,
+    allowedActions: allowedEventActions(role, actorId, event),
+  }
+}
+
+async function ineligibleResponsibleField(
+  userStore: UserStore,
+  input: EventInput,
+): Promise<'responsibleChiefId' | 'responsibleInvestmentId' | null> {
+  const [chief, investment] = await Promise.all(
+    [input.responsibleChiefId, input.responsibleInvestmentId].map(async (id) => {
+      try {
+        return await userStore.findById(id)
+      } catch {
+        return undefined
+      }
+    }),
+  )
+  if (!chief || operationalRoleOf(chief) !== 'chief-reviewer') return 'responsibleChiefId'
+  if (!investment || operationalRoleOf(investment) !== 'investment-reviewer') {
+    return 'responsibleInvestmentId'
+  }
+  return null
 }
 
 async function resolveRequesterNames(userStore: UserStore, requesterIds: string[]): Promise<Map<string, string>> {
@@ -130,8 +311,23 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const activities = new ActivityRepository(deps.pool)
   const stats = new StatsRepository(deps.pool)
   const profileRepo = new ProfileRepository(deps.userStore, deps.companyStore)
+  const dossierDocuments = deps.dossierDocuments ?? new SqlDossierDocumentSource(deps.pool)
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
+  const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
+  const catalogue =
+    deps.boothCatalogue ?? new PostgresBoothCatalogueRepository(deps.pool)
+
+  async function checkExhibition(
+    exhibitionId: string,
+  ): Promise<{ ok: true; exists: boolean } | { ok: false }> {
+    if (!deps.exhibitionStore) return { ok: true, exists: true }
+    try {
+      return { ok: true, exists: await deps.exhibitionStore.exists(exhibitionId) }
+    } catch {
+      return { ok: false }
+    }
+  }
 
   const actorCompanyId = async (actorId: string, role: string): Promise<string | null> => {
     if (role !== 'representative') return null
@@ -148,11 +344,51 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps }))
 
+  router.get('/capabilities', (_req, res) => {
+    const actor = actorOf(res)
+    const role = actor.user.operationalRole
+    if (!isOperationalRole(role)) {
+      res.set('Cache-Control', 'private, no-store, max-age=0').status(403).json({ error: 'forbidden' })
+      return
+    }
+    const definition = dashboardRoles[role]
+    res.set('Cache-Control', 'private, no-store, max-age=0')
+    res.set('Vary', 'Cookie')
+    res.json({
+      role,
+      roleLabel: definition.label,
+      responsibilities: [...definition.responsibilities],
+      destinations: [...definition.destinations],
+      // Scope identifiers reveal no assignments or personnel records. Request
+      // APIs continue to resolve the current scope independently on every call.
+      requestScope: role === 'system-owner' || role === 'central-secretariat'
+        ? 'all'
+        : role === 'representative' ? 'owned' : 'assigned',
+      eventScope: null,
+    })
+  })
+
+  router.get('/access', (req, res) => {
+    const actor = actorOf(res)
+    const requestedPath = typeof req.query.path === 'string' ? req.query.path : ''
+    const role = actor.user.operationalRole
+    res.set('Cache-Control', 'private, no-store, max-age=0')
+    if (!isOperationalRole(role)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    res.json({ allowed: canOpenDashboardDestination(role, requestedPath) })
+  })
+
   // The company profile adapter is privileged; only the current representative
   // of an existing company reaches it.
   router.use('/profile', async (_req, res, next) => {
     try {
       const actor = actorOf(res)
+      if (_req.path === '/me') {
+        next()
+        return
+      }
       if (!isRepresentative(actor.operationalRole)) {
         res.status(403).json({ error: 'forbidden' })
         return
@@ -165,7 +401,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
-  router.post('/requests', async (req, res) => {
+  router.post('/requests', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!isRepresentative(actor.operationalRole)) {
       res.status(403).json({ error: 'representative_only' })
@@ -209,9 +446,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       answers: answersValue as Record<string, unknown>,
     })
     res.status(201).json({ request: requestWithActions(actor.operationalRole, actor.id, request, companyId) })
+    } catch (error) { next(error) }
   })
 
-  router.get('/requests', async (req, res) => {
+  router.get('/requests', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const status = typeof req.query.status === 'string' ? req.query.status : undefined
     const page = parsePositiveInt(req.query.page, 1)
@@ -222,16 +461,18 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       ...result,
       items: result.items.map((item) => requestWithActions(actor.operationalRole, actor.id, item, companyId)),
     })
+    } catch (error) { next(error) }
   })
 
-  router.get('/admin/requests', async (req, res) => {
+  router.get('/admin/requests', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!isInternalOperationalRole(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
       return
     }
     const status = typeof req.query.status === 'string' ? req.query.status : undefined
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const result = await repo.listScoped(scope, {
       status,
       page: parsePositiveInt(req.query.page, 1),
@@ -244,27 +485,31 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       })),
     )
     res.json({ ...result, items })
+    } catch (error) { next(error) }
   })
 
-  router.get('/admin/requests/:id', async (req, res) => {
+  router.get('/admin/requests/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!isInternalOperationalRole(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
       return
     }
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const request = await repo.findByIdScoped(req.params.id, scope)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     const service = await deps.serviceCatalog.findById(request.serviceId)
     res.json({
       request: requestWithActions(actor.operationalRole, actor.id, request),
       owner: safeOwner(await deps.userStore.findById(request.ownerId)),
-      timeline: await activities.listForRequest(request.id),
+      timeline: await activities.listForRequestScoped(request.id, scope),
       workflow: service?.workflow ?? [],
     })
+    } catch (error) { next(error) }
   })
 
-  router.get('/requests/:id', async (req, res) => {
+  router.get('/requests/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
     const request = await repo.findByIdScoped(req.params.id, scope)
@@ -274,16 +519,31 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
 
     const service = await deps.serviceCatalog.findById(request.serviceId)
-    const timeline = await activities.listForRequest(request.id)
+    const timeline = await activities.listForRequestScoped(request.id, scope)
     res.json({
       request: requestWithActions(actor.operationalRole, actor.id, request, companyId),
       timeline,
       workflow: service?.workflow ?? [],
       owner: safeOwner(await deps.userStore.findById(request.ownerId)),
     })
+    } catch (error) { next(error) }
   })
 
-  router.post('/requests/:id/submit', async (req, res) => {
+  router.get('/requests/:id/history', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
+    const request = await repo.findByIdScoped(req.params.id, scope)
+    if (!request) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    res.json({ items: await activities.listForRequestScoped(request.id, scope) })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/requests/:id/submit', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
     const request = await repo.findByIdScoped(req.params.id, scope)
@@ -333,6 +593,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     res.json({ request: requestWithActions(actor.operationalRole, actor.id, result, companyId) })
+    } catch (error) { next(error) }
   })
 
   /*
@@ -353,6 +614,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.post('/admin/requests/:id/assignments', async (req, res) => {
     const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
     const request = await repo.findByIdAny(req.params.id)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     if (!canRequestAction(actor.operationalRole, request, actor.id, 'assign')) {
@@ -386,6 +651,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.delete('/admin/requests/:id/assignments/:userId', async (req, res) => {
     const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
     const request = await repo.findByIdAny(req.params.id)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     if (!canRequestAction(actor.operationalRole, request, actor.id, 'assign')) {
@@ -403,16 +672,142 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json({ assignment: revoked })
   })
 
-  router.get('/letters', async (req, res) => {
+  router.get('/admin/events', async (_req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (!isInternalOperationalRole(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const events = await eventStore.list()
+    const items = events
+      .filter((event) => canActOnEvent(actor.operationalRole, actor.id, event, 'read'))
+      .map((event) => eventWithActions(actor.operationalRole, actor.id, event))
+    res.json({ items })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/events/:id', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (!isInternalOperationalRole(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    if (!isEventId(req.params.id)) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const event = await eventStore.findById(req.params.id)
+    if (!event || !canActOnEvent(actor.operationalRole, actor.id, event, 'read')) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    res.json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/events', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (!canManageEvents(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const parsed = normalizeEventInput(req.body)
+    if (!parsed.ok) {
+      res.status(400).json(
+        parsed.error === 'invalid_event'
+          ? { error: parsed.error, fields: parsed.fields }
+          : { error: parsed.error },
+      )
+      return
+    }
+    const ineligible = await ineligibleResponsibleField(deps.userStore, parsed.input)
+    if (ineligible) {
+      res.status(400).json({ error: 'ineligible_responsible_person', field: ineligible })
+      return
+    }
+    const event = await eventStore.create({ ...parsed.input, createdBy: actor.id })
+    res.status(201).json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
+    } catch (error) { next(error) }
+  })
+
+  router.patch('/admin/events/:id', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (!canManageEvents(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    if (!isEventId(req.params.id)) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const existing = await eventStore.findById(req.params.id)
+    if (!existing) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const revision = parseEventRevision(req.body)
+    if (revision === null) {
+      res.status(400).json({ error: 'invalid_event', fields: ['revision'] })
+      return
+    }
+    const reason = parseEventReason(req.body)
+    if (reason === null) {
+      res.status(400).json({ error: 'invalid_event', fields: ['reason'] })
+      return
+    }
+    if (existing.revision !== revision) {
+      res.status(409).json({ error: 'stale_event', revision: existing.revision })
+      return
+    }
+    const parsed = normalizeEventInput(req.body, existing)
+    if (!parsed.ok) {
+      res.status(400).json(
+        parsed.error === 'invalid_event'
+          ? { error: parsed.error, fields: parsed.fields }
+          : { error: parsed.error },
+      )
+      return
+    }
+    const ineligible = await ineligibleResponsibleField(deps.userStore, parsed.input)
+    if (ineligible) {
+      res.status(400).json({ error: 'ineligible_responsible_person', field: ineligible })
+      return
+    }
+    const updated = await eventStore.update(existing.id, {
+      ...parsed.input,
+      expectedRevision: revision,
+      actorId: actor.id,
+      reason,
+    })
+    if (!updated.ok) {
+      if (updated.error === 'stale') {
+        res.status(409).json({ error: 'stale_event', revision: updated.event.revision })
+        return
+      }
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    res.json({ event: eventWithActions(actor.operationalRole, actor.id, updated.event) })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/letters', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const read = parseBoolean(req.query.read)
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
     res.json(await letters.listScoped(scope, { read, page, limit }))
+    } catch (error) { next(error) }
   })
 
-  router.get('/letters/:id', async (req, res) => {
+  router.get('/letters/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const letter = await letters.findByIdAndMarkReadScoped(req.params.id, scope)
@@ -421,32 +816,45 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     res.json({ letter })
+    } catch (error) { next(error) }
   })
 
-  router.get('/stats', async (_req, res) => {
+  router.get('/stats', async (_req, res, next) => {
+    try {
     const actor = actorOf(res)
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
     res.json(await stats.forScope(scope))
+    } catch (error) { next(error) }
   })
 
-  router.get('/stats/overview', async (_req, res) => {
+  router.get('/stats/overview', async (_req, res, next) => {
+    try {
     const actor = actorOf(res)
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
     res.json(await stats.forScope(scope))
+    } catch (error) { next(error) }
   })
 
-  router.get('/activities', async (req, res) => {
+  router.get('/activities', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
     res.json(await activities.listScoped(scope, page, limit))
+    } catch (error) { next(error) }
   })
 
   router.get('/profile', async (_req, res) => {
     const actor = actorOf(res)
     const profile = await profileRepo.getProfile(actor.id)
     res.json(profile)
+  })
+
+  router.get('/profile/me', (_req, res) => {
+    const actor = actorOf(res)
+    res.set('Cache-Control', 'private, no-store, max-age=0')
+    res.json(dashboardSelfProfile(actor.user, actor.operationalRole))
   })
 
   router.patch('/profile', async (req, res) => {
@@ -456,6 +864,30 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (company?.nationalId !== undefined && company.nationalId !== profile.company.nationalId) {
       res.status(403).json({ error: 'protected_company_identity' })
       return
+    }
+    let dossierUpdate
+    try {
+      dossierUpdate = pickDossierUpdate(req.body?.dossier ?? req.body)
+    } catch (error) {
+      if (error instanceof DossierValidationError) {
+        res.status(400).json({ error: error.code })
+        return
+      }
+      throw error
+    }
+    // Write the dossier first: its merge validation is the only 400-producing
+    // part of this combined PATCH, so a rejected request must not leave the
+    // company, contacts or executives partially updated.
+    if (Object.keys(dossierUpdate).length > 0) {
+      try {
+        profile = await profileRepo.updateDossier(actor.id, dossierUpdate)
+      } catch (error) {
+        if (error instanceof DossierValidationError) {
+          res.status(400).json({ error: error.code })
+          return
+        }
+        throw error
+      }
     }
     if (company && typeof company === 'object') {
       profile = await profileRepo.updateBasicInfo(actor.id, company)
@@ -467,6 +899,53 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       profile = await profileRepo.updateExecutives(actor.id, req.body.executives)
     }
     res.json(profile)
+  })
+
+  router.get('/profile/dossier', async (_req, res) => {
+    const actor = actorOf(res)
+    const company = await deps.companyStore.findByRepresentative(actor.id)
+    if (!company) {
+      res.status(404).json({ error: 'company_not_found' })
+      return
+    }
+    const dossier = dossierOfCompany(company)
+    const documents = await dossierDocuments.listCompanyDocuments(company.id)
+    res.json({ dossier, documents, missing: missingDossierItems(company, dossier, documents) })
+  })
+
+  router.patch('/profile/dossier', async (req, res) => {
+    const actor = actorOf(res)
+    let update
+    try {
+      update = pickDossierUpdate(req.body?.dossier ?? req.body)
+    } catch (error) {
+      if (error instanceof DossierValidationError) {
+        res.status(400).json({ error: error.code })
+        return
+      }
+      throw error
+    }
+    let profile
+    try {
+      profile = await profileRepo.updateDossier(actor.id, update)
+    } catch (error) {
+      if (error instanceof DossierValidationError) {
+        res.status(400).json({ error: error.code })
+        return
+      }
+      throw error
+    }
+    const company = await deps.companyStore.findByRepresentative(actor.id)
+    if (!company) {
+      res.status(404).json({ error: 'company_not_found' })
+      return
+    }
+    const documents = await dossierDocuments.listCompanyDocuments(company.id)
+    res.json({
+      dossier: profile.dossier,
+      documents,
+      missing: missingDossierItems(company, profile.dossier, documents),
+    })
   })
 
   router.post('/profile/addresses', async (req, res) => {
@@ -513,12 +992,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json({ success: true })
   })
 
-  router.delete('/letters/:id', async (req, res) => {
+  router.delete('/letters/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const deleted = await letters.deleteScoped(req.params.id, scope)
     if (!deleted) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ success: true })
+    } catch (error) { next(error) }
   })
 
   router.get('/admin/companies', async (req, res) => {
@@ -699,6 +1180,135 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const ticket = await support.close(req.params.id, actor.id, isCompanyAdministrator(actor.operationalRole) ? 'admin' : 'representative')
     if (!ticket) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ ticket })
+  })
+
+  router.get('/exhibitions/:exhibitionId/catalogue', async (req, res, next) => {
+    try {
+    const [settings, booths] = await Promise.all([
+      catalogue.getSettings(req.params.exhibitionId),
+      catalogue.listBooths(req.params.exhibitionId),
+    ])
+    res.json({
+      exhibitionId: req.params.exhibitionId,
+      companyBoothLimit: settings?.companyBoothLimit ?? null,
+      guideMapReference: settings?.guideMapReference ?? null,
+      booths,
+    })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/exhibitions/:exhibitionId/catalogue', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const [settings, booths] = await Promise.all([
+      catalogue.getSettings(req.params.exhibitionId),
+      catalogue.listBooths(req.params.exhibitionId, { includeInactive: true }),
+    ])
+    res.json({
+      exhibitionId: req.params.exhibitionId,
+      companyBoothLimit: settings?.companyBoothLimit ?? null,
+      guideMapReference: settings?.guideMapReference ?? null,
+      booths,
+    })
+    } catch (error) { next(error) }
+  })
+
+  router.put('/admin/exhibitions/:exhibitionId/settings', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const parsed = parseSettingsInput(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error })
+      return
+    }
+    const exhibition = await checkExhibition(req.params.exhibitionId)
+    if (!exhibition.ok) {
+      res.status(503).json({ error: 'exhibition_lookup_failed' })
+      return
+    }
+    if (!exhibition.exists) {
+      res.status(404).json({ error: 'exhibition_not_found' })
+      return
+    }
+    const settings = await catalogue.upsertSettings(
+      req.params.exhibitionId,
+      parsed.value,
+      actor.id,
+    )
+    res.json({ settings })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/exhibitions/:exhibitionId/booths', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const parsed = parseBoothCreate(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error })
+      return
+    }
+    const exhibition = await checkExhibition(req.params.exhibitionId)
+    if (!exhibition.ok) {
+      res.status(503).json({ error: 'exhibition_lookup_failed' })
+      return
+    }
+    if (!exhibition.exists) {
+      res.status(404).json({ error: 'exhibition_not_found' })
+      return
+    }
+    const result = await catalogue.createBooth({
+      ...parsed.value,
+      exhibitionId: req.params.exhibitionId,
+      createdBy: actor.id,
+    })
+    if (!result.ok) {
+      res.status(409).json({ error: result.error })
+      return
+    }
+    res.status(201).json({ booth: result.booth })
+    } catch (error) { next(error) }
+  })
+
+  router.patch('/admin/exhibitions/:exhibitionId/booths/:boothId', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    if (actor.operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    if (!isUuid(req.params.boothId)) {
+      res.status(400).json({ error: 'invalid_booth_id' })
+      return
+    }
+    const parsed = parseBoothUpdate(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error })
+      return
+    }
+    const result = await catalogue.updateBooth({
+      ...parsed.value,
+      exhibitionId: req.params.exhibitionId,
+      boothId: req.params.boothId,
+      updatedBy: actor.id,
+    })
+    if (!result.ok) {
+      res.status(result.error === 'booth_not_found' ? 404 : 409).json({ error: result.error })
+      return
+    }
+    res.json({ booth: result.booth })
+    } catch (error) { next(error) }
   })
 
   return router

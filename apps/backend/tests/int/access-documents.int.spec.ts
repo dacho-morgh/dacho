@@ -213,6 +213,42 @@ describe('shared access policy and private documents (T09/T10)', () => {
     expect((await request(payload).get(`/admin/companies/${people.repA.id}`).set(headers(people.chief.id))).status).toBe(403)
   })
 
+  it('rejects malformed resource IDs without terminating the HTTP service', async () => {
+    const malformed = 'mobile-request-453404135'
+
+    const malformedDetail = await request(payload)
+      .get(`/requests/${malformed}`)
+      .set(headers(people.repA.id))
+      .expect(404)
+    expect(malformedDetail.body).toEqual({ error: 'not_found' })
+
+    const malformedDocuments = await request(payload)
+      .get(`/documents?requestId=${malformed}`)
+      .set(headers(people.repA.id))
+      .expect(404)
+    expect(malformedDocuments.body).toEqual({ error: 'not_found' })
+
+    const malformedDocument = await request(payload)
+      .get(`/documents/${malformed}`)
+      .set(headers(people.repA.id))
+      .expect(404)
+    expect(malformedDocument.body).toEqual({ error: 'not_found' })
+
+    const malformedLetter = await request(payload)
+      .get(`/admin/letters/${malformed}`)
+      .set(headers(people.owner.id))
+      .expect(404)
+    expect(malformedLetter.body).toEqual({ error: 'not_found' })
+
+    const malformedTicket = await request(payload)
+      .get(`/support/${malformed}`)
+      .set(headers(people.repA.id))
+      .expect(404)
+    expect(malformedTicket.body).toEqual({ error: 'not_found' })
+
+    await request(payload).get('/health').expect(200, { status: 'ok' })
+  })
+
   it('revokes access on assignment revocation, role change and deactivation', async () => {
     const id = await createRequest()
     await submit(id)
@@ -410,7 +446,7 @@ describe('shared access policy and private documents (T09/T10)', () => {
       const { rows } = await pool.query<{ count: string }>(
         `SELECT COUNT(*)::text AS count FROM pg_stat_activity
          WHERE application_name = 'access-documents-integration' AND wait_event_type = 'Lock'
-           AND query LIKE 'SELECT owner_id, status::text AS status FROM dashboard.requests%'`,
+           AND query LIKE 'SELECT owner_id, company_id, status::text AS status FROM dashboard.requests%'`,
       )
       if (Number(rows[0]?.count) > 0) { deleteIsWaiting = true; break }
       await new Promise((resolve) => setTimeout(resolve, 20))

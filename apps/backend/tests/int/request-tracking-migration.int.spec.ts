@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -15,10 +16,18 @@ const input = {
   title: 'Tracking migration fixture', ownerId: 'tracking-migration', answers: {},
 }
 
+const TRACKING = '1780511400005_safe-request-tracking'
+const MIGRATIONS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../migrations')
+const LATER = readdirSync(MIGRATIONS_DIR)
+  .filter((file) => file.endsWith('.ts'))
+  .map((file) => file.slice(0, -3))
+  .filter((name) => name > TRACKING)
+  .sort()
+
 const migration = (file: string, direction: 'up' | 'down') =>
   runner({
     databaseUrl: connectionString,
-    dir: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../migrations'),
+    dir: MIGRATIONS_DIR,
     direction,
     file,
     count: 1,
@@ -28,17 +37,11 @@ const migration = (file: string, direction: 'up' | 'down') =>
     log: () => undefined,
   })
 
-const TRACKING = '1780511400005_safe-request-tracking'
-const LATER_MIGRATIONS = [
-  '1780511400010_company_owned_requests',
-  '1780511400006_shared_access_and_private_documents',
-]
-
 /**
- * Rehearse the tracking migration against the pre-sequence schema. Later
- * migrations are temporarily reverted too: node-pg-migrate rejects an unapplied
+ * Rehearse the tracking migration against the pre-sequence schema. Every later
+ * migration is temporarily reverted too: node-pg-migrate rejects an unapplied
  * earlier migration when a later one is recorded, even for a file-scoped run.
- * The disposable suite restores all migrations after each case.
+ * The disposable suite restores them after each case.
  */
 const trackingMigration = (direction: 'up' | 'down') => migration(TRACKING, direction)
 
@@ -50,18 +53,16 @@ describe('request tracking migration on isolated synthetic data', () => {
   beforeEach(async () => {
     await pool.query('DELETE FROM dashboard.requests')
     // The shared integration setup has already verified the disposable marker.
-    for (const later of LATER_MIGRATIONS) {
-      await migration(later, 'down')
-    }
+    // Temporarily revert every later migration in reverse order; node-pg-migrate
+    // rejects an unapplied earlier migration when a later one is recorded.
+    for (const later of [...LATER].reverse()) await migration(later, 'down')
     const reverted = await trackingMigration('down')
     expect(reverted.map((entry) => entry.name)).toEqual([TRACKING])
   })
 
   afterEach(async () => {
     await trackingMigration('up')
-    for (const later of [...LATER_MIGRATIONS].reverse()) {
-      await migration(later, 'up')
-    }
+    for (const later of LATER) await migration(later, 'up')
     await pool.query('DELETE FROM dashboard.requests')
   })
 
@@ -71,6 +72,8 @@ describe('request tracking migration on isolated synthetic data', () => {
 
   it('starts at one on an empty database and can run again without resetting allocation', async () => {
     await trackingMigration('up')
+    // Current repositories require columns supplied by later migrations.
+    for (const later of LATER) await migration(later, 'up')
     const first = await repo.create(input)
     expect(first.trackingCode).toBe(`DCH-${new Date().getFullYear()}-1`)
     await trackingMigration('up')
@@ -90,6 +93,7 @@ describe('request tracking migration on isolated synthetic data', () => {
     await trackingMigration('up')
     const after = await pool.query('SELECT * FROM dashboard.requests ORDER BY tracking_code')
     expect(after.rows).toEqual(before.rows)
+    for (const later of LATER) await migration(later, 'up')
     expect((await repo.create(input)).trackingCode).toBe(`DCH-${new Date().getFullYear()}-9007199254740994`)
   })
 })

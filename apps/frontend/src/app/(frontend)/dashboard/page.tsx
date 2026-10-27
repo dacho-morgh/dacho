@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import React from 'react'
+import { Typography } from '@/components/ui/typography'
 import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import { CompanyList } from '@/components/dashboard/company-list'
 import { RecentActivities } from '@/components/dashboard/recent-activities'
@@ -30,13 +31,22 @@ export const metadata: Metadata = {
   description: 'سامانه مدیریت درخواست‌ها، طرح‌ها و پیگیری فرآیندهای خدمات کارخانه نوآوری بوشهر',
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ access?: string }>
+}) {
+  const showDeniedNotice = (await searchParams).access === 'denied'
   const payload = await getPayload({ config: configPromise })
   const requestHeaders = await headers()
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })
   const role = dashboardOperationalRole(user)
-  if (role === 'system-owner' || role === 'central-secretariat') return <CompanyList />
-  if (role && role !== 'representative') return <AdminRequestList />
+  if (role === 'system-owner' || role === 'central-secretariat') {
+    return <>{showDeniedNotice && <DeniedNotice />}<CompanyList /></>
+  }
+  if (role && role !== 'representative') {
+    return <>{showDeniedNotice && <DeniedNotice />}<AdminRequestList /></>
+  }
 
   // CMS-owned definitions read server-side via Payload's local API.
   const { docs: services } = await payload.find({ collection: 'services', limit: 100 })
@@ -71,6 +81,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8 p-6 pb-12 sm:p-8">
+      {showDeniedNotice && <DeniedNotice />}
       {/* 1. Quick Stats */}
       <StatCards data={stats} />
 
@@ -83,5 +94,13 @@ export default async function DashboardPage() {
       {/* 4. Recent Activities & Upcoming Deadlines */}
       <RecentActivities activityItems={activities?.items} />
     </div>
+  )
+}
+
+function DeniedNotice() {
+  return (
+    <Typography role="status" variant="14/regular" color="warning" className="rounded-lg border border-warning-500 bg-warning-50 p-3">
+      به نشانی درخواستی دسترسی ندارید؛ پیشخوان نقش فعلی شما نمایش داده شده است.
+    </Typography>
   )
 }

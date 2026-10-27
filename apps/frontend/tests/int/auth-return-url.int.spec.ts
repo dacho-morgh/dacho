@@ -8,6 +8,12 @@ describe('getSafeReturnUrl', () => {
     )
   })
 
+  it('preserves a safe dashboard query string and fragment', () => {
+    expect(getSafeReturnUrl('/dashboard/requests?status=draft#request-12')).toBe(
+      '/dashboard/requests?status=draft#request-12',
+    )
+  })
+
   it.each([
     'https://attacker.example/dashboard',
     '//attacker.example/dashboard',

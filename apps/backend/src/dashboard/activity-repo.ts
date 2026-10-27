@@ -1,6 +1,7 @@
 import type { Pool } from 'pg'
 
 import type { RequestScope } from '../access/policy.js'
+import { requestScopeClause } from './request-repo.js'
 
 export interface ActivityDto {
   id: string
@@ -11,6 +12,12 @@ export interface ActivityDto {
   title: string
   description: string | null
   at: string
+  actorId: string | null
+  action: string | null
+  reason: string | null
+  fromState: string | null
+  toState: string | null
+  revision: number | null
 }
 
 interface ActivityRow {
@@ -22,9 +29,19 @@ interface ActivityRow {
   title: string
   description: string | null
   at: Date
+  actor_id: string | null
+  action: string | null
+  reason: string | null
+  from_state: string | null
+  to_state: string | null
+  revision: number | null
 }
 
-const ACTIVITY_COLUMNS = 'id, owner_id, request_id, letter_id, type, title, description, at'
+const ACTIVITY_COLUMNS = `id, owner_id, request_id, letter_id, type, title, description, at,
+  actor_id, action, reason, from_state, to_state, revision`
+
+const ACTIVITY_COLUMNS_ALIASED = `a.id, a.owner_id, a.request_id, a.letter_id, a.type, a.title,
+  a.description, a.at, a.actor_id, a.action, a.reason, a.from_state, a.to_state, a.revision`
 
 function mapActivity(row: ActivityRow): ActivityDto {
   return {
@@ -36,6 +53,12 @@ function mapActivity(row: ActivityRow): ActivityDto {
     title: row.title,
     description: row.description,
     at: row.at.toISOString(),
+    actorId: row.actor_id,
+    action: row.action,
+    reason: row.reason,
+    fromState: row.from_state,
+    toState: row.to_state,
+    revision: row.revision,
   }
 }
 
@@ -98,7 +121,7 @@ export class ActivityRepository {
     const total = Number(countRows[0]?.total ?? 0)
     const offset = (page - 1) * limit
     const { rows } = await this.pool.query<ActivityRow>(
-      `SELECT a.id, a.owner_id, a.request_id, a.letter_id, a.type, a.title, a.description, a.at
+      `SELECT ${ACTIVITY_COLUMNS_ALIASED}
        FROM dashboard.activities a
        WHERE ${whereSql}
        ORDER BY a.at DESC
@@ -137,11 +160,17 @@ export class ActivityRepository {
     }
   }
 
-  /** Chronological event log for a single request (the detail timeline). */
-  async listForRequest(requestId: string): Promise<ActivityDto[]> {
+  /** Chronological history for a single request, using the shared request scope. */
+  async listForRequestScoped(requestId: string, scope: RequestScope): Promise<ActivityDto[]> {
+    const params: unknown[] = [requestId]
+    const scopeSql = requestScopeClause(scope, params, 'r')
     const { rows } = await this.pool.query<ActivityRow>(
-      `SELECT ${ACTIVITY_COLUMNS} FROM dashboard.activities WHERE request_id = $1 ORDER BY at ASC`,
-      [requestId],
+      `SELECT ${ACTIVITY_COLUMNS_ALIASED}
+       FROM dashboard.activities a
+       JOIN dashboard.requests r ON r.id = a.request_id
+       WHERE a.request_id = $1 AND ${scopeSql}
+       ORDER BY a.at ASC`,
+      params,
     )
     return rows.map(mapActivity)
   }

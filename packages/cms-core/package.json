@@ -18,6 +18,10 @@
     "./auth": {
       "types": "./src/auth/backendJwtStrategy.ts",
       "default": "./src/auth/backendJwtStrategy.ts"
+    },
+    "./auth/self-signup": {
+      "types": "./src/auth/self-signup.ts",
+      "default": "./src/auth/self-signup.ts"
     }
   },
   "scripts": {

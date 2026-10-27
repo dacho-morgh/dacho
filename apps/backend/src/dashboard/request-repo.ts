@@ -1,6 +1,8 @@
 import type { Pool, PoolClient } from 'pg'
 
 import type { RequestScope } from '../access/policy.js'
+import { isUuid } from '../db/uuid.js'
+import { appendTransition } from './transition-history.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
@@ -191,6 +193,7 @@ export class RequestRepository {
   }
 
   async findByIdScoped(id: string, scope: RequestScope): Promise<RequestDto | undefined> {
+    if (!isUuid(id)) return undefined
     const params: unknown[] = [id]
     const scopeSql = requestScopeClause(scope, params, 'r')
     const { rows } = await this.pool.query<RequestRow>(
@@ -208,29 +211,12 @@ export class RequestRepository {
       await client.query('BEGIN')
       const year = new Date().getFullYear()
       const trackingCode = await nextTrackingCode(client, year)
-      const hasCompanyCol =
-        (
-          await client.query<{ exists: boolean }>(
-            `SELECT EXISTS (
-               SELECT 1 FROM information_schema.columns
-               WHERE table_schema = 'dashboard' AND table_name = 'requests' AND column_name = 'company_id'
-             ) AS exists`,
-          )
-        ).rows[0]?.exists ?? true
-
-      const { rows } = hasCompanyCol
-        ? await client.query<RequestRow>(
-            `INSERT INTO dashboard.requests (tracking_code, title, service_id, service_key, service_name, owner_id, company_id, answers)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-             RETURNING ${REQUEST_COLUMNS}`,
-            [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, input.companyId ?? null, JSON.stringify(input.answers)],
-          )
-        : await client.query<RequestRow>(
-            `INSERT INTO dashboard.requests (tracking_code, title, service_id, service_key, service_name, owner_id, answers)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             RETURNING id, tracking_code, title, service_id, service_key, service_name, owner_id, NULL::text AS company_id, status, current_step_index, assigned_role, current_step, answers, submission_date, due_date, created_at, updated_at`,
-            [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, JSON.stringify(input.answers)],
-          )
+      const { rows } = await client.query<RequestRow>(
+        `INSERT INTO dashboard.requests (tracking_code, title, service_id, service_key, service_name, owner_id, company_id, answers)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING ${REQUEST_COLUMNS}`,
+        [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, input.companyId ?? null, JSON.stringify(input.answers)],
+      )
       await client.query('COMMIT')
       const created = rows[0]
       if (!created) throw new Error('INSERT requests returned no row')
@@ -283,6 +269,7 @@ export class RequestRepository {
   }
 
   async findById(id: string, ownerId: string): Promise<RequestDto | undefined> {
+    if (!isUuid(id)) return undefined
     const { rows } = await this.pool.query<RequestRow>(
       `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1 AND owner_id = $2`,
       [id, ownerId],
@@ -291,6 +278,7 @@ export class RequestRepository {
   }
 
   async findByIdAny(id: string): Promise<RequestDto | undefined> {
+    if (!isUuid(id)) return undefined
     const { rows } = await this.pool.query<RequestRow>(
       `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1`, [id],
     )
@@ -304,36 +292,49 @@ export class RequestRepository {
     step?: { assignedRole: string; currentStep: string },
     companyId?: string | null,
   ): Promise<RequestDto | 'not_found' | 'already_submitted'> {
-    let whereClause = `id = $1 AND owner_id = $2 AND status = 'draft'`
-    const params: unknown[] = [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null]
-    if (companyId) {
-      params.push(companyId)
-      whereClause = `id = $1 AND (company_id = $5 OR (company_id IS NULL AND owner_id = $2)) AND status = 'draft'`
-    }
-    const { rows } = await this.pool.query<RequestRow>(
-      `UPDATE dashboard.requests
-       SET status = 'in_review', submission_date = now(), updated_at = now(),
-           assigned_role = $3, current_step = $4
-       WHERE ${whereClause}
-       RETURNING ${REQUEST_COLUMNS}`,
-      params,
-    )
-    const updated = rows[0]
-    if (updated) return mapRequestRow(updated)
-
-    // A competing submit may have won while this UPDATE waited on its row.
-    // Only the caller that changed the draft receives a successful transition.
-    let existing: RequestDto | undefined
-    if (companyId) {
-      const { rows: existingRows } = await this.pool.query<RequestRow>(
-        `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests
-         WHERE id = $1 AND (company_id = $2 OR (company_id IS NULL AND owner_id = $3))`,
-        [id, companyId, ownerId],
+    if (!isUuid(id)) return 'not_found'
+    const ownership = companyId
+      ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
+      : '(company_id IS NULL AND owner_id = $2)'
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const { rows } = await client.query<RequestRow & { revision: number }>(
+        `UPDATE dashboard.requests
+         SET status = 'in_review', submission_date = now(), updated_at = now(),
+             assigned_role = $3, current_step = $4, revision = revision + 1
+         WHERE id = $1 AND ${ownership} AND status = 'draft'
+         RETURNING ${REQUEST_COLUMNS}, revision`,
+        [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null, ...(companyId ? [companyId] : [])],
       )
-      existing = existingRows[0] ? mapRequestRow(existingRows[0]) : undefined
-    } else {
-      existing = await this.findById(id, ownerId)
+      const updated = rows[0]
+      if (!updated) {
+        // A competing submit may have won while this UPDATE waited on its row.
+        // Only the caller that changed the draft receives a successful transition.
+        await client.query('ROLLBACK')
+        const existing = await client.query<RequestRow>(
+          `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1 AND ${companyId ? '(company_id = $3 OR (company_id IS NULL AND owner_id = $2))' : '(company_id IS NULL AND owner_id = $2)'}`,
+          [id, ownerId, ...(companyId ? [companyId] : [])],
+        )
+        return existing.rows[0] ? 'already_submitted' : 'not_found'
+      }
+      await appendTransition(client, {
+        requestId: updated.id,
+        ownerId: updated.owner_id,
+        actorId: ownerId,
+        action: 'submit',
+        fromState: 'draft',
+        toState: updated.status,
+        revision: updated.revision,
+        reason: null,
+      })
+      await client.query('COMMIT')
+      return mapRequestRow(updated)
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw err
+    } finally {
+      client.release()
     }
-    return existing ? 'already_submitted' : 'not_found'
   }
 }
