@@ -412,7 +412,7 @@ describe('requests API', () => {
           const { rows } = await pool.query<{ waiting: number }>(
             `SELECT COUNT(*)::int AS waiting FROM pg_stat_activity
              WHERE application_name = 'requests-integration' AND datname = current_database()
-               AND wait_event_type = 'Lock' AND query LIKE 'UPDATE dashboard.requests%'`,
+               AND wait_event_type = 'Lock' AND query LIKE 'SELECT status FROM dashboard.requests%'`,
           )
           return rows[0]?.waiting
         }, { timeout: 3000, interval: 10 }).toBe(2)

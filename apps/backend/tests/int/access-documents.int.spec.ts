@@ -394,7 +394,7 @@ describe('shared access policy and private documents (T09/T10)', () => {
     expect(await waitUntil(async () => {
       const { rows } = await pool.query<{ count: string }>(
         `SELECT COUNT(*)::text AS count FROM pg_stat_activity
-         WHERE application_name = 'access-documents-integration' AND wait_event_type = 'Lock' AND query LIKE 'UPDATE dashboard.requests%'`,
+         WHERE application_name = 'access-documents-integration' AND wait_event_type = 'Lock' AND query LIKE 'SELECT status FROM dashboard.requests%'`,
       )
       return Number(rows[0]?.count) > 0
     })).toBe(true)
@@ -434,7 +434,7 @@ describe('shared access policy and private documents (T09/T10)', () => {
     while (Date.now() < deadline) {
       const { rows } = await pool.query<{ count: string }>(
         `SELECT COUNT(*)::text AS count FROM pg_stat_activity
-         WHERE application_name = 'access-documents-integration' AND wait_event_type = 'Lock' AND query LIKE 'UPDATE dashboard.requests%'`,
+         WHERE application_name = 'access-documents-integration' AND wait_event_type = 'Lock' AND query LIKE 'SELECT status FROM dashboard.requests%'`,
       )
       if (Number(rows[0]?.count) > 0) { submitIsWaiting = true; break }
       await new Promise((resolve) => setTimeout(resolve, 20))

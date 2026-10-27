@@ -101,6 +101,7 @@ export interface CreateRequestInput {
   ownerId: string
   companyId?: string | null
   answers: Record<string, unknown>
+  rfp?: { eventId: string; subtopicId: string; versionId: string }
 }
 
 export interface ListRequestOptions {
@@ -209,6 +210,11 @@ export class RequestRepository {
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
+      if (input.rfp) {
+        const { eventId, subtopicId, versionId } = input.rfp
+        const current = await client.query('SELECT id FROM dashboard.subtopics WHERE id=$1 AND event_id=$2 AND current_rfp_version_id=$3 FOR SHARE', [subtopicId, eventId, versionId])
+        if (!current.rows[0]) throw new Error('stale_rfp')
+      }
       const year = new Date().getFullYear()
       const trackingCode = await nextTrackingCode(client, year)
       const { rows } = await client.query<RequestRow>(
@@ -217,9 +223,10 @@ export class RequestRepository {
          RETURNING ${REQUEST_COLUMNS}`,
         [trackingCode, input.title, input.serviceId, input.serviceKey, input.serviceName, input.ownerId, input.companyId ?? null, JSON.stringify(input.answers)],
       )
-      await client.query('COMMIT')
       const created = rows[0]
       if (!created) throw new Error('INSERT requests returned no row')
+      if (input.rfp) await client.query('INSERT INTO dashboard.request_rfps (request_id,event_id,subtopic_id,version_id) VALUES ($1,$2,$3,$4)', [created.id, input.rfp.eventId, input.rfp.subtopicId, input.rfp.versionId])
+      await client.query('COMMIT')
       return mapRequestRow(created)
     } catch (err) {
       await client.query('ROLLBACK')
@@ -291,7 +298,7 @@ export class RequestRepository {
     ownerId: string,
     step?: { assignedRole: string; currentStep: string },
     companyId?: string | null,
-  ): Promise<RequestDto | 'not_found' | 'already_submitted'> {
+  ): Promise<RequestDto | 'not_found' | 'already_submitted' | 'stale_rfp'> {
     if (!isUuid(id)) return 'not_found'
     const ownership = companyId
       ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
@@ -299,6 +306,22 @@ export class RequestRepository {
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
+      const current = (await client.query<{ status: RequestStatus }>(
+        `SELECT status FROM dashboard.requests WHERE id=$1 AND ${companyId ? '(company_id=$3 OR (company_id IS NULL AND owner_id=$2))' : '(company_id IS NULL AND owner_id=$2)'} FOR UPDATE`,
+        [id, ownerId, ...(companyId ? [companyId] : [])],
+      )).rows[0]
+      if (!current || current.status !== 'draft') {
+        await client.query('ROLLBACK')
+        return current ? 'already_submitted' : 'not_found'
+      }
+      const context = (await client.query<{ version_id: string; current_rfp_version_id: string | null }>(
+        `SELECT c.version_id, s.current_rfp_version_id FROM dashboard.request_rfps c
+         JOIN dashboard.subtopics s ON s.id=c.subtopic_id WHERE c.request_id=$1 FOR SHARE OF s`, [id],
+      )).rows[0]
+      if (context && context.version_id !== context.current_rfp_version_id) {
+        await client.query('ROLLBACK')
+        return 'stale_rfp'
+      }
       const { rows } = await client.query<RequestRow & { revision: number }>(
         `UPDATE dashboard.requests
          SET status = 'in_review', submission_date = now(), updated_at = now(),

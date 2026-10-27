@@ -30,6 +30,7 @@ Updated: 2026-10-26. This is the English specification for the event, review, in
 | [Request tracking foundation](request-tracking-foundation.md) | T07 sequence allocation, atomic submit, synthetic migration rehearsal and rollout boundaries |
 | [Shared authorization](authorization.md) | T09 seven-role/assignment scope, server-derived actions, CMS/proxy projections and current denials |
 | [Private documents](private-documents.md) | T10 private storage, document policy, access audiences, API contract, migrations and FE07 scope |
+| [Subtopics and RFP](subtopics-rfp.md) | T17/T18 category/event integrity, personal employer, immutable multi-file private RFP and submitted request pinning |
 
 ## Reading and execution order
 

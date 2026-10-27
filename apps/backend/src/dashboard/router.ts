@@ -39,6 +39,8 @@ import {
   type EventInput,
   type EventStore,
 } from './event-repo.js'
+import { createSubtopicRouter } from './subtopics-router.js'
+import { createRfpRouter } from './rfp-router.js'
 import { LetterRepository } from './letter-repo.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
@@ -343,6 +345,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps }))
+  router.use(createSubtopicRouter(deps))
+  router.use(createRfpRouter(deps))
 
   router.get('/capabilities', (_req, res) => {
     const actor = actorOf(res)
@@ -436,7 +440,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(403).json({ error: 'company_required' })
       return
     }
+    const { eventId, subtopicId, rfpVersionId } = req.body ?? {}
+    const hasRfp = eventId !== undefined || subtopicId !== undefined || rfpVersionId !== undefined
+    if (hasRfp && ![eventId, subtopicId, rfpVersionId].every((id) => typeof id === 'string' && isUuid(id))) {
+      res.status(400).json({ error: 'invalid_rfp_context' }); return
+    }
     const request = await repo.create({
+      ...(hasRfp ? { rfp: { eventId, subtopicId, versionId: rfpVersionId } } : {}),
       serviceId,
       serviceKey: service.key,
       serviceName: service.title,
@@ -446,7 +456,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       answers: answersValue as Record<string, unknown>,
     })
     res.status(201).json({ request: requestWithActions(actor.operationalRole, actor.id, request, companyId) })
-    } catch (error) { next(error) }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'stale_rfp') { res.status(409).json({ error: 'stale_rfp' }); return }
+      next(error)
+    }
   })
 
   router.get('/requests', async (req, res, next) => {
@@ -588,6 +601,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(404).json({ error: 'not_found' })
       return
     }
+    if (result === 'stale_rfp') { res.status(409).json({ error: 'stale_rfp' }); return }
     if (result === 'already_submitted') {
       res.status(409).json({ error: 'already_submitted' })
       return
