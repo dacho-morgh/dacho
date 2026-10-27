@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import type { RequestScope } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
 import { appendTransition } from './transition-history.js'
+import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
@@ -155,7 +156,14 @@ export function requestScopeClause(scope: RequestScope, params: unknown[], alias
 }
 
 export class RequestRepository {
-  constructor(private readonly pool: Pool) {}
+  private readonly notificationOutbox: NotificationOutbox
+
+  constructor(
+    private readonly pool: Pool,
+    notificationOutbox?: NotificationOutbox,
+  ) {
+    this.notificationOutbox = notificationOutbox ?? new PostgresNotificationOutbox(pool)
+  }
 
   async listScoped(
     scope: RequestScope,
@@ -328,7 +336,23 @@ export class RequestRepository {
         revision: updated.revision,
         reason: null,
       })
+      const job = await this.notificationOutbox.enqueue(client, {
+        requestId: updated.id,
+        recipientId: updated.owner_id,
+        actorId: ownerId,
+        action: 'submit',
+        fromState: 'draft',
+        toState: updated.status,
+        revision: updated.revision,
+        title: 'ارسال درخواست',
+        body: `درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} ارسال شد.`,
+      })
       await client.query('COMMIT')
+      try {
+        await this.notificationOutbox.deliver(job.id)
+      } catch {
+        // Outbox pattern: delivery failure never reverts or fails the committed business transaction
+      }
       return mapRequestRow(updated)
     } catch (err) {
       await client.query('ROLLBACK').catch(() => undefined)
