@@ -41,7 +41,10 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const delivery = new ConsoleOtpDelivery()
   const codeStore = new InMemoryCodeStore()
   const userStore = options.userStore ?? new InMemoryUserStore()
-  const companyStore = new InMemoryCompanyStore()
+  const companyStore = new InMemoryCompanyStore([
+    { name: 'Company 1', nationalId: '10000000001', representativeId: 'user-1' },
+    { name: 'Company 2', nationalId: '10000000002', representativeId: 'user-2' },
+  ])
   const dossierDocuments = new InMemoryDossierDocumentSource()
   const boothCatalogue = options.boothCatalogue ?? new InMemoryBoothCatalogueRepository()
   const jwt = await JwtSigner.create('test-kid')

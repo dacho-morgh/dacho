@@ -4,8 +4,8 @@ Inspected 2026-10-23; updated 2026-10-26 for T16. The inventory describes code i
 
 | Owner | Location / migration journal | Current files | Scope |
 | --- | --- | --- | --- |
-| Payload CMS | `packages/cms-core/src/migrations/`, imported in `index.ts`; Payload `payload_migrations` journal in `public` | 21 TypeScript migrations from `20260810_103455` through `20261024_200000_single_operational_role` (some generated JSON snapshots) | CMS content, users, companies, role evolution, events page content and editorial fields |
-| Backend | `apps/backend/migrations/`; `dashboard.pgmigrations` journal via node-pg-migrate | 11 TypeScript migrations: `1780511400000`–`1780511400008`, `1780511400011`–`1780511400012` (T16 update, 2026-10-26) | Requests, letters, activities, support tickets/messages, author-role rekey, safe tracking sequence, case assignments, private document metadata, transition history, booth catalogue, event configuration and event audit history |
+| Payload CMS | `packages/cms-core/src/migrations/`, imported in `index.ts`; Payload `payload_migrations` journal in `public` | 23 TypeScript migrations from `20260810_103455` through `20261026_120000_company_dossier` (excluding `index.ts`; some generated JSON snapshots) | CMS content, users, companies, role evolution, events page content, editorial fields, company activity domain and dossier |
+| Backend | `apps/backend/migrations/`; `dashboard.pgmigrations` journal via node-pg-migrate | 13 TypeScript migrations: `1780511400000`–`1780511400009`, `1780511400011`–`1780511400013` | Requests, letters, activities, support tickets/messages, author-role rekey, safe tracking sequence, case assignments, private document metadata, transition history, booth catalogue, company dossier boundary, event configuration, event audit history and company-owned requests |
 | Runtime-created OTP storage | `apps/backend/src/otp/postgres-code-store.ts` | No numbered migration | `dashboard.otp_codes` is ensured at runtime; inventory/restore must include it if present |
 
 Payload runs explicit migrations with schema push disabled in `packages/cms-core/src/payload.config.ts`. That configuration has **no schema override**, and its migrations use `public` explicitly; `public` is the observed CMS schema in this checkout. The approved [backend design](backend-design.md) uses `cms.*` as a conceptual ownership label, so a future migration must not assume a deployed `cms` SQL schema. Backend `runMigrations` uses the actual `dashboard` schema and an advisory lock. Both services share one database but their migration journals and ownership boundaries differ; applying just one side does not produce a fully usable test app. Initial CMS migrations are chronological by `index.ts`; future migration files must be added there.
@@ -31,6 +31,22 @@ public `events`/`exhibitions` CMS content. Event commands are owner-only;
 updates are revision-checked and audited atomically, and assigned responsibility
 is read scope for the current chief or investment reviewer only.
 
+Company-owned requests migration `1780511400013_company_owned_requests` adds nullable
+`dashboard.requests.company_id` and its index. Its number follows staging's already
+applied `1780511400011`/`1780511400012`; the unpublished `1780511400010` filename
+is intentionally unused, not a migration to insert into existing journals. No live
+deployment of that unpublished entry occurred. A disposable rehearsal database
+that recorded it must be reset before testing the renamed migration; never rewrite
+a live journal to accommodate a rename.
+
+Backfill reads `public.companies` only when that table exists. CMS company ids and
+representative ids are integers; `representative_id` has a non-unique index, not a
+uniqueness constraint. Only representatives linked to exactly one company map to
+requests, and existing non-null request companies stay unchanged. Unmapped and
+ambiguous owners remain null for explicit reconciliation; oldest creation time,
+including tied timestamps, is not ownership evidence. Rollback drops the new
+column and its values, so retain a DB backup and reviewed mapping before rollout.
+
 ## Read-only aggregate inventory (T04 tooling slice)
 
 From repository root, run against a **sanitized disposable database copy**, using an account granted SELECT on every application table:
@@ -49,7 +65,7 @@ T07 adds the request tracking sequence without rewriting existing codes. Its ini
 1. `20261017_210000_company_and_collapsed_roles` maps legacy CMS `admin`/`editor` and applicant/representative accounts, creates a company only for unambiguous national IDs, and retains duplicate-ID legacy records for manual reconciliation. It does **not** map the seven operational roles. Review each real account and preserve editorial `editor` explicitly; do not infer System Owner from the old `admin` label.
 2. `20261017_223000_rename_user_role_and_drop_roles_collection` renames the users role relation and retains legacy workflow/role tables rather than deleting them. Confirm real row counts and dependent references before later cleanup. The existing integration spec tests a synthetic legacy schema in a rollback transaction; it is not an inventory of deployed data.
 3. `20261018_090000_add_editor_role` adds an enum label; its `down` is intentionally a no-op because dropping a populated enum value would lose assignments. Treat rollback as restore/forward repair, not automatic down migration.
-4. Generic dashboard requests are owner-user based and lack company/event/subtopic/revision identity. Any future conversion needs an explicit mapping for each existing row, unmatched services and correspondence. Avoid assigning live requests to a new event by guesswork.
+4. Generic dashboard requests now have company and revision fields, but company backfill deliberately leaves unmatched or ambiguous owners null; event/subtopic identity is still absent. Any later conversion needs an explicit mapping for each unresolved row, unmatched services and correspondence. Avoid assigning live requests to a company or new event by guesswork.
 5. Public editorial media and private documents use separate storage and backup manifests. The T10 store starts empty and is not populated from public media; classifying existing public files as private documents would require a separate reviewed migration.
 
 Before a real migration, capture versioned DB + file backups together, production row counts and duplicate national IDs, account/role/editor mapping, dashboard request/letter dependencies, migration journals, a restore checkpoint and a rollback/forward-repair decision. Rehearse on a sanitized disposable copy with the same schema version. The Phase 0 isolated suite uses synthetic data only and cannot complete this real-data inventory.

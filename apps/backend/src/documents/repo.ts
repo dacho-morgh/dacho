@@ -45,7 +45,7 @@ interface DocumentRow {
 const DOCUMENT_COLUMNS = `
   d.id, d.storage_key, d.category, d.original_filename, d.mime_type, d.size_bytes,
   d.logical_version, d.request_id, d.company_id, d.uploader_id, d.created_at, d.updated_at,
-  r.owner_id AS request_owner_id, r.status::text AS request_status, NULL::text AS request_company_id
+  r.owner_id AS request_owner_id, r.status::text AS request_status, r.company_id AS request_company_id
 `
 
 const DOCUMENT_FROM = `
@@ -69,7 +69,7 @@ function mapRow(row: DocumentRow): PrivateDocumentRecord {
     updatedAt: row.updated_at.toISOString(),
     requestOwnerId: row.request_owner_id,
     requestStatus: row.request_status,
-    requestCompanyId: row.request_company_id ?? row.company_id,
+    requestCompanyId: row.request_company_id,
   }
 }
 

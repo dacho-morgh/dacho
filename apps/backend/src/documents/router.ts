@@ -103,8 +103,13 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       record.requestId &&
       canDeleteDocument(
         role,
-        { requestOwnerId: record.requestOwnerId, requestStatus: record.requestStatus },
+        {
+          requestOwnerId: record.requestOwnerId,
+          requestCompanyId: record.requestCompanyId,
+          requestStatus: record.requestStatus,
+        },
         actorId,
+        companyId,
       )
     ) {
       actions.push('delete')
@@ -149,7 +154,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       }
       const request = await requests.findByIdScoped(
         requestId,
-        bindRequestScope(requestScopeFor(actor.operationalRole), actor.id),
+        bindRequestScope(requestScopeFor(actor.operationalRole), actor.id, companyId),
       )
       if (!request) {
         res.status(404).json({ error: 'not_found' })
@@ -247,6 +252,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
 
       let requestOwnerId: string | null = null
       let requestStatus: string | null = null
+      let requestCompanyId: string | null = null
       let parentCompanyId: string | null = requestedCompanyId
       if (requestId) {
         if (!isUuid(requestId)) {
@@ -255,7 +261,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         }
         const request = await requests.findByIdScoped(
           requestId,
-          bindRequestScope(requestScopeFor(actor.operationalRole), actor.id),
+          bindRequestScope(requestScopeFor(actor.operationalRole), actor.id, companyId),
         )
         if (!request) {
           res.status(404).json({ error: 'not_found' })
@@ -263,6 +269,8 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         }
         requestOwnerId = request.ownerId
         requestStatus = request.status
+        requestCompanyId = request.companyId
+        parentCompanyId = request.companyId ?? parentCompanyId
         if (!parentCompanyId) {
           const ownerCompany = await deps.companyStore.findByRepresentative(request.ownerId)
           parentCompanyId = ownerCompany?.id ?? null
@@ -276,7 +284,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           companyId: audience === 'company' ? parentCompanyId : null,
           requestOwnerId,
           requestStatus,
-          requestCompanyId: parentCompanyId,
+          requestCompanyId,
         },
         actor.id,
         companyId,
@@ -332,15 +340,15 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           const client = await deps.pool.connect()
           try {
             await client.query('BEGIN')
-            const locked = await client.query<{ owner_id: string; status: string }>(
-              'SELECT owner_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+            const locked = await client.query<{ owner_id: string; company_id: string | null; status: string }>(
+              'SELECT owner_id, company_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
               [requestId],
             )
             const current = locked.rows[0]
             const currentPermission = current && canUploadOwnedDocument(
               actor.operationalRole,
               category,
-              { requestOwnerId: current.owner_id, requestStatus: current.status, requestCompanyId: parentCompanyId },
+              { requestOwnerId: current.owner_id, requestStatus: current.status, requestCompanyId: current.company_id },
               actor.id,
               companyId,
             )
@@ -350,7 +358,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
               res.status(404).json({ error: 'not_found' })
               return
             }
-            record = await documents.create(input, client)
+            record = await documents.create({ ...input, companyId: current.company_id }, client)
             await client.query('COMMIT')
           } catch (error) {
             await client.query('ROLLBACK')
@@ -439,8 +447,8 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     let removed: PrivateDocumentRecord | undefined
     try {
       await client.query('BEGIN')
-      const { rows } = await client.query<{ owner_id: string; status: string }>(
-        'SELECT owner_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+      const { rows } = await client.query<{ owner_id: string; company_id: string | null; status: string }>(
+        'SELECT owner_id, company_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
         [record.requestId],
       )
       const current = rows[0]
@@ -449,7 +457,15 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      if (!canDeleteDocument(actor.operationalRole, { requestOwnerId: current.owner_id, requestStatus: current.status }, actor.id)) {
+      const companyId = await actorCompanyId(actor.id, actor.operationalRole)
+      if (
+        !canDeleteDocument(
+          actor.operationalRole,
+          { requestOwnerId: current.owner_id, requestCompanyId: current.company_id, requestStatus: current.status },
+          actor.id,
+          companyId,
+        )
+      ) {
         await client.query('ROLLBACK')
         res.status(403).json({ error: 'forbidden' })
         return

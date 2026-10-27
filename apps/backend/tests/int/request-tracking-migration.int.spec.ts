@@ -72,6 +72,8 @@ describe('request tracking migration on isolated synthetic data', () => {
 
   it('starts at one on an empty database and can run again without resetting allocation', async () => {
     await trackingMigration('up')
+    // Current repositories require columns supplied by later migrations.
+    for (const later of LATER) await migration(later, 'up')
     const first = await repo.create(input)
     expect(first.trackingCode).toBe(`DCH-${new Date().getFullYear()}-1`)
     await trackingMigration('up')
@@ -91,6 +93,7 @@ describe('request tracking migration on isolated synthetic data', () => {
     await trackingMigration('up')
     const after = await pool.query('SELECT * FROM dashboard.requests ORDER BY tracking_code')
     expect(after.rows).toEqual(before.rows)
+    for (const later of LATER) await migration(later, 'up')
     expect((await repo.create(input)).trackingCode).toBe(`DCH-${new Date().getFullYear()}-9007199254740994`)
   })
 })

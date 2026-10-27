@@ -13,6 +13,7 @@ export type RequestAction = (typeof REQUEST_ACTIONS)[number]
 
 export interface RequestForPolicy {
   ownerId: string
+  companyId?: string | null
   status: string
 }
 
@@ -23,6 +24,7 @@ export interface RequestForPolicy {
 export type RequestScope =
   | { kind: 'all' }
   | { kind: 'owner'; userId: string }
+  | { kind: 'company'; companyId: string; userId?: string }
   | { kind: 'assigned'; userId: string; role: CaseAssignmentRole }
   | { kind: 'none' }
 
@@ -32,7 +34,7 @@ export function requestScopeFor(role: OperationalRole): RequestScope {
     case 'central-secretariat':
       return { kind: 'all' }
     case 'representative':
-      return { kind: 'owner', userId: '' }
+      return { kind: 'company', companyId: '' }
     case 'chief-reviewer':
     case 'reviewer':
     case 'employer-reviewer':
@@ -41,9 +43,17 @@ export function requestScopeFor(role: OperationalRole): RequestScope {
   }
 }
 
-/** Bind a role-only scope to the current actor id. */
-export function bindRequestScope(scope: RequestScope, userId: string): RequestScope {
-  if (scope.kind === 'owner' || scope.kind === 'assigned') return { ...scope, userId }
+/** Bind a role-only scope to the current actor id and optional company id. */
+export function bindRequestScope(
+  scope: RequestScope,
+  userId: string,
+  companyId?: string | null,
+): RequestScope {
+  if (scope.kind === 'owner') return { ...scope, userId }
+  if (scope.kind === 'company') {
+    return { ...scope, companyId: companyId ?? '', userId }
+  }
+  if (scope.kind === 'assigned') return { ...scope, userId }
   return scope
 }
 
@@ -56,6 +66,7 @@ export function allowedRequestActions(
   role: OperationalRole,
   request: RequestForPolicy,
   actorId: string,
+  actorCompanyId?: string | null,
 ): RequestAction[] {
   switch (role) {
     case 'system-owner':
@@ -70,7 +81,10 @@ export function allowedRequestActions(
       // advertise routes that do not exist yet.
       return ['read']
     case 'representative': {
-      if (request.ownerId !== actorId) return []
+      const belongsToCompany = Boolean(
+        request.companyId && actorCompanyId && request.companyId === actorCompanyId,
+      ) || (!request.companyId && request.ownerId === actorId)
+      if (!belongsToCompany) return []
       const actions: RequestAction[] = ['read']
       if (request.status === 'draft') actions.push('submit', 'uploadDocument', 'deleteDocument')
       return actions
@@ -83,8 +97,9 @@ export function canRequestAction(
   request: RequestForPolicy,
   actorId: string,
   action: RequestAction,
+  actorCompanyId?: string | null,
 ): boolean {
-  return allowedRequestActions(role, request, actorId).includes(action)
+  return allowedRequestActions(role, request, actorId, actorCompanyId).includes(action)
 }
 
 /* ── Private document policy (docs/system/document-policy.json) ─────────── */
@@ -201,13 +216,17 @@ export function canUploadOwnedDocument(
   const audience = documentAudience(category)
   if (audience === 'unsupported') return false
   if (audience === 'company' && !parent.companyId) return false
-  if (audience !== 'company' && !parent.requestOwnerId) return false
+  if (audience !== 'company' && !parent.requestOwnerId && !parent.requestCompanyId) return false
   if (role === 'system-owner' || role === 'central-secretariat') return true
   if (role !== 'representative') return false
   if (audience === 'company') {
     return Boolean(parent.companyId && parent.companyId === actorCompanyId)
   }
-  if (!parent.requestOwnerId || parent.requestOwnerId !== actorId) return false
+  const ownsRequest = Boolean(
+    (parent.requestCompanyId && actorCompanyId && parent.requestCompanyId === actorCompanyId) ||
+    (!parent.requestCompanyId && parent.requestOwnerId === actorId)
+  )
+  if (!ownsRequest) return false
   // Draft-only company editing keeps submitted/financial snapshots immutable
   // until T30 introduces versioned package submissions.
   return parent.requestStatus === undefined || parent.requestStatus === null || parent.requestStatus === 'draft'
@@ -241,10 +260,18 @@ export function canReadDocument(
     case 'central-secretariat':
       return true
     case 'representative': {
-      const ownCompany = Boolean(document.companyId && document.companyId === actorCompanyId)
-      const ownsRequest = Boolean(document.requestId && document.requestOwnerId === actorId)
-      if (audience === 'company') return ownCompany
-      return ownCompany || ownsRequest
+      if (document.requestId) {
+        if (document.requestCompanyId) {
+          return Boolean(actorCompanyId && document.requestCompanyId === actorCompanyId)
+        }
+        // Legacy unmigrated request without companyId: fallback to creator
+        return document.requestOwnerId === actorId
+      }
+      // Standalone dossier document:
+      if (audience === 'company') {
+        return Boolean(document.companyId && actorCompanyId && document.companyId === actorCompanyId)
+      }
+      return false
     }
     case 'chief-reviewer':
     case 'reviewer':
@@ -259,10 +286,19 @@ export function canReadDocument(
 
 export function canDeleteDocument(
   role: OperationalRole,
-  document: { requestOwnerId: string | null; requestStatus: string | null },
+  document: {
+    requestOwnerId: string | null
+    requestCompanyId?: string | null
+    requestStatus: string | null
+  },
   actorId: string,
+  actorCompanyId?: string | null,
 ): boolean {
   if (role === 'system-owner') return true
   if (role !== 'representative') return false
-  return document.requestOwnerId === actorId && document.requestStatus === 'draft'
+  if (document.requestStatus !== 'draft') return false
+  if (document.requestCompanyId) {
+    return Boolean(actorCompanyId && document.requestCompanyId === actorCompanyId)
+  }
+  return document.requestOwnerId === actorId
 }

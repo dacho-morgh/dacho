@@ -86,6 +86,23 @@ export class ActivityRepository {
         params.push(scope.userId)
         whereSql = `a.owner_id = $${params.length}`
         break
+      case 'company': {
+        params.push(scope.companyId)
+        const compParam = params.length
+        if (scope.userId) {
+          params.push(scope.userId)
+          whereSql = `a.request_id IN (
+            SELECT r.id FROM dashboard.requests r
+            WHERE r.company_id = $${compParam} OR (r.company_id IS NULL AND r.owner_id = $${params.length})
+          )`
+        } else {
+          whereSql = `a.request_id IN (
+            SELECT r.id FROM dashboard.requests r
+            WHERE r.company_id = $${compParam}
+          )`
+        }
+        break
+      }
       case 'assigned':
         params.push(scope.userId)
         const userParam = params.length

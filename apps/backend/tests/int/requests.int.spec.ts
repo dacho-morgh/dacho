@@ -42,7 +42,10 @@ function authHeaders(userId: string) {
   }
 }
 
-async function createAppUnderTest() {
+async function createAppUnderTest(companyStore = new InMemoryCompanyStore([
+  { name: 'Company 1', nationalId: '10000000001', representativeId: OWNER },
+  { name: 'Company 2', nationalId: '10000000002', representativeId: OTHER },
+])) {
   const serviceCatalog = new InMemoryServiceCatalog()
   serviceCatalog.set(service)
   const jwt = await JwtSigner.create('test-kid')
@@ -54,7 +57,7 @@ async function createAppUnderTest() {
       ...['user-1', 'user-2', 'company-1', 'company-2'].map((id) => ({ id, phone: id, roles: ['representative' as const], isActive: true })),
       { id: 'staff-1', phone: 'staff-1', roles: ['admin'], isActive: true },
     ]),
-    companyStore: new InMemoryCompanyStore(),
+    companyStore,
     pool,
     serviceCatalog,
     proxySecret: PROXY_SECRET,
@@ -287,6 +290,52 @@ describe('requests API', () => {
       expect(count.rows[0]?.total).toBe(1)
     })
 
+    it('keeps replacement submit history company-scoped with original owner and current actor', async () => {
+      const companies = new InMemoryCompanyStore([
+        { name: 'Company 1', representativeId: OWNER },
+        { name: 'Company 2', representativeId: OTHER },
+      ])
+      const app = await createAppUnderTest(companies)
+      const created = await request(app).post('/requests').set(authHeaders(OWNER))
+        .send({ serviceId: '1', title: 'replacement submit', answers: { company_name: 'آینده' } })
+        .expect(201)
+      const { id, companyId } = created.body.request
+      const replacement = 'company-1'
+      const company = (await companies.findById(companyId))!
+      company.representativeId = replacement
+      const repo = new RequestRepository(pool)
+
+      // Creator identity alone must not authorize a company-owned draft.
+      expect(await repo.submit(id, OWNER)).toBe('not_found')
+      expect(await repo.submit(id, OWNER, undefined, 'wrong-company')).toBe('not_found')
+      await request(app).post(`/requests/${id}/submit`).set(authHeaders(OWNER)).expect(404)
+      await request(app).get(`/requests/${id}/history`).set(authHeaders(OWNER)).expect(404)
+      await request(app).post(`/requests/${id}/submit`).set(authHeaders(OTHER)).expect(404)
+
+      const submitted = await request(app).post(`/requests/${id}/submit`)
+        .set(authHeaders(replacement)).expect(200)
+      expect(submitted.body.request).toMatchObject({ ownerId: OWNER, companyId, status: 'in_review' })
+      await request(app).post(`/requests/${id}/submit`).set(authHeaders(replacement)).expect(409)
+      expect(await repo.submit(id, replacement, undefined, companyId)).toBe('already_submitted')
+      const history = await request(app).get(`/requests/${id}/history`)
+        .set(authHeaders(replacement)).expect(200)
+      expect(history.body.items).toHaveLength(1)
+      expect(history.body.items[0]).toMatchObject({
+        requestId: id, ownerId: OWNER, actorId: replacement,
+        action: 'submit', fromState: 'draft', toState: 'in_review', revision: 2,
+      })
+      const stored = await pool.query('SELECT owner_id, company_id, revision FROM dashboard.requests WHERE id = $1', [id])
+      expect(stored.rows).toEqual([{ owner_id: OWNER, company_id: companyId, revision: 2 }])
+      await request(app).get(`/requests/${id}/history`).set(authHeaders(OTHER)).expect(404)
+
+      // Reassigning the former creator to another company must not restore access.
+      const otherCompany = (await companies.findByRepresentative(OTHER))!
+      otherCompany.representativeId = OWNER
+      await request(app).get(`/requests/${id}/history`).set(authHeaders(OWNER)).expect(404)
+      await request(app).get(`/requests/${id}/history`).set(authHeaders(OTHER)).expect(404)
+      await request(app).post(`/requests/${id}/submit`).set(authHeaders(OWNER)).expect(404)
+    })
+
     it('handles a losing submit without borrowing a second connection', async () => {
       const app = await createAppUnderTest()
       const created = await request(app)
@@ -295,12 +344,13 @@ describe('requests API', () => {
         .send({ serviceId: '1', title: 'single connection', answers: { company_name: 'آینده' } })
         .expect(201)
       const id = created.body.request.id as string
+      const companyId = created.body.request.companyId as string
       const singlePool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 2000 })
       try {
         const repo = new RequestRepository(singlePool)
-        expect(await repo.submit(id, OTHER)).toBe('not_found')
-        expect(await repo.submit(id, OWNER)).toMatchObject({ status: 'in_review' })
-        expect(await repo.submit(id, OWNER)).toBe('already_submitted')
+        expect(await repo.submit(id, OTHER, undefined, 'wrong-company')).toBe('not_found')
+        expect(await repo.submit(id, OWNER, undefined, companyId)).toMatchObject({ status: 'in_review' })
+        expect(await repo.submit(id, OWNER, undefined, companyId)).toBe('already_submitted')
       } finally {
         await singlePool.end()
       }
@@ -323,7 +373,7 @@ describe('requests API', () => {
       await pool.query(`CREATE TRIGGER t36_fail_history BEFORE INSERT ON dashboard.activities
         FOR EACH ROW EXECUTE FUNCTION dashboard.t36_fail_history()`)
       try {
-        await expect(repo.submit(id, OWNER)).rejects.toThrow('forced history failure')
+        await expect(repo.submit(id, OWNER, undefined, created.body.request.companyId)).rejects.toThrow('forced history failure')
       } finally {
         await pool.query('DROP TRIGGER IF EXISTS t36_fail_history ON dashboard.activities')
         await pool.query('DROP FUNCTION IF EXISTS dashboard.t36_fail_history()')
@@ -392,14 +442,15 @@ describe('requests API', () => {
         .expect(201)
       const id = created.body.request.id as string
       const repo = new RequestRepository(pool)
-      expect(await repo.submit(id, OTHER)).toBe('not_found')
-      expect(await repo.submit('00000000-0000-0000-0000-000000000000', OWNER)).toBe('not_found')
+      const companyId = created.body.request.companyId as string
+      expect(await repo.submit(id, OTHER, undefined, 'wrong-company')).toBe('not_found')
+      expect(await repo.submit('00000000-0000-0000-0000-000000000000', OWNER, undefined, companyId)).toBe('not_found')
       expect((await repo.findById(id, OWNER))?.status).toBe('draft')
 
       for (const status of ['in_review', 'action_needed', 'approved', 'rejected']) {
         await pool.query('UPDATE dashboard.requests SET status = $2 WHERE id = $1', [id, status])
         const before = await repo.findById(id, OWNER)
-        expect(await repo.submit(id, OWNER, { assignedRole: 'replacement', currentStep: 'replacement' }))
+        expect(await repo.submit(id, OWNER, { assignedRole: 'replacement', currentStep: 'replacement' }, companyId))
           .toBe('already_submitted')
         expect(await repo.findById(id, OWNER)).toEqual(before)
       }

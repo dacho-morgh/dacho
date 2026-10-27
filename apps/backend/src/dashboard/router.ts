@@ -11,6 +11,7 @@ import {
   bindRequestScope,
   canRequestAction,
   requestScopeFor,
+  type RequestScope,
 } from '../access/policy.js'
 import {
   isCaseAssignmentRole,
@@ -18,6 +19,7 @@ import {
   isOperationalRole,
   operationalRoleOf,
   type CaseAssignmentRole,
+  type OperationalRole,
 } from '../access/roles.js'
 import type { ServiceCatalog, ServiceDefinition } from '../catalog/service-catalog.js'
 import { ActivityRepository } from './activity-repo.js'
@@ -165,11 +167,12 @@ function requestWithActions(
   role: Parameters<typeof allowedRequestActions>[0],
   actorId: string,
   request: Awaited<ReturnType<RequestRepository['findByIdAny']>>,
+  companyId?: string | null,
 ) {
   if (!request) return request
   return {
     ...request,
-    allowedActions: allowedRequestActions(role, request, actorId),
+    allowedActions: allowedRequestActions(role, request, actorId, companyId),
   }
 }
 
@@ -326,6 +329,18 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
   }
 
+  const actorCompanyId = async (actorId: string, role: string): Promise<string | null> => {
+    if (role !== 'representative') return null
+    const company = await deps.companyStore.findByRepresentative(actorId)
+    return company?.id ?? null
+  }
+
+  const resolveScope = async (actorId: string, role: OperationalRole): Promise<{ scope: RequestScope; companyId: string | null }> => {
+    const companyId = await actorCompanyId(actorId, role)
+    const scope = bindRequestScope(requestScopeFor(role), actorId, companyId)
+    return { scope, companyId }
+  }
+
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps }))
 
@@ -386,7 +401,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
-  router.post('/requests', async (req, res) => {
+  router.post('/requests', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!isRepresentative(actor.operationalRole)) {
       res.status(403).json({ error: 'representative_only' })
@@ -415,38 +431,48 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
 
+    const companyId = await actorCompanyId(actor.id, actor.operationalRole)
+    if (actor.operationalRole === 'representative' && !companyId) {
+      res.status(403).json({ error: 'company_required' })
+      return
+    }
     const request = await repo.create({
       serviceId,
       serviceKey: service.key,
       serviceName: service.title,
       title,
       ownerId: actor.id,
+      companyId,
       answers: answersValue as Record<string, unknown>,
     })
-    res.status(201).json({ request: requestWithActions(actor.operationalRole, actor.id, request) })
+    res.status(201).json({ request: requestWithActions(actor.operationalRole, actor.id, request, companyId) })
+    } catch (error) { next(error) }
   })
 
-  router.get('/requests', async (req, res) => {
+  router.get('/requests', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const status = typeof req.query.status === 'string' ? req.query.status : undefined
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
     const result = await repo.listScoped(scope, { status, page, limit })
     res.json({
       ...result,
-      items: result.items.map((item) => requestWithActions(actor.operationalRole, actor.id, item)),
+      items: result.items.map((item) => requestWithActions(actor.operationalRole, actor.id, item, companyId)),
     })
+    } catch (error) { next(error) }
   })
 
-  router.get('/admin/requests', async (req, res) => {
+  router.get('/admin/requests', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!isInternalOperationalRole(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
       return
     }
     const status = typeof req.query.status === 'string' ? req.query.status : undefined
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const result = await repo.listScoped(scope, {
       status,
       page: parsePositiveInt(req.query.page, 1),
@@ -459,15 +485,17 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       })),
     )
     res.json({ ...result, items })
+    } catch (error) { next(error) }
   })
 
-  router.get('/admin/requests/:id', async (req, res) => {
+  router.get('/admin/requests/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     if (!isInternalOperationalRole(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
       return
     }
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const request = await repo.findByIdScoped(req.params.id, scope)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     const service = await deps.serviceCatalog.findById(request.serviceId)
@@ -477,11 +505,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       timeline: await activities.listForRequestScoped(request.id, scope),
       workflow: service?.workflow ?? [],
     })
+    } catch (error) { next(error) }
   })
 
-  router.get('/requests/:id', async (req, res) => {
+  router.get('/requests/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
     const request = await repo.findByIdScoped(req.params.id, scope)
     if (!request) {
       res.status(404).json({ error: 'not_found' })
@@ -491,27 +521,31 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const service = await deps.serviceCatalog.findById(request.serviceId)
     const timeline = await activities.listForRequestScoped(request.id, scope)
     res.json({
-      request: requestWithActions(actor.operationalRole, actor.id, request),
+      request: requestWithActions(actor.operationalRole, actor.id, request, companyId),
       timeline,
       workflow: service?.workflow ?? [],
       owner: safeOwner(await deps.userStore.findById(request.ownerId)),
     })
+    } catch (error) { next(error) }
   })
 
-  router.get('/requests/:id/history', async (req, res) => {
+  router.get('/requests/:id/history', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const request = await repo.findByIdScoped(req.params.id, scope)
     if (!request) {
       res.status(404).json({ error: 'not_found' })
       return
     }
     res.json({ items: await activities.listForRequestScoped(request.id, scope) })
+    } catch (error) { next(error) }
   })
 
-  router.post('/requests/:id/submit', async (req, res) => {
+  router.post('/requests/:id/submit', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
     const request = await repo.findByIdScoped(req.params.id, scope)
     if (!request) {
       res.status(404).json({ error: 'not_found' })
@@ -520,15 +554,15 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     // A representative retrying an already-submitted request gets the stable
     // conflict response even though `allowedActions` no longer advertises
     // `submit`. Other roles are denied by the shared action policy.
-    if (
+    const isCompanyRequest =
       actor.operationalRole === 'representative' &&
-      request.ownerId === actor.id &&
-      request.status !== 'draft'
-    ) {
+      ((request.companyId && companyId && request.companyId === companyId) ||
+        (!request.companyId && request.ownerId === actor.id))
+    if (isCompanyRequest && request.status !== 'draft') {
       res.status(409).json({ error: 'already_submitted' })
       return
     }
-    if (!canRequestAction(actor.operationalRole, request, actor.id, 'submit')) {
+    if (!canRequestAction(actor.operationalRole, request, actor.id, 'submit', companyId)) {
       res.status(403).json({ error: 'forbidden' })
       return
     }
@@ -548,6 +582,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       req.params.id,
       actor.id,
       firstStep ? { assignedRole: firstStep.roleName, currentStep: firstStep.title } : undefined,
+      companyId,
     )
     if (result === 'not_found') {
       res.status(404).json({ error: 'not_found' })
@@ -557,7 +592,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(409).json({ error: 'already_submitted' })
       return
     }
-    res.json({ request: requestWithActions(actor.operationalRole, actor.id, result) })
+    res.json({ request: requestWithActions(actor.operationalRole, actor.id, result, companyId) })
+    } catch (error) { next(error) }
   })
 
   /*
@@ -759,38 +795,54 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
-  router.get('/letters', async (req, res) => {
+  router.get('/letters', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const read = parseBoolean(req.query.read)
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     res.json(await letters.listScoped(scope, { read, page, limit }))
+    } catch (error) { next(error) }
   })
 
-  router.get('/letters/:id', async (req, res) => {
+  router.get('/letters/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const letter = await letters.findByIdAndMarkReadScoped(req.params.id, scope)
     if (!letter) {
       res.status(404).json({ error: 'not_found' })
       return
     }
     res.json({ letter })
+    } catch (error) { next(error) }
   })
 
-  router.get('/stats', async (_req, res) => {
+  router.get('/stats', async (_req, res, next) => {
+    try {
     const actor = actorOf(res)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     res.json(await stats.forScope(scope))
+    } catch (error) { next(error) }
   })
 
-  router.get('/activities', async (req, res) => {
+  router.get('/stats/overview', async (_req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
+    res.json(await stats.forScope(scope))
+    } catch (error) { next(error) }
+  })
+
+  router.get('/activities', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     res.json(await activities.listScoped(scope, page, limit))
+    } catch (error) { next(error) }
   })
 
   router.get('/profile', async (_req, res) => {
@@ -940,12 +992,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json({ success: true })
   })
 
-  router.delete('/letters/:id', async (req, res) => {
+  router.delete('/letters/:id', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
-    const scope = bindRequestScope(requestScopeFor(actor.operationalRole), actor.id)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const deleted = await letters.deleteScoped(req.params.id, scope)
     if (!deleted) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ success: true })
+    } catch (error) { next(error) }
   })
 
   router.get('/admin/companies', async (req, res) => {

@@ -62,6 +62,29 @@ function letterScopeClause(scope: RequestScope, params: unknown[], alias = 'l'):
         OR (${alias}.request_id IN (SELECT r.id FROM dashboard.requests r WHERE r.owner_id = $${params.length})
             AND (${alias}.recipient_id = $${params.length} OR ${alias}.sender_id = $${params.length}))
       )`
+    case 'company': {
+      if (!scope.userId) return 'FALSE'
+      params.push(scope.userId)
+      const userParam = params.length
+      let requestFilter: string
+      if (scope.companyId) {
+        params.push(scope.companyId)
+        const compParam = params.length
+        requestFilter = `r.company_id = $${compParam} OR (r.company_id IS NULL AND r.owner_id = $${userParam})`
+      } else {
+        requestFilter = `r.company_id IS NULL AND r.owner_id = $${userParam}`
+      }
+      return `(
+        (${alias}.recipient_id = $${userParam} OR ${alias}.sender_id = $${userParam})
+        AND (
+          ${alias}.request_id IS NULL
+          OR ${alias}.request_id IN (
+            SELECT r.id FROM dashboard.requests r
+            WHERE ${requestFilter}
+          )
+        )
+      )`
+    }
     case 'assigned':
       params.push(scope.userId)
       const userParam = params.length
@@ -81,8 +104,10 @@ function letterDeleteScopeClause(scope: RequestScope, params: unknown[], alias =
   switch (scope.kind) {
     case 'all': return 'TRUE'
     case 'none': return 'FALSE'
+    case 'company':
     case 'owner':
     case 'assigned':
+      if (!scope.userId) return 'FALSE'
       const readable = letterScopeClause(scope, params, alias)
       params.push(scope.userId)
       return `(${readable}) AND ${alias}.recipient_id = $${params.length}`

@@ -446,7 +446,7 @@ describe('shared access policy and private documents (T09/T10)', () => {
       const { rows } = await pool.query<{ count: string }>(
         `SELECT COUNT(*)::text AS count FROM pg_stat_activity
          WHERE application_name = 'access-documents-integration' AND wait_event_type = 'Lock'
-           AND query LIKE 'SELECT owner_id, status::text AS status FROM dashboard.requests%'`,
+           AND query LIKE 'SELECT owner_id, company_id, status::text AS status FROM dashboard.requests%'`,
       )
       if (Number(rows[0]?.count) > 0) { deleteIsWaiting = true; break }
       await new Promise((resolve) => setTimeout(resolve, 20))
