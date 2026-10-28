@@ -51,11 +51,7 @@ test.afterAll(async () => {
 async function fillCompanyStep(page: Page) {
   await page.locator('#register-companyName').fill('شرکت نمونه تست')
   await page.locator('#register-companyNationalId').fill('12345678901')
-  await page.locator('#register-companyRegistrationNumber').fill('12345')
-  await page.getByRole('combobox').click()
-  await page.getByRole('option', { name: 'سهامی خاص' }).click()
-  await page.locator('#register-companyProvince').fill('بوشهر')
-  await page.locator('#register-companyCity').fill('بوشهر')
+  await page.locator('#register-activityDomain').fill('انرژی')
   await page.getByRole('button', { name: 'ادامه' }).click()
 }
 
@@ -142,16 +138,13 @@ test.describe('Register', () => {
     await page.goto(registerUrl)
     await page.waitForFunction(() => document.querySelector('form[data-hydrated="true"]') !== null)
     await page.locator('#register-companyName').fill('شرکت نمونه تست')
-    await page.locator('#register-companyNationalId').fill('123')
-    await page.locator('#register-companyRegistrationNumber').fill('12345')
-    await page.getByRole('combobox').click()
-    await page.getByRole('option', { name: 'سهامی خاص' }).click()
-    await page.locator('#register-companyProvince').fill('بوشهر')
-    await page.locator('#register-companyCity').fill('بوشهر')
+    await page.locator('#register-companyNationalId').fill('۱۲x')
+    await page.locator('#register-activityDomain').fill('انرژی')
     await page.getByRole('button', { name: 'ادامه' }).click()
-    await expect(page.getByText('شناسه ملی باید دقیقاً ۱۱ رقم باشد.')).toBeVisible()
+    await expect(page.getByText('شناسه ملی باید فقط شامل رقم باشد.')).toBeVisible()
+    await expect(page.locator('#register-companyNationalId')).toBeFocused()
 
-    await page.locator('#register-companyNationalId').fill('12345678901')
+    await page.locator('#register-companyNationalId').fill('۰۰١۲')
     await page.getByRole('button', { name: 'ادامه' }).click()
     await page.locator('#register-name').fill('متقاضی نمونه')
     await page.locator('#register-position').fill('مدیرعامل')
@@ -181,12 +174,8 @@ test.describe('Register', () => {
 
     // Step 1 — company info
     await page.locator('#register-companyName').fill('شرکت نمونه تست')
-    await page.locator('#register-companyNationalId').fill('12345678901')
-    await page.locator('#register-companyRegistrationNumber').fill('12345')
-    await page.getByRole('combobox').click()
-    await page.getByRole('option', { name: 'سهامی خاص' }).click()
-    await page.locator('#register-companyProvince').fill('بوشهر')
-    await page.locator('#register-companyCity').fill('بوشهر')
+    await page.locator('#register-companyNationalId').fill(`۰${suffix}`)
+    await page.locator('#register-activityDomain').fill('انرژی')
     await page.getByRole('button', { name: 'ادامه' }).click()
 
     // Step 2 — representative info
@@ -207,6 +196,8 @@ test.describe('Register', () => {
     const registrationBody = await registrationResponse.json()
     registeredUserIds.push(registrationBody.user.id)
     registeredCompanyIds.push(registrationBody.company.id)
+    expect(registrationBody.company.nationalId).toBe(`0${suffix}`)
+    expect(registrationBody.company.activityDomain).toBe('انرژی')
     // Company relationships expose IDs without hydrating authentication records.
     expect(registrationBody.user.roles).toEqual(['representative'])
     expect(registrationBody.company.representative).toBe(registrationBody.user.id)
@@ -268,6 +259,7 @@ test.describe('Register', () => {
         name: 'Applicant created during admin session',
         position: 'Company representative',
         companyName: 'Test company',
+        activityDomain: 'Energy',
         companyNationalId: `20${suffix}`,
         companyRegistrationNumber: suffix,
         companyType: 'سهامی خاص',
