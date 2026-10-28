@@ -363,3 +363,118 @@ export function createSupportTicket(input: { subject: string; message: string })
 export function listSupportTickets(): Promise<Paginated<SupportTicketDto>> {
   return dashboardFetch<Paginated<SupportTicketDto>>('/support?limit=100')
 }
+
+export type BoothStatus = 'available' | 'unavailable'
+export type PriceUnit = 'toman'
+
+export interface BoothDto {
+  id: string
+  exhibitionId: string
+  identifier: string
+  specification: string
+  location: string | null
+  status: BoothStatus
+  active: boolean
+  available: boolean
+  priceAmount: number
+  priceUnit: PriceUnit
+  priceVersionId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ExhibitionCatalogueDto {
+  exhibitionId: string
+  companyBoothLimit: number | null
+  guideMapReference: string | null
+  booths: BoothDto[]
+}
+
+export interface ExhibitionCatalogueSettingsDto {
+  exhibitionId: string
+  companyBoothLimit: number
+  guideMapReference: string | null
+  updatedAt: string
+}
+
+export interface CreateBoothInput {
+  identifier: string
+  specification: string
+  location?: string | null
+  priceAmount: number
+  priceUnit?: PriceUnit
+  status?: BoothStatus
+  active?: boolean
+}
+
+export type UpdateBoothInput = Partial<CreateBoothInput>
+
+export interface UpdateExhibitionSettingsInput {
+  companyBoothLimit: number
+  guideMapReference?: string | null
+}
+
+export function formatToman(amount: number | null | undefined): string {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return '۰ تومان'
+  return `${amount.toLocaleString('fa-IR')} تومان`
+}
+
+export function parsePersianNumber(value: string): number {
+  const normalized = value
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/[^0-9]/g, '')
+  const parsed = Number.parseInt(normalized, 10)
+  return Number.isSafeInteger(parsed) ? parsed : 0
+}
+
+export function getExhibitionCatalogue(exhibitionId: string): Promise<ExhibitionCatalogueDto> {
+  return dashboardFetch<ExhibitionCatalogueDto>(`/exhibitions/${encodeURIComponent(exhibitionId)}/catalogue`)
+}
+
+export function getAdminExhibitionCatalogue(exhibitionId: string): Promise<ExhibitionCatalogueDto> {
+  return dashboardFetch<ExhibitionCatalogueDto>(`/admin/exhibitions/${encodeURIComponent(exhibitionId)}/catalogue`)
+}
+
+export function updateExhibitionSettings(
+  exhibitionId: string,
+  input: UpdateExhibitionSettingsInput,
+): Promise<{ settings: ExhibitionCatalogueSettingsDto }> {
+  return dashboardFetch<{ settings: ExhibitionCatalogueSettingsDto }>(
+    `/admin/exhibitions/${encodeURIComponent(exhibitionId)}/settings`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+export function createBooth(
+  exhibitionId: string,
+  input: CreateBoothInput,
+): Promise<{ booth: BoothDto }> {
+  return dashboardFetch<{ booth: BoothDto }>(
+    `/admin/exhibitions/${encodeURIComponent(exhibitionId)}/booths`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+export function updateBooth(
+  exhibitionId: string,
+  boothId: string,
+  input: UpdateBoothInput,
+): Promise<{ booth: BoothDto }> {
+  return dashboardFetch<{ booth: BoothDto }>(
+    `/admin/exhibitions/${encodeURIComponent(exhibitionId)}/booths/${encodeURIComponent(boothId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+}

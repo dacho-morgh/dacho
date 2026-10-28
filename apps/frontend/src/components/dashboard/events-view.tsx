@@ -37,6 +37,7 @@ export interface EventItem {
 export interface EventsViewProps {
   initialEventsList?: EventItem[]
   state?: 'default' | 'loading' | 'empty'
+  isOwner?: boolean
 }
 
 // Skeleton state matching Figma node 56:13600
@@ -90,6 +91,7 @@ function EventsEmptyState() {
 export function EventsView({
   initialEventsList = [],
   state = 'default',
+  isOwner = false,
 }: EventsViewProps) {
   const router = useRouter()
   const [events] = useState<EventItem[]>(initialEventsList)
@@ -241,14 +243,25 @@ export function EventsView({
                             </div>
                           </div>
 
-                          {/* "ثبت درخواست" Button - Figma node 56:14063 */}
+                          {/* Action Button */}
                           <button
                             type="button"
-                            onClick={() => router.push(`/dashboard/new-request?service=${evt.serviceKey}&eventId=${encodeURIComponent(evt.id)}&eventTitle=${encodeURIComponent(evt.title)}`)}
+                            onClick={() => {
+                              if (isOwner && evt.serviceKey === 'exhibitions') {
+                                const rawId = evt.id.replace(/^exhibitions-/, '')
+                                router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
+                              } else {
+                                router.push(
+                                  `/dashboard/new-request?service=${evt.serviceKey}&eventId=${encodeURIComponent(evt.id)}&eventTitle=${encodeURIComponent(evt.title)}`,
+                                )
+                              }
+                            }}
                             className="flex h-[40px] items-center justify-center gap-[8px] rounded-[10px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500"
                           >
                             <span className="font-sans text-[16px] leading-[28px] font-semibold">
-                              {evt.actionButtonText || 'ثبت درخواست'}
+                              {isOwner && evt.serviceKey === 'exhibitions'
+                                ? 'مدیریت غرفه‌ها'
+                                : evt.actionButtonText || 'ثبت درخواست'}
                             </span>
                             <TickSquareIcon className="size-[24px] shrink-0 stroke-white" />
                           </button>

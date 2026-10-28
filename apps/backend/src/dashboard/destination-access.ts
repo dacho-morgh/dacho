@@ -37,7 +37,12 @@ export function canOpenDashboardDestination(role: OperationalRole, value: string
   if (path === '/dashboard/employees' || path.startsWith('/dashboard/employees/')) {
     return managementRoles.includes(role)
   }
-  if (path === '/dashboard/events') return role === 'representative'
+  if (path === '/dashboard/events' || path.startsWith('/dashboard/events/')) {
+    return role === 'representative' || role === 'system-owner'
+  }
+  if (path === '/dashboard/exhibitions' || path.startsWith('/dashboard/exhibitions/')) {
+    return role === 'representative' || role === 'system-owner'
+  }
   if (path === '/dashboard/new-request') return role === 'representative'
 
   return false
