@@ -40,7 +40,7 @@ describe('T42 current backend document authority matrix', () => {
             const expected = supported && (
               privileged || (role === 'representative'
                 ? context.companyId === 'company' || (!companyDocument && context.requestOwnerId === 'actor')
-                : assigned && (category === 'proposal' || (role === 'investment-reviewer' && category === 'correspondenceAttachment')))
+                : assigned && category === 'proposal')
             )
             expect(canReadDocument(role, {
               category,

@@ -162,6 +162,29 @@ describe('T35 - Case-linked letters and private attachments integration', () => 
     }
   })
 
+  it('rejects cross-company dossier attachments even when both mailbox actors can access every case', async () => {
+    const ownRequest = await createRequest()
+    const otherRequest = await createRequest(people.repB.id)
+    const company = await companyStore.findByRepresentative(people.repA.id)
+    const upload = await request(payload).post('/documents').set(headers(people.repA.id))
+      .field('category', 'articlesOfAssociation').field('companyId', company!.id)
+      .attach('file', pdf(), { filename: 'company-a.pdf', contentType: 'application/pdf' }).expect(201)
+    const documentId = upload.body.document.id as string
+    const send = (requestId: string) => request(payload).post('/letters').set(headers(people.secretariat.id))
+      .send({ title: 'Dossier', body: 'Dossier', recipientId: people.owner.id, requestId, attachmentIds: [documentId] })
+    await send(ownRequest).expect(201)
+    await send(otherRequest).expect(403)
+    const { rows } = await pool.query<{ id: string }>(`INSERT INTO dashboard.letters
+      (type, title, body, sender_id, recipient_id, request_id, attachments)
+      VALUES ('official', 'Legacy', 'Legacy', $1, $2, $3, $4::jsonb) RETURNING id`,
+      [people.secretariat.id, people.owner.id, otherRequest, JSON.stringify([{ id: documentId }])])
+    const letterId = rows[0]!.id
+    const detail = await request(payload).get(`/letters/${letterId}`).set(headers(people.owner.id)).expect(200)
+    expect(detail.body.letter.attachments).toEqual([])
+    await request(payload).get(`/letters/${letterId}/attachments/${documentId}/download`)
+      .set(headers(people.owner.id)).expect(404)
+  })
+
   it('a historic letter cannot restore proposal access after assignment revocation', async () => {
     const requestId = await createRequest()
     const upload = await request(payload).post('/documents').set(headers(people.repA.id))
@@ -276,12 +299,11 @@ describe('T35 - Case-linked letters and private attachments integration', () => 
       .set(headers(people.repA.id))
       .expect(200)
 
-    // 8. Assigned investment reviewer can review/download the correspondence attachment for the case
-    const invDownload = await request(payload)
+    // 8. Assignment alone cannot replace the still-undelivered financial handoff.
+    await request(payload)
       .get(`/documents/${docId}/download`)
       .set(headers(people.investment.id))
-      .expect(200)
-    expect(invDownload.headers['content-type']).toBe('application/pdf')
+      .expect(404)
 
     // 9. Confidentiality: Ordinary reviewer, chief reviewer, and employer reviewer CANNOT download it
     await request(payload)

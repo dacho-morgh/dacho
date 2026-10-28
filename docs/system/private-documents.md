@@ -57,13 +57,16 @@ role, ownership and active assignment. A document id or URL is never authority.
 | Company dossier (`articlesOfAssociation`, notices, catalogues, certificates) | owning representative, System Owner, Central Secretariat. Chief/reviewer/employer/investment are denied even when assigned to a case |
 | Case (`proposal`) | owning representative, System Owner, Central Secretariat, and an actively assigned chief/reviewer/employer/investment reviewer |
 | Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner and Central Secretariat. Investment reviewer access requires an authorized persisted handoff; T29/T30 have not delivered that state, so investment access currently fails closed. Chief, ordinary reviewer and employer reviewer are explicitly denied |
-| Future workflow (`rfp`, `supplementaryCaseFiles`, `boothPaymentReceipt`, `correspondenceAttachment`) | denied with `422 unsupported_category` until T18/T33/T35/T50 provide the parent workflow |
+| Correspondence (`correspondenceAttachment`) | owning representative, System Owner and Central Secretariat. Supplementary financial replies retain the financial audience restrictions, including denying investment access until a persisted handoff exists |
+| Future workflow (`rfp`, `supplementaryCaseFiles`, `boothPaymentReceipt`) | denied with `422 unsupported_category` until T18/T33/T50 provide the parent workflow |
 
 Uploads: an active representative may add files to its own draft request or own
 company dossier; System Owner and Central Secretariat may add to an authorized
 parent. Other roles cannot upload here. Deleting a request file is limited to
 the owner representative while the request is `draft`, or System Owner.
 Company-dossier deletion is not exposed in this slice.
+Correspondence uploads require a request parent and may be added after submission;
+they do not replace or mutate existing submitted/financial files.
 
 Unknown and unauthorized document ids both return `404`; a missing stored file
 returns `410 document_unavailable`.
@@ -73,6 +76,10 @@ category, ownership and assignment policy. A historic letter never grants
 additional document access. Sending an attachment checks both sender and
 recipient; a request document must be sent with its exact request id. Existing
 letters omit attachment metadata when current document access is denied.
+Company-dossier attachments on a case letter must belong to that case's company,
+including legacy requests whose company is resolved through their representative.
+Malformed attachment lists are rejected in full; sending never silently drops
+invalid entries. Repeated document ids are persisted once.
 
 ## API
 
@@ -113,8 +120,10 @@ rehearsal applied all seven backend migrations on the disposable database.
 ## Deliberately not delivered
 
 - RFP version/download workflow (T18), proposal/revision workflow (T20),
-  financial package completeness (T30), supplementary correspondence (T33/T35)
-  and booth receipt workflow (T50).
+  financial package completeness/handoff (T30/T31), supplementary result
+  publication (T33) and booth receipt workflow (T50). T35 supports company and
+  Secretariat supplementary replies; investment inspection remains dependent
+  on the persisted handoff.
 - Image uploads, OCR, virus scanning, signed URLs, resumable uploads, retention
   automation or a numerical file-count cap.
 - A deployed staging runtime or real-data migration.

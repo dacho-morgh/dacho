@@ -126,7 +126,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     const assigned = record.requestId
       ? await isAssignedTo(record.requestId, actorId, role)
       : false
-    const directAllowed = canReadDocument(
+    return canReadDocument(
       role,
       {
         category: record.category,
@@ -139,7 +139,6 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       actorId,
       companyId,
     )
-    return directAllowed
   }
 
   router.get('/documents', asyncHandler(async (req: Request, res: Response) => {
@@ -236,12 +235,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const requestedCompanyId = stringField(req.body?.companyId)
       const companyId = await actorCompanyId(actor.id, actor.operationalRole)
 
-      if (category === 'correspondenceAttachment') {
-        if (!requestId && !requestedCompanyId) {
-          res.status(400).json({ error: 'invalid_document_parent' })
-          return
-        }
-      } else if (audience === 'company') {
+      if (audience === 'company') {
         if (requestId || !requestedCompanyId) {
           res.status(400).json({ error: 'invalid_document_parent' })
           return
@@ -287,7 +281,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         actor.operationalRole,
         category,
         {
-          companyId: (audience === 'company' || category === 'correspondenceAttachment') ? parentCompanyId : null,
+          companyId: audience === 'company' ? parentCompanyId : null,
           requestOwnerId,
           requestStatus,
           requestCompanyId,

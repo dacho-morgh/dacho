@@ -8,6 +8,7 @@ import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
 import { createDashboardRouter } from '../src/dashboard/router.js'
 import { LetterRepository, type LetterDto } from '../src/dashboard/letter-repo.js'
 import { AssignmentRepository } from '../src/dashboard/assignment-repo.js'
+import { RequestRepository, type RequestDto } from '../src/dashboard/request-repo.js'
 import { DocumentRepository, type PrivateDocumentRecord } from '../src/documents/repo.js'
 import { PrivateDocumentStorage } from '../src/documents/storage.js'
 
@@ -31,6 +32,8 @@ function setup() {
       { id: 'chief', phone: '09000000002', operationalRole: 'chief-reviewer', isActive: true },
       { id: 'rep', phone: '09000000003', operationalRole: 'representative', isActive: true },
       { id: 'other-rep', phone: '09000000004', operationalRole: 'representative', isActive: true },
+      { id: 'investment', phone: '09000000005', operationalRole: 'investment-reviewer', isActive: true },
+      { id: 'owner', phone: '09000000006', operationalRole: 'system-owner', isActive: true },
     ]), companyStore: new InMemoryCompanyStore([
       { representativeId: 'rep' }, { representativeId: 'other-rep' },
     ]), serviceCatalog: new InMemoryServiceCatalog(),
@@ -47,6 +50,54 @@ function setup() {
 }
 afterEach(() => vi.restoreAllMocks())
 describe('letter attachment authorization at HTTP boundaries', () => {
+  it.each([
+    { attachmentIds: documentId }, { attachments: { id: documentId } },
+    { attachmentIds: [null] }, { attachments: [{}] },
+    { attachments: [documentId, 42] }, { attachmentIds: [{ id: documentId }] },
+  ])('rejects malformed attachment input without sending a partial letter: %j', async (input) => {
+    const { app, query, findDocument } = setup()
+    vi.spyOn(LetterRepository.prototype, 'createScoped').mockResolvedValue(letter)
+    await request(app).post('/letters').set(headers('sec')).send({ title: 'Title', body: 'Body',
+      recipientId: 'rep', requestId, ...input }).expect(400, { error: 'invalid_attachment' })
+    expect(query).not.toHaveBeenCalled()
+    expect(findDocument).not.toHaveBeenCalled()
+  })
+  it('denies investment access to supplementary finance before an authorized handoff', async () => {
+    const { app, read, findDocument } = setup()
+    findDocument.mockResolvedValue({ ...doc, category: 'correspondenceAttachment' })
+    vi.spyOn(LetterRepository.prototype, 'findByIdScoped').mockResolvedValue(letter)
+    vi.spyOn(LetterRepository.prototype, 'findByIdAndMarkReadScoped').mockResolvedValue(letter)
+    for (const url of [`/documents/${documentId}`, `/documents/${documentId}/download`,
+      `/letters/${letterId}/attachments/${documentId}/download`]) {
+      await request(app).get(url).set(headers('investment')).expect(404)
+    }
+    const detail = await request(app).get(`/letters/${letterId}`).set(headers('investment')).expect(200)
+    expect(detail.body.letter.attachments).toEqual([])
+    expect(read).not.toHaveBeenCalled()
+  })
+  it.each(['1', null])('keeps company dossier files on the owning company case (%s)', async (caseCompanyId) => {
+    const { app, read, findDocument } = setup()
+    findDocument.mockResolvedValue({ ...doc, requestId: null, category: 'articlesOfAssociation' })
+    vi.spyOn(RequestRepository.prototype, 'findByIdScoped').mockResolvedValue({
+      id: requestId, companyId: caseCompanyId, ownerId: 'rep',
+    } as RequestDto)
+    const create = vi.spyOn(LetterRepository.prototype, 'createScoped').mockResolvedValue(letter)
+    await request(app).post('/letters').set(headers('sec')).send({ title: 'Title', body: 'Body',
+      recipientId: 'owner', requestId, attachmentIds: [documentId] }).expect(201)
+    create.mockClear()
+    vi.mocked(RequestRepository.prototype.findByIdScoped).mockResolvedValue({
+      id: requestId, companyId: caseCompanyId === null ? null : '2', ownerId: 'other-rep',
+    } as RequestDto)
+    await request(app).post('/letters').set(headers('sec')).send({ title: 'Title', body: 'Body',
+      recipientId: 'owner', requestId, attachmentIds: [documentId] }).expect(403)
+    expect(create).not.toHaveBeenCalled()
+    vi.spyOn(LetterRepository.prototype, 'findByIdScoped').mockResolvedValue(letter)
+    vi.spyOn(LetterRepository.prototype, 'findByIdAndMarkReadScoped').mockResolvedValue(letter)
+    const detail = await request(app).get(`/letters/${letterId}`).set(headers('sec')).expect(200)
+    expect(detail.body.letter.attachments).toEqual([])
+    await request(app).get(`/letters/${letterId}/attachments/${documentId}/download`).set(headers('sec')).expect(404)
+    expect(read).not.toHaveBeenCalled()
+  })
   it('rejects a financial document sent to an assigned chief before inserting the letter', async () => {
     const { app, query } = setup()
     await request(app).post('/letters').set(headers('sec')).send({ title: 'Title', body: 'Body',
@@ -92,6 +143,17 @@ describe('letter attachment authorization at HTTP boundaries', () => {
     await request(app).post('/letters').set(headers('sec')).send({ title: 'Title', body: 'Body',
       recipientId: 'rep', requestId, attachmentIds: [documentId] }).expect(201)
     expect(create).toHaveBeenCalledOnce()
+  })
+  it('accepts both attachment input forms and persists each document once', async () => {
+    const { app, findDocument } = setup()
+    const create = vi.spyOn(LetterRepository.prototype, 'createScoped').mockResolvedValue(letter)
+    await request(app).post('/letters').set(headers('sec')).send({ title: 'Title', body: 'Body',
+      recipientId: 'rep', requestId, attachmentIds: [documentId],
+      attachments: [documentId, { id: documentId, filename: 'untrusted.pdf' }] }).expect(201)
+    expect(findDocument).toHaveBeenCalledOnce()
+    expect(create.mock.calls[0]![0].attachments).toEqual([expect.objectContaining({
+      id: documentId, filename: doc.filename,
+    })])
   })
   it('denies legacy financial download despite current letter visibility, before reading storage', async () => {
     const { app, read } = setup()

@@ -72,8 +72,8 @@ describe('T35 - Case-linked letters and private attachments policy', () => {
       expect(canReadDocument('representative', financialDoc, 'rep-1', companyId)).toBe(true)
     })
 
-    it('allows assigned investment reviewer to review correspondence attachments on the case', () => {
-      expect(canReadDocument('investment-reviewer', correspondenceDoc, 'inv-1', null)).toBe(true)
+    it('denies assigned investment reviewer supplementary finance before a persisted handoff', () => {
+      expect(canReadDocument('investment-reviewer', correspondenceDoc, 'inv-1', null)).toBe(false)
     })
 
     it('denies unassigned investment reviewer from reading correspondence attachments', () => {

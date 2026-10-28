@@ -47,6 +47,15 @@ function setup() {
 }
 
 describe('document router input and error boundaries', () => {
+  it.each([
+    {}, { companyId: '123' }, { requestId, companyId: '123' },
+  ])('requires exactly one request parent for correspondence uploads: %j', async (parent) => {
+    const { invoke, query, res } = setup()
+    await invoke('post', '/documents', { body: { category: 'correspondenceAttachment', ...parent } })
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_document_parent' })
+    expect(query).not.toHaveBeenCalled()
+  })
   it.each(['chief-reviewer', 'reviewer', 'employer-reviewer', 'investment-reviewer', 'representative'])(
     'historic letters cannot grant %s financial metadata or bytes', async (role) => {
       const { app, query, res } = setup()

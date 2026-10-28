@@ -376,8 +376,15 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     return canReadDocument(role, { ...doc, assigned }, actorId, companyId)
   }
 
-  const attachmentMatchesLetter = (doc: PrivateDocumentRecord, requestId: string | null): boolean =>
-    doc.requestId === null || doc.requestId === requestId
+  const attachmentMatchesLetter = async (doc: PrivateDocumentRecord, requestId: string | null): Promise<boolean> => {
+    if (doc.requestId !== null) return doc.requestId === requestId
+    if (requestId === null) return true
+    // Dossier files have no request id; bind them to the case's actual company.
+    const request = await repo.findByIdScoped(requestId, { kind: 'all' })
+    if (!request || !doc.companyId) return false
+    const companyId = request.companyId ?? (await deps.companyStore.findByRepresentative(request.ownerId))?.id
+    return doc.companyId === companyId
+  }
 
   const attachmentDto = (doc: PrivateDocumentRecord): LetterAttachmentDto => ({
     id: doc.id,
@@ -397,7 +404,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       const id = value && typeof value === 'object' ? (value as { id?: unknown }).id : null
       if (typeof id !== 'string' || !isUuid(id)) continue
       const doc = await documents.findById(id)
-      if (!doc || !attachmentMatchesLetter(doc, letter.requestId) || !(await canReadAttachment(doc, actorId, role))) continue
+      if (!doc || !(await attachmentMatchesLetter(doc, letter.requestId)) || !(await canReadAttachment(doc, actorId, role))) continue
       attachments.push(attachmentDto(doc))
     }
     return { ...letter, attachments }
@@ -1534,34 +1541,40 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (!recipientRole || !canSendLetter(actor.operationalRole, recipientRole, Boolean(requestId))) { res.status(403).json({ error: 'forbidden' }); return }
 
     const incomingAttachmentIds: string[] = []
-    if (Array.isArray(attachmentIds)) {
+    if (attachmentIds !== undefined) {
+      if (!Array.isArray(attachmentIds) || !attachmentIds.every((item) => typeof item === 'string' && isUuid(item))) {
+        res.status(400).json({ error: 'invalid_attachment' })
+        return
+      }
       for (const item of attachmentIds) {
-        if (typeof item === 'string') incomingAttachmentIds.push(item)
+        incomingAttachmentIds.push(item)
       }
     }
-    if (Array.isArray(rawAttachments)) {
+    if (rawAttachments !== undefined) {
+      if (!Array.isArray(rawAttachments)) {
+        res.status(400).json({ error: 'invalid_attachment' })
+        return
+      }
       for (const item of rawAttachments) {
-        if (typeof item === 'string') incomingAttachmentIds.push(item)
-        else if (item && typeof item === 'object' && typeof (item as { id?: unknown }).id === 'string') {
-          incomingAttachmentIds.push((item as { id: string }).id)
+        const id = typeof item === 'string' ? item : item && typeof item === 'object' ? item.id : undefined
+        if (typeof id !== 'string' || !isUuid(id)) {
+          res.status(400).json({ error: 'invalid_attachment' })
+          return
         }
+        incomingAttachmentIds.push(id)
       }
     }
 
     const resolvedAttachments: LetterAttachmentDto[] = []
     if (incomingAttachmentIds.length > 0) {
       const documentsRepo = new DocumentRepository(deps.pool)
-      for (const attId of incomingAttachmentIds) {
-        if (!isUuid(attId)) {
-          res.status(400).json({ error: 'invalid_attachment' })
-          return
-        }
+      for (const attId of new Set(incomingAttachmentIds)) {
         const doc = await documentsRepo.findById(attId)
         if (!doc) {
           res.status(404).json({ error: 'attachment_not_found' })
           return
         }
-        if (!attachmentMatchesLetter(doc, requestId ?? null) ||
+        if (!(await attachmentMatchesLetter(doc, requestId ?? null)) ||
             !(await canReadAttachment(doc, actor.id, actor.operationalRole)) ||
             !(await canReadAttachment(doc, trimmedRecipientId, recipientRole))) {
           res.status(403).json({ error: 'forbidden' })
@@ -1621,7 +1634,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
       const documentsRepo = new DocumentRepository(deps.pool)
       const doc = await documentsRepo.findById(attachmentId)
-      if (!doc || !attachmentMatchesLetter(doc, letter.requestId) || !(await canReadAttachment(doc, actor.id, actor.operationalRole))) {
+      if (!doc || !(await attachmentMatchesLetter(doc, letter.requestId)) || !(await canReadAttachment(doc, actor.id, actor.operationalRole))) {
         res.status(404).json({ error: 'not_found' })
         return
       }
