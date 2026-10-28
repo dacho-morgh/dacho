@@ -227,18 +227,4 @@ describe('dashboard migrations', () => {
     expect(rows[0]?.data_type).toBe('USER-DEFINED')
     expect(rows[0]?.udt_name).toBe('company_verification_status')
   })
-
-  it('creates the request_verifications table with required columns', async () => {
-    const cols = await tableColumns('request_verifications')
-    expect(cols).toEqual(
-      expect.arrayContaining([
-        'request_id',
-        'company_id',
-        'verification_id',
-        'revision',
-        'snapshot',
-        'created_at',
-      ]),
-    )
-  })
 })

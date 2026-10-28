@@ -18,7 +18,6 @@ import { AssignmentRepository } from '../dashboard/assignment-repo.js'
 import { actorOf } from '../dashboard/proxy-auth.js'
 import { RequestRepository } from '../dashboard/request-repo.js'
 import { isUuid } from '../exhibitions/catalogue.js'
-import type { VerificationStore } from '../dashboard/verification-repo.js'
 import {
   MAX_DOCUMENT_BYTES,
   validateDocumentFile,
@@ -32,7 +31,6 @@ export interface DocumentRouterDeps {
   userStore: UserStore
   companyStore: CompanyStore
   privateDocumentStorage: PrivateDocumentStorage
-  verificationStore?: VerificationStore
 }
 
 const MAX_MULTIPART_BYTES = MAX_DOCUMENT_BYTES + 1
@@ -378,19 +376,6 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const assigned = requestId
         ? await isAssignedTo(requestId, actor.id, actor.operationalRole)
         : false
-      if (audience === 'company' && parentCompanyId) {
-        const registrationCategories: readonly DocumentCategory[] = [
-          'articlesOfAssociation',
-          'establishmentNotices',
-          'amendmentNotices',
-        ]
-        if (registrationCategories.includes(category)) {
-          await deps.verificationStore?.invalidateApproval(
-            parentCompanyId,
-            'تغییر مدارک ثبتی؛ نیازمند احراز مجدد',
-          )
-        }
-      }
       res.status(201).json({
         document: present(record, actor.id, actor.operationalRole, companyId, assigned),
       })

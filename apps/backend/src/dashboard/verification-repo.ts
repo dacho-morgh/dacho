@@ -72,8 +72,6 @@ export interface VerificationStore {
   submit(input: SubmitVerificationInput): Promise<VerificationSubmitResult>
   decide(input: VerificationDecisionInput): Promise<VerificationDecisionResult>
   listQueue(filter?: VerificationQueueFilter): Promise<VerificationQueueItem[]>
-  isVerified(companyId: string): Promise<boolean>
-  invalidateApproval(companyId: string, reason: string): Promise<boolean>
 }
 
 interface VerificationRow {
@@ -141,48 +139,6 @@ export class PostgresVerificationStore implements VerificationStore {
       [companyId],
     )
     return rows.map(mapRow)
-  }
-
-  async isVerified(companyId: string): Promise<boolean> {
-    const current = await this.findCurrentByCompanyId(companyId)
-    return current?.status === 'approved'
-  }
-
-  async invalidateApproval(companyId: string, reason: string): Promise<boolean> {
-    const client = await this.pool.connect()
-    try {
-      await client.query('BEGIN')
-      const { rows } = await client.query<VerificationRow>(
-        `SELECT ${VERIFICATION_COLUMNS} FROM dashboard.company_verifications
-         WHERE company_id = $1 ORDER BY revision DESC LIMIT 1 FOR UPDATE`,
-        [companyId],
-      )
-      const current = rows[0]
-      if (!current || current.status !== 'approved') {
-        await client.query('ROLLBACK')
-        return false
-      }
-      await client.query(
-        `UPDATE dashboard.company_verifications
-         SET status = 'returned', reason = $1, updated_at = now()
-         WHERE id = $2`,
-        [reason, current.id],
-      )
-      await client.query(
-        `INSERT INTO dashboard.activities
-           (owner_id, request_id, letter_id, type, title, description,
-            actor_id, action, reason, from_state, to_state, revision)
-         VALUES ($1, NULL, NULL, 'transition', 'ابطال تأیید احراز جهت احراز مجدد', NULL, $2, 'verification_return', $3, 'approved', 'returned', $4)`,
-        [current.representative_id, current.representative_id, reason, current.revision],
-      )
-      await client.query('COMMIT')
-      return true
-    } catch (err) {
-      await client.query('ROLLBACK').catch(() => {})
-      throw err
-    } finally {
-      client.release()
-    }
   }
 
   async submit(input: SubmitVerificationInput): Promise<VerificationSubmitResult> {
@@ -411,22 +367,6 @@ export class InMemoryVerificationStore implements VerificationStore {
       .filter((item) => item.companyId === companyId)
       .sort((a, b) => b.revision - a.revision)
       .map((item) => structuredClone(item))
-  }
-
-  async isVerified(companyId: string): Promise<boolean> {
-    const current = await this.findCurrentByCompanyId(companyId)
-    return current?.status === 'approved'
-  }
-
-  async invalidateApproval(companyId: string, reason: string): Promise<boolean> {
-    const target = this.items
-      .filter((item) => item.companyId === companyId)
-      .sort((a, b) => b.revision - a.revision)[0]
-    if (!target || target.status !== 'approved') return false
-    target.status = 'returned'
-    target.reason = reason
-    target.updatedAt = new Date().toISOString()
-    return true
   }
 
   async submit(input: SubmitVerificationInput): Promise<VerificationSubmitResult> {

@@ -33,7 +33,6 @@ export interface AppDeps extends AuthDeps {
   boothCatalogue?: BoothCatalogueRepository
   boothReservations?: BoothReservationRepository
   boothCompanyEligibility?: BoothCompanyEligibility
-  eventCompanyEligibility?: BoothCompanyEligibility
   exhibitionStore?: ExhibitionStore
   evaluationStore?: EvaluationStore
   notificationOutbox?: NotificationOutbox
@@ -58,8 +57,6 @@ export function createApp(deps: AppDeps): Express {
     createDashboardRouter({
       ...deps,
       verificationStore: deps.verificationStore ?? new PostgresVerificationStore(deps.pool),
-      eventCompanyEligibility: deps.eventCompanyEligibility,
-      boothCompanyEligibility: deps.boothCompanyEligibility,
       privateDocumentStorage:
         deps.privateDocumentStorage ??
         new PrivateDocumentStorage(
