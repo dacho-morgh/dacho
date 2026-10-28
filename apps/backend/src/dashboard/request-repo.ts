@@ -3,11 +3,13 @@ import type { Pool, PoolClient } from 'pg'
 import type { RequestScope } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
 import { appendTransition } from './transition-history.js'
+import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
 export interface RequestDto {
   id: string
+  revision: number
   trackingCode: string
   title: string
   serviceId: string
@@ -28,6 +30,7 @@ export interface RequestDto {
 
 export interface RequestRow {
   id: string
+  revision: number
   tracking_code: string
   title: string
   service_id: string
@@ -49,18 +52,19 @@ export interface RequestRow {
 export const REQUEST_COLUMNS = `
   id, tracking_code, title, service_id, service_key, service_name, owner_id, company_id, status,
   current_step_index, assigned_role, current_step, answers, submission_date, due_date,
-  created_at, updated_at
+  created_at, updated_at, revision
 `
 
 const REQUEST_COLUMNS_ALIASED = `
   r.id, r.tracking_code, r.title, r.service_id, r.service_key, r.service_name, r.owner_id,
   r.company_id, r.status, r.current_step_index, r.assigned_role, r.current_step, r.answers,
-  r.submission_date, r.due_date, r.created_at, r.updated_at
+  r.submission_date, r.due_date, r.created_at, r.updated_at, r.revision
 `
 
 export function mapRequestRow(row: RequestRow): RequestDto {
   return {
     id: row.id,
+    revision: row.revision,
     trackingCode: row.tracking_code,
     title: row.title,
     serviceId: row.service_id,
@@ -155,7 +159,14 @@ export function requestScopeClause(scope: RequestScope, params: unknown[], alias
 }
 
 export class RequestRepository {
-  constructor(private readonly pool: Pool) {}
+  private readonly notificationOutbox: NotificationOutbox
+
+  constructor(
+    private readonly pool: Pool,
+    notificationOutbox?: NotificationOutbox,
+  ) {
+    this.notificationOutbox = notificationOutbox ?? new PostgresNotificationOutbox(pool)
+  }
 
   async listScoped(
     scope: RequestScope,
@@ -297,6 +308,8 @@ export class RequestRepository {
       ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
       : '(company_id IS NULL AND owner_id = $2)'
     const client = await this.pool.connect()
+    let submittedRequest: RequestDto
+    let notificationJobId: string
     try {
       await client.query('BEGIN')
       const { rows } = await client.query<RequestRow & { revision: number }>(
@@ -304,7 +317,7 @@ export class RequestRepository {
          SET status = 'in_review', submission_date = now(), updated_at = now(),
              assigned_role = $3, current_step = $4, revision = revision + 1
          WHERE id = $1 AND ${ownership} AND status = 'draft'
-         RETURNING ${REQUEST_COLUMNS}, revision`,
+         RETURNING ${REQUEST_COLUMNS}`,
         [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null, ...(companyId ? [companyId] : [])],
       )
       const updated = rows[0]
@@ -328,13 +341,33 @@ export class RequestRepository {
         revision: updated.revision,
         reason: null,
       })
+      const job = await this.notificationOutbox.enqueue(client, {
+        requestId: updated.id,
+        recipientId: updated.owner_id,
+        actorId: ownerId,
+        action: 'submit',
+        fromState: 'draft',
+        toState: updated.status,
+        revision: updated.revision,
+        title: 'ارسال درخواست',
+        body: `درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} ارسال شد.`,
+      })
+      submittedRequest = mapRequestRow(updated)
+      notificationJobId = job.id
       await client.query('COMMIT')
-      return mapRequestRow(updated)
     } catch (err) {
       await client.query('ROLLBACK').catch(() => undefined)
       throw err
     } finally {
       client.release()
     }
+    // Delivery needs its own connection. Return the transaction client to the
+    // pool first so concurrent submissions cannot exhaust it while awaiting delivery.
+    try {
+      await this.notificationOutbox.deliver(notificationJobId)
+    } catch {
+      // The committed pending job remains available for operator recovery.
+    }
+    return submittedRequest
   }
 }

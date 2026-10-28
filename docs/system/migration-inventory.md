@@ -5,10 +5,15 @@ Inspected 2026-10-23; updated 2026-10-26 for T16. The inventory describes code i
 | Owner | Location / migration journal | Current files | Scope |
 | --- | --- | --- | --- |
 | Payload CMS | `packages/cms-core/src/migrations/`, imported in `index.ts`; Payload `payload_migrations` journal in `public` | 23 TypeScript migrations from `20260810_103455` through `20261026_120000_company_dossier` (excluding `index.ts`; some generated JSON snapshots) | CMS content, users, companies, role evolution, events page content, editorial fields, company activity domain and dossier |
-| Backend | `apps/backend/migrations/`; `dashboard.pgmigrations` journal via node-pg-migrate | 14 TypeScript migrations: `1780511400000`–`1780511400009`, `1780511400011`–`1780511400014` | Requests, letters, activities, support tickets/messages, author-role rekey, safe tracking sequence, case assignments, private document metadata, transition history, booth catalogue, company dossier boundary, event configuration, event audit history, company-owned requests and booth reservation storage |
+| Backend | `apps/backend/migrations/`; `dashboard.pgmigrations` journal via node-pg-migrate | 17 TypeScript migrations: `1780511400000`–`1780511400009`, `1780511400011`–`1780511400015`, `1780511400017`–`1780511400018` | Requests, letters, activities, support tickets/messages, author-role rekey, safe tracking sequence, case assignments, private document metadata, transition history, booth catalogue, company dossier boundary, event configuration, event audit history, company-owned requests, event categories/subtopics, notification outbox, evaluations, and draft booth reservation storage |
 | Runtime-created OTP storage | `apps/backend/src/otp/postgres-code-store.ts` | No numbered migration | `dashboard.otp_codes` is ensured at runtime; inventory/restore must include it if present |
 
 Payload runs explicit migrations with schema push disabled in `packages/cms-core/src/payload.config.ts`. That configuration has **no schema override**, and its migrations use `public` explicitly; `public` is the observed CMS schema in this checkout. The approved [backend design](backend-design.md) uses `cms.*` as a conceptual ownership label, so a future migration must not assume a deployed `cms` SQL schema. Backend `runMigrations` uses the actual `dashboard` schema and an advisory lock. Both services share one database but their migration journals and ownership boundaries differ; applying just one side does not produce a fully usable test app. Initial CMS migrations are chronological by `index.ts`; future migration files must be added there.
+
+T25 adds `dashboard.evaluations` in `1780511400017_evaluations`, keyed by request,
+person and revision. It stores draft/final state, rubric scores, answers and finalization
+time. See [evaluation foundation](evaluation-foundation.md) for authorization, locking
+and the remaining dedicated review-round dependencies.
 
 T08 preserves legacy assignments, quarantines ambiguous accounts and requires explicit owner mapping; see [personnel foundation](personnel-foundation.md). Existing editorial privilege is independent of operational authority. No real accounts have been mapped by this implementation.
 
@@ -31,6 +36,12 @@ public `events`/`exhibitions` CMS content. Event commands are owner-only;
 updates are revision-checked and audited atomically, and assigned responsibility
 is read scope for the current chief or investment reviewer only.
 
+T17 adds `dashboard.event_categories` and `dashboard.event_subtopics` with event
+foreign keys, a composite foreign key on `(category_id, event_id)` preventing cross-event
+subtopic misuse, and indexes on `event_id`, `category_id`, and `employer_id`. Subtopics
+require exactly one personal employer account with operational role `employer-reviewer`
+and reject organization entities or invalid roles.
+
 Company-owned requests migration `1780511400013_company_owned_requests` adds nullable
 `dashboard.requests.company_id` and its index. Its number follows staging's already
 applied `1780511400011`/`1780511400012`; the unpublished `1780511400010` filename
@@ -46,6 +57,16 @@ requests, and existing non-null request companies stay unchanged. Unmapped and
 ambiguous owners remain null for explicit reconciliation; oldest creation time,
 including tied timestamps, is not ownership evidence. Rollback drops the new
 column and its values, so retain a DB backup and reviewed mapping before rollout.
+
+T37 adds `dashboard.notification_jobs` (migration `1780511400015_transition_notification_outbox`)
+to implement the transactional outbox pattern for workflow state transitions and
+notification delivery. It enforces atomic persistence of request transitions, activity
+history, and notification jobs, guarantees delivery retry idempotency via a unique
+`(request_id, revision, action, recipient_id)` constraint, and prevents partial state on transaction failure.
+The operator retry-all command recovers both failed jobs and pending jobs left by
+an interrupted delivery attempt. Delivery releases the business transaction's
+connection first and uses one pooled connection for its own attempt and failure
+recording. A late failed attempt cannot overwrite another worker's delivered status.
 
 ## Read-only aggregate inventory (T04 tooling slice)
 
@@ -71,4 +92,4 @@ T07 adds the request tracking sequence without rewriting existing codes. Its ini
 Before a real migration, capture versioned DB + file backups together, production row counts and duplicate national IDs, account/role/editor mapping, dashboard request/letter dependencies, migration journals, a restore checkpoint and a rollback/forward-repair decision. Rehearse on a sanitized disposable copy with the same schema version. The Phase 0 isolated suite uses synthetic data only and cannot complete this real-data inventory.
 
 
-The draft T48 migration `1780511400014_booth_reservations` adds active reservation storage with one active reservation per booth and a booth/exhibition foreign key. Apply it before the matching catalogue code: effective availability now queries active reservations. Rollback removes reservation records and their captured price references; retain a backup before any real rollout. No live migration or eligibility/application workflow is authorized by this draft.
+The draft T48 migration `1780511400018_booth_reservations` adds active reservation storage with one active reservation per booth and a booth/exhibition foreign key. Apply it before the matching catalogue code: effective availability now queries active reservations. Rollback removes reservation records and their captured price references; retain a backup before any real rollout. No live migration or eligibility/application workflow is authorized by this draft.

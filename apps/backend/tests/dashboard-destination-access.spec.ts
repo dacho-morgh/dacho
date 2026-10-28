@@ -37,6 +37,14 @@ describe('current-role dashboard destinations', () => {
     expect(canOpenDashboardDestination('reviewer', '/dashboard\\companies')).toBe(false)
     expect(canOpenDashboardDestination('reviewer', '//outside.example/dashboard')).toBe(false)
   })
+
+  it('allows system-owner and representative to access exhibition and event routes', () => {
+    expect(canOpenDashboardDestination('system-owner', '/dashboard/exhibitions')).toBe(true)
+    expect(canOpenDashboardDestination('system-owner', '/dashboard/exhibitions/ex-1')).toBe(true)
+    expect(canOpenDashboardDestination('system-owner', '/dashboard/events')).toBe(true)
+    expect(canOpenDashboardDestination('representative', '/dashboard/exhibitions/ex-1')).toBe(false)
+    expect(canOpenDashboardDestination('reviewer', '/dashboard/exhibitions')).toBe(false)
+  })
 })
 
 describe('dashboard own-profile projection', () => {

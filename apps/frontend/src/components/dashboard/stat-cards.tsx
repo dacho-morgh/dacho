@@ -1,23 +1,32 @@
 import React from 'react'
+import Link from 'next/link'
 import { FileText, Clock, CheckCircle2, AlertTriangle, TrendingUp } from 'lucide-react'
 
+import { OfflineNotice, type UnavailableReason } from '@/components/dashboard/offline-notice'
 import type { RequestStats } from '@/utilities/dashboard-api'
+import type { RequestStatus } from '@/components/dashboard/requests/types'
 
 export interface StatCardsProps {
   /** Real aggregates from GET /stats. */
   data?: RequestStats
+  /** Set when /stats could not be read; zeros would misreport an outage. */
+  notice?: UnavailableReason
+  activeStatus?: RequestStatus
 }
 
 function card(value: number) {
   return value.toLocaleString('fa-IR')
 }
 
-export function StatCards({ data }: StatCardsProps) {
+export function StatCards({ data, notice, activeStatus }: StatCardsProps) {
+  if (notice) return <OfflineNotice reason={notice} retryHref="/dashboard" />
+
   const stats = [
     {
       title: 'کل درخواست‌های ثبت شده',
       value: card(data?.total ?? 0),
-      change: '',
+      href: '/dashboard',
+      status: undefined as RequestStatus | undefined,
       changeType: 'increase' as const,
       icon: FileText,
       bgColor: 'bg-blue-50',
@@ -27,7 +36,8 @@ export function StatCards({ data }: StatCardsProps) {
     {
       title: 'در حال بررسی و داوری',
       value: card(data?.in_review ?? 0),
-      change: '',
+      href: '/dashboard?status=in_review',
+      status: 'in_review' as RequestStatus | undefined,
       changeType: 'neutral' as const,
       icon: Clock,
       bgColor: 'bg-amber-50',
@@ -37,7 +47,8 @@ export function StatCards({ data }: StatCardsProps) {
     {
       title: 'تأیید و تصویب شده',
       value: card(data?.approved ?? 0),
-      change: '',
+      href: '/dashboard?status=approved',
+      status: 'approved' as RequestStatus | undefined,
       changeType: 'success' as const,
       icon: CheckCircle2,
       bgColor: 'bg-emerald-50',
@@ -47,7 +58,8 @@ export function StatCards({ data }: StatCardsProps) {
     {
       title: 'نیازمند اقدام / رفع نقص',
       value: card(data?.action_needed ?? 0),
-      change: '',
+      href: '/dashboard?status=action_needed',
+      status: 'action_needed' as RequestStatus | undefined,
       changeType: 'warning' as const,
       icon: AlertTriangle,
       bgColor: 'bg-rose-50',
@@ -60,10 +72,15 @@ export function StatCards({ data }: StatCardsProps) {
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat, idx) => {
         const Icon = stat.icon
+        const isActive = stat.status !== undefined && stat.status === activeStatus
         return (
-          <div
+          <Link
             key={idx}
-            className={`relative overflow-hidden rounded-2xl border ${stat.borderColor} bg-white p-5 shadow-xs transition-all hover:shadow-md`}
+            href={stat.href}
+            aria-current={isActive ? 'page' : undefined}
+            className={`relative overflow-hidden rounded-2xl border ${stat.borderColor} bg-white p-5 shadow-xs transition-all hover:shadow-md ${
+              isActive ? 'ring-2 ring-brand-500' : ''
+            }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-slate-600">{stat.title}</span>
@@ -81,9 +98,9 @@ export function StatCards({ data }: StatCardsProps) {
               {stat.changeType === 'increase' && <TrendingUp className="h-3.5 w-3.5 text-blue-600 shrink-0" />}
               {stat.changeType === 'warning' && <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />}
               {stat.changeType === 'success' && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />}
-              <span className="truncate">{stat.change}</span>
+              <span className="truncate">مشاهده صف</span>
             </div>
-          </div>
+          </Link>
         )
       })}
     </div>

@@ -7,11 +7,14 @@ import { createAuthRouter, type AuthDeps } from './auth/router.js'
 import type { CompanyStore } from './auth/company-store.js'
 import type { ServiceCatalog } from './catalog/service-catalog.js'
 import type { DossierDocumentSource } from './dashboard/dossier.js'
+import type { EventCategoryStore } from './dashboard/event-category-repo.js'
 import type { EventStore } from './dashboard/event-repo.js'
+import type { NotificationOutbox } from './dashboard/notification-outbox.js'
 import { createDashboardRouter } from './dashboard/router.js'
 import { PrivateDocumentStorage } from './documents/storage.js'
 import type { BoothCatalogueRepository } from './exhibitions/catalogue-repo.js'
 import type { ExhibitionStore } from './exhibitions/exhibition-store.js'
+import type { EvaluationStore } from './reviews/evaluation-repo.js'
 
 export interface AppDeps extends AuthDeps {
   pool: Pool
@@ -24,8 +27,11 @@ export interface AppDeps extends AuthDeps {
   dossierDocuments?: DossierDocumentSource
   /** Tests may inject an in-memory store; production always uses Postgres. */
   eventStore?: EventStore
+  eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
+  evaluationStore?: EvaluationStore
+  notificationOutbox?: NotificationOutbox
 }
 
 export function createApp(deps: AppDeps): Express {
