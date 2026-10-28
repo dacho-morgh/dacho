@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   AlertCircle,
@@ -34,7 +34,6 @@ import {
   type ExhibitionCatalogueDto,
   type UpdateBoothInput,
 } from '@/utilities/dashboard-api'
-import { cn } from '@/utilities/ui'
 
 export interface ExhibitionInfo {
   id: string
@@ -83,8 +82,6 @@ export function ExhibitionBoothAdmin({
   // Booth Modal state
   const [modalOpen, setModalOpen] = useState<boolean>(false)
   const [editingBooth, setEditingBooth] = useState<BoothDto | null>(null)
-  const [boothSubmitting, setBoothSubmitting] = useState<boolean>(false)
-  const [boothError, setBoothError] = useState<string | null>(null)
 
   const loadCatalogue = useCallback(async () => {
     setLoading(true)
@@ -149,40 +146,35 @@ export function ExhibitionBoothAdmin({
   }
 
   // Filtered Booths
-  const filteredBooths = useMemo(() => {
-    if (!catalogue?.booths) return []
-    return catalogue.booths.filter((b) => {
-      const matchesSearch =
-        searchQuery.trim() === '' ||
-        b.identifier.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-        b.specification.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-        (b.location && b.location.toLowerCase().includes(searchQuery.trim().toLowerCase()))
-      const matchesStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'available' && b.status === 'available') ||
-        (statusFilter === 'unavailable' && b.status === 'unavailable')
-      return matchesSearch && matchesStatus
-    })
-  }, [catalogue?.booths, searchQuery, statusFilter])
+  const boothsList = catalogue?.booths ?? []
+  const filteredBooths = boothsList.filter((b) => {
+    const matchesSearch =
+      searchQuery.trim() === '' ||
+      b.identifier.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+      b.specification.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+      (b.location && b.location.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'available' && b.status === 'available') ||
+      (statusFilter === 'unavailable' && b.status === 'unavailable')
+    return matchesSearch && matchesStatus
+  })
 
   // Open modal for new booth
   const handleOpenAdd = () => {
     setEditingBooth(null)
-    setBoothError(null)
     setModalOpen(true)
   }
 
   // Open modal for editing booth
   const handleOpenEdit = (booth: BoothDto) => {
     setEditingBooth(booth)
-    setBoothError(null)
     setModalOpen(true)
   }
 
   const handleCloseModal = () => {
     setModalOpen(false)
     setEditingBooth(null)
-    setBoothError(null)
   }
 
   // Stats
