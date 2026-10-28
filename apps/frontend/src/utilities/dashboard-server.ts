@@ -98,6 +98,22 @@ export function isInternalDashboardUser(
   return role !== null && role !== 'representative'
 }
 
+export type DashboardWorkspace =
+  | 'company-dossiers'
+  | 'internal-queue'
+  | 'applicant-queue'
+  | 'unauthenticated'
+
+/**
+ * Single seven-role decision for which dashboard surface `/dashboard` renders.
+ * UI routing only: the API still authorizes every read.
+ */
+export function dashboardWorkspace(role: OperationalRole | null): DashboardWorkspace {
+  if (!role) return 'unauthenticated'
+  if (role === 'system-owner' || role === 'central-secretariat') return 'company-dossiers'
+  return role === 'representative' ? 'applicant-queue' : 'internal-queue'
+}
+
 /** Company dossiers are readable by the owner and Secretariat only. */
 export function canReadCompanyDossiers(
   user: SeniorManagerCandidate | null | undefined,

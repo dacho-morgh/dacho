@@ -12,6 +12,38 @@ finance-package completeness, correspondence attachments and booth receipts
 remain later workflow integrations, so issue #71 stays open. See
 [private documents](private-documents.md).
 
+Implementation update (FE23/FE13/FE30 scoped queues, 2026-10-28): the applicant
+dashboard and `/dashboard/requests` now read real `/stats`, `/requests` and
+`/activities` responses and keep the queue filter in the URL (`?status=`), so
+back navigation, refresh and shared links preserve scope. `status` is validated
+against the DTO enum before it reaches the queue query; unknown values are
+dropped rather than forwarded. Stat cards link to the status queue they count.
+
+Supported read contracts used by these screens:
+
+| Endpoint | Response | Notes |
+| --- | --- | --- |
+| `/stats` | `RequestStats`: `total`, `in_review`, `approved`, `action_needed`, `rejected` | Role-scoped aggregates; never filtered by the UI |
+| `/requests?status&page&limit` | `Paginated<RequestDto>`; item adds `trackingCode`, `currentStep`, `assignedRole`, `allowedActions` | Scope enforced server-side; `status` is one of the five DTO statuses |
+| `/requests/:id` | `RequestDetail`: `request`, `workflow[]`, `timeline[]` | `timeline` carries `type`, `title`, `description`, `at` |
+| `/activities?page&limit` | `Paginated<ActivityDto>` with optional `requestId` | Only activities bound to a request link to that request |
+
+Error contract: `serverDashboardFetchResult` preserves `401 → expired`, `403 →
+denied`, everything else non-2xx or a transport failure → `unavailable`, and
+only a 2xx read produces `ok`. `unavailableReasonFor` maps those kinds to the
+`OfflineNotice` surfaces, so a denied or failed read is never rendered as an
+empty queue; `Loading`/`Failed`/`Empty` are three separate visual states on
+every queue and on the request dossier. Regression coverage lives in
+`tests/int/dashboard-api-contracts.int.spec.ts` and
+`tests/int/permission-matrix.int.spec.ts`.
+
+Still open on these tickets: submitting a corrected revision (no
+`PATCH /requests/:id` exists on `staging`), the company-visible published
+result text (no released-result field in `RequestDetail`), and a submitted
+revision counter (internal `revision` is not part of the public DTO). The
+tracking table, stage/next-action summary, timeline and role-scoped queues are
+delivered; FE13/FE23 stay open for those three backend dependencies.
+
 ## Design boundaries
 
 Keep the existing Next.js App Router, same-origin dashboard proxy, Payload session and shared UI primitives. Reuse existing lists, profile editing, support, layout and loading components where their semantics fit. Avoid a second browser workflow engine or browser-maintained access grants. The server owns eligibility, allowed actions, active revision, review completion, reservation exclusivity, price, receipt verification and publication.

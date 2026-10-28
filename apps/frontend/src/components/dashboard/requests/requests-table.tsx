@@ -11,11 +11,14 @@ import type { RecentRequestItem } from './types'
 export interface RequestsTableProps {
   items?: RecentRequestItem[]
   className?: string
+  /** False when the page owns the filter in the URL (server-side scoped queue). */
+  showFilterTabs?: boolean
 }
 
 export function RequestsTable({
   items = [],
   className = '',
+  showFilterTabs = true,
 }: RequestsTableProps) {
   const [filter, setFilter] = useState<RecentRequestsFilterType>('all')
 
@@ -29,11 +32,22 @@ export function RequestsTable({
       className={`rounded-2xl border border-slate-200/80 bg-white shadow-xs ${className}`}
     >
       {/* Table Header / Filter Toolbar */}
-      <RecentRequestsFilterTabs
-        filter={filter}
-        onFilterChange={setFilter}
-        totalCount={items.length}
-      />
+      {showFilterTabs ? (
+        <RecentRequestsFilterTabs
+          filter={filter}
+          onFilterChange={setFilter}
+          totalCount={items.length}
+        />
+      ) : (
+        <div className="border-b border-slate-100 p-5">
+          <h2 className="text-base font-bold text-slate-900">
+            آخرین درخواست‌ها و پیگیری فرآیندها
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            وضعیت و پیشرفت طرح‌های ارسالی به دبیرخانه کارخانه نوآوری
+          </p>
+        </div>
+      )}
 
       {/* Table Body */}
       <div className="overflow-x-auto">
@@ -49,9 +63,17 @@ export function RequestsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredRequests.map((req) => (
-              <RecentRequestRow key={req.id} item={req} />
-            ))}
+            {filteredRequests.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-500">
+                  درخواستی در این وضعیت موجود نیست؛ وضعیت دیگری را انتخاب کنید.
+                </td>
+              </tr>
+            ) : (
+              filteredRequests.map((req) => (
+                <RecentRequestRow key={req.id} item={req} />
+              ))
+            )}
           </tbody>
         </table>
       </div>

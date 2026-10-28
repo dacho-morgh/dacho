@@ -1,12 +1,18 @@
 import React from 'react'
 import { Typography } from '@/components/ui/typography'
+import { OfflineNotice, type UnavailableReason } from '@/components/dashboard/offline-notice'
 import { RequestsToolbar } from './requests-toolbar'
+import { RequestsStatusFilter } from './requests-status-filter'
 import { RequestsListTable } from './requests-list-table'
-import type { RequestItem } from './types'
+import type { RequestItem, RequestStatus } from './types'
 
 export interface RequestsListViewProps {
   state?: 'default' | 'loading' | 'empty'
+  /** Set when the queue could not be read; never rendered as an empty list. */
+  notice?: UnavailableReason
   items?: RequestItem[]
+  activeStatus?: RequestStatus | 'all'
+  basePath?: string
   onFilterClick?: () => void
   searchValue?: string
   onSearchChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
@@ -17,7 +23,10 @@ export interface RequestsListViewProps {
 
 export function RequestsListView({
   state = 'default',
+  notice,
   items,
+  activeStatus = 'all',
+  basePath = '/dashboard/requests',
   onFilterClick,
   searchValue,
   onSearchChange,
@@ -35,20 +44,26 @@ export function RequestsListView({
         لیست درخواست ها
       </Typography>
 
+      <RequestsStatusFilter basePath={basePath} active={activeStatus} className="mt-5" />
+
       <RequestsToolbar
         searchValue={searchValue}
         onSearchChange={onSearchChange}
         onFilterClick={onFilterClick}
       />
 
-      <RequestsListTable
-        data={data}
-        isLoading={isLoading}
-        isEmpty={isEmpty}
-        onView={onViewRequest}
-        onEdit={onEditRequest}
-        onCancel={onCancelRequest}
-      />
+      {notice ? (
+        <OfflineNotice reason={notice} retryHref={basePath} className="mt-4" />
+      ) : (
+        <RequestsListTable
+          data={data}
+          isLoading={isLoading}
+          isEmpty={isEmpty}
+          onView={onViewRequest}
+          onEdit={onEditRequest}
+          onCancel={onCancelRequest}
+        />
+      )}
     </div>
   )
 }

@@ -1,20 +1,27 @@
 import React from 'react'
+import Link from 'next/link'
 import { Bell } from 'lucide-react'
 
+import { OfflineNotice, type UnavailableReason } from '@/components/dashboard/offline-notice'
 import { formatDate, type ActivityDto } from '@/utilities/dashboard-api'
 
 export interface RecentActivitiesProps {
   /** Recent activity log from GET /activities. */
   activityItems?: ActivityDto[]
+  /** Set when /activities could not be read. */
+  notice?: UnavailableReason
 }
 
-export function RecentActivities({ activityItems }: RecentActivitiesProps) {
+export function RecentActivities({ activityItems, notice }: RecentActivitiesProps) {
   const activities =
     activityItems?.map((a) => ({
       id: a.id,
       title: a.title,
       description: a.description ?? '',
       time: formatDate(a.at),
+      // Only activities bound to a request get a next-action link; the API has
+      // already scoped the list to this actor, so the target is permitted.
+      href: a.requestId ? `/dashboard/requests/${encodeURIComponent(a.requestId)}` : null,
       icon: Bell,
       iconColor: 'text-blue-500',
       bgColor: 'bg-blue-50',
@@ -34,25 +41,46 @@ export function RecentActivities({ activityItems }: RecentActivitiesProps) {
           <span className="text-xs text-slate-400">{activities.length.toLocaleString('fa-IR')} اعلان</span>
         </div>
 
-        <div className="mt-5 space-y-4">
-          {activities.map((act) => {
-            const Icon = act.icon
-            return (
-              <div key={act.id} className="flex items-start gap-4 rounded-xl p-3 hover:bg-slate-50 transition-colors">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${act.bgColor} ${act.iconColor}`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-800">{act.title}</h3>
-                    <span className="text-[11px] text-slate-400 font-mono">{act.time}</span>
+        {notice ? (
+          <OfflineNotice reason={notice} retryHref="/dashboard" className="mt-5" />
+        ) : activities.length === 0 ? (
+          <p className="mt-5 text-xs text-slate-500">اعلان جدیدی ثبت نشده است.</p>
+        ) : (
+          <div className="mt-5 space-y-4">
+            {activities.map((act) => {
+              const Icon = act.icon
+              const body = (
+                <>
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${act.bgColor} ${act.iconColor}`}>
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">{act.description}</p>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-800">{act.title}</h3>
+                      <span className="text-[11px] text-slate-400 font-mono">{act.time}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600 leading-relaxed">{act.description}</p>
+                    {act.href && (
+                      <span className="mt-1 inline-block text-[11px] font-semibold text-blue-700">
+                        مشاهده و اقدام
+                      </span>
+                    )}
+                  </div>
+                </>
+              )
+              const className = 'flex items-start gap-4 rounded-xl p-3 hover:bg-slate-50 transition-colors'
+              return act.href ? (
+                <Link key={act.id} href={act.href} className={className}>
+                  {body}
+                </Link>
+              ) : (
+                <div key={act.id} className={className}>
+                  {body}
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Upcoming deadlines */}
