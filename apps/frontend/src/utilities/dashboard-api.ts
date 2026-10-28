@@ -3,9 +3,9 @@
 // (labels + dates) live here so they are unit-testable; the fetch helpers are
 // thin wrappers over the same-origin proxy (the browser forwards the session).
 
-import type { RequestItem } from '@/components/dashboard/requests/types'
 import type { LetterItem } from '@/components/dashboard/inbox-list-view'
 import type { MailData } from '@/components/dashboard/mail-detail-view'
+import type { RequestItem } from '@/components/dashboard/requests/types'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 export type LetterType = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
@@ -184,11 +184,23 @@ export function serviceNameFor(serviceKey: string): string {
   return SERVICE_KEY_LABELS[serviceKey] ?? serviceKey
 }
 
+export class DashboardApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+  ) {
+    super(code)
+  }
+}
+
 async function dashboardFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api/dashboard${path}`, { cache: 'no-store', ...init })
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { error?: string } | null
-    throw new Error(body?.error ?? `dashboard request failed: HTTP ${res.status}`)
+    throw new DashboardApiError(
+      res.status,
+      typeof body?.error === 'string' ? body.error : 'request_failed',
+    )
   }
   return res.json() as Promise<T>
 }
@@ -197,7 +209,11 @@ export function getStats(): Promise<RequestStats> {
   return dashboardFetch<RequestStats>('/stats')
 }
 
-export function listRequests(params?: { status?: RequestStatus; page?: number; limit?: number }): Promise<Paginated<RequestDto>> {
+export function listRequests(params?: {
+  status?: RequestStatus
+  page?: number
+  limit?: number
+}): Promise<Paginated<RequestDto>> {
   const qs = new URLSearchParams()
   if (params?.status) qs.set('status', params.status)
   if (params?.page) qs.set('page', String(params.page))
@@ -216,7 +232,11 @@ export function getRequest(id: string): Promise<RequestDetail> {
   return dashboardFetch<RequestDetail>(`/requests/${encodeURIComponent(id)}`)
 }
 
-export function listLetters(params?: { read?: boolean; page?: number; limit?: number }): Promise<Paginated<LetterDto>> {
+export function listLetters(params?: {
+  read?: boolean
+  page?: number
+  limit?: number
+}): Promise<Paginated<LetterDto>> {
   const qs = new URLSearchParams()
   if (params?.read !== undefined) qs.set('read', String(params.read))
   if (params?.page) qs.set('page', String(params.page))
@@ -229,7 +249,10 @@ export function getLetter(id: string): Promise<{ letter: LetterDto }> {
   return dashboardFetch<{ letter: LetterDto }>(`/letters/${id}`)
 }
 
-export function listActivities(params?: { page?: number; limit?: number }): Promise<Paginated<ActivityDto>> {
+export function listActivities(params?: {
+  page?: number
+  limit?: number
+}): Promise<Paginated<ActivityDto>> {
   const qs = new URLSearchParams()
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
@@ -237,7 +260,11 @@ export function listActivities(params?: { page?: number; limit?: number }): Prom
   return dashboardFetch<Paginated<ActivityDto>>(`/activities${suffix}`)
 }
 
-export function createRequest(input: { serviceId: string; title: string; answers?: Record<string, unknown> }): Promise<{ request: RequestDto }> {
+export function createRequest(input: {
+  serviceId: string
+  title: string
+  answers?: Record<string, unknown>
+}): Promise<{ request: RequestDto }> {
   return dashboardFetch<{ request: RequestDto }>('/requests', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -265,7 +292,9 @@ export function updateProfile(data: {
   })
 }
 
-export function addAddress(address: Omit<AddressDto, 'id'>): Promise<{ address: AddressDto } | undefined> {
+export function addAddress(
+  address: Omit<AddressDto, 'id'>,
+): Promise<{ address: AddressDto } | undefined> {
   return dashboardFetch<{ address: AddressDto }>('/profile/addresses', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -273,7 +302,10 @@ export function addAddress(address: Omit<AddressDto, 'id'>): Promise<{ address: 
   })
 }
 
-export function updateAddress(id: string, address: Partial<Omit<AddressDto, 'id'>>): Promise<{ address: AddressDto } | undefined> {
+export function updateAddress(
+  id: string,
+  address: Partial<Omit<AddressDto, 'id'>>,
+): Promise<{ address: AddressDto } | undefined> {
   return dashboardFetch<{ address: AddressDto }>(`/profile/addresses/${id}`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
@@ -329,7 +361,9 @@ export function mapMailData(dto: LetterDto): MailData {
 }
 
 export function deleteLetter(id: string): Promise<{ success: boolean }> {
-  return dashboardFetch<{ success: boolean }>(`/letters/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  return dashboardFetch<{ success: boolean }>(`/letters/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
 }
 
 export interface SupportTicketDto {
@@ -354,12 +388,141 @@ export interface SupportMessageDto {
   createdAt: string
 }
 
-export function createSupportTicket(input: { subject: string; message: string }): Promise<{ ticket: SupportTicketDto }> {
+export function createSupportTicket(input: {
+  subject: string
+  message: string
+}): Promise<{ ticket: SupportTicketDto }> {
   return dashboardFetch<{ ticket: SupportTicketDto }>('/support', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input),
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
   })
 }
 
 export function listSupportTickets(): Promise<Paginated<SupportTicketDto>> {
   return dashboardFetch<Paginated<SupportTicketDto>>('/support?limit=100')
+}
+
+export type BoothStatus = 'available' | 'unavailable'
+export type PriceUnit = 'toman'
+
+export interface BoothDto {
+  id: string
+  exhibitionId: string
+  identifier: string
+  specification: string
+  location: string | null
+  status: BoothStatus
+  active: boolean
+  available: boolean
+  priceAmount: number
+  priceUnit: PriceUnit
+  priceVersionId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ExhibitionCatalogueDto {
+  exhibitionId: string
+  companyBoothLimit: number | null
+  guideMapReference: string | null
+  booths: BoothDto[]
+}
+
+export interface ExhibitionCatalogueSettingsDto {
+  exhibitionId: string
+  companyBoothLimit: number
+  guideMapReference: string | null
+  updatedAt: string
+}
+
+export interface CreateBoothInput {
+  identifier: string
+  specification: string
+  location?: string | null
+  priceAmount: number
+  priceUnit: PriceUnit
+  status?: BoothStatus
+  active?: boolean
+}
+
+export type UpdateBoothInput = Omit<Partial<CreateBoothInput>, 'priceAmount' | 'priceUnit'> &
+  ({ priceAmount: number; priceUnit: PriceUnit } | { priceAmount?: never; priceUnit?: never })
+
+export interface UpdateExhibitionSettingsInput {
+  companyBoothLimit: number
+  guideMapReference?: string | null
+}
+
+export function formatToman(amount: number | null | undefined): string {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return '۰ تومان'
+  return `${amount.toLocaleString('fa-IR')} تومان`
+}
+
+export function parsePersianNumber(value: string): number {
+  const normalized = value
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .trim()
+    .replace(/\s*تومان$/, '')
+    .trim()
+  // Reject signs, decimals and arbitrary text instead of silently changing the amount.
+  if (!/^(?:[0-9]+|[0-9]{1,3}(?:[,٬][0-9]{3})+)$/.test(normalized)) return 0
+  const parsed = Number(normalized.replace(/[,٬]/g, ''))
+  return Number.isSafeInteger(parsed) ? parsed : 0
+}
+
+export function getExhibitionCatalogue(exhibitionId: string): Promise<ExhibitionCatalogueDto> {
+  return dashboardFetch<ExhibitionCatalogueDto>(
+    `/exhibitions/${encodeURIComponent(exhibitionId)}/catalogue`,
+  )
+}
+
+export function getAdminExhibitionCatalogue(exhibitionId: string): Promise<ExhibitionCatalogueDto> {
+  return dashboardFetch<ExhibitionCatalogueDto>(
+    `/admin/exhibitions/${encodeURIComponent(exhibitionId)}/catalogue`,
+  )
+}
+
+export function updateExhibitionSettings(
+  exhibitionId: string,
+  input: UpdateExhibitionSettingsInput,
+): Promise<{ settings: ExhibitionCatalogueSettingsDto }> {
+  return dashboardFetch<{ settings: ExhibitionCatalogueSettingsDto }>(
+    `/admin/exhibitions/${encodeURIComponent(exhibitionId)}/settings`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+export function createBooth(
+  exhibitionId: string,
+  input: CreateBoothInput,
+): Promise<{ booth: BoothDto }> {
+  return dashboardFetch<{ booth: BoothDto }>(
+    `/admin/exhibitions/${encodeURIComponent(exhibitionId)}/booths`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+export function updateBooth(
+  exhibitionId: string,
+  boothId: string,
+  input: UpdateBoothInput,
+): Promise<{ booth: BoothDto }> {
+  return dashboardFetch<{ booth: BoothDto }>(
+    `/admin/exhibitions/${encodeURIComponent(exhibitionId)}/booths/${encodeURIComponent(boothId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
 }

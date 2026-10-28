@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-
 import {
   formatDate,
+  formatToman,
   LETTER_TYPE_LABELS,
+  parsePersianNumber,
   REQUEST_STATUS_LABELS,
   SERVICE_KEY_LABELS,
   serviceNameFor,
@@ -57,4 +58,24 @@ describe('formatDate', () => {
     expect(formatDate(undefined)).toBe('')
     expect(formatDate('')).toBe('')
   })
+})
+
+describe('formatToman & parsePersianNumber', () => {
+  it('formats amounts in toman with Persian digits and separator', () => {
+    expect(formatToman(15000000)).toMatch(/^[۰-۹٬]+ تومان$/)
+    expect(formatToman(0)).toBe('۰ تومان')
+    expect(formatToman(null)).toBe('۰ تومان')
+  })
+
+  it('parses Persian and Latin digits correctly', () => {
+    expect(parsePersianNumber('۱۵۰۰۰۰۰۰')).toBe(15000000)
+    expect(parsePersianNumber('15,000,000')).toBe(15000000)
+    expect(parsePersianNumber('۱۲,۳۴۵ تومان')).toBe(12345)
+  })
+  it.each(['-150', '۱٫۵', '1.5', '1e6', '12x3', '12,34', '9007199254740993'])(
+    'rejects malformed or unsafe amount %s instead of changing its value',
+    (input) => {
+      expect(parsePersianNumber(input)).toBe(0)
+    },
+  )
 })

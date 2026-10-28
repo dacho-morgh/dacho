@@ -2,8 +2,8 @@
 
 import { Check } from 'lucide-react'
 import Image from 'next/image'
-import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useMemo, useState } from 'react'
 import {
   CalendarBulkIcon,
   EmptyInboxIllustration,
@@ -37,6 +37,7 @@ export interface EventItem {
 export interface EventsViewProps {
   initialEventsList?: EventItem[]
   state?: 'default' | 'loading' | 'empty'
+  isOwner?: boolean
 }
 
 // Skeleton state matching Figma node 56:13600
@@ -90,6 +91,7 @@ function EventsEmptyState() {
 export function EventsView({
   initialEventsList = [],
   state = 'default',
+  isOwner = false,
 }: EventsViewProps) {
   const router = useRouter()
   const [events] = useState<EventItem[]>(initialEventsList)
@@ -207,7 +209,22 @@ export function EventsView({
                     className="flex flex-col-reverse items-start justify-end gap-[16px] sm:h-[200px] sm:flex-row"
                   >
                     <div className="relative size-[200px] shrink-0 overflow-hidden rounded-[8px] bg-slate-100">
-                      {evt.imageSrc ? <Image src={evt.imageSrc} alt={evt.title} fill className="object-cover" sizes="200px" /> : <Typography variant="14/regular" className="flex h-full items-center justify-center text-neutral-400">تصویری ثبت نشده است</Typography>}
+                      {evt.imageSrc ? (
+                        <Image
+                          src={evt.imageSrc}
+                          alt={evt.title}
+                          fill
+                          className="object-cover"
+                          sizes="200px"
+                        />
+                      ) : (
+                        <Typography
+                          variant="14/regular"
+                          className="flex h-full items-center justify-center text-neutral-400"
+                        >
+                          تصویری ثبت نشده است
+                        </Typography>
+                      )}
                     </div>
                     {/* Content Column on Left (Frame 46) */}
                     <div className="flex h-[176px] w-full flex-1 flex-col justify-between py-1">
@@ -222,7 +239,8 @@ export function EventsView({
                       </div>
 
                       {/* Bottom Section: Details + Action Button */}
-                      {evt.hasActionButton ? (
+                      {(isOwner && evt.serviceKey === 'exhibitions') ||
+                      (!isOwner && evt.hasActionButton) ? (
                         /* Frame 91: Has Date/Location + Button */
                         <div className="flex flex-wrap items-end justify-between gap-4">
                           {/* Date and Location */}
@@ -241,14 +259,25 @@ export function EventsView({
                             </div>
                           </div>
 
-                          {/* "ثبت درخواست" Button - Figma node 56:14063 */}
+                          {/* Action Button */}
                           <button
                             type="button"
-                            onClick={() => router.push(`/dashboard/new-request?service=${evt.serviceKey}&eventId=${encodeURIComponent(evt.id)}&eventTitle=${encodeURIComponent(evt.title)}`)}
+                            onClick={() => {
+                              if (isOwner && evt.serviceKey === 'exhibitions') {
+                                const rawId = evt.id.replace(/^exhibitions-/, '')
+                                router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
+                              } else {
+                                router.push(
+                                  `/dashboard/new-request?service=${evt.serviceKey}&eventId=${encodeURIComponent(evt.id)}&eventTitle=${encodeURIComponent(evt.title)}`,
+                                )
+                              }
+                            }}
                             className="flex h-[40px] items-center justify-center gap-[8px] rounded-[10px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500"
                           >
                             <span className="font-sans text-[16px] leading-[28px] font-semibold">
-                              {evt.actionButtonText || 'ثبت درخواست'}
+                              {isOwner && evt.serviceKey === 'exhibitions'
+                                ? 'مدیریت غرفه‌ها'
+                                : evt.actionButtonText || 'ثبت درخواست'}
                             </span>
                             <TickSquareIcon className="size-[24px] shrink-0 stroke-white" />
                           </button>
@@ -283,7 +312,6 @@ export function EventsView({
           </>
         )}
       </section>
-
     </div>
   )
 }

@@ -23,7 +23,25 @@ export default async function EventsPage(props: PageProps) {
   const state = searchParams?.state ?? 'default'
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
-  if (dashboardOperationalRole(user) === 'system-owner') return <OwnerEvents />
+  const isOwner = dashboardOperationalRole(user) === 'system-owner'
+
+  if (isOwner) {
+    const exhibitions = await payload.find({
+      collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate',
+    })
+    return (
+      <>
+        <OwnerEvents />
+        <div className="flex w-full flex-col items-center bg-[#fafafa] px-4 pb-12 sm:px-6 lg:px-8">
+          <EventsView
+            initialEventsList={exhibitions.docs.map((item) => mapEvent(item, 'exhibitions'))}
+            state={state}
+            isOwner
+          />
+        </div>
+      </>
+    )
+  }
   const [eventResult, exhibitionResult] = await Promise.all([
     payload.find({ collection: 'events', limit: 100, depth: 1, sort: 'startDate' }),
     payload.find({ collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate' }),
@@ -35,7 +53,7 @@ export default async function EventsPage(props: PageProps) {
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">
-      <EventsView initialEventsList={events} state={state} />
+      <EventsView initialEventsList={events} state={state} isOwner={isOwner} />
     </div>
   )
 }

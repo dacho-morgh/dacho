@@ -39,11 +39,14 @@ it('routes active owner to personnel management', async () => {
   render(await EmployeesPage())
   expect(screen.getByText('Manage personnel')).toBeTruthy()
 })
-it('routes active owner to operational events without fetching public CMS events', async () => {
+it('routes active owner to operational events and exhibition catalogue management', async () => {
   backend.auth.mockResolvedValue({ user: { operationalRole: 'system-owner', isActive: true } })
   render(await EventsPage({}))
   expect(screen.getByText('Manage operational events')).toBeTruthy()
-  expect(backend.find).not.toHaveBeenCalled()
+  expect(screen.getByText('Discover exhibitions-17')).toBeTruthy()
+  expect(backend.find).toHaveBeenCalledExactlyOnceWith({
+    collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate',
+  })
 })
 it.each(['employees', 'events'])(
   'preserves owner cookie authentication on mobile HTTP navigation to %s',
