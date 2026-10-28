@@ -3,7 +3,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
 import {
   ExhibitionBoothAdmin,
   type ExhibitionInfo,
@@ -94,6 +93,84 @@ describe('ExhibitionBoothAdmin component', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+  })
+
+  it('includes the explicit toman unit when editing an existing booth', async () => {
+    render(
+      createElement(ExhibitionBoothAdmin, {
+        exhibition: mockExhibition,
+        initialCatalogue: mockCatalogue,
+      }),
+    )
+    fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره تغییرات' }))
+    await waitFor(() =>
+      expect(dashboardApi.updateBooth).toHaveBeenCalledWith(
+        'exhibition-1',
+        'booth-1',
+        expect.objectContaining({ priceAmount: 15000000, priceUnit: 'toman' }),
+      ),
+    )
+  })
+
+  it('keeps failed catalogue loads distinct from empty data and disables mutation controls', async () => {
+    vi.mocked(dashboardApi.getAdminExhibitionCatalogue).mockRejectedValue(
+      new dashboardApi.DashboardApiError(403, 'forbidden'),
+    )
+    render(createElement(ExhibitionBoothAdmin, { exhibition: mockExhibition }))
+    expect(
+      (screen.getByRole('button', { name: 'ذخیره تنظیمات' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    expect((await screen.findByRole('alert')).textContent).toContain('اجازه مدیریت')
+    expect(screen.queryByText('هنوز غرفه‌ای برای این نمایشگاه تعریف نشده است')).toBeNull()
+    expect(
+      (screen.getByRole('button', { name: 'تعریف غرفه جدید' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    expect(dashboardApi.updateExhibitionSettings).not.toHaveBeenCalled()
+  })
+
+  it('rejects decimal prices without issuing a different integer price', async () => {
+    render(
+      createElement(ExhibitionBoothAdmin, {
+        exhibition: mockExhibition,
+        initialCatalogue: mockCatalogue,
+      }),
+    )
+    fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0])
+    fireEvent.change(screen.getByLabelText(/قیمت قطعی غرفه/), { target: { value: '1.5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره تغییرات' }))
+    await screen.findByRole('alert')
+    expect(dashboardApi.updateBooth).not.toHaveBeenCalled()
+  })
+
+  it('locks duplicate submits and closing while pending and preserves answers on failure', async () => {
+    let fail!: (reason: Error) => void
+    vi.mocked(dashboardApi.updateBooth).mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject
+        }),
+    )
+    render(
+      createElement(ExhibitionBoothAdmin, {
+        exhibition: mockExhibition,
+        initialCatalogue: mockCatalogue,
+      }),
+    )
+    fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0])
+    const form = screen.getByRole('form', { name: 'اطلاعات غرفه' })
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    await waitFor(() => expect(dashboardApi.updateBooth).toHaveBeenCalledOnce())
+    expect((screen.getByRole('button', { name: 'بستن' }) as HTMLButtonElement).disabled).toBe(true)
+    fail(new dashboardApi.DashboardApiError(409, 'duplicate_identifier'))
+    await screen.findByRole('alert')
+    expect((screen.getByLabelText(/شناسه غرفه/) as HTMLInputElement).value).toBe('A-101')
+    await waitFor(() =>
+      expect(
+        (screen.getByRole('button', { name: 'ذخیره تغییرات' }) as HTMLButtonElement).disabled,
+      ).toBe(false),
+    )
   })
 
   it('renders catalogue settings, stats badges and booth list in toman', async () => {

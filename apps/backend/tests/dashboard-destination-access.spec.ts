@@ -42,7 +42,7 @@ describe('current-role dashboard destinations', () => {
     expect(canOpenDashboardDestination('system-owner', '/dashboard/exhibitions')).toBe(true)
     expect(canOpenDashboardDestination('system-owner', '/dashboard/exhibitions/ex-1')).toBe(true)
     expect(canOpenDashboardDestination('system-owner', '/dashboard/events')).toBe(true)
-    expect(canOpenDashboardDestination('representative', '/dashboard/exhibitions/ex-1')).toBe(true)
+    expect(canOpenDashboardDestination('representative', '/dashboard/exhibitions/ex-1')).toBe(false)
     expect(canOpenDashboardDestination('reviewer', '/dashboard/exhibitions')).toBe(false)
   })
 })

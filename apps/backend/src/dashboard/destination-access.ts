@@ -41,7 +41,7 @@ export function canOpenDashboardDestination(role: OperationalRole, value: string
     return role === 'representative' || role === 'system-owner'
   }
   if (path === '/dashboard/exhibitions' || path.startsWith('/dashboard/exhibitions/')) {
-    return role === 'representative' || role === 'system-owner'
+    return role === 'system-owner'
   }
   if (path === '/dashboard/new-request') return role === 'representative'
 

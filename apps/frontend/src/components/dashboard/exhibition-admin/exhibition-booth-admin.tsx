@@ -1,28 +1,28 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
-  AlertCircle,
-  ArrowRight,
-  Check,
-  CheckCircle2,
-  Edit2,
-  FileText,
-  MapPin,
-  Plus,
-  Search,
-  Store,
-  X,
-} from 'lucide-react'
-
+  InfoCircleIcon as AlertCircle,
+  CarouselArrowRightIcon as ArrowRight,
+  CheckSquareIcon as Check,
+  TickCircleIcon as CheckCircle2,
+  DashboardEditIcon as Edit2,
+  DashboardRequestsIcon as FileText,
+  EventsLocationIcon as MapPin,
+  DashboardAddIcon as Plus,
+  DashboardSearchIcon as Search,
+  DashboardEventsIcon as Store,
+  DashboardCloseCircle as X,
+} from '@/components/icons/generated'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import {
   createBooth,
+  DashboardApiError,
   formatToman,
   getAdminExhibitionCatalogue,
   parsePersianNumber,
@@ -56,6 +56,22 @@ interface BoothFormData {
   active: boolean
 }
 
+function catalogueFailure(error: unknown, fallback: string): string {
+  if (error instanceof DashboardApiError) {
+    if (error.status === 401) return 'نشست شما پایان یافته است. دوباره وارد شوید.'
+    if (error.status === 403) return 'اجازه مدیریت کاتالوگ را ندارید.'
+    if (error.status === 404) return 'این نمایشگاه یا غرفه دیگر در دسترس نیست.'
+    if (error.code === 'duplicate_identifier')
+      return 'شناسه غرفه در این نمایشگاه تکراری است. شناسه دیگری انتخاب کنید.'
+    if (error.status === 409) return 'اطلاعات تغییر کرده است. کاتالوگ را دوباره دریافت کنید.'
+    if (error.code.startsWith('invalid_price'))
+      return 'مبلغ قیمت نامعتبر است. عدد صحیح مثبت به تومان وارد کنید.'
+    if (error.status >= 500)
+      return 'ارتباط با سامانه برقرار نشد. اطلاعات شما حفظ شده است؛ دوباره تلاش کنید.'
+  }
+  return fallback
+}
+
 export function ExhibitionBoothAdmin({
   exhibition,
   initialCatalogue = null,
@@ -63,6 +79,8 @@ export function ExhibitionBoothAdmin({
   const [catalogue, setCatalogue] = useState<ExhibitionCatalogueDto | null>(initialCatalogue)
   const [loading, setLoading] = useState<boolean>(!initialCatalogue)
   const [error, setError] = useState<string | null>(null)
+  const settingsLock = useRef(false)
+  const canEdit = !loading && !error && catalogue !== null
 
   // Settings form state
   const [companyLimitInput, setCompanyLimitInput] = useState<string>(
@@ -94,8 +112,7 @@ export function ExhibitionBoothAdmin({
       }
       setGuideMapInput(data.guideMapReference ?? '')
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'خطا در دریافت کاتالوگ غرفه‌ها'
-      setError(msg)
+      setError(catalogueFailure(err, 'دریافت کاتالوگ غرفه‌ها انجام نشد. دوباره تلاش کنید.'))
     } finally {
       setLoading(false)
     }
@@ -110,6 +127,8 @@ export function ExhibitionBoothAdmin({
   // Save Exhibition Settings
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!canEdit || settingsLock.current) return
+    settingsLock.current = true
     setSettingsSaving(true)
     setSettingsError(null)
     setSettingsSuccess(false)
@@ -118,6 +137,7 @@ export function ExhibitionBoothAdmin({
     if (!limit || limit < 1) {
       setSettingsError('سقف غرفه هر شرکت باید عدد صحیح بزرگتر از صفر باشد')
       setSettingsSaving(false)
+      settingsLock.current = false
       return
     }
 
@@ -138,10 +158,10 @@ export function ExhibitionBoothAdmin({
       setSettingsSuccess(true)
       setTimeout(() => setSettingsSuccess(false), 3000)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'خطا در ذخیره تنظیمات نمایشگاه'
-      setSettingsError(msg)
+      setSettingsError(catalogueFailure(err, 'ذخیره تنظیمات نمایشگاه انجام نشد. دوباره تلاش کنید.'))
     } finally {
       setSettingsSaving(false)
+      settingsLock.current = false
     }
   }
 
@@ -183,15 +203,20 @@ export function ExhibitionBoothAdmin({
   const availableBooths = catalogue?.booths?.filter((b) => b.available).length ?? 0
 
   return (
-    <div className="flex w-full max-w-7xl flex-col gap-8 px-4 py-6 font-sans sm:px-6 lg:px-8" dir="rtl">
+    <div
+      className="flex w-full max-w-7xl flex-col gap-8 px-4 py-6 font-sans sm:px-6 lg:px-8"
+      dir="rtl"
+    >
       {/* Navigation & Header */}
       <div className="flex flex-col gap-4">
         <Link
-          href="/dashboard/events"
+          href="/dashboard/exhibitions"
           className="inline-flex w-fit items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-brand-600"
         >
           <ArrowRight className="size-4" />
-          <span>بازگشت به رویدادها و نمایشگاه‌ها</span>
+          <Typography as="span" variant="14/regular">
+            بازگشت به رویدادها و نمایشگاه‌ها
+          </Typography>
         </Link>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
@@ -204,12 +229,16 @@ export function ExhibitionBoothAdmin({
             {(exhibition.location || exhibition.dates) && (
               <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-neutral-400">
                 {exhibition.location && (
-                  <span className="flex items-center gap-1">
+                  <Typography as="span" variant="14/regular" className="flex items-center gap-1">
                     <MapPin className="size-3.5" />
                     {exhibition.location}
-                  </span>
+                  </Typography>
                 )}
-                {exhibition.dates && <span>{exhibition.dates}</span>}
+                {exhibition.dates && (
+                  <Typography as="span" variant="14/regular">
+                    {exhibition.dates}
+                  </Typography>
+                )}
               </div>
             )}
           </div>
@@ -218,17 +247,23 @@ export function ExhibitionBoothAdmin({
             variant="default"
             size="md"
             onClick={handleOpenAdd}
+            disabled={!canEdit}
             className="flex items-center gap-2"
           >
             <Plus className="size-4" />
-            <span>تعریف غرفه جدید</span>
+            <Typography as="span" variant="14/regular">
+              تعریف غرفه جدید
+            </Typography>
           </Button>
         </div>
       </div>
 
       {/* Global Error Banner */}
       {error && (
-        <div className="flex items-center justify-between rounded-xl border border-error-100 bg-error-50 p-4 text-error-700">
+        <div
+          role="alert"
+          className="flex items-center justify-between rounded-xl border border-error-100 bg-error-50 p-4 text-error-700"
+        >
           <div className="flex items-center gap-2">
             <AlertCircle className="size-5 shrink-0 text-error-600" />
             <Typography variant="14/regular">{error}</Typography>
@@ -248,33 +283,48 @@ export function ExhibitionBoothAdmin({
           </Typography>
         </div>
 
-        <form onSubmit={handleSaveSettings} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <form
+          onSubmit={handleSaveSettings}
+          className="flex flex-col gap-4 sm:flex-row sm:items-end"
+        >
           <div className="flex-1">
-            <label htmlFor="company-limit-input" className="mb-1 block text-sm font-medium text-neutral-600">
+            <Typography
+              as="label"
+              variant="14/regular"
+              htmlFor="company-limit-input"
+              className="mb-1 block text-sm font-medium text-neutral-600"
+            >
               سقف مجاز غرفه برای هر شرکت (تعداد)
-            </label>
+            </Typography>
             <input
               id="company-limit-input"
               type="text"
               inputMode="numeric"
               value={companyLimitInput}
+              disabled={!canEdit || settingsSaving}
               onChange={(e) => setCompanyLimitInput(e.target.value)}
               placeholder="مثال: ۲"
-              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 outline-none transition-colors focus:border-brand-500"
+              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 transition-colors outline-none focus:border-brand-500"
             />
           </div>
 
           <div className="flex-1">
-            <label htmlFor="guide-map-input" className="mb-1 block text-sm font-medium text-neutral-600">
+            <Typography
+              as="label"
+              variant="14/regular"
+              htmlFor="guide-map-input"
+              className="mb-1 block text-sm font-medium text-neutral-600"
+            >
               شناسه یا آدرس نقشه راهنمای نمایشگاه
-            </label>
+            </Typography>
             <input
               id="guide-map-input"
               type="text"
               value={guideMapInput}
+              disabled={!canEdit || settingsSaving}
               onChange={(e) => setGuideMapInput(e.target.value)}
               placeholder="شناسه فایل یا مرجع نقشه راهنما"
-              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 outline-none transition-colors focus:border-brand-500"
+              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 transition-colors outline-none focus:border-brand-500"
             />
           </div>
 
@@ -282,30 +332,38 @@ export function ExhibitionBoothAdmin({
             type="submit"
             variant="default"
             size="md"
-            disabled={settingsSaving}
+            disabled={!canEdit || settingsSaving}
             className="flex shrink-0 items-center gap-2"
           >
             {settingsSaving ? (
-              <span>در حال ذخیره...</span>
+              <Typography as="span" variant="14/regular">
+                در حال ذخیره...
+              </Typography>
             ) : (
               <>
                 <Check className="size-4" />
-                <span>ذخیره تنظیمات</span>
+                <Typography as="span" variant="14/regular">
+                  ذخیره تنظیمات
+                </Typography>
               </>
             )}
           </Button>
         </form>
 
         {settingsSuccess && (
-          <div className="flex items-center gap-2 text-xs text-success-600">
+          <div role="status" className="flex items-center gap-2 text-xs text-success-500">
             <CheckCircle2 className="size-4" />
-            <span>تنظیمات کاتالوگ با موفقیت به‌روزرسانی شد.</span>
+            <Typography as="span" variant="14/regular">
+              تنظیمات کاتالوگ با موفقیت به‌روزرسانی شد.
+            </Typography>
           </div>
         )}
         {settingsError && (
-          <div className="flex items-center gap-2 text-xs text-error-600">
+          <div role="alert" className="flex items-center gap-2 text-xs text-error-600">
             <AlertCircle className="size-4" />
-            <span>{settingsError}</span>
+            <Typography as="span" variant="14/regular">
+              {settingsError}
+            </Typography>
           </div>
         )}
       </section>
@@ -318,36 +376,50 @@ export function ExhibitionBoothAdmin({
               فهرست غرفه‌ها
             </Typography>
             <Badge variant="gray" size="sm">
-              کل: {totalBooths}
+              <Typography as="span" variant="12/regular">
+                کل: {totalBooths}
+              </Typography>
             </Badge>
             <Badge variant="blue" size="sm">
-              فعال: {activeBooths}
+              <Typography as="span" variant="12/regular">
+                فعال: {activeBooths}
+              </Typography>
             </Badge>
             <Badge variant="green" size="sm">
-              در دسترس: {availableBooths}
+              <Typography as="span" variant="12/regular">
+                در دسترس: {availableBooths}
+              </Typography>
             </Badge>
           </div>
 
           {/* Search & Status Filter */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative w-full sm:w-60">
-              <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+              <Search className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-neutral-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="جستجو در غرفه‌ها..."
-                className="h-9 w-full rounded-lg border border-neutral-200 bg-white pr-9 pl-3 text-sm text-neutral-700 outline-none transition-colors focus:border-brand-500"
+                className="h-9 w-full rounded-lg border border-neutral-200 bg-white pr-9 pl-3 text-sm text-neutral-700 transition-colors outline-none focus:border-brand-500"
               />
             </div>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'available' | 'unavailable')}
-              className="h-9 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 outline-none transition-colors focus:border-brand-500"
+              onChange={(e) =>
+                setStatusFilter(e.target.value as 'all' | 'available' | 'unavailable')
+              }
+              className="h-9 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 transition-colors outline-none focus:border-brand-500"
             >
-              <option value="all">همه وضعیت‌ها</option>
-              <option value="available">فقط در دسترس</option>
-              <option value="unavailable">غیرقابل دسترس</option>
+              <Typography as="option" variant="14/regular" value="all">
+                همه وضعیت‌ها
+              </Typography>
+              <Typography as="option" variant="14/regular" value="available">
+                فقط در دسترس
+              </Typography>
+              <Typography as="option" variant="14/regular" value="unavailable">
+                غیرقابل دسترس
+              </Typography>
             </select>
           </div>
         </div>
@@ -362,7 +434,7 @@ export function ExhibitionBoothAdmin({
         )}
 
         {/* Empty State */}
-        {!loading && filteredBooths.length === 0 && (
+        {!loading && !error && filteredBooths.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-200 bg-white p-12 text-center">
             <Store className="mb-3 size-12 text-neutral-300" />
             <Typography variant="16/semibold" color="neutral-600" className="mb-1">
@@ -382,36 +454,84 @@ export function ExhibitionBoothAdmin({
         )}
 
         {/* Booths Table / Cards */}
-        {!loading && filteredBooths.length > 0 && (
+        {!loading && !error && filteredBooths.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-2xs">
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-right text-sm">
                 <thead className="border-b border-neutral-100 bg-neutral-50/70 text-xs font-semibold text-neutral-500">
                   <tr>
-                    <th className="px-4 py-3">شناسه غرفه</th>
-                    <th className="px-4 py-3">ابعاد و مشخصات</th>
-                    <th className="px-4 py-3">موقعیت / سالن</th>
-                    <th className="px-4 py-3">قیمت ثابت</th>
-                    <th className="px-4 py-3">وضعیت رزرو</th>
-                    <th className="px-4 py-3">فعال بودن</th>
-                    <th className="px-4 py-3 text-center">عملیات</th>
+                    <th className="px-4 py-3">
+                      <Typography as="span" variant="12/semibold">
+                        شناسه غرفه
+                      </Typography>
+                    </th>
+                    <th className="px-4 py-3">
+                      <Typography as="span" variant="12/semibold">
+                        ابعاد و مشخصات
+                      </Typography>
+                    </th>
+                    <th className="px-4 py-3">
+                      <Typography as="span" variant="12/semibold">
+                        موقعیت / سالن
+                      </Typography>
+                    </th>
+                    <th className="px-4 py-3">
+                      <Typography as="span" variant="12/semibold">
+                        قیمت ثابت
+                      </Typography>
+                    </th>
+                    <th className="px-4 py-3">
+                      <Typography as="span" variant="12/semibold">
+                        وضعیت کاتالوگ
+                      </Typography>
+                    </th>
+                    <th className="px-4 py-3">
+                      <Typography as="span" variant="12/semibold">
+                        فعال بودن
+                      </Typography>
+                    </th>
+                    <th className="px-4 py-3 text-center">
+                      <Typography as="span" variant="12/semibold">
+                        عملیات
+                      </Typography>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                   {filteredBooths.map((booth) => (
                     <tr key={booth.id} className="transition-colors hover:bg-neutral-50/50">
-                      <td className="px-4 py-3 font-semibold text-neutral-700">{booth.identifier}</td>
-                      <td className="px-4 py-3 text-neutral-600">{booth.specification}</td>
-                      <td className="px-4 py-3 text-neutral-500">{booth.location || '—'}</td>
-                      <td className="px-4 py-3 font-medium text-brand-600">{formatToman(booth.priceAmount)}</td>
+                      <td className="px-4 py-3 font-semibold text-neutral-700">
+                        <Typography as="span" variant="14/regular">
+                          {booth.identifier}
+                        </Typography>
+                      </td>
+                      <td className="px-4 py-3 text-neutral-600">
+                        <Typography as="span" variant="14/regular">
+                          {booth.specification}
+                        </Typography>
+                      </td>
+                      <td className="px-4 py-3 text-neutral-500">
+                        <Typography as="span" variant="14/regular">
+                          {booth.location || '—'}
+                        </Typography>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-brand-600">
+                        <Typography as="span" variant="14/regular">
+                          {formatToman(booth.priceAmount)}
+                        </Typography>
+                      </td>
                       <td className="px-4 py-3">
                         <Badge variant={booth.status === 'available' ? 'green' : 'red'} size="sm">
-                          {booth.status === 'available' ? 'در دسترس' : 'غیرقابل دسترس'}
+                          <Typography as="span" variant="12/regular">
+                            {booth.status === 'available' ? 'در دسترس' : 'غیرقابل دسترس'}
+                          </Typography>
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={booth.active ? 'blue' : 'gray'} size="sm">
-                          {booth.active ? 'فعال' : 'غیرفعال'}
+                          <Typography as="span" variant="12/regular">
+                            {booth.active ? 'فعال' : 'غیرفعال'}
+                          </Typography>
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -423,7 +543,9 @@ export function ExhibitionBoothAdmin({
                           className="flex items-center gap-1 text-neutral-600 hover:text-brand-600"
                         >
                           <Edit2 className="size-3.5" />
-                          <span>ویرایش</span>
+                          <Typography as="span" variant="14/regular">
+                            ویرایش
+                          </Typography>
                         </Button>
                       </td>
                     </tr>
@@ -437,27 +559,49 @@ export function ExhibitionBoothAdmin({
               {filteredBooths.map((booth) => (
                 <div key={booth.id} className="flex flex-col gap-2 p-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-neutral-800">{booth.identifier}</span>
+                    <Typography
+                      as="span"
+                      variant="14/regular"
+                      className="font-semibold text-neutral-800"
+                    >
+                      {booth.identifier}
+                    </Typography>
                     <div className="flex items-center gap-1.5">
                       <Badge variant={booth.status === 'available' ? 'green' : 'red'} size="sm">
-                        {booth.status === 'available' ? 'در دسترس' : 'غیرقابل دسترس'}
+                        <Typography as="span" variant="12/regular">
+                          {booth.status === 'available' ? 'در دسترس' : 'غیرقابل دسترس'}
+                        </Typography>
                       </Badge>
                       <Badge variant={booth.active ? 'blue' : 'gray'} size="sm">
-                        {booth.active ? 'فعال' : 'غیرفعال'}
+                        <Typography as="span" variant="12/regular">
+                          {booth.active ? 'فعال' : 'غیرفعال'}
+                        </Typography>
                       </Badge>
                     </div>
                   </div>
-                  <p className="text-xs text-neutral-600">{booth.specification}</p>
+                  <Typography as="p" variant="14/regular" className="text-xs text-neutral-600">
+                    {booth.specification}
+                  </Typography>
                   {booth.location && (
-                    <p className="flex items-center gap-1 text-xs text-neutral-400">
+                    <Typography
+                      as="p"
+                      variant="14/regular"
+                      className="flex items-center gap-1 text-xs text-neutral-400"
+                    >
                       <MapPin className="size-3" />
-                      <span>{booth.location}</span>
-                    </p>
+                      <Typography as="span" variant="14/regular">
+                        {booth.location}
+                      </Typography>
+                    </Typography>
                   )}
                   <div className="mt-1 flex items-center justify-between border-t border-neutral-50 pt-2">
-                    <span className="text-sm font-semibold text-brand-600">
+                    <Typography
+                      as="span"
+                      variant="14/regular"
+                      className="text-sm font-semibold text-brand-600"
+                    >
                       {formatToman(booth.priceAmount)}
-                    </span>
+                    </Typography>
                     <Button
                       type="button"
                       variant="outline"
@@ -466,7 +610,9 @@ export function ExhibitionBoothAdmin({
                       className="flex items-center gap-1 text-xs"
                     >
                       <Edit2 className="size-3" />
-                      <span>ویرایش</span>
+                      <Typography as="span" variant="14/regular">
+                        ویرایش
+                      </Typography>
                     </Button>
                   </div>
                 </div>
@@ -511,6 +657,13 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
   const isEditing = Boolean(booth)
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const submissionLock = useRef(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null
+    dialogRef.current?.querySelector<HTMLInputElement>('input')?.focus()
+    return () => previous?.focus()
+  }, [])
 
   const {
     register,
@@ -545,6 +698,7 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
           specification: data.specification.trim(),
           location: data.location.trim() || null,
           priceAmount: price,
+          priceUnit: 'toman',
           status: data.status,
           active: Boolean(data.active),
         }
@@ -564,14 +718,9 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
         onSaved(res.booth)
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'خطا در ثبت غرفه'
-      if (msg.includes('duplicate_identifier') || msg === 'duplicate_identifier') {
-        setServerError('شناسه غرفه در این نمایشگاه تکراری است. لطفاً شناسه دیگری انتخاب کنید.')
-      } else if (msg.includes('invalid_price') || msg === 'invalid_price') {
-        setServerError('مبلغ قیمت نامعتبر است. عدد مثبت به تومان وارد کنید.')
-      } else {
-        setServerError(msg)
-      }
+      setServerError(
+        catalogueFailure(err, 'ثبت غرفه انجام نشد. اطلاعات شما حفظ شده است؛ دوباره تلاش کنید.'),
+      )
     } finally {
       setSubmitting(false)
     }
@@ -579,137 +728,247 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs"
+      ref={dialogRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 p-4 backdrop-blur-xs"
       role="dialog"
       aria-modal="true"
       aria-labelledby="booth-modal-title"
       dir="rtl"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && !submitting) onClose()
+        if (event.key !== 'Tab') return
+        const fields = Array.from(
+          dialogRef.current?.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]',
+          ) ?? [],
+        )
+        const first = fields[0]
+        const last = fields.at(-1)
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last?.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first?.focus()
+        }
+      }}
     >
-      <section className="flex w-full max-w-lg flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-6 shadow-xl">
+      <section className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col gap-5 overflow-y-auto rounded-2xl border border-neutral-100 bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
           <Typography id="booth-modal-title" as="h3" variant="20/bold" color="neutral-700">
             {isEditing ? `ویرایش غرفه: ${booth?.identifier}` : 'افزودن غرفه جدید'}
           </Typography>
-          <button
+          <Button
+            variant="ghost"
+            size="icon-32"
             type="button"
             onClick={onClose}
+            disabled={submitting}
             className="rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
             aria-label="بستن"
           >
             <X className="size-5" />
-          </button>
+          </Button>
         </div>
 
         {serverError && (
-          <div className="flex items-center gap-2 rounded-lg border border-error-100 bg-error-50 p-3 text-xs text-error-700">
+          <div
+            role="alert"
+            className="flex items-center gap-2 rounded-lg border border-error-100 bg-error-50 p-3 text-xs text-error-700"
+          >
             <AlertCircle className="size-4 shrink-0 text-error-600" />
-            <span>{serverError}</span>
+            <Typography as="span" variant="14/regular">
+              {serverError}
+            </Typography>
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 text-right">
-          <div>
-            <label htmlFor="booth-id-input" className="mb-1 block text-xs font-medium text-neutral-600">
-              شناسه غرفه <span className="text-error-500">*</span>
-            </label>
-            <input
-              id="booth-id-input"
-              type="text"
-              {...register('identifier', { required: 'شناسه غرفه الزامی است' })}
-              placeholder="مثال: A-1 یا B-12"
-              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 outline-none transition-colors focus:border-brand-500"
-            />
-            {errors.identifier && (
-              <span className="mt-1 block text-xs text-error-500">{errors.identifier.message}</span>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="booth-spec-input" className="mb-1 block text-xs font-medium text-neutral-600">
-              ابعاد و مشخصات <span className="text-error-500">*</span>
-            </label>
-            <input
-              id="booth-spec-input"
-              type="text"
-              {...register('specification', { required: 'ابعاد و مشخصات غرفه الزامی است' })}
-              placeholder="مثال: ۳ متر × ۴ متر، مجهز به اسپیس‌فریم و برق"
-              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 outline-none transition-colors focus:border-brand-500"
-            />
-            {errors.specification && (
-              <span className="mt-1 block text-xs text-error-500">{errors.specification.message}</span>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="booth-loc-input" className="mb-1 block text-xs font-medium text-neutral-600">
-              موقعیت / سالن (اختیاری)
-            </label>
-            <input
-              id="booth-loc-input"
-              type="text"
-              {...register('location')}
-              placeholder="مثال: سالن خلیج فارس، ردیف اول"
-              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 outline-none transition-colors focus:border-brand-500"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="booth-price-input" className="mb-1 block text-xs font-medium text-neutral-600">
-              قیمت قطعی غرفه (تومان) <span className="text-error-500">*</span>
-            </label>
-            <input
-              id="booth-price-input"
-              type="text"
-              inputMode="numeric"
-              {...register('priceAmount', { required: 'قیمت غرفه الزامی است' })}
-              placeholder="مثال: ۱۵۰۰۰۰۰۰"
-              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 outline-none transition-colors focus:border-brand-500"
-            />
-            {errors.priceAmount && (
-              <span className="mt-1 block text-xs text-error-500">{errors.priceAmount.message}</span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <form
+          aria-label="اطلاعات غرفه"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (submissionLock.current) return
+            submissionLock.current = true
+            void handleSubmit(onSubmit)(event).finally(() => {
+              submissionLock.current = false
+            })
+          }}
+        >
+          <fieldset disabled={submitting} className="flex flex-col gap-4 text-right">
             <div>
-              <label htmlFor="booth-status-select" className="mb-1 block text-xs font-medium text-neutral-600">
-                وضعیت رزرو
-              </label>
-              <select
-                id="booth-status-select"
-                {...register('status')}
-                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 outline-none transition-colors focus:border-brand-500"
+              <Typography
+                as="label"
+                variant="14/regular"
+                htmlFor="booth-id-input"
+                className="mb-1 block text-xs font-medium text-neutral-600"
               >
-                <option value="available">در دسترس</option>
-                <option value="unavailable">غیرقابل دسترس</option>
-              </select>
+                شناسه غرفه{' '}
+                <Typography as="span" variant="14/regular" className="text-error-500">
+                  *
+                </Typography>
+              </Typography>
+              <input
+                id="booth-id-input"
+                type="text"
+                {...register('identifier', { required: 'شناسه غرفه الزامی است' })}
+                placeholder="مثال: A-1 یا B-12"
+                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
+              />
+              {errors.identifier && (
+                <Typography
+                  as="span"
+                  variant="14/regular"
+                  className="mt-1 block text-xs text-error-500"
+                >
+                  {errors.identifier.message}
+                </Typography>
+              )}
             </div>
 
             <div>
-              <label htmlFor="booth-active-select" className="mb-1 block text-xs font-medium text-neutral-600">
-                وضعیت نمایش
-              </label>
-              <select
-                id="booth-active-select"
-                {...register('active', {
-                  setValueAs: (v) => v === 'true' || v === true,
-                })}
-                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 outline-none transition-colors focus:border-brand-500"
+              <Typography
+                as="label"
+                variant="14/regular"
+                htmlFor="booth-spec-input"
+                className="mb-1 block text-xs font-medium text-neutral-600"
               >
-                <option value="true">فعال در کاتالوگ</option>
-                <option value="false">غیرفعال (مخفی)</option>
-              </select>
+                ابعاد و مشخصات{' '}
+                <Typography as="span" variant="14/regular" className="text-error-500">
+                  *
+                </Typography>
+              </Typography>
+              <input
+                id="booth-spec-input"
+                type="text"
+                {...register('specification', { required: 'ابعاد و مشخصات غرفه الزامی است' })}
+                placeholder="مثال: ۳ متر × ۴ متر، مجهز به اسپیس‌فریم و برق"
+                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
+              />
+              {errors.specification && (
+                <Typography
+                  as="span"
+                  variant="14/regular"
+                  className="mt-1 block text-xs text-error-500"
+                >
+                  {errors.specification.message}
+                </Typography>
+              )}
             </div>
-          </div>
 
-          <div className="mt-4 flex items-center justify-end gap-2 border-t border-neutral-100 pt-3">
-            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={submitting}>
-              انصراف
-            </Button>
-            <Button type="submit" variant="default" size="sm" disabled={submitting}>
-              {submitting ? 'در حال ثبت...' : isEditing ? 'ذخیره تغییرات' : 'ثبت غرفه'}
-            </Button>
-          </div>
+            <div>
+              <Typography
+                as="label"
+                variant="14/regular"
+                htmlFor="booth-loc-input"
+                className="mb-1 block text-xs font-medium text-neutral-600"
+              >
+                موقعیت / سالن (اختیاری)
+              </Typography>
+              <input
+                id="booth-loc-input"
+                type="text"
+                {...register('location')}
+                placeholder="مثال: سالن خلیج فارس، ردیف اول"
+                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
+              />
+            </div>
+
+            <div>
+              <Typography
+                as="label"
+                variant="14/regular"
+                htmlFor="booth-price-input"
+                className="mb-1 block text-xs font-medium text-neutral-600"
+              >
+                قیمت قطعی غرفه (تومان){' '}
+                <Typography as="span" variant="14/regular" className="text-error-500">
+                  *
+                </Typography>
+              </Typography>
+              <input
+                id="booth-price-input"
+                type="text"
+                inputMode="numeric"
+                {...register('priceAmount', { required: 'قیمت غرفه الزامی است' })}
+                placeholder="مثال: ۱۵۰۰۰۰۰۰"
+                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
+              />
+              {errors.priceAmount && (
+                <Typography
+                  as="span"
+                  variant="14/regular"
+                  className="mt-1 block text-xs text-error-500"
+                >
+                  {errors.priceAmount.message}
+                </Typography>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <Typography
+                  as="label"
+                  variant="14/regular"
+                  htmlFor="booth-status-select"
+                  className="mb-1 block text-xs font-medium text-neutral-600"
+                >
+                  وضعیت کاتالوگ
+                </Typography>
+                <select
+                  id="booth-status-select"
+                  {...register('status')}
+                  className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
+                >
+                  <Typography as="option" variant="14/regular" value="available">
+                    در دسترس
+                  </Typography>
+                  <Typography as="option" variant="14/regular" value="unavailable">
+                    غیرقابل دسترس
+                  </Typography>
+                </select>
+              </div>
+
+              <div>
+                <Typography
+                  as="label"
+                  variant="14/regular"
+                  htmlFor="booth-active-select"
+                  className="mb-1 block text-xs font-medium text-neutral-600"
+                >
+                  وضعیت نمایش
+                </Typography>
+                <select
+                  id="booth-active-select"
+                  {...register('active', {
+                    setValueAs: (v) => v === 'true' || v === true,
+                  })}
+                  className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
+                >
+                  <Typography as="option" variant="14/regular" value="true">
+                    فعال در کاتالوگ
+                  </Typography>
+                  <Typography as="option" variant="14/regular" value="false">
+                    غیرفعال (مخفی)
+                  </Typography>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2 border-t border-neutral-100 pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                disabled={submitting}
+              >
+                انصراف
+              </Button>
+              <Button type="submit" variant="default" size="sm" disabled={submitting}>
+                {submitting ? 'در حال ثبت...' : isEditing ? 'ذخیره تغییرات' : 'ثبت غرفه'}
+              </Button>
+            </div>
+          </fieldset>
         </form>
       </section>
     </div>

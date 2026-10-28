@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-
 import {
   formatDate,
   formatToman,
@@ -73,4 +72,10 @@ describe('formatToman & parsePersianNumber', () => {
     expect(parsePersianNumber('15,000,000')).toBe(15000000)
     expect(parsePersianNumber('۱۲,۳۴۵ تومان')).toBe(12345)
   })
+  it.each(['-150', '۱٫۵', '1.5', '1e6', '12x3', '12,34', '9007199254740993'])(
+    'rejects malformed or unsafe amount %s instead of changing its value',
+    (input) => {
+      expect(parsePersianNumber(input)).toBe(0)
+    },
+  )
 })

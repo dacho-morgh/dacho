@@ -14,6 +14,24 @@ remain later workflow integrations, so issue #71 stays open. See
 
 ## Design boundaries
 
+### Exhibition catalogue administration (FE24 / #77)
+
+Owner navigation includes `/dashboard/exhibitions`, independent of the operational
+event workspace. It lists CMS exhibitions with an authorized CMS entry for exhibition
+content, and opens `/dashboard/exhibitions/[id]` for booth catalogue settings.
+Catalogue edits send an explicit toman unit with each price; invalid signed,
+fractional, unsafe or malformed amounts are rejected rather than rewritten.
+Loading/failed catalogue reads disable mutations and never appear as an empty
+catalogue. Pending booth saves prevent duplicate submission and closing; failures
+retain answers and use Persian copy. Existing booked-price versions remain owned
+by the backend. Catalogue availability is administrative state, not a claim of a
+reservation or attendance confirmation.
+
+FE24 still requires approved administration designs, real browser/API acceptance
+and UAT31. Its current backend DTO does not expose reservation/confirmation state
+or optimistic edit tokens; those contracts remain follow-up dependencies. No
+Figma-parity or completed full exhibition-journey claim is made.
+
 ### Signup frontend slice (FE03 / #80, FE29 / #78, FE30 / #79)
 
 `/register` retains the three-step company / representative / account-security

@@ -2,8 +2,8 @@
 
 import { Check } from 'lucide-react'
 import Image from 'next/image'
-import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useMemo, useState } from 'react'
 import {
   CalendarBulkIcon,
   EmptyInboxIllustration,
@@ -209,7 +209,22 @@ export function EventsView({
                     className="flex flex-col-reverse items-start justify-end gap-[16px] sm:h-[200px] sm:flex-row"
                   >
                     <div className="relative size-[200px] shrink-0 overflow-hidden rounded-[8px] bg-slate-100">
-                      {evt.imageSrc ? <Image src={evt.imageSrc} alt={evt.title} fill className="object-cover" sizes="200px" /> : <Typography variant="14/regular" className="flex h-full items-center justify-center text-neutral-400">تصویری ثبت نشده است</Typography>}
+                      {evt.imageSrc ? (
+                        <Image
+                          src={evt.imageSrc}
+                          alt={evt.title}
+                          fill
+                          className="object-cover"
+                          sizes="200px"
+                        />
+                      ) : (
+                        <Typography
+                          variant="14/regular"
+                          className="flex h-full items-center justify-center text-neutral-400"
+                        >
+                          تصویری ثبت نشده است
+                        </Typography>
+                      )}
                     </div>
                     {/* Content Column on Left (Frame 46) */}
                     <div className="flex h-[176px] w-full flex-1 flex-col justify-between py-1">
@@ -224,7 +239,8 @@ export function EventsView({
                       </div>
 
                       {/* Bottom Section: Details + Action Button */}
-                      {evt.hasActionButton ? (
+                      {(isOwner && evt.serviceKey === 'exhibitions') ||
+                      (!isOwner && evt.hasActionButton) ? (
                         /* Frame 91: Has Date/Location + Button */
                         <div className="flex flex-wrap items-end justify-between gap-4">
                           {/* Date and Location */}
@@ -296,7 +312,6 @@ export function EventsView({
           </>
         )}
       </section>
-
     </div>
   )
 }
