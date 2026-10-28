@@ -6,7 +6,7 @@ import { RequestRepository, type RequestRow } from '../src/dashboard/request-rep
 const id = '00000000-0000-4000-8000-000000000001'
 const ownerId = '00000000-0000-4000-8000-000000000002'
 const row: RequestRow = {
-  id, owner_id: ownerId, company_id: null, tracking_code: 'DCH-2026-1', title: 'Request',
+  id, revision: 1, owner_id: ownerId, company_id: null, tracking_code: 'DCH-2026-1', title: 'Request',
   service_id: id, service_key: 'service', service_name: 'Service', status: 'draft',
   current_step_index: 0, assigned_role: null, current_step: null, answers: {},
   submission_date: null, due_date: null,

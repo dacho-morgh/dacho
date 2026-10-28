@@ -64,6 +64,7 @@ import {
 import type { ExhibitionStore } from '../exhibitions/exhibition-store.js'
 import {
   PostgresEvaluationRepository,
+  type EvaluationDto,
   type EvaluationStore,
 } from '../reviews/evaluation-repo.js'
 import { validateAndScoreReview } from '../reviews/scoring.js'
@@ -682,6 +683,20 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   /* ── Evaluation routes (T25) ────────────────────────────────────────── */
 
+  async function currentCompletion(requestId: string, items: EvaluationDto[]): Promise<number> {
+    const active = (await assignments.listForRequest(requestId)).filter((item) => item.active)
+    return items.filter((item) => item.state === 'final' && active.some(
+      (assignment) => assignment.userId === item.userId && assignment.role === item.role,
+    )).length
+  }
+
+  function oversightEvaluation(item: EvaluationDto) {
+    if (item.state === 'final') return item
+    // Unfinished answer content is visible only to its author, including for owner oversight.
+    const { id, requestId, userId, role, variant, state, revision, createdAt, updatedAt, finalizedAt } = item
+    return { id, requestId, userId, role, variant, state, revision, createdAt, updatedAt, finalizedAt }
+  }
+
   router.get('/requests/:id/evaluation', async (req, res, next) => {
     try {
       const actor = actorOf(res)
@@ -694,15 +709,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const assignment = await assignments.findActiveForUser(request.id, actor.id)
-      if (!assignment || assignment.role !== actor.operationalRole) {
+      if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
         res.status(403).json({ error: 'forbidden' })
         return
       }
-      const revision = (request as unknown as { revision?: number }).revision ?? 1
+      const revision = request.revision
       const evaluation = await evaluations.findByRequestAndUser(request.id, actor.id, revision)
-      const completedCount = await evaluations.countFinalized(request.id, revision)
-      res.json({ evaluation, completedEvaluationsCount: completedCount })
+      const completedCount = await currentCompletion(request.id, await evaluations.listForRequest(request.id, revision))
+      res.json({ evaluation, revision, completedEvaluationsCount: completedCount })
     } catch (error) { next(error) }
   })
 
@@ -718,9 +732,16 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const assignment = await assignments.findActiveForUser(request.id, actor.id)
-      if (!assignment || assignment.role !== actor.operationalRole) {
+      if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
         res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!Number.isSafeInteger(req.body?.revision) || req.body.revision < 1) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      if (req.body.revision !== request.revision || request.status !== 'in_review') {
+        res.status(409).json({ error: 'stale_evaluation' })
         return
       }
       const variant = actor.operationalRole === 'employer-reviewer' ? 'employer' : 'ordinary'
@@ -737,7 +758,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(400).json({ error: 'validation_failed', errors: validation.errors })
         return
       }
-      const revision = (request as unknown as { revision?: number }).revision ?? 1
+      const revision = request.revision
       const result = await evaluations.saveDraft({
         requestId: request.id,
         userId: actor.id,
@@ -752,7 +773,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         answers,
       })
       if (!result.ok) {
-        res.status(409).json({ error: 'evaluation_locked' })
+        res.status(result.reason === 'forbidden' ? 403 : 409).json({
+          error: result.reason === 'locked' ? 'evaluation_locked' : result.reason === 'forbidden' ? 'forbidden' : 'stale_evaluation',
+        })
         return
       }
       res.json({ evaluation: result.evaluation })
@@ -771,9 +794,16 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const assignment = await assignments.findActiveForUser(request.id, actor.id)
-      if (!assignment || assignment.role !== actor.operationalRole) {
+      if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
         res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!Number.isSafeInteger(req.body?.revision) || req.body.revision < 1) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      if (req.body.revision !== request.revision || request.status !== 'in_review') {
+        res.status(409).json({ error: 'stale_evaluation' })
         return
       }
       const variant = actor.operationalRole === 'employer-reviewer' ? 'employer' : 'ordinary'
@@ -790,7 +820,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(400).json({ error: 'validation_failed', errors: validation.errors })
         return
       }
-      const revision = (request as unknown as { revision?: number }).revision ?? 1
+      const revision = request.revision
       const result = await evaluations.finalize({
         requestId: request.id,
         userId: actor.id,
@@ -805,7 +835,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         answers,
       })
       if (!result.ok) {
-        res.status(409).json({ error: 'evaluation_locked' })
+        res.status(result.reason === 'forbidden' ? 403 : 409).json({
+          error: result.reason === 'locked' ? 'evaluation_locked' : result.reason === 'forbidden' ? 'forbidden' : 'stale_evaluation',
+        })
         return
       }
       res.json({ evaluation: result.evaluation })
@@ -825,10 +857,15 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const revision = (request as unknown as { revision?: number }).revision ?? 1
+      if (actor.operationalRole === 'chief-reviewer' &&
+          !await assignments.activeFor(request.id, actor.id, 'chief-reviewer')) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const revision = request.revision
       const items = await evaluations.listForRequest(request.id, revision)
-      const completedCount = await evaluations.countFinalized(request.id, revision)
-      res.json({ items, completedCount })
+      const completedCount = await currentCompletion(request.id, items)
+      res.json({ items: items.map(oversightEvaluation), revision, completedCount })
     } catch (error) { next(error) }
   })
 

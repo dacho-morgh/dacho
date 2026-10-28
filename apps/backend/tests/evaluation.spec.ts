@@ -11,6 +11,8 @@ const MISSING_REQUEST_ID = '00000000-0000-4000-8000-000000000002'
 const USERS: User[] = [
   { id: 'owner-1', phone: '09000000001', name: 'System Owner', operationalRole: 'system-owner', isActive: true },
   { id: 'chief-1', phone: '09000000002', name: 'Chief Reviewer', operationalRole: 'chief-reviewer', isActive: true },
+  { id: 'chief-2', phone: '09000000007', name: 'Other Chief', operationalRole: 'chief-reviewer', isActive: true },
+  { id: 'secretariat-1', phone: '09000000008', name: 'Secretariat', operationalRole: 'central-secretariat', isActive: true },
   { id: 'reviewer-1', phone: '09000000003', name: 'Reviewer One', operationalRole: 'reviewer', isActive: true },
   { id: 'reviewer-2', phone: '09000000004', name: 'Reviewer Two', operationalRole: 'reviewer', isActive: true },
   { id: 'employer-1', phone: '09000000005', name: 'Employer Reviewer', operationalRole: 'employer-reviewer', isActive: true },
@@ -78,7 +80,10 @@ function validEmployerRisk() {
   }
 }
 
-async function setupTest(assignments: Array<{ requestId: string; userId: string; role: string; active?: boolean }> = []) {
+async function setupTest(
+  assignments: Array<{ requestId: string; userId: string; role: string; active?: boolean }> = [],
+  requestState = { revision: 2, status: 'in_review' },
+) {
   const userStore = new InMemoryUserStore(USERS)
   const evaluationStore = new InMemoryEvaluationStore()
 
@@ -95,9 +100,9 @@ async function setupTest(assignments: Array<{ requestId: string; userId: string;
             service_id: '1',
             service_key: 'financing',
             owner_id: 'rep-1',
-            status: 'in_review',
+            status: requestState.status,
             current_step_index: 0,
-            revision: 1,
+            revision: requestState.revision,
             created_at: new Date(),
             updated_at: new Date(),
           }],
@@ -108,7 +113,11 @@ async function setupTest(assignments: Array<{ requestId: string; userId: string;
     if (sql.includes('FROM dashboard.case_assignments')) {
       const reqId = params[0]
       const userId = params[1]
-      const found = assignments.filter((a) => a.requestId === reqId && a.userId === userId && (a.active ?? true))
+      const found = assignments.filter((a) => a.requestId === reqId &&
+        (userId === undefined || a.userId === userId) && (a.active ?? true))
+      if (sql.includes('SELECT EXISTS')) {
+        return { rows: [{ present: found.some((item) => item.role === params[2]) }] }
+      }
       return {
         rows: found.map((a, i) => ({
           id: `assignment-${i + 1}`,
@@ -142,6 +151,75 @@ async function setupTest(assignments: Array<{ requestId: string; userId: string;
 }
 
 describe('[T25] Evaluation draft, finalization and lock', () => {
+  it('denies another chief and a revoked chief access to evaluation content', async () => {
+    const chief = { requestId: REQUEST_ID, userId: 'chief-1', role: 'chief-reviewer', active: true }
+    const { app, authHeader } = await setupTest([chief])
+    expect((await request(app).get(`/requests/${REQUEST_ID}/evaluations`).set(authHeader('chief-2'))).status).toBe(404)
+    expect((await request(app).get(`/requests/${REQUEST_ID}/evaluations`).set(authHeader('chief-1'))).status).toBe(200)
+    chief.active = false
+    expect((await request(app).get(`/requests/${REQUEST_ID}/evaluations`).set(authHeader('chief-1'))).status).toBe(404)
+  })
+
+  it('exposes draft metadata but no unfinished answers or scores to oversight roles', async () => {
+    const { app, authHeader } = await setupTest([
+      { requestId: REQUEST_ID, userId: 'reviewer-1', role: 'reviewer' },
+      { requestId: REQUEST_ID, userId: 'chief-1', role: 'chief-reviewer' },
+    ])
+    await request(app).put(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-1'))
+      .send({ revision: 2, scores: { a: { interdisciplinary: 4 } }, answers: { technicalApproachClear: 'yes' } }).expect(200)
+    for (const userId of ['owner-1', 'chief-1', 'secretariat-1']) {
+      const response = await request(app).get(`/requests/${REQUEST_ID}/evaluations`).set(authHeader(userId)).expect(200)
+      expect(response.body.items).toHaveLength(1)
+      expect(response.body.items[0]).toMatchObject({ state: 'draft', userId: 'reviewer-1' })
+      for (const field of ['answers', 'scores', 'scoreA', 'scoreB', 'scoreC', 'weightedHundredths'])
+        expect(response.body.items[0]).not.toHaveProperty(field)
+    }
+    const own = await request(app).get(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-1')).expect(200)
+    expect(own.body.evaluation.answers.technicalApproachClear).toBe('yes')
+  })
+
+  it('uses the persisted revision, rejects stale clients and preserves earlier locked evaluations', async () => {
+    const state = { revision: 2, status: 'in_review' }
+    const { app, evaluationStore, authHeader } = await setupTest([
+      { requestId: REQUEST_ID, userId: 'reviewer-1', role: 'reviewer' },
+    ], state)
+    const payload = { revision: 2, scores: validOrdinaryScores(), answers: validOrdinaryAnswers() }
+    const first = await request(app).post(`/requests/${REQUEST_ID}/evaluation/finalize`).set(authHeader('reviewer-1')).send(payload).expect(200)
+    expect(first.body.evaluation.revision).toBe(2)
+    state.revision = 3
+    const current = await request(app).get(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-1')).expect(200)
+    expect(current.body).toMatchObject({ revision: 3, evaluation: null, completedEvaluationsCount: 0 })
+    await request(app).post(`/requests/${REQUEST_ID}/evaluation/finalize`).set(authHeader('reviewer-1')).send(payload).expect(409)
+    await request(app).put(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-1')).send({ revision: 3, scores: {} }).expect(200)
+    expect((await evaluationStore.findByRequestAndUser(REQUEST_ID, 'reviewer-1', 2))?.state).toBe('final')
+    expect((await evaluationStore.findByRequestAndUser(REQUEST_ID, 'reviewer-1', 3))?.state).toBe('draft')
+  })
+
+  it('counts only active reviewer assignments while retaining revoked evaluation history', async () => {
+    const reviewer = { requestId: REQUEST_ID, userId: 'reviewer-1', role: 'reviewer', active: true }
+    const { app, evaluationStore, authHeader } = await setupTest([reviewer])
+    await request(app).post(`/requests/${REQUEST_ID}/evaluation/finalize`).set(authHeader('reviewer-1'))
+      .send({ revision: 2, scores: validOrdinaryScores(), answers: validOrdinaryAnswers() }).expect(200)
+    expect((await request(app).get(`/requests/${REQUEST_ID}/evaluations`).set(authHeader('owner-1')).expect(200)).body.completedCount).toBe(1)
+    reviewer.active = false
+    const progress = await request(app).get(`/requests/${REQUEST_ID}/evaluations`).set(authHeader('owner-1')).expect(200)
+    expect(progress.body.completedCount).toBe(0)
+    expect(progress.body.items).toHaveLength(1)
+    expect(await evaluationStore.countFinalized(REQUEST_ID, 2)).toBe(1)
+  })
+
+  it('rejects missing revision and writes outside review, and resolves the active matching role', async () => {
+    const state = { revision: 2, status: 'in_review' }
+    const { app, authHeader } = await setupTest([
+      { requestId: REQUEST_ID, userId: 'reviewer-1', role: 'chief-reviewer' },
+      { requestId: REQUEST_ID, userId: 'reviewer-1', role: 'reviewer' },
+    ], state)
+    await request(app).put(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-1')).send({ scores: {} }).expect(400)
+    await request(app).put(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-1')).send({ revision: 2, scores: {} }).expect(200)
+    state.status = 'approved'
+    await request(app).put(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-1')).send({ revision: 2, scores: {} }).expect(409)
+  })
+
   it('rejects unassigned or non-evaluating actors with 403', async () => {
     const { app, authHeader } = await setupTest([
       { requestId: REQUEST_ID, userId: 'reviewer-1', role: 'reviewer' },
@@ -175,7 +253,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
     const draftRes = await request(app)
       .put(`/requests/${REQUEST_ID}/evaluation`)
       .set(authHeader('reviewer-1'))
-      .send({
+      .send({ revision: 2,
         scores: {
           a: { technologyLevel: { tier: 'mid', score: 5 } },
         },
@@ -217,7 +295,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
     await request(app)
       .put(`/requests/${REQUEST_ID}/evaluation`)
       .set(authHeader('reviewer-1'))
-      .send({ scores: { a: { interdisciplinary: 4 } } })
+      .send({ revision: 2, scores: { a: { interdisciplinary: 4 } } })
 
     // Reviewer 2 checks their own evaluation -> null, cannot see reviewer 1's draft
     const res2 = await request(app)
@@ -244,7 +322,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
     await request(app)
       .put(`/requests/${REQUEST_ID}/evaluation`)
       .set(authHeader('reviewer-1'))
-      .send({
+      .send({ revision: 2,
         scores: validOrdinaryScores(),
         answers: {
           ...validOrdinaryAnswers(),
@@ -256,7 +334,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
     const failRes = await request(app)
       .post(`/requests/${REQUEST_ID}/evaluation/finalize`)
       .set(authHeader('reviewer-1'))
-      .send({
+      .send({ revision: 2,
         scores: validOrdinaryScores(),
         answers: {
           ...validOrdinaryAnswers(),
@@ -274,7 +352,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
       { requestId: REQUEST_ID, userId: 'reviewer-1', role: 'reviewer' },
     ])
 
-    const payload = {
+    const payload = { revision: 2,
       scores: validOrdinaryScores(),
       answers: validOrdinaryAnswers(),
     }
@@ -301,7 +379,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
     const editRes = await request(app)
       .put(`/requests/${REQUEST_ID}/evaluation`)
       .set(authHeader('reviewer-1'))
-      .send({ scores: { a: { interdisciplinary: 9 } } })
+      .send({ revision: 2, scores: { a: { interdisciplinary: 9 } } })
 
     expect(editRes.status).toBe(409)
     expect(editRes.body.error).toBe('evaluation_locked')
@@ -328,7 +406,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
     const badEmployerRes = await request(app)
       .post(`/requests/${REQUEST_ID}/evaluation/finalize`)
       .set(authHeader('employer-1'))
-      .send({
+      .send({ revision: 2,
         scores: validOrdinaryScores(),
         answers: {
           risk: { assessment: { done: 'yes' } }, // incomplete!
@@ -344,7 +422,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
     const goodEmployerRes = await request(app)
       .post(`/requests/${REQUEST_ID}/evaluation/finalize`)
       .set(authHeader('employer-1'))
-      .send({
+      .send({ revision: 2,
         scores: validOrdinaryScores(),
         answers: {
           risk: validEmployerRisk(),
@@ -371,7 +449,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
     await request(app)
       .post(`/requests/${REQUEST_ID}/evaluation/finalize`)
       .set(authHeader('reviewer-1'))
-      .send({
+      .send({ revision: 2,
         scores: validOrdinaryScores(),
         answers: validOrdinaryAnswers(),
       })
@@ -396,6 +474,30 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
   })
 
   describe('PostgresEvaluationRepository (database operations & locking)', () => {
+    it.each([
+      { revision: 2, status: 'in_review', reason: 'forbidden' },
+      { revision: 3, status: 'in_review', reason: 'stale' },
+      { revision: 2, status: 'approved', reason: 'stale' },
+    ])('rejects a transaction-time $reason context before inserting answers', async (context) => {
+      const { PostgresEvaluationRepository } = await import('../src/reviews/evaluation-repo.js')
+      const client = {
+        query: async (sql: string) => {
+          if (sql.includes('FROM dashboard.requests')) return { rows: [context] }
+          if (sql.includes('INSERT INTO dashboard.evaluations')) throw new Error('Unauthorized write attempted')
+          return { rows: [] }
+        },
+        release: () => {},
+      }
+      const repo = new PostgresEvaluationRepository({ connect: async () => client } as any)
+      const input = {
+        requestId: REQUEST_ID, userId: 'reviewer-1', role: 'reviewer' as const,
+        variant: 'ordinary' as const, revision: 2, scores: {}, answers: {},
+        scoreA: 0, scoreB: 0, scoreC: 0, weightedHundredths: 0,
+      }
+      expect(await repo.saveDraft(input)).toEqual({ ok: false, reason: context.reason })
+      expect(await repo.finalize(input)).toEqual({ ok: false, reason: context.reason })
+    })
+
     it('executes atomic saveDraft, finalize and rejects modifications when locked', async () => {
       const { PostgresEvaluationRepository } = await import('../src/reviews/evaluation-repo.js')
 
@@ -404,6 +506,12 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
         query: async (sql: string, params: unknown[] = []) => {
           if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
             return { rows: [] }
+          }
+          if (sql.includes('SELECT revision, status FROM dashboard.requests')) {
+            return { rows: [{ revision: 1, status: 'in_review' }] }
+          }
+          if (sql.includes('FROM dashboard.case_assignments')) {
+            return { rows: [{ id: 'active-assignment' }] }
           }
           if (sql.includes('SELECT state FROM dashboard.evaluations')) {
             return { rows: evaluationRow ? [{ state: evaluationRow.state }] : [] }

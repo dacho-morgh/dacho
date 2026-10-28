@@ -1,4 +1,4 @@
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 
 export interface EvaluationDto {
   id: string
@@ -35,7 +35,7 @@ export interface SaveEvaluationInput {
 
 export type EvaluationSaveResult =
   | { ok: true; evaluation: EvaluationDto }
-  | { ok: false; reason: 'locked' }
+  | { ok: false; reason: 'locked' | 'stale' | 'forbidden' }
 
 export interface EvaluationStore {
   findByRequestAndUser(requestId: string, userId: string, revision?: number): Promise<EvaluationDto | null>
@@ -94,6 +94,22 @@ function mapRow(row: EvaluationRow): EvaluationDto {
 export class PostgresEvaluationRepository implements EvaluationStore {
   constructor(private readonly pool: Pool) {}
 
+  private async writeGuard(client: PoolClient, input: SaveEvaluationInput): Promise<'stale' | 'forbidden' | undefined> {
+    // Share locks allow independent reviewers while preventing a revision change
+    // or assignment revocation from committing between authorization and this write.
+    const request = await client.query<{ revision: number; status: string }>(
+      'SELECT revision, status FROM dashboard.requests WHERE id = $1 FOR SHARE',
+      [input.requestId],
+    )
+    if (request.rows[0]?.revision !== input.revision || request.rows[0]?.status !== 'in_review') return 'stale'
+    const assignment = await client.query(
+      `SELECT id FROM dashboard.case_assignments
+       WHERE request_id = $1 AND user_id = $2 AND role = $3 AND active FOR SHARE`,
+      [input.requestId, input.userId, input.role],
+    )
+    if (!assignment.rows[0]) return 'forbidden'
+  }
+
   async findByRequestAndUser(requestId: string, userId: string, revision?: number): Promise<EvaluationDto | null> {
     const params: unknown[] = [requestId, userId]
     let sql = `SELECT ${EVALUATION_COLUMNS} FROM dashboard.evaluations WHERE request_id = $1 AND user_id = $2`
@@ -112,6 +128,11 @@ export class PostgresEvaluationRepository implements EvaluationStore {
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
+      const denied = await this.writeGuard(client, input)
+      if (denied) {
+        await client.query('ROLLBACK')
+        return { ok: false, reason: denied }
+      }
       const { rows: existingRows } = await client.query<{ state: string }>(
         `SELECT state FROM dashboard.evaluations
          WHERE request_id = $1 AND user_id = $2 AND revision = $3
@@ -130,6 +151,8 @@ export class PostgresEvaluationRepository implements EvaluationStore {
            updated_at
          ) VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, now())
          ON CONFLICT (request_id, user_id, revision) DO UPDATE SET
+           role = EXCLUDED.role,
+           variant = EXCLUDED.variant,
            scores = EXCLUDED.scores,
            score_a = EXCLUDED.score_a,
            score_b = EXCLUDED.score_b,
@@ -160,6 +183,11 @@ export class PostgresEvaluationRepository implements EvaluationStore {
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
+      const denied = await this.writeGuard(client, input)
+      if (denied) {
+        await client.query('ROLLBACK')
+        return { ok: false, reason: denied }
+      }
       const { rows: existingRows } = await client.query<{ state: string }>(
         `SELECT state FROM dashboard.evaluations
          WHERE request_id = $1 AND user_id = $2 AND revision = $3
@@ -178,6 +206,8 @@ export class PostgresEvaluationRepository implements EvaluationStore {
            finalized_at, updated_at
          ) VALUES ($1, $2, $3, $4, 'final', $5, $6, $7, $8, $9, $10, $11, now(), now())
          ON CONFLICT (request_id, user_id, revision) DO UPDATE SET
+           role = EXCLUDED.role,
+           variant = EXCLUDED.variant,
            scores = EXCLUDED.scores,
            score_a = EXCLUDED.score_a,
            score_b = EXCLUDED.score_b,
@@ -243,12 +273,14 @@ export class InMemoryEvaluationStore implements EvaluationStore {
   }
 
   async saveDraft(input: SaveEvaluationInput): Promise<EvaluationSaveResult> {
-    const existing = await this.findByRequestAndUser(input.requestId, input.userId, input.revision)
+    const existing = this.items.find((item) => item.requestId === input.requestId && item.userId === input.userId && item.revision === input.revision)
     if (existing?.state === 'final') {
       return { ok: false, reason: 'locked' }
     }
     const now = new Date().toISOString()
     if (existing) {
+      existing.role = input.role
+      existing.variant = input.variant
       existing.scores = input.scores
       existing.scoreA = input.scoreA
       existing.scoreB = input.scoreB
@@ -281,12 +313,14 @@ export class InMemoryEvaluationStore implements EvaluationStore {
   }
 
   async finalize(input: SaveEvaluationInput): Promise<EvaluationSaveResult> {
-    const existing = await this.findByRequestAndUser(input.requestId, input.userId, input.revision)
+    const existing = this.items.find((item) => item.requestId === input.requestId && item.userId === input.userId && item.revision === input.revision)
     if (existing?.state === 'final') {
       return { ok: false, reason: 'locked' }
     }
     const now = new Date().toISOString()
     if (existing) {
+      existing.role = input.role
+      existing.variant = input.variant
       existing.scores = input.scores
       existing.scoreA = input.scoreA
       existing.scoreB = input.scoreB

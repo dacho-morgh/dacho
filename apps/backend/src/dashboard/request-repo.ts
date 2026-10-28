@@ -8,6 +8,7 @@ export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved'
 
 export interface RequestDto {
   id: string
+  revision: number
   trackingCode: string
   title: string
   serviceId: string
@@ -28,6 +29,7 @@ export interface RequestDto {
 
 export interface RequestRow {
   id: string
+  revision: number
   tracking_code: string
   title: string
   service_id: string
@@ -49,18 +51,19 @@ export interface RequestRow {
 export const REQUEST_COLUMNS = `
   id, tracking_code, title, service_id, service_key, service_name, owner_id, company_id, status,
   current_step_index, assigned_role, current_step, answers, submission_date, due_date,
-  created_at, updated_at
+  created_at, updated_at, revision
 `
 
 const REQUEST_COLUMNS_ALIASED = `
   r.id, r.tracking_code, r.title, r.service_id, r.service_key, r.service_name, r.owner_id,
   r.company_id, r.status, r.current_step_index, r.assigned_role, r.current_step, r.answers,
-  r.submission_date, r.due_date, r.created_at, r.updated_at
+  r.submission_date, r.due_date, r.created_at, r.updated_at, r.revision
 `
 
 export function mapRequestRow(row: RequestRow): RequestDto {
   return {
     id: row.id,
+    revision: row.revision,
     trackingCode: row.tracking_code,
     title: row.title,
     serviceId: row.service_id,
@@ -304,7 +307,7 @@ export class RequestRepository {
          SET status = 'in_review', submission_date = now(), updated_at = now(),
              assigned_role = $3, current_step = $4, revision = revision + 1
          WHERE id = $1 AND ${ownership} AND status = 'draft'
-         RETURNING ${REQUEST_COLUMNS}, revision`,
+         RETURNING ${REQUEST_COLUMNS}`,
         [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null, ...(companyId ? [companyId] : [])],
       )
       const updated = rows[0]
