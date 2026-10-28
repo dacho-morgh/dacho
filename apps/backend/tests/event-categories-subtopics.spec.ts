@@ -20,6 +20,7 @@ const USERS: User[] = [
   { id: 'reviewer-1', phone: '09000000006', name: 'Reviewer', operationalRole: 'reviewer', isActive: true },
   { id: 'employer-1', phone: '09000000007', name: 'Employer Reviewer One', operationalRole: 'employer-reviewer', isActive: true },
   { id: 'employer-2', phone: '09000000008', name: 'Employer Reviewer Two', operationalRole: 'employer-reviewer', isActive: true },
+  { id: '1', phone: '09000000012', name: 'Numeric Employer', operationalRole: 'employer-reviewer', isActive: true },
   { id: 'employer-inactive', phone: '09000000009', name: 'Employer Inactive', operationalRole: 'employer-reviewer', isActive: false },
   { id: 'employer-company', phone: '09000000010', name: 'Employer With Company', operationalRole: 'employer-reviewer', isActive: true, companyId: 'company-1' },
   { id: 'rep-1', phone: '09000000011', name: 'Representative', operationalRole: 'representative', isActive: true, companyId: 'company-1' },
@@ -281,6 +282,21 @@ describe('Event categories and subtopics (T17)', () => {
   })
 
   describe('Employer assignment validation (personal account only, no orgs, valid role)', () => {
+    it('accepts a personal employer whose numeric ID also identifies an unrelated company', async () => {
+      const { app, eventStore, categoryStore, companyStore, as } = await createCategorySubtopicTestApp()
+      const event = await seedEvent(eventStore)
+      const cat = await categoryStore.createCategory(event.id, 'فناوری سلامت')
+      expect((await companyStore.findById('1'))?.representativeId).toBe('rep-1')
+
+      const res = await request(app)
+        .post(`/admin/events/${event.id}/subtopics`)
+        .set(as('owner-1'))
+        .send({ title: 'تجهیزات پزشکی', categoryId: cat.id, employerId: '1' })
+
+      expect(res.status).toBe(201)
+      expect(res.body.subtopic.employerId).toBe('1')
+    })
+
     it('rejects subtopic creation when employer account does not exist with 400 ineligible_employer', async () => {
       const { app, eventStore, categoryStore, as } = await createCategorySubtopicTestApp()
       const event = await seedEvent(eventStore)

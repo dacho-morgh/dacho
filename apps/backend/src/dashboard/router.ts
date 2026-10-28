@@ -901,7 +901,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       const user = await deps.userStore.findById(employerId)
-      if (!user || user.companyId || (await deps.companyStore.findById(employerId))) {
+      // User and company IDs belong to different collections and may overlap.
+      // Resolve the employer as a person; an unrelated company's ID is not evidence of its type.
+      if (!user || user.companyId) {
         res.status(400).json({ error: 'ineligible_employer' })
         return
       }
