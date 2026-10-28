@@ -566,6 +566,78 @@ describe('shared access policy and private documents (T09/T10)', () => {
     expect((await request(payload).delete(`/admin/requests/${id}/assignments/${people.chief.id}`).set(headers(people.chief.id))).status).toBe(403)
   })
 
+  it('enforces recipient roles and current case scope when sending letters', async () => {
+    const id = await createRequest()
+    const send = (from: string, recipientId: string, requestId?: string) => request(payload)
+      .post('/letters').set(headers(from)).send({ title: 'نامه', body: 'متن', recipientId, requestId })
+
+    await send(people.repA.id, people.secretariat.id).expect(201)
+    await send(people.repA.id, people.chief.id).expect(403)
+    await send(people.reviewer.id, people.chief.id, id).expect(403)
+    await assign(id, people.reviewer.id, 'reviewer').expect(201)
+    await assign(id, people.chief.id, 'chief-reviewer').expect(201)
+    await send(people.reviewer.id, people.chief.id, id).expect(201)
+    await send(people.reviewer.id, people.secretariat.id, id).expect(403)
+    await send(people.owner.id, people.repB.id).expect(201)
+    await send(people.chief.id, people.repB.id).expect(201)
+    await send(people.chief.id, people.repB.id, id).expect(403)
+    await send(people.investment.id, people.secretariat.id, id).expect(403)
+    await assign(id, people.investment.id, 'investment-reviewer').expect(201)
+    await send(people.investment.id, people.secretariat.id, id).expect(403)
+    await send(people.owner.id, people.investment.id, id).expect(403)
+    await request(payload).delete(`/admin/requests/${id}/assignments/${people.chief.id}`).set(headers(people.owner.id)).expect(200)
+    await send(people.reviewer.id, people.chief.id, id).expect(403)
+    await send(people.owner.id, 'nonexistent').expect(403)
+    await request(payload).get(`/requests/${id}`).set(headers(people.repB.id)).expect(404)
+  })
+
+  it('keeps a sent letter unread until its recipient opens it', async () => {
+    const response = await request(payload).post('/letters').set(headers(people.chief.id))
+      .send({ title: 'نامه تازه', body: 'متن', recipientId: people.repB.id }).expect(201)
+    const letterId = response.body.letter.id as string
+    expect(response.body.letter.senderName).toBe(people.chief.name)
+    expect((await request(payload).get(`/letters/${letterId}`).set(headers(people.chief.id)).expect(200)).body.letter.read).toBe(false)
+    expect((await request(payload).get(`/letters/${letterId}`).set(headers(people.owner.id)).expect(200)).body.letter.read).toBe(false)
+    expect((await request(payload).get(`/letters/${letterId}`).set(headers(people.repB.id)).expect(200)).body.letter.read).toBe(true)
+    const internal = await request(payload).post('/letters').set(headers(people.chief.id))
+      .send({ title: 'نامه دبیرخانه', body: 'متن', recipientId: people.secretariat.id }).expect(201)
+    const internalId = internal.body.letter.id as string
+    expect((await request(payload).get(`/admin/letters/${internalId}`).set(headers(people.owner.id)).expect(200)).body.letter.read).toBe(false)
+    expect((await request(payload).get(`/admin/letters/${internalId}`).set(headers(people.secretariat.id)).expect(200)).body.letter.read).toBe(true)
+  })
+
+  it('rechecks an assignment revoked while a letter is being authorized', async () => {
+    const id = await createRequest()
+    await assign(id, people.reviewer.id, 'reviewer').expect(201)
+    await assign(id, people.chief.id, 'chief-reviewer').expect(201)
+    const revoker = await pool.connect()
+    let settled = false
+    try {
+      await revoker.query('BEGIN')
+      await revoker.query('UPDATE dashboard.case_assignments SET active = false WHERE request_id = $1 AND user_id = $2', [id, people.reviewer.id])
+      const sending = request(payload).post('/letters').set(headers(people.reviewer.id))
+        .send({ title: 'نباید ارسال شود', body: 'متن', recipientId: people.chief.id, requestId: id })
+        .then((response) => { settled = true; return response })
+      const deadline = Date.now() + 3000
+      let waiting = false
+      while (!settled && !waiting && Date.now() < deadline) {
+        const state = await pool.query<{ waiting: boolean }>(`SELECT EXISTS (
+          SELECT 1 FROM pg_stat_activity WHERE application_name = 'access-documents-integration'
+            AND query LIKE '%WITH locked_letter_assignments AS MATERIALIZED%' AND wait_event_type = 'Lock'
+        ) AS waiting`)
+        waiting = state.rows[0]?.waiting === true
+        if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      expect(waiting).toBe(true)
+      await revoker.query('COMMIT')
+      expect((await sending).status).toBe(403)
+      expect((await pool.query('SELECT id FROM dashboard.letters WHERE request_id = $1', [id])).rows).toHaveLength(0)
+    } finally {
+      await revoker.query('ROLLBACK')
+      revoker.release()
+    }
+  })
+
   it('scopes letter reads to participant/assignment and supports draft-only deletion', async () => {
     const id = await createRequest()
     const participantLetter = await pool.query<{ id: string }>(

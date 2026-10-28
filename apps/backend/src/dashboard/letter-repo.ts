@@ -2,6 +2,7 @@ import type { Pool } from 'pg'
 
 import type { RequestScope } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
+import { requestScopeClause } from './request-repo.js'
 
 export type LetterType = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -171,6 +172,44 @@ export class LetterRepository {
     return mapRow(rows[0])
   }
 
+  /** Authorize both parties and insert against one database snapshot, locking
+   * active assignment rows so a concurrent revocation cannot race the send. */
+  async createScoped(
+    input: CreateLetterInput,
+    senderScope: RequestScope,
+    recipientScope: RequestScope,
+    requireResponsibleChief: boolean,
+  ): Promise<LetterDto | undefined> {
+    if (!input.requestId) return this.create(input)
+    const params: unknown[] = [input.type, input.title, input.body, input.senderId ?? null,
+      input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId]
+    const scopeClause = (scope: RequestScope): string => {
+      if (scope.kind !== 'assigned') return requestScopeClause(scope, params, 'r')
+      params.push(scope.userId, scope.role)
+      return `EXISTS (SELECT 1 FROM locked_letter_assignments a
+        WHERE a.user_id = $${params.length - 1} AND a.role = $${params.length})`
+    }
+    const senderClause = scopeClause(senderScope)
+    const recipientClause = scopeClause(recipientScope)
+    const chiefClause = requireResponsibleChief ? `
+      AND (SELECT COUNT(*) FROM locked_letter_assignments WHERE role = 'chief-reviewer') = 1
+      AND EXISTS (SELECT 1 FROM locked_letter_assignments WHERE role = 'chief-reviewer' AND user_id = $7)
+    ` : ''
+    const { rows } = await this.pool.query<LetterRow>(
+      `WITH locked_letter_assignments AS MATERIALIZED (
+         SELECT user_id, role FROM dashboard.case_assignments
+         WHERE request_id = $8 AND active FOR SHARE
+       )
+       INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
+       SELECT $1, $2, $3, $4, $5, $6, $7, $8, false
+       FROM dashboard.requests r
+       WHERE r.id = $8 AND (${senderClause}) AND (${recipientClause}) ${chiefClause}
+       RETURNING ${LETTER_COLUMNS}`,
+      params,
+    )
+    return rows[0] ? mapRow(rows[0]) : undefined
+  }
+
   async listAll(options: { page: number; limit: number; recipientId?: string }): Promise<LetterList> {
     const where = options.recipientId ? 'WHERE recipient_id = $1' : ''
     const params: unknown[] = options.recipientId ? [options.recipientId] : []
@@ -264,14 +303,15 @@ export class LetterRepository {
     return rows[0] ? mapRow(rows[0]) : undefined
   }
 
-  async findByIdAndMarkReadScoped(id: string, scope: RequestScope): Promise<LetterDto | undefined> {
+  async findByIdAndMarkReadScoped(id: string, scope: RequestScope, actorId: string): Promise<LetterDto | undefined> {
     const existing = await this.findByIdScoped(id, scope)
     if (!existing) return undefined
-    const params: unknown[] = [id]
+    if (existing.recipientId !== actorId) return existing
+    const params: unknown[] = [id, actorId]
     const whereSql = letterScopeClause(scope, params, 'l')
     const { rows } = await this.pool.query<LetterRow>(
       `UPDATE dashboard.letters l SET read = true, updated_at = now()
-       WHERE l.id = $1 AND ${whereSql}
+       WHERE l.id = $1 AND l.recipient_id = $2 AND ${whereSql}
        RETURNING l.id, l.type, l.title, l.body, l.sender_id, l.sender_name, l.sender_role,
                  l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments,
                  l.created_at, l.updated_at`,
