@@ -1,3 +1,4 @@
+import { seedVerifiedCompanies, clearVerifiedCompanies } from './verified-company-fixtures.js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
@@ -69,9 +70,13 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
   beforeAll(async () => {
     await runMigrations(process.env.DATABASE_URL!)
   })
-  beforeEach(cleanup)
+  beforeEach(async () => {
+    await cleanup()
+    await seedVerifiedCompanies(pool, companyStore)
+  })
   afterAll(async () => {
     await cleanup()
+    await clearVerifiedCompanies(pool)
     await pool.end()
   })
 

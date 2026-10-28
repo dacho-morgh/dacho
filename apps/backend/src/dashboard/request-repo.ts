@@ -4,6 +4,7 @@ import type { RequestScope } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
 import { appendTransition } from './transition-history.js'
 import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
+import { lockApprovedVerification } from './verification-repo.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
@@ -35,12 +36,6 @@ export interface RequestVerificationDto {
   revision: number
   snapshot: Record<string, unknown>
   createdAt: string
-}
-
-export interface RequestVerificationSnapshot {
-  id: string
-  revision: number
-  snapshot: Record<string, unknown>
 }
 
 export interface RequestRow {
@@ -332,8 +327,8 @@ export class RequestRepository {
     ownerId: string,
     step?: { assignedRole: string; currentStep: string },
     companyId?: string | null,
-    verification?: RequestVerificationSnapshot,
-  ): Promise<RequestDto | 'not_found' | 'already_submitted' | 'stale_rfp'> {
+    requireVerification = false,
+  ): Promise<RequestDto | 'not_found' | 'already_submitted' | 'stale_rfp' | 'company_not_verified'> {
     if (!isUuid(id)) return 'not_found'
     const ownership = companyId
       ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
@@ -376,6 +371,23 @@ export class RequestRepository {
         await client.query('ROLLBACK')
         return 'stale_rfp'
       }
+      if (requireVerification) {
+        const verificationCompanyId = companyId ?? updated.company_id
+        // Serialize with re-verification submissions and invalidations. Read the
+        // authoritative snapshot inside this transaction, never from the caller.
+        const verification = await lockApprovedVerification(client, verificationCompanyId)
+        if (!verification) {
+          await client.query('ROLLBACK')
+          return 'company_not_verified'
+        }
+        await client.query(
+          `INSERT INTO dashboard.request_verifications
+             (request_id, company_id, verification_id, revision, snapshot)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [updated.id, verificationCompanyId, verification.id, verification.revision,
+            JSON.stringify(verification.snapshot)],
+        )
+      }
       await appendTransition(client, {
         requestId: updated.id,
         ownerId: updated.owner_id,
@@ -398,21 +410,6 @@ export class RequestRepository {
         body: `درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} ارسال شد.`,
       })
       submittedRequest = mapRequestRow(updated)
-      if (verification) {
-        await client.query(
-          `INSERT INTO dashboard.request_verifications
-             (request_id, company_id, verification_id, revision, snapshot)
-           VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (request_id) DO NOTHING`,
-          [
-            updated.id,
-            companyId ?? updated.company_id,
-            verification.id,
-            verification.revision,
-            JSON.stringify(verification.snapshot),
-          ],
-        )
-      }
       notificationJobId = job.id
       await client.query('COMMIT')
     } catch (err) {

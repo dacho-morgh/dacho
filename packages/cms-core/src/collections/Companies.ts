@@ -10,6 +10,7 @@ import {
 } from '@cms-core/access/roles'
 import { companyDirectory } from '@cms-core/endpoints/companyDirectory'
 import { validateCompanyAbsenceList } from './companyAbsence'
+import { invalidateCompanyVerification } from '../hooks/invalidateCompanyVerification'
 
 /**
  * A Company (شرکت) — the organization that applies for the Innovation
@@ -77,6 +78,7 @@ export const Companies: CollectionConfig = {
     update: canEditCompany,
   },
   endpoints: [companyDirectory],
+  hooks: { beforeChange: [invalidateCompanyVerification] },
   admin: {
     useAsTitle: 'name',
     defaultColumns: ['name', 'nationalId', 'type', 'city', 'representative'],

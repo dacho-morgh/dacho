@@ -5,6 +5,7 @@ import config from '@/payload.config'
 import { PayloadCompanyStore } from '../../../backend/src/auth/company-store'
 import { PayloadUserStore } from '../../../backend/src/auth/payload-user-store'
 import { ProfileRepository } from '../../../backend/src/dashboard/profile-repo'
+import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 
 // Dispatch through Payload's real REST handlers/auth/access/serialization and
 // Postgres, rather than faking responses from the CMS adapter.
@@ -81,8 +82,28 @@ describe('company persistence and private CMS boundaries (T05/T06)', () => {
   }, 60_000)
 
   afterAll(async () => {
+    const db = (payload.db as unknown as PostgresAdapter).drizzle
+    for (const id of companies) {
+      await db.execute(sql`DELETE FROM dashboard.company_verifications WHERE company_id = ${String(id)}`)
+    }
     for (const id of companies) await payload.delete({ collection: 'companies', id })
     for (const id of users) await payload.delete({ collection: 'users', id })
+  })
+
+  it.each(['approved', 'pending'] as const)('invalidates %s verification on direct CMS identity edits', async (status) => {
+    const db = (payload.db as unknown as PostgresAdapter).drizzle
+    const id = String(companyId)
+    await db.execute(sql`DELETE FROM dashboard.company_verifications WHERE company_id = ${id}`)
+    await db.execute(sql`
+      INSERT INTO dashboard.company_verifications (company_id, representative_id, status, snapshot)
+      VALUES (${id}, ${String(users[0])}, ${status}, '{"company":{"name":"Historical approved name"}}'::jsonb)
+    `)
+    const response = await rest(`companies/${companyId}`, keys[0], 'PATCH', { name: `CMS identity ${status}` })
+    expect(response.status).toBe(200)
+    const verification = await db.execute(sql`SELECT status, snapshot FROM dashboard.company_verifications WHERE company_id = ${id}`)
+    expect(verification.rows).toEqual([{ status: 'returned', snapshot: { company: { name: 'Historical approved name' } } }])
+    await db.execute(sql`DELETE FROM dashboard.company_verifications WHERE company_id = ${id}`)
+    await rest(`companies/${companyId}`, keys[0], 'PATCH', { name: 'شرکت آزمون 0' })
   })
 
   it('persists create/edit/delete and explicit empty arrays through fresh CMS adapters', async () => {

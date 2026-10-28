@@ -30,6 +30,7 @@ import {
   DossierValidationError,
   dossierOfCompany,
   missingDossierItems,
+  mergeDossier,
   pickDossierUpdate,
   SqlDossierDocumentSource,
   type DossierDocumentSource,
@@ -50,7 +51,7 @@ import { DocumentRepository, type PrivateDocumentRecord } from '../documents/rep
 import { canSendLetter } from './letter-policy.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
-import { RequestRepository, type RequestVerificationSnapshot } from './request-repo.js'
+import { RequestRepository } from './request-repo.js'
 import { StatsRepository } from './stats-repo.js'
 import type { CompanyStore } from '../auth/company-store.js'
 import type { User, UserStore } from '../auth/user-store.js'
@@ -674,12 +675,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
 
-    if (deps.eventCompanyEligibility) {
-      const isVerified = companyId ? await deps.eventCompanyEligibility.isVerified(companyId) : false
-      if (!isVerified) {
-        res.status(403).json({ error: 'company_not_verified' })
-        return
-      }
+    const currentVerification = companyId
+      ? await verificationStore.findCurrentByCompanyId(companyId)
+      : null
+    if (currentVerification?.status !== 'approved' ||
+        (deps.eventCompanyEligibility && !await deps.eventCompanyEligibility.isVerified(companyId!))) {
+      res.status(403).json({ error: 'company_not_verified' })
+      return
     }
 
     // Validate answers against the service's form schema (required fields present).
@@ -692,26 +694,18 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
     }
 
-    let verificationSnapshot: RequestVerificationSnapshot | undefined
-    if (companyId) {
-      const currentVerif = await verificationStore.findCurrentByCompanyId(companyId)
-      if (currentVerif && currentVerif.status === 'approved') {
-        verificationSnapshot = {
-          id: currentVerif.id,
-          revision: currentVerif.revision,
-          snapshot: currentVerif.snapshot,
-        }
-      }
-    }
-
     const firstStep = service?.workflow[0]
     const result = await repo.submit(
       req.params.id,
       actor.id,
       firstStep ? { assignedRole: firstStep.roleName, currentStep: firstStep.title } : undefined,
       companyId,
-      verificationSnapshot,
+      true,
     )
+    if (result === 'company_not_verified') {
+      res.status(403).json({ error: 'company_not_verified' })
+      return
+    }
     if (result === 'not_found') {
       res.status(404).json({ error: 'not_found' })
       return
@@ -741,6 +735,18 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       if (!pinned) {
         res.status(404).json({ error: 'not_found' })
         return
+      }
+      if (!isCompanyAdministrator(actor.operationalRole) && !isRepresentative(actor.operationalRole)) {
+        // Case assignment permits only the profile fields needed for review;
+        // it never grants access to the private verification dossier or files.
+        const company = (pinned.snapshot.company ?? {}) as Record<string, unknown>
+        const dossier = (pinned.snapshot.dossier ?? {}) as Record<string, unknown>
+        pinned.snapshot = {
+          company: { name: company.name, nationalId: company.nationalId, type: company.type,
+            province: company.province, city: company.city },
+          dossier: { legalEntityType: dossier.legalEntityType, classification: dossier.classification,
+            activityDomain: dossier.activityDomain, productsServices: dossier.productsServices },
+        }
       }
       res.json({ verification: pinned })
     } catch (error) { next(error) }
@@ -1359,7 +1365,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json(dashboardSelfProfile(actor.user, actor.operationalRole))
   })
 
-  router.patch('/profile', async (req, res) => {
+  router.patch('/profile', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const { company, contacts } = req.body ?? {}
     let profile = await profileRepo.getProfile(actor.id)
@@ -1371,6 +1378,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     let dossierUpdate
     try {
       dossierUpdate = pickDossierUpdate(req.body?.dossier ?? req.body)
+      mergeDossier(profile.dossier, dossierUpdate)
     } catch (error) {
       if (error instanceof DossierValidationError) {
         res.status(400).json({ error: error.code })
@@ -1398,6 +1406,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
     }
 
+    // Invalidate before any external write: a later contact/storage failure
+    // must not leave changed identity data eligible under the old approval.
+    if (identityChanged && initialProfile.companyId) {
+      await verificationStore.invalidateApproval(
+        initialProfile.companyId,
+        'تغییر اطلاعات هویتی؛ نیازمند احراز مجدد',
+      )
+    }
     // Write the dossier first: its merge validation is the only 400-producing
     // part of this combined PATCH, so a rejected request must not leave the
     // company, contacts or executives partially updated.
@@ -1421,13 +1437,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (Array.isArray(req.body?.executives)) {
       profile = await profileRepo.updateExecutives(actor.id, req.body.executives)
     }
-    if (identityChanged && initialProfile.companyId) {
-      await verificationStore.invalidateApproval(
-        initialProfile.companyId,
-        'تغییر اطلاعات هویتی؛ نیازمند احراز مجدد',
-      )
-    }
     res.json(profile)
+    } catch (error) { next(error) }
   })
 
   router.get('/profile/dossier', async (_req, res, next) => {
@@ -1460,11 +1471,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
-  router.patch('/profile/dossier', async (req, res) => {
+  router.patch('/profile/dossier', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
+    const currentProfile = await profileRepo.getProfile(actor.id)
     let update
     try {
       update = pickDossierUpdate(req.body?.dossier ?? req.body)
+      mergeDossier(currentProfile.dossier, update)
     } catch (error) {
       if (error instanceof DossierValidationError) {
         res.status(400).json({ error: error.code })
@@ -1472,13 +1486,18 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
       throw error
     }
-    const currentProfile = await profileRepo.getProfile(actor.id)
     let identityChanged = false
     if (
       update.legalEntityType !== undefined &&
       update.legalEntityType !== currentProfile.dossier.legalEntityType
     ) {
       identityChanged = true
+    }
+    if (identityChanged && currentProfile.companyId) {
+      await verificationStore.invalidateApproval(
+        currentProfile.companyId,
+        'تغییر اطلاعات هویتی؛ نیازمند احراز مجدد',
+      )
     }
     let profile
     try {
@@ -1495,18 +1514,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(404).json({ error: 'company_not_found' })
       return
     }
-    if (identityChanged && currentProfile.companyId) {
-      await verificationStore.invalidateApproval(
-        currentProfile.companyId,
-        'تغییر اطلاعات هویتی؛ نیازمند احراز مجدد',
-      )
-    }
     const documents = await dossierDocuments.listCompanyDocuments(company.id)
     res.json({
       dossier: profile.dossier,
       documents,
       missing: missingDossierItems(company, profile.dossier, documents),
     })
+    } catch (error) { next(error) }
   })
 
   router.post('/profile/verification/invalidate', async (req, res, next) => {
@@ -2323,12 +2337,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'company_not_found' })
         return
       }
-      // Fail closed until the authoritative verification workflow is connected.
-      if (!deps.boothCompanyEligibility) {
-        res.status(503).json({ error: 'company_verification_unavailable' })
-        return
-      }
-      if (!await deps.boothCompanyEligibility.isVerified(company.id)) {
+      const eligibility = deps.boothCompanyEligibility ?? verificationStore
+      if (!await eligibility.isVerified(company.id)) {
         res.status(403).json({ error: 'company_not_verified' })
         return
       }
@@ -2350,8 +2360,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         boothId: req.params.boothId,
         companyId: company.id,
         actorId: actor.id,
+        requireVerification: true,
       })
       if (!result.ok) {
+        if (result.error === 'company_not_verified') {
+          res.status(403).json({ error: result.error })
+          return
+        }
         if (result.error === 'catalogue_not_configured') {
           res.status(400).json({ error: result.error })
           return

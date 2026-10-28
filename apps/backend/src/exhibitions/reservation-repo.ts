@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import type { BoothCatalogueRepository } from './catalogue-repo.js'
+import { lockApprovedVerification } from '../dashboard/verification-repo.js'
 
 export type AttendanceStatus = 'pending' | 'approved' | 'rejected'
 
@@ -53,7 +54,7 @@ export type AttendanceDecisionResult =
 
 export type ReserveResult =
   | { ok: true; reservation: BoothReservationDto }
-  | { ok: false; error: 'catalogue_not_configured' | 'booth_unavailable' | 'company_limit_reached' }
+  | { ok: false; error: 'catalogue_not_configured' | 'booth_unavailable' | 'company_limit_reached' | 'company_not_verified' }
 
 export type CanSubmitReceiptResult =
   | { ok: true; reservation: BoothReservationDto }
@@ -78,8 +79,16 @@ export function computeReservationAllowedActions(
   return ['read']
 }
 
+export interface ReserveInput {
+  exhibitionId: string
+  boothId: string
+  companyId: string
+  actorId: string
+  requireVerification?: boolean
+}
+
 export interface BoothReservationRepository {
-  reserve(input: { exhibitionId: string; boothId: string; companyId: string; actorId: string }): Promise<ReserveResult>
+  reserve(input: ReserveInput): Promise<ReserveResult>
   findById(id: string, role?: string): Promise<BoothReservationDto | null>
   listByExhibition(
     exhibitionId: string,
@@ -138,10 +147,14 @@ function mapReservationRow(row: ReservationRow, role?: string): BoothReservation
 export class PostgresBoothReservationRepository implements BoothReservationRepository {
   constructor(private readonly pool: Pool) {}
 
-  async reserve(input: { exhibitionId: string; boothId: string; companyId: string; actorId: string }): Promise<ReserveResult> {
+  async reserve(input: ReserveInput): Promise<ReserveResult> {
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
+      if (input.requireVerification && !await lockApprovedVerification(client, input.companyId)) {
+        await client.query('ROLLBACK')
+        return { ok: false, error: 'company_not_verified' }
+      }
       // Serializes reservations and concurrent changes to the configured limit.
       const settings = await client.query<{ company_booth_limit: string }>(
         'SELECT company_booth_limit FROM dashboard.exhibition_catalogue_settings WHERE exhibition_id = $1 FOR UPDATE',
@@ -377,7 +390,7 @@ export class InMemoryBoothReservationRepository implements BoothReservationRepos
     return false
   }
 
-  async reserve(input: { exhibitionId: string; boothId: string; companyId: string; actorId: string }): Promise<ReserveResult> {
+  async reserve(input: ReserveInput): Promise<ReserveResult> {
     let selectedBooth: Awaited<ReturnType<BoothCatalogueRepository['getBooth']>>
     if (this.catalogue) {
       const settings = await this.catalogue.getSettings(input.exhibitionId)

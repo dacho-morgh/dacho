@@ -1,3 +1,4 @@
+import { seedVerifiedCompanies, clearVerifiedCompanies } from './verified-company-fixtures.js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import request from 'supertest'
@@ -103,9 +104,11 @@ describe('T35 - Case-linked letters and private attachments integration', () => 
     await pool.query('DELETE FROM dashboard.private_documents')
     await pool.query('DELETE FROM dashboard.case_assignments')
     await pool.query('DELETE FROM dashboard.requests')
+    await seedVerifiedCompanies(pool, companyStore)
   })
 
   afterAll(async () => {
+    await clearVerifiedCompanies(pool)
     await pool.end()
     try {
       rmSync(storageRoot, { recursive: true, force: true })

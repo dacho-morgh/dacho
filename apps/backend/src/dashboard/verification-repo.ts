@@ -1,4 +1,4 @@
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { isUuid } from '../db/uuid.js'
 
 export type VerificationStatus = 'unsubmitted' | 'pending' | 'approved' | 'returned' | 'rejected'
@@ -96,6 +96,22 @@ const VERIFICATION_COLUMNS = `
   submitted_at, decided_at, reviewer_id, reason, created_at, updated_at
 `
 
+/** Keep eligibility and the approved snapshot stable until the caller commits. */
+export async function lockApprovedVerification(client: PoolClient, companyId: string | null | undefined) {
+  if (!companyId) return null
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+    `company-verification:${companyId}`,
+  ])
+  const { rows } = await client.query<{
+    id: string; revision: number; status: string; snapshot: Record<string, unknown>
+  }>(
+    `SELECT id, revision, status, snapshot FROM dashboard.company_verifications
+     WHERE company_id = $1 ORDER BY revision DESC LIMIT 1 FOR SHARE`,
+    [companyId],
+  )
+  return rows[0]?.status === 'approved' ? rows[0] : null
+}
+
 function mapRow(row: VerificationRow): CompanyVerificationDto {
   return {
     id: row.id,
@@ -152,13 +168,16 @@ export class PostgresVerificationStore implements VerificationStore {
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        `company-verification:${companyId}`,
+      ])
       const { rows } = await client.query<VerificationRow>(
         `SELECT ${VERIFICATION_COLUMNS} FROM dashboard.company_verifications
          WHERE company_id = $1 ORDER BY revision DESC LIMIT 1 FOR UPDATE`,
         [companyId],
       )
       const current = rows[0]
-      if (!current || current.status !== 'approved') {
+      if (!current || (current.status !== 'approved' && current.status !== 'pending')) {
         await client.query('ROLLBACK')
         return false
       }
@@ -172,8 +191,8 @@ export class PostgresVerificationStore implements VerificationStore {
         `INSERT INTO dashboard.activities
            (owner_id, request_id, letter_id, type, title, description,
             actor_id, action, reason, from_state, to_state, revision)
-         VALUES ($1, NULL, NULL, 'transition', 'ابطال تأیید احراز جهت احراز مجدد', NULL, $2, 'verification_return', $3, 'approved', 'returned', $4)`,
-        [current.representative_id, current.representative_id, reason, current.revision],
+         VALUES ($1, NULL, NULL, 'transition', 'ابطال تأیید احراز جهت احراز مجدد', NULL, $2, 'verification_return', $3, $4, 'returned', $5)`,
+        [current.representative_id, current.representative_id, reason, current.status, current.revision],
       )
       await client.query('COMMIT')
       return true
@@ -422,7 +441,7 @@ export class InMemoryVerificationStore implements VerificationStore {
     const target = this.items
       .filter((item) => item.companyId === companyId)
       .sort((a, b) => b.revision - a.revision)[0]
-    if (!target || target.status !== 'approved') return false
+    if (!target || (target.status !== 'approved' && target.status !== 'pending')) return false
     target.status = 'returned'
     target.reason = reason
     target.updatedAt = new Date().toISOString()

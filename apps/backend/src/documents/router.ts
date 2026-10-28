@@ -327,6 +327,13 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const storageKey = await storage.save(validated.file.body, validated.file.extension)
       let record: PrivateDocumentRecord
       try {
+        if (audience === 'company' && parentCompanyId &&
+            ['articlesOfAssociation', 'establishmentNotices', 'amendmentNotices'].includes(category)) {
+          await deps.verificationStore?.invalidateApproval(
+            parentCompanyId,
+            'تغییر مدارک ثبتی؛ نیازمند احراز مجدد',
+          )
+        }
         const input = {
           storageKey,
           category: validated.file.category,
@@ -378,19 +385,6 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const assigned = requestId
         ? await isAssignedTo(requestId, actor.id, actor.operationalRole)
         : false
-      if (audience === 'company' && parentCompanyId) {
-        const registrationCategories: readonly DocumentCategory[] = [
-          'articlesOfAssociation',
-          'establishmentNotices',
-          'amendmentNotices',
-        ]
-        if (registrationCategories.includes(category)) {
-          await deps.verificationStore?.invalidateApproval(
-            parentCompanyId,
-            'تغییر مدارک ثبتی؛ نیازمند احراز مجدد',
-          )
-        }
-      }
       res.status(201).json({
         document: present(record, actor.id, actor.operationalRole, companyId, assigned),
       })

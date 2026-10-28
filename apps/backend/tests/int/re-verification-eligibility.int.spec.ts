@@ -32,6 +32,61 @@ describe('T15: Re-verification and participation eligibility (PostgreSQL Integra
     await pool.end()
   })
 
+  it.each(['unsubmitted', 'pending', 'returned', 'rejected'] as const)(
+    'rolls back submission without history or notifications when verification is %s', async (status) => {
+      if (status !== 'unsubmitted') {
+        const submitted = await verificationStore.submit({ companyId, representativeId, snapshot: {} })
+        if (!submitted.ok) throw new Error('Verification fixture failed')
+        if (status !== 'pending') {
+          await verificationStore.decide({ id: submitted.verification.id, reviewerId: secretariatId,
+            action: status === 'returned' ? 'return' : 'reject', reason: 'Fixture decision' })
+        }
+      }
+      const draft = await requestRepo.create({ serviceId: 'event', serviceKey: 'event', serviceName: 'Event',
+        title: 'Unverified submission', ownerId: representativeId, companyId, answers: {} })
+      expect(await requestRepo.submit(draft.id, representativeId, undefined, companyId, true))
+        .toBe('company_not_verified')
+      expect(await requestRepo.findByIdAny(draft.id)).toMatchObject({ status: 'draft', revision: 1 })
+      expect((await pool.query('SELECT id FROM dashboard.activities WHERE request_id = $1', [draft.id])).rows).toEqual([])
+      expect((await pool.query('SELECT id FROM dashboard.notification_jobs WHERE request_id = $1', [draft.id])).rows).toEqual([])
+      expect(await requestRepo.findRequestVerification(draft.id)).toBeNull()
+    },
+  )
+
+  it('rejects approval of a pending revision invalidated by an identity edit', async () => {
+    const submitted = await verificationStore.submit({ companyId, representativeId, snapshot: {} })
+    if (!submitted.ok) throw new Error('Verification fixture failed')
+    expect(await verificationStore.invalidateApproval(companyId, 'Changed pending identity')).toBe(true)
+    expect(await verificationStore.decide({ id: submitted.verification.id, action: 'approve', reviewerId: secretariatId }))
+      .toEqual({ ok: false, reason: 'not_pending' })
+    const activity = await pool.query("SELECT from_state FROM dashboard.activities WHERE owner_id = $1 AND action = 'verification_return'", [representativeId])
+    expect(activity.rows).toEqual([{ from_state: 'pending' }])
+  })
+
+  it('rechecks approval under a row lock when invalidation races with submission', async () => {
+    const submitted = await verificationStore.submit({ companyId, representativeId, snapshot: { marker: 'approved' } })
+    if (!submitted.ok) throw new Error('Verification fixture failed')
+    await verificationStore.decide({ id: submitted.verification.id, action: 'approve', reviewerId: secretariatId })
+    const draft = await requestRepo.create({ serviceId: 'event', serviceKey: 'event', serviceName: 'Event',
+      title: 'Concurrent identity edit', ownerId: representativeId, companyId, answers: {} })
+    const client = await pool.connect()
+    let submission: ReturnType<RequestRepository['submit']> | undefined
+    try {
+      await client.query('BEGIN')
+      await client.query('SELECT id FROM dashboard.company_verifications WHERE id = $1 FOR UPDATE', [submitted.verification.id])
+      submission = requestRepo.submit(draft.id, representativeId, undefined, companyId, true)
+      await client.query("UPDATE dashboard.company_verifications SET status = 'returned' WHERE id = $1", [submitted.verification.id])
+      await client.query('COMMIT')
+      expect(await submission).toBe('company_not_verified')
+      expect(await requestRepo.findByIdAny(draft.id)).toMatchObject({ status: 'draft' })
+      expect(await requestRepo.findRequestVerification(draft.id)).toBeNull()
+    } finally {
+      await client.query('ROLLBACK')
+      client.release()
+      await submission
+    }
+  })
+
   it('verifies company, pins immutable snapshot on request submit, invalidates on identity change, and preserves historical snapshot', async () => {
     // 1. Initial verification submission and approval
     const submitResult = await verificationStore.submit({
@@ -75,11 +130,7 @@ describe('T15: Re-verification and participation eligibility (PostgreSQL Integra
       representativeId,
       { assignedRole: 'دبیرخانه', currentStep: 'بررسی اولیه' },
       companyId,
-      {
-        id: currentVerif!.id,
-        revision: currentVerif!.revision,
-        snapshot: currentVerif!.snapshot,
-      },
+      true,
     )
 
     expect(typeof submitReqResult).toBe('object')

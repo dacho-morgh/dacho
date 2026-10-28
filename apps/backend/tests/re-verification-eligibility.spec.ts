@@ -119,8 +119,6 @@ describe('T15: Re-verification and participation eligibility', () => {
       verificationStore,
       boothCatalogue: catalogue,
       boothReservations,
-      boothCompanyEligibility: verificationStore,
-      eventCompanyEligibility: verificationStore,
       pool: poolOverride,
     })
 
@@ -202,7 +200,7 @@ describe('T15: Re-verification and participation eligibility', () => {
       })
     })
 
-    it('refuses formal request submission for unverified company', async () => {
+    it.each(['unsubmitted', 'pending', 'returned', 'rejected'] as const)('refuses formal request submission for %s company without an eligibility override', async (status) => {
       // Pool stub returning a draft request
       const poolQuery = vi.fn().mockImplementation(async (sql: string) => {
         if (sql.includes('SELECT') && sql.includes('FROM dashboard.requests')) {
@@ -235,7 +233,7 @@ describe('T15: Re-verification and participation eligibility', () => {
       })
 
       const poolStub = { query: poolQuery, connect: vi.fn() } as unknown as Pool
-      const { testApp, repHeaders } = await setup('pending', poolStub)
+      const { testApp, repHeaders } = await setup(status, poolStub)
 
       const reqRes = await request(testApp.app)
         .post('/requests/00000000-0000-4000-8000-000000000001/submit')
@@ -263,6 +261,26 @@ describe('T15: Re-verification and participation eligibility', () => {
       const after = await verificationStore.findCurrentByCompanyId(company.id)
       expect(after?.status).toBe('returned')
       expect(after?.reason).toContain('تغییر اطلاعات هویتی')
+    })
+
+    it('requires a new revision when identity changes during pending review', async () => {
+      const { testApp, repHeaders, verificationStore, company, secretariat } = await setup('pending')
+      const original = (await verificationStore.findCurrentByCompanyId(company.id))!
+      await request(testApp.app).patch('/profile').set(repHeaders)
+        .send({ company: { name: 'Changed while pending' } }).expect(200)
+      expect(await verificationStore.decide({ id: original.id, action: 'approve', reviewerId: secretariat.id }))
+        .toEqual({ ok: false, reason: 'not_pending' })
+      const resubmitted = await verificationStore.submit({ companyId: company.id, representativeId: original.representativeId, snapshot: {} })
+      expect(resubmitted).toMatchObject({ ok: true, verification: { revision: 2, status: 'pending' } })
+    })
+
+    it('revokes eligibility before a later contact update fails', async () => {
+      const { testApp, repHeaders, verificationStore, company } = await setup('approved')
+      vi.spyOn(testApp.userStore, 'update').mockRejectedValueOnce(new Error('Contact service unavailable'))
+      await request(testApp.app).patch('/profile').set(repHeaders)
+        .send({ company: { name: 'Changed identity' }, contacts: { email: 'new@example.invalid' } }).expect(500)
+      expect((await testApp.companyStore.findById(company.id))?.name).toBe('Changed identity')
+      expect(await verificationStore.isVerified(company.id)).toBe(false)
     })
 
     it('invalidates approval when company registrationNumber is changed via PATCH /profile', async () => {

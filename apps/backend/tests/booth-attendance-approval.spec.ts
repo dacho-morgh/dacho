@@ -274,7 +274,7 @@ describe('T55: Booth attendance approval and receipt gating', () => {
 
   it.each([
     ['unverified', 403, 'company_not_verified'],
-    ['unavailable', 503, 'company_verification_unavailable'],
+    ['unavailable', 403, 'company_not_verified'],
   ] as const)('blocks reservations when company verification is %s', async (verification, status, error) => {
     const { app, representative, booth, boothReservations } = await setup(verification)
     const response = await request(app)

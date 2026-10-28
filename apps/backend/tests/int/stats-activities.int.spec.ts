@@ -1,3 +1,4 @@
+import { seedVerifiedCompanies, clearVerifiedCompanies } from './verified-company-fixtures.js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import request from 'supertest'
@@ -40,6 +41,11 @@ function ownerHeaders() {
 }
 
 async function createAppUnderTest() {
+  const companyStore = new InMemoryCompanyStore([
+    { name: 'Company 1', nationalId: '10000000001', representativeId: 'user-1' },
+    { name: 'Company 2', nationalId: '10000000002', representativeId: 'user-2' },
+  ])
+  await seedVerifiedCompanies(pool, companyStore)
   const serviceCatalog = new InMemoryServiceCatalog()
   serviceCatalog.set(service)
   const jwt = await JwtSigner.create('test-kid')
@@ -51,10 +57,7 @@ async function createAppUnderTest() {
       ...['user-1', 'user-2', 'company-1', 'company-2', 'someone-else'].map((id) => ({ id, phone: id, roles: ['representative' as const], isActive: true })),
       { id: 'staff-1', phone: 'staff-1', roles: ['admin'], isActive: true },
     ]),
-    companyStore: new InMemoryCompanyStore([
-      { name: 'Company 1', nationalId: '10000000001', representativeId: 'user-1' },
-      { name: 'Company 2', nationalId: '10000000002', representativeId: 'user-2' },
-    ]),
+    companyStore,
     pool,
     serviceCatalog,
     proxySecret: PROXY_SECRET,
@@ -82,6 +85,7 @@ describe('stats & activities API', () => {
   })
 
   afterAll(async () => {
+    await clearVerifiedCompanies(pool)
     await pool.end()
   })
 

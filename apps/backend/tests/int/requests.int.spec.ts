@@ -1,3 +1,4 @@
+import { seedVerifiedCompanies, clearVerifiedCompanies } from './verified-company-fixtures.js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import request, { type Response } from 'supertest'
@@ -46,6 +47,7 @@ async function createAppUnderTest(companyStore = new InMemoryCompanyStore([
   { name: 'Company 1', nationalId: '10000000001', representativeId: OWNER },
   { name: 'Company 2', nationalId: '10000000002', representativeId: OTHER },
 ])) {
+  await seedVerifiedCompanies(pool, companyStore)
   const serviceCatalog = new InMemoryServiceCatalog()
   serviceCatalog.set(service)
   const jwt = await JwtSigner.create('test-kid')
@@ -75,6 +77,7 @@ describe('requests API', () => {
   })
 
   afterAll(async () => {
+    await clearVerifiedCompanies(pool)
     await pool.end()
   })
 
