@@ -45,7 +45,7 @@ and reject organization entities or invalid roles.
 T18 adds `dashboard.rfp_versions`, `dashboard.rfp_files`, `dashboard.request_rfps`,
 and `dashboard.event_subtopics.current_rfp_version_id` in `1780511400019_rfp_versions_and_request_pinning`.
 It stores immutable versioned multi-file RFPs, pins submitted requests to their active RFP version,
-and enforces immutability via plpgsql triggers.
+records the document-policy version accepted for each file, and enforces immutability via plpgsql triggers.
 
 Company-owned requests migration `1780511400013_company_owned_requests` adds nullable
 `dashboard.requests.company_id` and its index. Its number follows staging's already

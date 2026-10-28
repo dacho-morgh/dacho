@@ -4,7 +4,7 @@ import type { Pool } from 'pg'
 import type { CompanyStore } from '../auth/company-store.js'
 import { actorOf } from './proxy-auth.js'
 import { isUuid } from '../db/uuid.js'
-import { MAX_DOCUMENT_BYTES, validateDocumentFile } from '../documents/policy.js'
+import { DOCUMENT_POLICY_VERSION, MAX_DOCUMENT_BYTES, validateDocumentFile } from '../documents/policy.js'
 import type { PrivateDocumentStorage } from '../documents/storage.js'
 import { RequestRepository } from './request-repo.js'
 import { bindRequestScope, requestScopeFor } from '../access/policy.js'
@@ -16,7 +16,7 @@ interface Deps {
 }
 
 const base = '/events/:eventId/subtopics/:subtopicId/rfp'
-const fileColumns = 'id, filename, mime_type AS "mimeType", size_bytes AS "sizeBytes"'
+const fileColumns = 'id, filename, mime_type AS "mimeType", size_bytes AS "sizeBytes", policy_version AS "policyVersion"'
 
 export function createRfpRouter({ pool, companyStore, privateDocumentStorage: storage }: Deps): Router {
   const router = Router()
@@ -121,10 +121,10 @@ export function createRfpRouter({ pool, companyStore, privateDocumentStorage: st
             records.push(
               (
                 await client.query(
-                  `INSERT INTO dashboard.rfp_files (version_id, storage_key, filename, mime_type, size_bytes, position)
-                   VALUES ($1, $2, $3, $4, $5, $6)
+                  `INSERT INTO dashboard.rfp_files (version_id, storage_key, filename, mime_type, size_bytes, position, policy_version)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)
                    RETURNING ${fileColumns}`,
-                  [version.id, key, file.filename, file.mimeType, file.sizeBytes, records.length],
+                  [version.id, key, file.filename, file.mimeType, file.sizeBytes, records.length, DOCUMENT_POLICY_VERSION],
                 )
               ).rows[0],
             )
@@ -199,10 +199,15 @@ export function createRfpRouter({ pool, companyStore, privateDocumentStorage: st
         await pool.query(
           `SELECT v.id, v.subtopic_id AS "subtopicId", v.created_by AS "createdBy", v.created_at AS "createdAt", v.reason
            FROM dashboard.event_subtopics s
+           JOIN dashboard.events e ON e.id = s.event_id
            JOIN dashboard.rfp_versions v ON v.subtopic_id = s.id
            WHERE s.event_id = $1 AND s.id = $2 AND v.id = COALESCE($3::uuid, s.current_rfp_version_id)
-             AND ($4::boolean OR ($5::text IS NOT NULL AND v.id = s.current_rfp_version_id))`,
-          [eventId, subtopicId, versionId ?? null, admin, company?.id ?? null],
+             AND ($4::boolean OR (v.id = s.current_rfp_version_id AND (
+               $5::text IS NOT NULL
+               OR ($6::text = 'chief-reviewer' AND e.responsible_chief_id = $7)
+               OR ($6::text = 'employer-reviewer' AND s.employer_id = $7)
+             )))`,
+          [eventId, subtopicId, versionId ?? null, admin, company?.id ?? null, actor.operationalRole, actor.id],
         )
       ).rows[0]
 

@@ -12,13 +12,16 @@ import { JwtSigner } from '../../src/jwt.js'
 import { InMemoryCodeStore } from '../../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../../src/otp/console-delivery.js'
 import { PrivateDocumentStorage } from '../../src/documents/storage.js'
+import { DOCUMENT_POLICY_VERSION } from '../../src/documents/policy.js'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
 const users: User[] = [
   { id: 'owner', phone: 'owner', operationalRole: 'system-owner', isActive: true },
   { id: 'chief', phone: 'chief', operationalRole: 'chief-reviewer', isActive: true },
+  { id: 'other-chief', phone: 'other-chief', operationalRole: 'chief-reviewer', isActive: true },
   { id: 'investment', phone: 'investment', operationalRole: 'investment-reviewer', isActive: true },
   { id: 'employer', phone: 'employer', operationalRole: 'employer-reviewer', isActive: true },
+  { id: 'other-employer', phone: 'other-employer', operationalRole: 'employer-reviewer', isActive: true },
   { id: 'inactive', phone: 'inactive', operationalRole: 'employer-reviewer', isActive: false },
   { id: 'company', phone: 'company', operationalRole: 'representative', isActive: true },
   { id: 'outsider', phone: 'outsider', operationalRole: 'representative', isActive: true },
@@ -93,6 +96,14 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
 
     expect(published.status).toBe(201)
     expect(published.body.version.files).toHaveLength(3)
+    for (const file of published.body.version.files) {
+      expect(file.policyVersion).toBe(DOCUMENT_POLICY_VERSION)
+    }
+    const acceptedPolicies = await pool.query<{ policy_version: string }>(
+      'SELECT policy_version FROM dashboard.rfp_files WHERE version_id=$1',
+      [published.body.version.id],
+    )
+    expect(acceptedPolicies.rows.map((file) => file.policy_version)).toEqual(Array(3).fill(DOCUMENT_POLICY_VERSION))
     expect(JSON.stringify(published.body)).not.toMatch(/storageKey|storage_key/)
 
     const current = await request(await makeApp()).get(base).set(auth('company'))
@@ -108,8 +119,31 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
     // Unauthorized or mismatching attempts
     expect((await request(app).get(`${base}/${current.body.version.id}/files/${file.id}`)).status).toBe(403)
     expect((await request(app).get(`/events/${randomUUID()}/subtopics/${subtopicId}/rfp/${current.body.version.id}/files/${file.id}`).set(auth('company'))).status).toBe(404)
-    expect((await request(app).get(base).set(auth('chief'))).status).toBe(404)
     expect((await request(app).post(`/admin${base}`).set(auth('company'))).status).toBe(403)
+
+    // Definition assignments authorize the current RFP before any case exists.
+    const downloadUrl = `${base}/${current.body.version.id}/files/${file.id}`
+    for (const id of ['chief', 'employer']) {
+      expect((await request(app).get(base).set(auth(id))).status).toBe(200)
+      expect((await request(app).get(downloadUrl).set(auth(id))).body).toEqual(Buffer.from('%PDF-Synthetic first'))
+      expect((await request(app).post(`/admin${base}`).set(auth(id))).status).toBe(403)
+    }
+    for (const id of ['other-chief', 'other-employer', 'reviewer', 'investment', 'unassociated']) {
+      expect((await request(app).get(base).set(auth(id))).status).toBe(404)
+      expect((await request(app).get(downloadUrl).set(auth(id))).status).toBe(404)
+    }
+
+    // Reload authoritative assignments on every metadata and byte request.
+    await pool.query('UPDATE dashboard.events SET responsible_chief_id=$2 WHERE id=$1', [eventId, 'other-chief'])
+    await pool.query('UPDATE dashboard.event_subtopics SET employer_id=$2 WHERE id=$1', [subtopicId, 'other-employer'])
+    for (const id of ['chief', 'employer']) {
+      expect((await request(app).get(base).set(auth(id))).status).toBe(404)
+      expect((await request(app).get(downloadUrl).set(auth(id))).status).toBe(404)
+    }
+    for (const id of ['other-chief', 'other-employer']) {
+      expect((await request(app).get(base).set(auth(id))).status).toBe(200)
+      expect((await request(app).get(downloadUrl).set(auth(id))).status).toBe(200)
+    }
   })
 
   it('pins submitted RFP version and rejects stale draft submission after replacement', async () => {
@@ -172,7 +206,9 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
     expect(oldFile.body).toEqual(Buffer.from('%PDF-Version one'))
 
     // Subtopic direct download only serves current active RFP
-    expect((await request(app).get(`${base}/${v1.id}/files/${v1.files[0].id}`).set(auth('company'))).status).toBe(404)
+    for (const id of ['company', 'chief', 'employer']) {
+      expect((await request(app).get(`${base}/${v1.id}/files/${v1.files[0].id}`).set(auth(id))).status).toBe(404)
+    }
 
     // Stale draft submit is rejected
     expect((await request(app).post(`/requests/${stale.body.request.id}/submit`).set(auth('company'))).body).toEqual({ error: 'stale_rfp' })

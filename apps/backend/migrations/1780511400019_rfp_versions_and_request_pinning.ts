@@ -24,6 +24,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       filename text NOT NULL,
       mime_type text NOT NULL,
       size_bytes integer NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 10000000),
+      policy_version text NOT NULL,
       position integer NOT NULL,
       UNIQUE (version_id, position)
     );
