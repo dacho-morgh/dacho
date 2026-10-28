@@ -202,4 +202,29 @@ describe('dashboard migrations', () => {
       ]),
     )
   })
+
+  it('creates the company_verifications table with status enum and required columns', async () => {
+    const cols = await tableColumns('company_verifications')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'company_id',
+        'representative_id',
+        'status',
+        'revision',
+        'snapshot',
+        'submitted_at',
+        'decided_at',
+        'reviewer_id',
+        'reason',
+        'created_at',
+        'updated_at',
+      ]),
+    )
+    const { rows } = await pool.query(
+      `SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'company_verifications' AND table_schema = 'dashboard' AND column_name = 'status'`,
+    )
+    expect(rows[0]?.data_type).toBe('USER-DEFINED')
+    expect(rows[0]?.udt_name).toBe('company_verification_status')
+  })
 })

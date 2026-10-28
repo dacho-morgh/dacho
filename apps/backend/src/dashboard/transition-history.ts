@@ -2,6 +2,10 @@ import type { PoolClient } from 'pg'
 
 export const TRANSITION_TITLES: Record<string, string> = {
   submit: 'ارسال درخواست',
+  verification_submit: 'ارسال مدارک برای احراز',
+  verification_approve: 'تأیید مدارک احراز',
+  verification_return: 'برگشت مدارک احراز جهت اصلاح',
+  verification_reject: 'رد مدارک احراز',
 }
 
 export interface TransitionInput {

@@ -15,6 +15,7 @@ export interface EventSubtopic {
   categoryId: string
   title: string
   employerId: string
+  currentRfpVersionId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -53,6 +54,8 @@ interface SubtopicRow {
   categoryId: string
   title: string
   employerId: string
+  currentRfpVersionId?: string | null
+  current_rfp_version_id?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -78,6 +81,7 @@ function mapSubtopic(row: SubtopicRow): EventSubtopic {
     categoryId: row.categoryId,
     title: row.title,
     employerId: row.employerId,
+    currentRfpVersionId: row.currentRfpVersionId ?? row.current_rfp_version_id ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
@@ -142,6 +146,7 @@ export class EventCategoryRepository implements EventCategoryStore {
     const { rows } = await this.pool.query<SubtopicWithCategoryRow>(
       `SELECT s.id, s.event_id AS "eventId", s.category_id AS "categoryId",
               c.title AS "categoryTitle", s.title, s.employer_id AS "employerId",
+              s.current_rfp_version_id AS "currentRfpVersionId",
               s.created_at AS "createdAt", s.updated_at AS "updatedAt"
        FROM dashboard.event_subtopics s
        JOIN dashboard.event_categories c ON c.id = s.category_id
@@ -156,6 +161,7 @@ export class EventCategoryRepository implements EventCategoryStore {
     const { rows } = await this.pool.query<SubtopicWithCategoryRow>(
       `SELECT s.id, s.event_id AS "eventId", s.category_id AS "categoryId",
               c.title AS "categoryTitle", s.title, s.employer_id AS "employerId",
+              s.current_rfp_version_id AS "currentRfpVersionId",
               s.created_at AS "createdAt", s.updated_at AS "updatedAt"
        FROM dashboard.event_subtopics s
        JOIN dashboard.event_categories c ON c.id = s.category_id
@@ -207,6 +213,7 @@ export class InMemoryEventCategoryStore implements EventCategoryStore {
       categoryId: input.categoryId,
       title: input.title.trim(),
       employerId: input.employerId.trim(),
+      currentRfpVersionId: null,
       createdAt: now,
       updatedAt: now,
     }

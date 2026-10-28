@@ -23,6 +23,10 @@ import {
 } from '../src/exhibitions/reservation-repo.js'
 import type { ExhibitionStore } from '../src/exhibitions/exhibition-store.js'
 import type { EvaluationStore } from '../src/reviews/evaluation-repo.js'
+import {
+  InMemoryVerificationStore,
+  type VerificationStore,
+} from '../src/dashboard/verification-repo.js'
 import { JwtSigner } from '../src/jwt.js'
 import { InMemoryCodeStore } from '../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../src/otp/console-delivery.js'
@@ -38,6 +42,7 @@ export interface TestApp {
   boothReservations: BoothReservationRepository
   jwt: JwtSigner
   notificationOutbox: NotificationOutbox
+  verificationStore: VerificationStore
 }
 
 export interface TestAppOptions {
@@ -54,6 +59,7 @@ export interface TestAppOptions {
   evaluationStore?: EvaluationStore
   pool?: Pool
   notificationOutbox?: NotificationOutbox
+  verificationStore?: VerificationStore
 }
 
 export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
@@ -68,6 +74,9 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const boothCatalogue = options.boothCatalogue ?? new InMemoryBoothCatalogueRepository()
   const boothReservations =
     options.boothReservations ?? new InMemoryBoothReservationRepository(boothCatalogue)
+  const verificationStore =
+    options.verificationStore ??
+    new InMemoryVerificationStore()
   const jwt = await JwtSigner.create('test-kid')
   // Tests that query dashboard routes inject a pool stub; default stays unconnected.
   const pool = options.pool ?? new Pool()
@@ -91,6 +100,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     exhibitionStore: options.exhibitionStore,
     evaluationStore: options.evaluationStore,
     notificationOutbox,
+    verificationStore,
   })
   return {
     app,
@@ -103,5 +113,6 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     boothReservations,
     jwt,
     notificationOutbox,
+    verificationStore,
   }
 }
