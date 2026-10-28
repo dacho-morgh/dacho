@@ -14,6 +14,50 @@ remain later workflow integrations, so issue #71 stays open. See
 
 ## Design boundaries
 
+### Signup frontend slice (FE03 / #80, FE29 / #78, FE30 / #79)
+
+`/register` retains the three-step company / representative / account-security
+shell referenced by Figma `qVz7LsJUPwiXI3OMoW9kAj`, node `242:12193`. Approved
+form contracts override its 11-digit placeholder: national ID is a nonempty
+digit string, normalized from Persian/Arabic digits on submission with leading
+zeroes preserved and no length/checksum gate. Company name, national ID and
+free-text `activityDomain` are required in step one; registration number, legal
+type, province and city remain optional early answers, not eligibility gates.
+The existing legal-type choices are legacy UI vocabulary, not an approved final
+taxonomy; activity domain is independent of that choice.
+
+The browser POSTs to `/api/users/self-signup`: trimmed `companyName`,
+`activityDomain`, representative `name` / `position`, normalized `phone`,
+lowercased `email`, `password`, normalized `companyNationalId`, and existing
+optional company answers. Password confirmation and privilege fields are never
+sent. A successful response redirects to login with the safe return URL; signup
+does not confer company verification or participation rights. Backend activity
+domain compatibility remains unchanged in this frontend-only slice; removing
+the omission exemption requires separate coordinated backend delivery.
+
+Supported errors use the current `{ errors: [{ code, field?, message }] }`
+envelope. `missing_field` and `invalid_field` get linked Persian field errors;
+`duplicate_national_id` returns to company identity with one-representative
+recovery wording. `signup_rejected` stays generic and must not identify an
+existing phone/email account. Legacy duplicate-contact responses remain
+supported. Unknown field errors never echo raw server messages. Malformed non-2xx
+response bodies, 5xx and network failures remain recoverable failures, never
+successful signup.
+Errors retain component values, focus the affected field (including company
+type) or summary, and unlock retry; pending submit locks submit/back.
+
+`tests/int/register-page.int.spec.ts` provides component regressions with
+**mocked HTTP**, not real API or release evidence. The Phase 0 isolation setup
+remains active. `tests/e2e/register.e2e.spec.ts` now covers activity domain,
+optional completion fields and normalized short IDs in its real signup path.
+This slice does not complete the parent issues or their human UAT gates.
+Local `/register` returned HTTP 200. Chromium exercised all three steps at
+1440, 360, 390 and 430 px: no horizontal overflow, and missing activity focused
+the linked field. Screenshots captured for all twelve views; phone error view
+visually inspected. Real signup/API E2E and human UAT remain unrun; no full
+visual-parity claim is made. Existing
+auth-shell typography, hero placement and legacy icons remain out of scope.
+
 Keep the existing Next.js App Router, same-origin dashboard proxy, Payload session and shared UI primitives. Reuse existing lists, profile editing, support, layout and loading components where their semantics fit. Avoid a second browser workflow engine or browser-maintained access grants. The server owns eligibility, allowed actions, active revision, review completion, reservation exclusivity, price, receipt verification and publication.
 
 One account has one operational role. A reviewer and employer use the same review capabilities where assigned, while the employer slot remains identifiable and replacement-restricted. Event responsibility scopes chiefs and the single investment person. Owner/global messaging permission never implies every recipient can read the case being discussed.
