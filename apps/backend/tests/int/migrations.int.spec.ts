@@ -176,4 +176,30 @@ describe('dashboard migrations', () => {
       ]),
     )
   })
+
+  it('adds attendance fields to booth_reservations and creates booth_attendance_decisions', async () => {
+    const resCols = await tableColumns('booth_reservations')
+    expect(resCols).toEqual(
+      expect.arrayContaining([
+        'attendance_status',
+        'attendance_reason',
+        'attendance_decided_by',
+        'attendance_decided_at',
+      ]),
+    )
+
+    const decCols = await tableColumns('booth_attendance_decisions')
+    expect(decCols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'reservation_id',
+        'action',
+        'from_status',
+        'to_status',
+        'reason',
+        'decided_by',
+        'created_at',
+      ]),
+    )
+  })
 })
