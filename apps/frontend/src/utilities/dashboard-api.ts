@@ -434,12 +434,23 @@ export function updateProfileDossier(
 
 /* ── Display mappers (backend DTO → component prop shapes) ─────────────── */
 
+export function canUploadDocuments(request: Pick<RequestDto, 'allowedActions'>): boolean {
+  return request.allowedActions?.includes('uploadDocument') === true
+}
+
+export function canDeleteDocuments(request: Pick<RequestDto, 'allowedActions'>): boolean {
+  return request.allowedActions?.includes('deleteDocument') === true
+}
+
 export function mapRequestItem(dto: RequestDto): RequestItem {
   return {
     id: dto.id,
+    trackingCode: dto.trackingCode,
     title: dto.title,
     status: dto.status as RequestItem['status'],
     statusLabel: REQUEST_STATUS_LABELS[dto.status],
+    currentStep: dto.currentStep ?? '',
+    allowedActions: dto.allowedActions ?? [],
     dueDate: formatDate(dto.dueDate),
     createdDate: formatDate(dto.createdAt),
   }

@@ -12,6 +12,38 @@ finance-package completeness, correspondence attachments and booth receipts
 remain later workflow integrations, so issue #71 stays open. See
 [private documents](private-documents.md).
 
+Implementation update (FE23/FE13/FE30 scoped queues, 2026-10-28): the applicant
+dashboard and `/dashboard/requests` now read real `/stats`, `/requests` and
+`/activities` responses and keep the queue filter in the URL (`?status=`), so
+back navigation, refresh and shared links preserve scope. `status` is validated
+against the DTO enum before it reaches the queue query; unknown values are
+dropped rather than forwarded. Stat cards link to the status queue they count.
+
+Supported read contracts used by these screens:
+
+| Endpoint | Response | Notes |
+| --- | --- | --- |
+| `/stats` | `RequestStats`: `total`, `in_review`, `approved`, `action_needed`, `rejected` | Role-scoped aggregates; never filtered by the UI |
+| `/requests?status&page&limit` | `Paginated<RequestDto>`; item adds `trackingCode`, `currentStep`, `assignedRole`, `allowedActions` | Scope enforced server-side; `status` is one of the five DTO statuses |
+| `/requests/:id` | `RequestDetail`: `request`, `workflow[]`, `timeline[]` | `timeline` carries `type`, `title`, `description`, `at` |
+| `/activities?page&limit` | `Paginated<ActivityDto>` with optional `requestId` | Only activities bound to a request link to that request |
+
+Error contract: `serverDashboardFetchResult` preserves `401 → expired`, `403 →
+denied`, everything else non-2xx or a transport failure → `unavailable`, and
+only a 2xx read produces `ok`. `unavailableReasonFor` maps those kinds to the
+`OfflineNotice` surfaces, so a denied or failed read is never rendered as an
+empty queue; `Loading`/`Failed`/`Empty` are three separate visual states on
+every queue and on the request dossier. Regression coverage lives in
+`tests/int/dashboard-api-contracts.int.spec.ts` and
+`tests/int/permission-matrix.int.spec.ts`.
+
+Still open on these tickets: submitting a corrected revision (no
+`PATCH /requests/:id` exists on `staging`), the company-visible published
+result text (no released-result field in `RequestDetail`), and a submitted
+revision counter (internal `revision` is not part of the public DTO). The
+tracking table, stage/next-action summary, timeline and role-scoped queues are
+delivered; FE13/FE23 stay open for those three backend dependencies.
+
 ## Design boundaries
 
 ### Exhibition catalogue administration (FE24 / #77)
@@ -175,3 +207,10 @@ Use existing Typography and Button primitives, generated icon barrel, Tailwind u
 Contract/render tests should prove behavior that can regress: redacted fields, distinct denied/error/empty states, role actions, independent subtopic/booth payloads, attachment mapping, stale responses and resume-after-partial-failure. Integration tests must verify real persistence and authorization on an isolated environment. UI permission tests supplement backend/CMS/proxy/file permission tests.
 
 FE31 and FE32 provide real-backed multi-account E2E. They cannot replace named human execution of UAT01–UAT42. Each slice can enter manual testing as soon as it is deployable, with linked prerequisites ready. Record a build, test URL, synthetic fixture IDs, tester, step outcomes and evidence; retain failures and rerun records. The ordinary/employer question sets and per-review scoring are now supplied in [review-rubric.md](review-rubric.md); all qualitative/risk questions are now required at finalization, articles are capped at 2 total, and the Word/PDF upload policy is supplied. Missing approved agreement text blocks consent assertions, not unrelated implementation. Technical DTO/precision choices and unrequested aggregation are not product blockers.
+
+
+### Scoped dashboard queue review — FE23/FE13/FE29/FE30 slice
+
+The applicant request list paginates the authorized backend result in groups of 50. Page and status live in the URL; changing status resets the page, and retry/navigation links preserve the current queue. The dashboard's latest-ten preview links to the complete paginated queue. Request detail keeps a genuine backend 404 separate from expired sessions, denied reads and unavailable services; expired reads offer a safe login return path.
+
+Search and extra event/stage filters remain absent from the implemented backend query contract; inactive toolbar controls are hidden on the server-driven list. Detailed actor/action/reason/revision history, released results, correction/resubmission and resumable draft submission remain separate workflow/DTO work. Displaying the backend's `submit` next-action label does not complete that action flow. These dependencies and the human acceptance gates remain open; this slice does not claim complete FE23 or FE13 coverage.

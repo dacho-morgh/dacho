@@ -1,12 +1,19 @@
 import React from 'react'
+import { OfflineNotice, type UnavailableReason } from '@/components/dashboard/offline-notice'
 import { Typography } from '@/components/ui/typography'
-import { RequestsToolbar } from './requests-toolbar'
 import { RequestsListTable } from './requests-list-table'
-import type { RequestItem } from './types'
+import { RequestsStatusFilter } from './requests-status-filter'
+import { RequestsToolbar } from './requests-toolbar'
+import type { RequestItem, RequestStatus } from './types'
 
 export interface RequestsListViewProps {
   state?: 'default' | 'loading' | 'empty'
+  /** Set when the queue could not be read; never rendered as an empty list. */
+  notice?: UnavailableReason
   items?: RequestItem[]
+  activeStatus?: RequestStatus | 'all'
+  basePath?: string
+  retryHref?: string
   onFilterClick?: () => void
   searchValue?: string
   onSearchChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
@@ -17,7 +24,11 @@ export interface RequestsListViewProps {
 
 export function RequestsListView({
   state = 'default',
+  notice,
   items,
+  activeStatus = 'all',
+  basePath = '/dashboard/requests',
+  retryHref = basePath,
   onFilterClick,
   searchValue,
   onSearchChange,
@@ -35,20 +46,28 @@ export function RequestsListView({
         لیست درخواست ها
       </Typography>
 
-      <RequestsToolbar
-        searchValue={searchValue}
-        onSearchChange={onSearchChange}
-        onFilterClick={onFilterClick}
-      />
+      <RequestsStatusFilter basePath={basePath} active={activeStatus} className="mt-5" />
 
-      <RequestsListTable
-        data={data}
-        isLoading={isLoading}
-        isEmpty={isEmpty}
-        onView={onViewRequest}
-        onEdit={onEditRequest}
-        onCancel={onCancelRequest}
-      />
+      {(onSearchChange || onFilterClick) && (
+        <RequestsToolbar
+          searchValue={searchValue}
+          onSearchChange={onSearchChange}
+          onFilterClick={onFilterClick}
+        />
+      )}
+
+      {notice ? (
+        <OfflineNotice reason={notice} retryHref={retryHref} className="mt-4" />
+      ) : (
+        <RequestsListTable
+          data={data}
+          isLoading={isLoading}
+          isEmpty={isEmpty}
+          onView={onViewRequest}
+          onEdit={onEditRequest}
+          onCancel={onCancelRequest}
+        />
+      )}
     </div>
   )
 }

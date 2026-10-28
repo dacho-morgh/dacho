@@ -39,10 +39,12 @@ export type DashboardFetchResult<T> =
   | { kind: 'ok'; data: T }
   | { kind: 'unauthenticated' }
   | { kind: 'denied' }
-  | { kind: 'unavailable' }
+  | { kind: 'unavailable'; status?: number }
 
 /** Preserves auth/permission failures so protected routes never look empty. */
-export async function serverDashboardFetchResult<T>(path: string): Promise<DashboardFetchResult<T>> {
+export async function serverDashboardFetchResult<T>(
+  path: string,
+): Promise<DashboardFetchResult<T>> {
   try {
     const cookie = (await cookies()).toString()
     const res = await fetch(`${getServerSideURL()}/api/dashboard${path}`, {
@@ -51,7 +53,7 @@ export async function serverDashboardFetchResult<T>(path: string): Promise<Dashb
     })
     if (res.status === 401) return { kind: 'unauthenticated' }
     if (res.status === 403) return { kind: 'denied' }
-    if (!res.ok) return { kind: 'unavailable' }
+    if (!res.ok) return { kind: 'unavailable', status: res.status }
     return { kind: 'ok', data: (await res.json()) as T }
   } catch {
     return { kind: 'unavailable' }
@@ -91,17 +93,29 @@ export function dashboardOperationalRole(
 }
 
 /** Any non-representative operational role is internal staff. */
-export function isInternalDashboardUser(
-  user: SeniorManagerCandidate | null | undefined,
-): boolean {
+export function isInternalDashboardUser(user: SeniorManagerCandidate | null | undefined): boolean {
   const role = dashboardOperationalRole(user)
   return role !== null && role !== 'representative'
 }
 
+export type DashboardWorkspace =
+  | 'company-dossiers'
+  | 'internal-queue'
+  | 'applicant-queue'
+  | 'unauthenticated'
+
+/**
+ * Single seven-role decision for which dashboard surface `/dashboard` renders.
+ * UI routing only: the API still authorizes every read.
+ */
+export function dashboardWorkspace(role: OperationalRole | null): DashboardWorkspace {
+  if (!role) return 'unauthenticated'
+  if (role === 'system-owner' || role === 'central-secretariat') return 'company-dossiers'
+  return role === 'representative' ? 'applicant-queue' : 'internal-queue'
+}
+
 /** Company dossiers are readable by the owner and Secretariat only. */
-export function canReadCompanyDossiers(
-  user: SeniorManagerCandidate | null | undefined,
-): boolean {
+export function canReadCompanyDossiers(user: SeniorManagerCandidate | null | undefined): boolean {
   const role = dashboardOperationalRole(user)
   return role === 'system-owner' || role === 'central-secretariat'
 }

@@ -20,12 +20,15 @@ export function RequestsListRow({
 }: RequestsListRowProps) {
   return (
     <tr className="h-18 border-b border-neutral-100 transition-colors hover:bg-neutral-50">
-      {/* Column 1: Title (16/regular #525252) */}
+      {/* Column 1: Title (16/regular #525252) + tracking code */}
       <td className="h-18 px-4">
         <Typography variant="16/regular" className="truncate text-neutral-600">
           <Link href={`/dashboard/requests/${encodeURIComponent(item.id)}`} className="hover:text-brand-600">
             {item.title}
           </Link>
+        </Typography>
+        <Typography variant="12/regular" className="mt-1 font-mono text-neutral-400">
+          کد پیگیری: {item.trackingCode}
         </Typography>
       </td>
 
