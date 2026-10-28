@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProfileView } from '@/components/dashboard/profile/account-profile-view'
 import { CompanyProfileView } from '@/components/dashboard/profile/company-profile-view'
 import { ResumeProfileView } from '@/components/dashboard/profile/resume-profile-view'
-import type { ProfileDto } from '@/utilities/dashboard-api'
+import type { DossierResponseDto, ProfileDto } from '@/utilities/dashboard-api'
 
 const profile: ProfileDto = {
   company: {
@@ -32,6 +32,17 @@ const profile: ProfileDto = {
   ],
 }
 
+const dossier: DossierResponseDto = {
+  dossier: {
+    legalEntityType: '', knowledgeBasedStatus: '', classification: '', foundingYear: '',
+    activityDomain: '', website: '', centerEstablishment: '', insuredEmployeeCount: null,
+    productsServices: [], keyMembers: [], pastProjectsCustomers: [], requestedServices: [],
+    certificatesLicenses: [], notAvailable: [],
+  },
+  documents: [],
+  missing: { required: [], optional: [], canRequestVerification: false },
+}
+
 function expectHeadingBeforeAction(heading: HTMLElement) {
   const header = heading.parentElement
   expect(header?.firstElementChild).toBe(heading)
@@ -41,7 +52,7 @@ function expectHeadingBeforeAction(heading: HTMLElement) {
 describe('company profile view', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
-    render(createElement(CompanyProfileView, { initialProfile: profile }))
+    render(createElement(CompanyProfileView, { initialProfile: profile, initialDossier: dossier }))
   })
 
   afterEach(() => {
@@ -70,7 +81,10 @@ describe('company profile view', () => {
   it('edits and saves company information inline', async () => {
     const fetchMock = vi.mocked(fetch)
     const savedProfile = { ...profile, company: { ...profile.company, name: 'شرکت ویرایش‌شده' } }
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(savedProfile), { status: 200 }))
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify(dossier), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(savedProfile), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(dossier), { status: 200 }))
 
     const input = screen.getByRole('textbox', { name: 'نام شرکت' }) as HTMLInputElement
     expect(input.readOnly).toBe(true)
