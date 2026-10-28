@@ -36,7 +36,7 @@ export interface TestApp {
   boothCatalogue: BoothCatalogueRepository
   jwt: JwtSigner
   notificationOutbox: NotificationOutbox
-  verificationStore: InMemoryVerificationStore
+  verificationStore: VerificationStore
 }
 
 export interface TestAppOptions {
@@ -65,7 +65,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const dossierDocuments = new InMemoryDossierDocumentSource()
   const boothCatalogue = options.boothCatalogue ?? new InMemoryBoothCatalogueRepository()
   const verificationStore =
-    (options.verificationStore as InMemoryVerificationStore | undefined) ??
+    options.verificationStore ??
     new InMemoryVerificationStore()
   const jwt = await JwtSigner.create('test-kid')
   // Tests that query dashboard routes inject a pool stub; default stays unconnected.

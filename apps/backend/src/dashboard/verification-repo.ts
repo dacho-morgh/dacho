@@ -145,6 +145,11 @@ export class PostgresVerificationStore implements VerificationStore {
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
+      // A row lock cannot serialize the first submission: there is no row yet.
+      // Serialize submissions for a company across connections and API instances.
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        `company-verification:${input.companyId}`,
+      ])
       const existingRes = await client.query<VerificationRow>(
         `SELECT ${VERIFICATION_COLUMNS} FROM dashboard.company_verifications
          WHERE company_id = $1 ORDER BY revision DESC LIMIT 1 FOR UPDATE`,
@@ -365,7 +370,9 @@ export class InMemoryVerificationStore implements VerificationStore {
   }
 
   async submit(input: SubmitVerificationInput): Promise<VerificationSubmitResult> {
-    const existing = await this.findCurrentByCompanyId(input.companyId)
+    const existing = this.items
+      .filter((item) => item.companyId === input.companyId)
+      .sort((a, b) => b.revision - a.revision)[0]
     if (existing?.status === 'pending') {
       return { ok: false, reason: 'already_submitted' }
     }
@@ -399,8 +406,9 @@ export class InMemoryVerificationStore implements VerificationStore {
       target = this.items.find((item) => item.id === input.id)
     }
     if (!target && input.companyId) {
-      const history = await this.listHistory(input.companyId)
-      target = history[0]
+      target = this.items
+        .filter((item) => item.companyId === input.companyId)
+        .sort((a, b) => b.revision - a.revision)[0]
     }
     if (!target) return { ok: false, reason: 'not_found' }
     if (target.status !== 'pending') return { ok: false, reason: 'not_pending' }

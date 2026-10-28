@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { randomUUID } from 'node:crypto'
 import request from 'supertest'
 import { Pool } from 'pg'
 
@@ -21,6 +22,13 @@ describe('Postgres Company Verification Integration (T14)', () => {
   let userStore: InMemoryUserStore
   let companyStore: InMemoryCompanyStore
   let dossierDocuments: InMemoryDossierDocumentSource
+  const representativeIds: string[] = []
+
+  function submission() {
+    const representativeId = randomUUID()
+    representativeIds.push(representativeId)
+    return { companyId: randomUUID(), representativeId, snapshot: { company: { name: 'Concurrent verification test' } } }
+  }
 
   beforeAll(async () => {
     await runMigrations(connectionString)
@@ -48,14 +56,60 @@ describe('Postgres Company Verification Integration (T14)', () => {
   })
 
   afterAll(async () => {
-    await pool.query('DELETE FROM dashboard.company_verifications WHERE snapshot->\'company\'->>\'name\' = $1', ['شرکت فناوران ادغام'])
-    await pool.query('DELETE FROM dashboard.letters WHERE title LIKE $1', ['%احراز هویت شرکت%'])
-    await pool.query('DELETE FROM dashboard.activities WHERE action LIKE $1', ['verification_%'])
+    await pool.query('DELETE FROM dashboard.company_verifications WHERE representative_id = ANY($1::text[])', [representativeIds])
+    await pool.query('DELETE FROM dashboard.letters WHERE recipient_id = ANY($1::text[])', [representativeIds])
+    await pool.query('DELETE FROM dashboard.activities WHERE owner_id = ANY($1::text[]) AND action LIKE $2', [representativeIds, 'verification_%'])
     await pool.end()
+  })
+
+  it('serializes simultaneous first submissions and records a single transition', async () => {
+    const store = new PostgresVerificationStore(pool)
+    const input = submission()
+    const results = await Promise.all(Array.from({ length: 10 }, () => store.submit(input)))
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toEqual(
+      Array.from({ length: 9 }, () => ({ ok: false, reason: 'already_submitted' })),
+    )
+    expect(await store.listHistory(input.companyId)).toHaveLength(1)
+    const activities = await pool.query('SELECT action FROM dashboard.activities WHERE owner_id = $1', [input.representativeId])
+    expect(activities.rows).toEqual([{ action: 'verification_submit' }])
+  })
+
+  it.each(['return', 'reject'] as const)('serializes resubmissions after %s and preserves the previous decision', async (action) => {
+    const store = new PostgresVerificationStore(pool)
+    const input = submission()
+    await store.submit(input)
+    await store.decide({ companyId: input.companyId, action, reviewerId: randomUUID(), reason: 'Correct documents', expectedRevision: 1 })
+    const results = await Promise.all(Array.from({ length: 10 }, () => store.submit(input)))
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toHaveLength(9)
+    const history = await store.listHistory(input.companyId)
+    expect(history).toHaveLength(2)
+    expect(history[0]).toMatchObject({ revision: 2, status: 'pending' })
+    expect(history[1]).toMatchObject({ revision: 1, status: action === 'return' ? 'returned' : 'rejected', reason: 'Correct documents' })
+  })
+
+  it('records only one decision and one letter when reviewers decide concurrently', async () => {
+    const store = new PostgresVerificationStore(pool)
+    const input = submission()
+    const submitted = await store.submit(input)
+    if (!submitted.ok) throw new Error('Expected a new submission')
+    const results = await Promise.all(Array.from({ length: 5 }, () => store.decide({
+      id: submitted.verification.id, action: 'approve', reviewerId: randomUUID(), expectedRevision: 1,
+    })))
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toEqual(
+      Array.from({ length: 4 }, () => ({ ok: false, reason: 'not_pending' })),
+    )
+    const letters = await pool.query('SELECT type FROM dashboard.letters WHERE recipient_id = $1', [input.representativeId])
+    expect(letters.rows).toEqual([{ type: 'approved' }])
+    const activities = await pool.query("SELECT action FROM dashboard.activities WHERE owner_id = $1 AND action = 'verification_approve'", [input.representativeId])
+    expect(activities.rows).toHaveLength(1)
   })
 
   it('persists verification, creates letter on return, and logs transition in activities', async () => {
     const repUser = await userStore.findOrCreateByPhone('09120000001')
+    representativeIds.push(repUser.id)
     repUser.name = 'نماینده شرکت ادغام'
     repUser.operationalRole = 'representative'
     repUser.roles = ['representative']

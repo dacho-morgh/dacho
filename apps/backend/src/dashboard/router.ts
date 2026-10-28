@@ -1455,7 +1455,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
       const profile = await profileRepo.getProfile(actor.id)
       const snapshot = {
-        company: profile.company,
+        company: { ...profile.company, province: company.province ?? '', city: company.city ?? '' },
         dossier: profile.dossier,
         addresses: profile.addresses,
         executives: profile.executives,
@@ -1552,7 +1552,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       const currentVerif = profile.companyId
         ? await verificationStore.findCurrentByCompanyId(profile.companyId)
         : null
-      const allowedActions = currentVerif?.status === 'pending'
+      const allowedActions = currentVerif?.status === 'pending' && target.id !== actor.id && currentVerif.representativeId !== actor.id
         ? ['read', 'approve', 'return', 'reject']
         : ['read']
 
@@ -1619,7 +1619,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       const history = await verificationStore.listHistory(verification.companyId)
-      const allowedActions = verification.status === 'pending'
+      const company = await deps.companyStore.findById(verification.companyId)
+      const allowedActions = verification.status === 'pending' && verification.representativeId !== actor.id && company?.representativeId !== actor.id
         ? ['read', 'approve', 'return', 'reject']
         : ['read']
       res.json({
@@ -1646,6 +1647,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(400).json({ error: 'reason_required' })
         return
       }
+      if (expectedRevision !== undefined && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1)) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
 
       const targetId = req.params.id
       if (!targetId) {
@@ -1653,9 +1658,16 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
 
-      let verification = await verificationStore.findById(targetId)
-      if (!verification) {
-        verification = await verificationStore.findCurrentByCompanyId(targetId)
+      let verification
+      if (req.route.path === '/admin/companies/:id/verification/decision') {
+        // Company detail URLs use the representative ID, not the CMS company ID.
+        const target = await deps.userStore.findById(targetId)
+        const company = target && operationalRoleOf(target) === 'representative'
+          ? await deps.companyStore.findByRepresentative(target.id)
+          : undefined
+        verification = company ? await verificationStore.findCurrentByCompanyId(company.id) : null
+      } else {
+        verification = await verificationStore.findById(targetId)
       }
       if (!verification) {
         res.status(404).json({ error: 'not_found' })
@@ -1663,7 +1675,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
 
       // Prohibit self-approval: representative cannot approve their own company even if they hold admin/secretariat role
-      if (verification.representativeId === actor.id) {
+      const company = await deps.companyStore.findById(verification.companyId)
+      if (verification.representativeId === actor.id || company?.representativeId === actor.id) {
         res.status(403).json({ error: 'self_approval_prohibited' })
         return
       }
@@ -1674,7 +1687,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         action,
         reviewerId: actor.id,
         reason: typeof reason === 'string' ? reason.trim() : null,
-        expectedRevision: typeof expectedRevision === 'number' ? expectedRevision : undefined,
+        expectedRevision: expectedRevision ?? verification.revision,
       })
       if (!result.ok) {
         if (result.reason === 'not_found') {

@@ -204,6 +204,8 @@ describe('Company Verification and Secretariat Queue (T14)', () => {
       expect(queueRes.body.items[0]).toMatchObject({
         companyName: 'شرکت دانش‌بنیان پیشرو',
         nationalId: '14001111111',
+        province: 'تهران',
+        city: 'تهران',
         status: 'pending',
         revision: 1,
       })
@@ -238,6 +240,65 @@ describe('Company Verification and Secretariat Queue (T14)', () => {
   })
 
   describe('Verification Decisions & Self-Approval Prohibition', () => {
+    it('uses the representative ID from company details for company decisions', async () => {
+      const { app, repUser, company, repHeaders, secretariatHeaders } = await setup()
+      expect(repUser.id).not.toBe(company.id)
+      await request(app).post('/profile/verification/submit').set(repHeaders).expect(201)
+      const detail = await request(app).get(`/admin/companies/${repUser.id}`).set(secretariatHeaders).expect(200)
+      expect(detail.body.companyId).toBe(company.id)
+
+      await request(app)
+        .post(`/admin/companies/${repUser.id}/verification/decision`)
+        .set(secretariatHeaders)
+        .send({ action: 'approve', expectedRevision: detail.body.verification.revision })
+        .expect(200)
+      const status = await request(app).get('/profile/verification').set(repHeaders).expect(200)
+      expect(status.body.status).toBe('approved')
+    })
+
+    it('does not decide another company when its company ID equals the target representative ID', async () => {
+      const { app, repUser, company, repHeaders, secretariatHeaders, verificationStore } = await setup()
+      // Numeric IDs in Payload users and companies belong to separate sequences.
+      await verificationStore.submit({ companyId: repUser.id, representativeId: 'other-representative', snapshot: {} })
+      await request(app).post('/profile/verification/submit').set(repHeaders).expect(201)
+      await request(app)
+        .post(`/admin/companies/${repUser.id}/verification/decision`)
+        .set(secretariatHeaders)
+        .send({ action: 'approve', expectedRevision: 1 })
+        .expect(200)
+      expect(await verificationStore.findCurrentByCompanyId(company.id)).toMatchObject({ status: 'approved' })
+      expect(await verificationStore.findCurrentByCompanyId(repUser.id)).toMatchObject({ status: 'pending' })
+    })
+
+    it.each(['1', 0, -1, 1.5, null])('rejects malformed expectedRevision %s', async (expectedRevision) => {
+      const { app, repHeaders, secretariatHeaders } = await setup()
+      const submit = await request(app).post('/profile/verification/submit').set(repHeaders).expect(201)
+      await request(app)
+        .post(`/admin/verifications/${submit.body.verification.id}/decision`)
+        .set(secretariatHeaders)
+        .send({ action: 'approve', expectedRevision })
+        .expect(400)
+      const status = await request(app).get('/profile/verification').set(repHeaders).expect(200)
+      expect(status.body.status).toBe('pending')
+    })
+
+    it('denies the current company representative after the representative relationship changes', async () => {
+      const { app, company, repHeaders, secretariat, companyStore, secretariatHeaders } = await setup()
+      const submit = await request(app).post('/profile/verification/submit').set(repHeaders).expect(201)
+      const stored = await companyStore.findById(company.id)
+      stored!.representativeId = secretariat.id
+      const detail = await request(app)
+        .get(`/admin/verifications/${submit.body.verification.id}`)
+        .set(secretariatHeaders)
+        .expect(200)
+      expect(detail.body.allowedActions).toEqual(['read'])
+      await request(app)
+        .post(`/admin/verifications/${submit.body.verification.id}/decision`)
+        .set(secretariatHeaders)
+        .send({ action: 'approve' })
+        .expect(403)
+    })
+
     it('prohibits company self-approval even if representative holds admin role', async () => {
       const { app, userStore, companyStore, dossierDocuments } = await setup()
 
