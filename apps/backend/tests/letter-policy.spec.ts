@@ -14,4 +14,13 @@ describe('letter recipient roles', () => {
     expect(canSendLetter('system-owner', 'reviewer', false)).toBe(true)
     expect(canSendLetter('chief-reviewer', 'representative', false)).toBe(true)
   })
+  it('keeps investment participation closed until an authoritative T31 handoff exists', () => {
+    for (const recipient of ['system-owner', 'central-secretariat', 'chief-reviewer', 'reviewer', 'employer-reviewer', 'investment-reviewer', 'representative'] as const) {
+      expect(canSendLetter('investment-reviewer', recipient, true)).toBe(false)
+      expect(canSendLetter(recipient, 'investment-reviewer', true)).toBe(false)
+    }
+    expect(canSendLetter('system-owner', 'investment-reviewer', false)).toBe(true)
+    expect(canSendLetter('chief-reviewer', 'investment-reviewer', false)).toBe(true)
+  })
+
 })
