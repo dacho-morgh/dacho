@@ -54,6 +54,7 @@ import type { CompanyStore } from '../auth/company-store.js'
 import type { User, UserStore } from '../auth/user-store.js'
 import { SupportRepository } from './support-repo.js'
 import { createDocumentRouter } from '../documents/router.js'
+import { createRfpRouter } from './rfp-router.js'
 import type { PrivateDocumentStorage } from '../documents/storage.js'
 import { canOpenDashboardDestination } from './destination-access.js'
 import { dashboardSelfProfile } from './self-profile.js'
@@ -368,6 +369,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps }))
+  router.use(
+    createRfpRouter({
+      pool: deps.pool,
+      companyStore: deps.companyStore,
+      privateDocumentStorage: deps.privateDocumentStorage,
+    }),
+  )
 
   router.get('/capabilities', (_req, res) => {
     const actor = actorOf(res)
@@ -428,50 +436,66 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   router.post('/requests', async (req, res, next) => {
     try {
-    const actor = actorOf(res)
-    if (!isRepresentative(actor.operationalRole)) {
-      res.status(403).json({ error: 'representative_only' })
-      return
-    }
-    const { serviceId, title, answers } = req.body ?? {}
+      const actor = actorOf(res)
+      if (!isRepresentative(actor.operationalRole)) {
+        res.status(403).json({ error: 'representative_only' })
+        return
+      }
+      const { serviceId, title, answers, eventId, subtopicId, rfpVersionId } = req.body ?? {}
 
-    if (typeof serviceId !== 'string' || serviceId.trim() === '') {
-      res.status(400).json({ error: 'invalid_service' })
-      return
-    }
-    if (typeof title !== 'string' || title.trim() === '') {
-      res.status(400).json({ error: 'invalid_title' })
-      return
-    }
+      if (typeof serviceId !== 'string' || serviceId.trim() === '') {
+        res.status(400).json({ error: 'invalid_service' })
+        return
+      }
+      if (typeof title !== 'string' || title.trim() === '') {
+        res.status(400).json({ error: 'invalid_title' })
+        return
+      }
 
-    const answersValue = answers === undefined ? {} : answers
-    if (typeof answersValue !== 'object' || answersValue === null || Array.isArray(answersValue)) {
-      res.status(400).json({ error: 'invalid_answers' })
-      return
-    }
+      const answersValue = answers === undefined ? {} : answers
+      if (typeof answersValue !== 'object' || answersValue === null || Array.isArray(answersValue)) {
+        res.status(400).json({ error: 'invalid_answers' })
+        return
+      }
 
-    const service = await deps.serviceCatalog.findById(serviceId)
-    if (!service) {
-      res.status(404).json({ error: 'service_not_found' })
-      return
-    }
+      const service = await deps.serviceCatalog.findById(serviceId)
+      if (!service) {
+        res.status(404).json({ error: 'service_not_found' })
+        return
+      }
 
-    const companyId = await actorCompanyId(actor.id, actor.operationalRole)
-    if (actor.operationalRole === 'representative' && !companyId) {
-      res.status(403).json({ error: 'company_required' })
-      return
+      const rfpFields = [eventId, subtopicId, rfpVersionId]
+      const hasAnyRfp = rfpFields.some((f) => f !== undefined)
+      if (hasAnyRfp) {
+        if (!rfpFields.every((f) => typeof f === 'string' && isUuid(f))) {
+          res.status(400).json({ error: 'invalid_rfp_context' })
+          return
+        }
+      }
+
+      const companyId = await actorCompanyId(actor.id, actor.operationalRole)
+      if (actor.operationalRole === 'representative' && !companyId) {
+        res.status(403).json({ error: 'company_required' })
+        return
+      }
+      const request = await repo.create({
+        serviceId,
+        serviceKey: service.key,
+        serviceName: service.title,
+        title,
+        ownerId: actor.id,
+        companyId,
+        answers: answersValue as Record<string, unknown>,
+        rfp: hasAnyRfp ? { eventId, subtopicId, versionId: rfpVersionId } : undefined,
+      })
+      res.status(201).json({ request: requestWithActions(actor.operationalRole, actor.id, request, companyId) })
+    } catch (error) {
+      if (error instanceof Error && error.message === 'stale_rfp') {
+        res.status(409).json({ error: 'stale_rfp' })
+        return
+      }
+      next(error)
     }
-    const request = await repo.create({
-      serviceId,
-      serviceKey: service.key,
-      serviceName: service.title,
-      title,
-      ownerId: actor.id,
-      companyId,
-      answers: answersValue as Record<string, unknown>,
-    })
-    res.status(201).json({ request: requestWithActions(actor.operationalRole, actor.id, request, companyId) })
-    } catch (error) { next(error) }
   })
 
   router.get('/requests', async (req, res, next) => {
@@ -615,6 +639,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
     if (result === 'already_submitted') {
       res.status(409).json({ error: 'already_submitted' })
+      return
+    }
+    if (result === 'stale_rfp') {
+      res.status(409).json({ error: 'stale_rfp' })
       return
     }
     res.json({ request: requestWithActions(actor.operationalRole, actor.id, result, companyId) })
