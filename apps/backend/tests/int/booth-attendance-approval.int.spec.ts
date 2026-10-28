@@ -139,4 +139,33 @@ describe('T55: Booth attendance approval integration', () => {
     })
     expect(reserveBSuccess.ok).toBe(true)
   })
+
+  it('cannot approve or reject an inactive pending reservation after its booth is reserved again', async () => {
+    await catalogue.upsertSettings(exhibitionId, { companyBoothLimit: 2, guideMapReference: null }, 'owner')
+    const booth = await createBooth('inactive-pending')
+    const first = await reservations.reserve({ exhibitionId, boothId: booth.id, companyId: 'company-a', actorId: 'user-a' })
+    if (!first.ok) throw new Error('reservation fixture failed')
+    await pool.query('UPDATE dashboard.booth_reservations SET active = false WHERE id = $1', [first.reservation.id])
+    const second = await reservations.reserve({ exhibitionId, boothId: booth.id, companyId: 'company-b', actorId: 'user-b' })
+    expect(second.ok).toBe(true)
+
+    expect((await reservations.findById(first.reservation.id, 'central-secretariat'))?.allowedActions).toEqual(['read'])
+    for (const action of ['approve', 'reject'] as const) {
+      expect(await reservations.decideAttendance({ id: first.reservation.id, action, reason: 'test', actorId: 'secretariat' }))
+        .toEqual({ ok: false, error: 'invalid_state' })
+    }
+    expect(await reservations.listDecisionsHistory(first.reservation.id)).toEqual([])
+    expect((await reservations.findById(first.reservation.id))?.active).toBe(false)
+  })
+
+  it('retains the reserved price version when catalogue pricing changes', async () => {
+    await catalogue.upsertSettings(exhibitionId, { companyBoothLimit: 2, guideMapReference: null }, 'owner')
+    const booth = await createBooth('price-snapshot')
+    const reserved = await reservations.reserve({ exhibitionId, boothId: booth.id, companyId: 'company-a', actorId: 'user-a' })
+    if (!reserved.ok) throw new Error('reservation fixture failed')
+    await catalogue.updateBooth({ exhibitionId, boothId: booth.id, priceAmount: 900, updatedBy: 'owner' })
+    expect(await reservations.findById(reserved.reservation.id)).toMatchObject({
+      priceVersionId: booth.priceVersionId, priceAmount: 500, priceUnit: 'toman',
+    })
+  })
 })

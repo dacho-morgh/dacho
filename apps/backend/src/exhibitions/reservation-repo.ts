@@ -4,6 +4,11 @@ import type { BoothCatalogueRepository } from './catalogue-repo.js'
 
 export type AttendanceStatus = 'pending' | 'approved' | 'rejected'
 
+/** T09 supplies authoritative verification; profile completeness is insufficient. */
+export interface BoothCompanyEligibility {
+  isVerified(companyId: string): Promise<boolean>
+}
+
 export interface BoothReservationDto {
   id: string
   boothId: string
@@ -63,7 +68,7 @@ export function computeReservationAllowedActions(
   role?: string,
 ): string[] {
   if (role === 'system-owner' || role === 'central-secretariat') {
-    if (reservation.attendanceStatus === 'pending') return ['read', 'approve', 'reject']
+    if (reservation.attendanceStatus === 'pending' && reservation.active) return ['read', 'approve', 'reject']
     return ['read']
   }
   if (role === 'representative') {
@@ -270,7 +275,7 @@ export class PostgresBoothReservationRepository implements BoothReservationRepos
         await client.query('ROLLBACK')
         return { ok: false, error: 'not_found' }
       }
-      if (reservation.attendance_status !== 'pending') {
+      if (reservation.attendance_status !== 'pending' || !reservation.active) {
         await client.query('ROLLBACK')
         return { ok: false, error: 'invalid_state' }
       }
@@ -373,12 +378,13 @@ export class InMemoryBoothReservationRepository implements BoothReservationRepos
   }
 
   async reserve(input: { exhibitionId: string; boothId: string; companyId: string; actorId: string }): Promise<ReserveResult> {
+    let selectedBooth: Awaited<ReturnType<BoothCatalogueRepository['getBooth']>>
     if (this.catalogue) {
       const settings = await this.catalogue.getSettings(input.exhibitionId)
       if (!settings) return { ok: false, error: 'catalogue_not_configured' }
 
       const booth = await this.catalogue.getBooth(input.exhibitionId, input.boothId)
-      if (!booth || !booth.active || booth.status !== 'available' || this.hasActiveReservation(input.boothId)) {
+      if (!booth || !booth.priceVersionId || !booth.active || booth.status !== 'available' || this.hasActiveReservation(input.boothId)) {
         return { ok: false, error: 'booth_unavailable' }
       }
 
@@ -391,6 +397,7 @@ export class InMemoryBoothReservationRepository implements BoothReservationRepos
       if (companyCount >= settings.companyBoothLimit) {
         return { ok: false, error: 'company_limit_reached' }
       }
+      selectedBooth = booth
     } else if (this.hasActiveReservation(input.boothId)) {
       return { ok: false, error: 'booth_unavailable' }
     }
@@ -403,7 +410,10 @@ export class InMemoryBoothReservationRepository implements BoothReservationRepos
       exhibitionId: input.exhibitionId,
       companyId: input.companyId,
       requestedBy: input.actorId,
-      priceVersionId: randomUUID(),
+      priceVersionId: selectedBooth?.priceVersionId ?? randomUUID(),
+      boothIdentifier: selectedBooth?.identifier,
+      priceAmount: selectedBooth?.priceAmount,
+      priceUnit: selectedBooth?.priceUnit,
       active: true,
       attendanceStatus: 'pending',
       attendanceReason: null,
@@ -458,7 +468,7 @@ export class InMemoryBoothReservationRepository implements BoothReservationRepos
     }
     const res = this.reservations.get(input.id)
     if (!res) return { ok: false, error: 'not_found' }
-    if (res.attendanceStatus !== 'pending') return { ok: false, error: 'invalid_state' }
+    if (res.attendanceStatus !== 'pending' || !res.active) return { ok: false, error: 'invalid_state' }
 
     const cleanReason = input.reason?.trim() ?? null
     const nextStatus: AttendanceStatus = input.action === 'approve' ? 'approved' : 'rejected'

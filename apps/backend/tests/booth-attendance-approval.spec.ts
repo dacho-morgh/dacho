@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import request from 'supertest'
 
 import type { User } from '../src/auth/user-store.js'
@@ -14,8 +14,13 @@ function headers(user: User) {
   }
 }
 
-async function setup() {
-  const testApp = await createTestApp()
+async function setup(verification: 'verified' | 'unverified' | 'unavailable' = 'verified') {
+  const verifiedCompanies = new Set<string>()
+  const testApp = await createTestApp({
+    boothCompanyEligibility: verification === 'unavailable' ? undefined : {
+      isVerified: async (companyId) => verifiedCompanies.has(companyId),
+    },
+  })
   const owner = await testApp.userStore.findOrCreateByPhone('09120000001')
   owner.operationalRole = 'system-owner'
   owner.roles = ['admin']
@@ -33,11 +38,12 @@ async function setup() {
   reviewer.roles = ['referee']
 
   // Setup company for representative
-  await testApp.companyStore.create({
+  const company = await testApp.companyStore.create({
     name: 'توسعه فناوری پارس',
     nationalId: '10101010101',
     representativeId: representative.id,
   })
+  if (verification === 'verified') verifiedCompanies.add(company.id)
 
   // Setup catalogue settings and booth
   await testApp.boothCatalogue.upsertSettings(
@@ -157,17 +163,15 @@ describe('T55: Booth attendance approval and receipt gating', () => {
       active: true,
     })
 
-    // Receipt submission is now allowed
+    // Attendance unlocks eligibility, but T50 must implement actual uploads.
     const receiptRes = await request(app)
       .post(`/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt`)
       .set(headers(representative))
       .send()
 
-    expect(receiptRes.status).toBe(200)
+    expect(receiptRes.status).toBe(501)
     expect(receiptRes.body).toMatchObject({
-      ok: true,
-      message: 'receipt_eligible',
-      reservationId,
+      error: 'receipt_upload_not_implemented',
     })
   })
 
@@ -225,7 +229,7 @@ describe('T55: Booth attendance approval and receipt gating', () => {
   it('prevents company verification from bypassing attendance approval', async () => {
     const { app, representative, booth, companyStore } = await setup()
 
-    // Mark company as verified
+    // setup connects an authoritative verified-company fixture.
     const company = await companyStore.findByRepresentative(representative.id)
     expect(company).toBeDefined()
     // Even with a verified company in system:
@@ -266,5 +270,56 @@ describe('T55: Booth attendance approval and receipt gating', () => {
       .send({ action: 'reject', reason: 'دوباره رد شود' })
     expect(secondDecision.status).toBe(409)
     expect(secondDecision.body.error).toBe('invalid_state')
+  })
+
+  it.each([
+    ['unverified', 403, 'company_not_verified'],
+    ['unavailable', 503, 'company_verification_unavailable'],
+  ] as const)('blocks reservations when company verification is %s', async (verification, status, error) => {
+    const { app, representative, booth, boothReservations } = await setup(verification)
+    const response = await request(app)
+      .post(`/exhibitions/${EXHIBITION}/booths/${booth.id}/reserve`)
+      .set(headers(representative))
+      .send()
+    expect(response.status).toBe(status)
+    expect(response.body.error).toBe(error)
+    expect(await boothReservations.listByExhibition(EXHIBITION)).toEqual([])
+  })
+
+  it('rejects malformed UUIDs before querying the reservation store', async () => {
+    const { app, representative, secretariat, boothReservations } = await setup()
+    const find = vi.spyOn(boothReservations, 'findById')
+    const reserve = vi.spyOn(boothReservations, 'reserve')
+    const responses = await Promise.all([
+      request(app).post(`/exhibitions/${EXHIBITION}/booths/invalid/reserve`).set(headers(representative)),
+      request(app).get(`/exhibitions/${EXHIBITION}/reservations/invalid`).set(headers(representative)),
+      request(app).get(`/admin/exhibitions/${EXHIBITION}/reservations/invalid`).set(headers(secretariat)),
+      request(app).post(`/admin/exhibitions/${EXHIBITION}/reservations/invalid/attendance`).set(headers(secretariat)).send({ action: 'approve' }),
+      request(app).post(`/exhibitions/${EXHIBITION}/reservations/invalid/receipt`).set(headers(representative)),
+    ])
+    expect(responses.map((response) => response.status)).toEqual([404, 404, 404, 404, 404])
+    expect(find).not.toHaveBeenCalled()
+    expect(reserve).not.toHaveBeenCalled()
+  })
+
+  it('denies other companies and reviewers access to a reservation and its receipt', async () => {
+    const { app, representative, reviewer, booth, userStore, companyStore, boothReservations } = await setup()
+    const ownCompany = await companyStore.findByRepresentative(representative.id)
+    const reserved = await boothReservations.reserve({
+      exhibitionId: EXHIBITION, boothId: booth.id, companyId: ownCompany!.id, actorId: representative.id,
+    })
+    if (!reserved.ok) throw new Error('reservation fixture failed')
+    const stranger = await userStore.findOrCreateByPhone('09120000005')
+    stranger.operationalRole = 'representative'
+    await companyStore.create({ representativeId: stranger.id, name: 'Other', nationalId: '10101010102' })
+    const id = reserved.reservation.id
+    const responses = await Promise.all([
+      request(app).get(`/exhibitions/${EXHIBITION}/reservations/${id}`).set(headers(stranger)),
+      request(app).post(`/exhibitions/${EXHIBITION}/reservations/${id}/receipt`).set(headers(stranger)),
+      request(app).get(`/exhibitions/${EXHIBITION}/reservations/${id}`).set(headers(reviewer)),
+      request(app).get(`/admin/exhibitions/${EXHIBITION}/reservations/${id}`).set(headers(representative)),
+      request(app).get(`/exhibitions/another-exhibition/reservations/${id}`).set(headers(representative)),
+    ])
+    expect(responses.map((response) => response.status)).toEqual([403, 403, 403, 403, 404])
   })
 })

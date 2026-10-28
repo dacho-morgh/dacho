@@ -18,6 +18,7 @@ import {
 } from '../src/exhibitions/catalogue-repo.js'
 import {
   InMemoryBoothReservationRepository,
+  type BoothCompanyEligibility,
   type BoothReservationRepository,
 } from '../src/exhibitions/reservation-repo.js'
 import type { ExhibitionStore } from '../src/exhibitions/exhibition-store.js'
@@ -48,6 +49,7 @@ export interface TestAppOptions {
   eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
   boothReservations?: BoothReservationRepository
+  boothCompanyEligibility?: BoothCompanyEligibility
   exhibitionStore?: ExhibitionStore
   evaluationStore?: EvaluationStore
   pool?: Pool
@@ -85,6 +87,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     eventCategoryStore: options.eventCategoryStore,
     boothCatalogue,
     boothReservations,
+    boothCompanyEligibility: options.boothCompanyEligibility,
     exhibitionStore: options.exhibitionStore,
     evaluationStore: options.evaluationStore,
     notificationOutbox,
