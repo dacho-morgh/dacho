@@ -28,6 +28,7 @@ Updated: 2026-10-26. This is the English specification for the event, review, in
 | [Personnel foundation](personnel-foundation.md) | T08 scalar operational role, editorial/service separation, deactivation and explicit legacy mapping |
 | [Company profile foundation](company-profile-foundation.md) | T05/T06 persistence, private dossier access, public projection and validation boundaries |
 | [Request tracking foundation](request-tracking-foundation.md) | T07 sequence allocation, atomic submit, synthetic migration rehearsal and rollout boundaries |
+| [Evaluation foundation](evaluation-foundation.md) | T25 author-owned drafts, final locking, scoped oversight, revision/revocation guards and remaining round dependencies |
 | [Shared authorization](authorization.md) | T09 seven-role/assignment scope, server-derived actions, CMS/proxy projections and current denials |
 | [Private documents](private-documents.md) | T10 private storage, document policy, access audiences, API contract, migrations and FE07 scope |
 

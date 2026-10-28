@@ -5,10 +5,15 @@ Inspected 2026-10-23; updated 2026-10-26 for T16. The inventory describes code i
 | Owner | Location / migration journal | Current files | Scope |
 | --- | --- | --- | --- |
 | Payload CMS | `packages/cms-core/src/migrations/`, imported in `index.ts`; Payload `payload_migrations` journal in `public` | 23 TypeScript migrations from `20260810_103455` through `20261026_120000_company_dossier` (excluding `index.ts`; some generated JSON snapshots) | CMS content, users, companies, role evolution, events page content, editorial fields, company activity domain and dossier |
-| Backend | `apps/backend/migrations/`; `dashboard.pgmigrations` journal via node-pg-migrate | 15 TypeScript migrations: `1780511400000`–`1780511400009`, `1780511400011`–`1780511400015` | Requests, letters, activities, support tickets/messages, author-role rekey, safe tracking sequence, case assignments, private document metadata, transition history, booth catalogue, company dossier boundary, event configuration, event audit history, company-owned requests, event categories/subtopics, and notification outbox |
+| Backend | `apps/backend/migrations/`; `dashboard.pgmigrations` journal via node-pg-migrate | 16 TypeScript migrations: `1780511400000`–`1780511400009`, `1780511400011`–`1780511400015`, `1780511400017` | Requests, letters, activities, support tickets/messages, author-role rekey, safe tracking sequence, case assignments, private document metadata, transition history, booth catalogue, company dossier boundary, event configuration, event audit history, company-owned requests, event categories/subtopics, notification outbox, and evaluations |
 | Runtime-created OTP storage | `apps/backend/src/otp/postgres-code-store.ts` | No numbered migration | `dashboard.otp_codes` is ensured at runtime; inventory/restore must include it if present |
 
 Payload runs explicit migrations with schema push disabled in `packages/cms-core/src/payload.config.ts`. That configuration has **no schema override**, and its migrations use `public` explicitly; `public` is the observed CMS schema in this checkout. The approved [backend design](backend-design.md) uses `cms.*` as a conceptual ownership label, so a future migration must not assume a deployed `cms` SQL schema. Backend `runMigrations` uses the actual `dashboard` schema and an advisory lock. Both services share one database but their migration journals and ownership boundaries differ; applying just one side does not produce a fully usable test app. Initial CMS migrations are chronological by `index.ts`; future migration files must be added there.
+
+T25 adds `dashboard.evaluations` in `1780511400017_evaluations`, keyed by request,
+person and revision. It stores draft/final state, rubric scores, answers and finalization
+time. See [evaluation foundation](evaluation-foundation.md) for authorization, locking
+and the remaining dedicated review-round dependencies.
 
 T08 preserves legacy assignments, quarantines ambiguous accounts and requires explicit owner mapping; see [personnel foundation](personnel-foundation.md). Existing editorial privilege is independent of operational authority. No real accounts have been mapped by this implementation.
 

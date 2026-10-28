@@ -14,6 +14,7 @@ import { createDashboardRouter } from './dashboard/router.js'
 import { PrivateDocumentStorage } from './documents/storage.js'
 import type { BoothCatalogueRepository } from './exhibitions/catalogue-repo.js'
 import type { ExhibitionStore } from './exhibitions/exhibition-store.js'
+import type { EvaluationStore } from './reviews/evaluation-repo.js'
 
 export interface AppDeps extends AuthDeps {
   pool: Pool
@@ -29,6 +30,7 @@ export interface AppDeps extends AuthDeps {
   eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
+  evaluationStore?: EvaluationStore
   notificationOutbox?: NotificationOutbox
 }
 
