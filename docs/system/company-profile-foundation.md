@@ -41,3 +41,10 @@ A representative can explicitly answer "does not have / not available" for centr
 The absence list is a JSON field in Payload because it is a closed set of flags, not a repeatable row. The same value is used when deciding whether an optional item is still an open question, so the representative is not asked again after answering "does not have". Dossier document presence is read through the existing private-document repository rather than duplicating file metadata onto the company. This batch is backend/cms-core only; the dashboard UI, request submission and reviewer-facing dossier snapshots remain with their own tasks.
 
 Validation for this batch: backend typecheck, backend unit tests (including Payload adapter regression coverage for every dossier array and the absence/conflict rules) and cms-core typecheck. No integration or E2E suite is claimed here.
+
+
+## Frontend dossier editing and readiness — FE04/FE07/FE29/FE30 slice
+
+The company and resume pages read and save the implemented T13 dossier contract, including repeatable items, private documents and all eight optional absence answers. Missing or failed dossier reads block editing rather than treating persisted information as an empty form. Saves are serialized in the browser; basic edits submit changed fields only and merge changed absence flags with a fresh read. Resume replacement slices reject a stale snapshot detected by a fresh read. This reduces lost updates but does not introduce a server-side optimistic concurrency token; truly concurrent writes from separate sessions still need that backend contract.
+
+The readiness card refreshes after address and document changes. Completeness is not a verification state: no verification request has been sent by filling this form. Verification submission, pending/returned decisions, return reasons, resubmission and immutable approved snapshots remain T14/T15 dependencies. This slice does not complete full FE04 or UAT04–06. Figma parity and human acceptance remain unverified.

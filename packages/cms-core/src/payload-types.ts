@@ -1403,7 +1403,15 @@ export interface Company {
         id?: string | null;
       }[]
     | null;
-  notAvailable?: unknown;
+  notAvailable?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2254,6 +2262,49 @@ export interface CompaniesSelect<T extends boolean = true> {
         address?: T;
         id?: T;
       };
+  legalEntityType?: T;
+  knowledgeBasedStatus?: T;
+  classification?: T;
+  foundingYear?: T;
+  website?: T;
+  centerEstablishment?: T;
+  insuredEmployeeCount?: T;
+  productsServices?:
+    | T
+    | {
+        title?: T;
+        id?: T;
+      };
+  keyMembers?:
+    | T
+    | {
+        name?: T;
+        role?: T;
+        id?: T;
+      };
+  pastProjectsCustomers?:
+    | T
+    | {
+        project?: T;
+        customer?: T;
+        summary?: T;
+        id?: T;
+      };
+  requestedServices?:
+    | T
+    | {
+        service?: T;
+        id?: T;
+      };
+  certificatesLicenses?:
+    | T
+    | {
+        title?: T;
+        issuer?: T;
+        reference?: T;
+        id?: T;
+      };
+  notAvailable?: T;
   updatedAt?: T;
   createdAt?: T;
 }
