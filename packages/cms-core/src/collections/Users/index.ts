@@ -1,12 +1,3 @@
-import {
-  APIError,
-  commitTransaction,
-  initTransaction,
-  type Access,
-  type CollectionConfig,
-  type FieldAccess,
-} from 'payload'
-
 import { hasCmsRole } from '@cms-core/access/hasCmsRole'
 import {
   compatibilityRoles,
@@ -25,6 +16,15 @@ import {
   normalizeLoginIdentifier,
   runSelfSignup,
 } from '@cms-core/auth/self-signup'
+import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
+import {
+  APIError,
+  commitTransaction,
+  initTransaction,
+  type Access,
+  type CollectionConfig,
+  type FieldAccess,
+} from 'payload'
 
 /**
  * The only fields the profile command may echo back. `apiKey`, `enableAPIKey`,
@@ -171,6 +171,110 @@ export const Users: CollectionConfig = {
     afterRead: [({ doc }) => ({ ...doc, roles: compatibilityRoles(doc) })],
   },
   endpoints: [
+    {
+      path: '/personnel/:id',
+      method: 'patch',
+      handler: async (req) => {
+        if (!isInternalAdmin(req.user))
+          return Response.json({ error: 'forbidden' }, { status: 403 })
+        const id = req.routeParams?.id
+        const body = await req.json?.().catch(() => null)
+        if (
+          typeof id !== 'string' ||
+          !/^[1-9]\d*$/.test(id) ||
+          !Number.isSafeInteger(Number(id)) ||
+          Number(id) > 2147483647 ||
+          !body ||
+          typeof body !== 'object' ||
+          Array.isArray(body) ||
+          typeof body.expectedUpdatedAt !== 'string' ||
+          !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(body.expectedUpdatedAt) ||
+          !Number.isFinite(Date.parse(body.expectedUpdatedAt)) ||
+          new Date(body.expectedUpdatedAt).toISOString() !== body.expectedUpdatedAt
+        )
+          return Response.json({ error: 'invalid_personnel' }, { status: 400 })
+        const data: {
+          name?: string
+          phone?: string
+          email?: string | null
+          password?: string
+          operationalRole?: (typeof OPERATIONAL_ROLES)[number]
+          isActive?: boolean
+        } = {}
+        for (const key of ['name', 'phone', 'email', 'password'] as const) {
+          if (!(key in body)) continue
+          if (key === 'email' && body[key] === null) data.email = null
+          else {
+            if (typeof body[key] !== 'string')
+              return Response.json({ error: 'invalid_personnel' }, { status: 400 })
+            data[key] = body[key]
+          }
+        }
+        if ('operationalRole' in body) {
+          if (!OPERATIONAL_ROLES.includes(body.operationalRole))
+            return Response.json({ error: 'invalid_personnel' }, { status: 400 })
+          data.operationalRole = body.operationalRole
+        }
+        if ('isActive' in body) {
+          if (typeof body.isActive !== 'boolean')
+            return Response.json({ error: 'invalid_personnel' }, { status: 400 })
+          data.isActive = body.isActive
+        }
+        await initTransaction(req)
+        try {
+          const transactionID = await req.transactionID
+          // Never fall back to the pool: the row lock and Payload hooks must share a session.
+          if (transactionID == null)
+            throw new Error('Personnel commands require a database transaction.')
+          const db = (req.payload.db as unknown as PostgresAdapter).sessions[transactionID]?.db
+          if (!db) throw new Error('Personnel commands require a database transaction.')
+          const locked = await db.execute(sql`
+            SELECT id, updated_at FROM public.users WHERE id = ${Number(id)} FOR UPDATE
+          `)
+          const current = locked.rows[0] as { id: number; updated_at: string | Date } | undefined
+          if (!current || new Date(current.updated_at).toISOString() !== body.expectedUpdatedAt) {
+            await req.payload.db.rollbackTransaction(transactionID)
+            delete req.transactionID
+            return Response.json(
+              { error: current ? 'stale_personnel' : 'not_found' },
+              { status: current ? 409 : 404 },
+            )
+          }
+          const updated = await req.payload.update({
+            collection: 'users',
+            id: Number(id),
+            data,
+            overrideAccess: false,
+            depth: 0,
+            req,
+          })
+          // Payload uses wall time; preserve CAS even within one millisecond or after clock skew.
+          const advanced = await db.execute(sql`
+            UPDATE public.users
+            SET updated_at = GREATEST(updated_at, ${body.expectedUpdatedAt}::timestamptz + interval '1 millisecond')
+            WHERE id = ${Number(id)} RETURNING updated_at
+          `)
+          const timestamp = advanced.rows[0] as { updated_at: string | Date }
+          const doc = {
+            id: updated.id,
+            name: updated.name ?? null,
+            phone: updated.phone,
+            email: updated.email ?? null,
+            operationalRole: updated.operationalRole,
+            isActive: updated.isActive,
+            updatedAt: new Date(timestamp.updated_at).toISOString(),
+          }
+          await commitTransaction(req)
+          return Response.json({ doc })
+        } catch (error) {
+          if (req.transactionID != null) {
+            await req.payload.db.rollbackTransaction(await req.transactionID)
+            delete req.transactionID
+          }
+          throw error
+        }
+      },
+    },
     {
       path: '/backend-profile/:id',
       method: 'patch',
