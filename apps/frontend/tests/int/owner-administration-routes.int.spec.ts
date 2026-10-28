@@ -3,10 +3,10 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const backend = vi.hoisted(() => ({ auth: vi.fn(), find: vi.fn() }))
+const backend = vi.hoisted(() => ({ auth: vi.fn(), find: vi.fn(), requestHeaders: new Headers() }))
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({ getPayload: async () => backend }))
-vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
+vi.mock('next/headers', () => ({ headers: async () => backend.requestHeaders }))
 vi.mock('next/navigation', () => ({
   redirect: () => {
     throw new Error('REDIRECT')
@@ -27,6 +27,7 @@ import EmployeesPage from '@/app/(frontend)/dashboard/employees/page'
 import EventsPage from '@/app/(frontend)/dashboard/events/page'
 
 beforeEach(() => {
+  backend.requestHeaders = new Headers()
   backend.find.mockResolvedValue({ docs: [{ id: 17, title: 'Public event' }] })
 })
 afterEach(() => {
@@ -44,6 +45,34 @@ it('routes active owner to operational events without fetching public CMS events
   expect(screen.getByText('Manage operational events')).toBeTruthy()
   expect(backend.find).not.toHaveBeenCalled()
 })
+it.each(['employees', 'events'])(
+  'preserves owner cookie authentication on mobile HTTP navigation to %s',
+  async (route) => {
+    const { extractJWT } = await vi.importActual<typeof import('payload')>('payload')
+    const payload = {
+      config: {
+        cookiePrefix: 'payload',
+        csrf: ['http://localhost:3000'],
+        auth: { jwtOrder: ['JWT', 'Bearer', 'cookie'] },
+      },
+    } as unknown as Parameters<typeof extractJWT>[0]['payload']
+    backend.requestHeaders = new Headers({
+      host: '192.168.100.14:3000',
+      cookie: 'payload-token=owner-session',
+    })
+    backend.auth.mockImplementation(async ({ headers }: { headers: Headers }) => ({
+      user:
+        extractJWT({ headers, payload }) === 'owner-session'
+          ? { operationalRole: 'system-owner', isActive: true }
+          : null,
+    }))
+    render(route === 'employees' ? await EmployeesPage() : await EventsPage({}))
+    expect(
+      screen.getByText(route === 'employees' ? 'Manage personnel' : 'Manage operational events'),
+    ).toBeTruthy()
+    expect(backend.requestHeaders.has('sec-fetch-site')).toBe(false)
+  },
+)
 it('keeps Secretariat personnel read-only', async () => {
   backend.auth.mockResolvedValue({
     user: { operationalRole: 'central-secretariat', isActive: true },

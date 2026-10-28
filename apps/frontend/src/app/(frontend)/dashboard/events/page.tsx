@@ -5,6 +5,7 @@ import { getPayload } from 'payload'
 import { EventsView, type EventItem } from '@/components/dashboard/events-view'
 import { OwnerEvents } from '@/components/dashboard/owner-events'
 import { dashboardOperationalRole } from '@/utilities/dashboard-server'
+import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export default async function EventsPage(props: PageProps) {
   const searchParams = await props.searchParams
   const state = searchParams?.state ?? 'default'
   const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
+  const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   if (dashboardOperationalRole(user) === 'system-owner') return <OwnerEvents />
   const [eventResult, exhibitionResult] = await Promise.all([
     payload.find({ collection: 'events', limit: 100, depth: 1, sort: 'startDate' }),
