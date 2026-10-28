@@ -13,6 +13,7 @@ import type { NotificationOutbox } from './dashboard/notification-outbox.js'
 import { createDashboardRouter } from './dashboard/router.js'
 import { PrivateDocumentStorage } from './documents/storage.js'
 import type { BoothCatalogueRepository } from './exhibitions/catalogue-repo.js'
+import type { BoothCompanyEligibility, BoothReservationRepository } from './exhibitions/reservation-repo.js'
 import type { ExhibitionStore } from './exhibitions/exhibition-store.js'
 import type { EvaluationStore } from './reviews/evaluation-repo.js'
 import { PostgresVerificationStore, type VerificationStore } from './dashboard/verification-repo.js'
@@ -30,6 +31,8 @@ export interface AppDeps extends AuthDeps {
   eventStore?: EventStore
   eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
+  boothReservations?: BoothReservationRepository
+  boothCompanyEligibility?: BoothCompanyEligibility
   exhibitionStore?: ExhibitionStore
   evaluationStore?: EvaluationStore
   notificationOutbox?: NotificationOutbox

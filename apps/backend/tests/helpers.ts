@@ -16,6 +16,11 @@ import {
   InMemoryBoothCatalogueRepository,
   type BoothCatalogueRepository,
 } from '../src/exhibitions/catalogue-repo.js'
+import {
+  InMemoryBoothReservationRepository,
+  type BoothCompanyEligibility,
+  type BoothReservationRepository,
+} from '../src/exhibitions/reservation-repo.js'
 import type { ExhibitionStore } from '../src/exhibitions/exhibition-store.js'
 import type { EvaluationStore } from '../src/reviews/evaluation-repo.js'
 import {
@@ -34,6 +39,7 @@ export interface TestApp {
   companyStore: InMemoryCompanyStore
   dossierDocuments: InMemoryDossierDocumentSource
   boothCatalogue: BoothCatalogueRepository
+  boothReservations: BoothReservationRepository
   jwt: JwtSigner
   notificationOutbox: NotificationOutbox
   verificationStore: VerificationStore
@@ -47,6 +53,8 @@ export interface TestAppOptions {
   eventStore?: EventStore
   eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
+  boothReservations?: BoothReservationRepository
+  boothCompanyEligibility?: BoothCompanyEligibility
   exhibitionStore?: ExhibitionStore
   evaluationStore?: EvaluationStore
   pool?: Pool
@@ -64,6 +72,8 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   ])
   const dossierDocuments = new InMemoryDossierDocumentSource()
   const boothCatalogue = options.boothCatalogue ?? new InMemoryBoothCatalogueRepository()
+  const boothReservations =
+    options.boothReservations ?? new InMemoryBoothReservationRepository(boothCatalogue)
   const verificationStore =
     options.verificationStore ??
     new InMemoryVerificationStore()
@@ -85,6 +95,8 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     eventStore: options.eventStore,
     eventCategoryStore: options.eventCategoryStore,
     boothCatalogue,
+    boothReservations,
+    boothCompanyEligibility: options.boothCompanyEligibility,
     exhibitionStore: options.exhibitionStore,
     evaluationStore: options.evaluationStore,
     notificationOutbox,
@@ -98,6 +110,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     companyStore,
     dossierDocuments,
     boothCatalogue,
+    boothReservations,
     jwt,
     notificationOutbox,
     verificationStore,

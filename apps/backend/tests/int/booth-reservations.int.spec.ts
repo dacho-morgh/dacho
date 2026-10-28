@@ -2,13 +2,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import { runMigrations } from '../../src/db/migrate.js'
 import { PostgresBoothCatalogueRepository } from '../../src/exhibitions/catalogue-repo.js'
-import { BoothReservationRepository } from '../../src/exhibitions/reservation-repo.js'
+import { PostgresBoothReservationRepository } from '../../src/exhibitions/reservation-repo.js'
 
-const connectionString = process.env.DATABASE_URL ?? 'postgres://dacho:dacho@localhost:5432/dacho-cms'
+const connectionString = process.env.DATABASE_URL ?? 'postgres://dacho:***@localhost:5432/dacho-cms'
 const pool = new Pool({ connectionString, application_name: 'booth-reservations-integration' })
 const exhibitionId = 'reservation-concurrency-test'
 const catalogue = new PostgresBoothCatalogueRepository(pool)
-const reservations = new BoothReservationRepository(pool)
+const reservations = new PostgresBoothReservationRepository(pool)
 
 async function clearFixtures() {
   await pool.query('DELETE FROM dashboard.booth_reservations WHERE exhibition_id = $1', [exhibitionId])

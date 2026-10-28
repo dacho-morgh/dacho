@@ -68,6 +68,11 @@ import {
   PostgresBoothCatalogueRepository,
   type BoothCatalogueRepository,
 } from '../exhibitions/catalogue-repo.js'
+import {
+  PostgresBoothReservationRepository,
+  type BoothCompanyEligibility,
+  type BoothReservationRepository,
+} from '../exhibitions/reservation-repo.js'
 import type { ExhibitionStore } from '../exhibitions/exhibition-store.js'
 import {
   PostgresEvaluationRepository,
@@ -93,6 +98,8 @@ export interface DashboardDeps {
   eventStore?: EventStore
   eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
+  boothReservations?: BoothReservationRepository
+  boothCompanyEligibility?: BoothCompanyEligibility
   exhibitionStore?: ExhibitionStore
   evaluationStore?: EvaluationStore
   notificationOutbox?: NotificationOutbox
@@ -345,6 +352,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     deps.eventCategoryStore ?? new EventCategoryRepository(deps.pool)
   const catalogue =
     deps.boothCatalogue ?? new PostgresBoothCatalogueRepository(deps.pool)
+  const boothReservations =
+    deps.boothReservations ?? new PostgresBoothReservationRepository(deps.pool)
   const verificationStore =
     deps.verificationStore ?? new PostgresVerificationStore(deps.pool)
 
@@ -2058,6 +2067,234 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     res.json({ booth: result.booth })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/exhibitions/:exhibitionId/booths/:boothId/reserve', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'representative') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const company = await deps.companyStore.findByRepresentative(actor.id)
+      if (!company) {
+        res.status(404).json({ error: 'company_not_found' })
+        return
+      }
+      // Fail closed until the authoritative verification workflow is connected.
+      if (!deps.boothCompanyEligibility) {
+        res.status(503).json({ error: 'company_verification_unavailable' })
+        return
+      }
+      if (!await deps.boothCompanyEligibility.isVerified(company.id)) {
+        res.status(403).json({ error: 'company_not_verified' })
+        return
+      }
+      if (!isUuid(req.params.boothId)) {
+        res.status(404).json({ error: 'booth_not_found' })
+        return
+      }
+      const exhibition = await checkExhibition(req.params.exhibitionId)
+      if (!exhibition.ok) {
+        res.status(503).json({ error: 'exhibition_lookup_failed' })
+        return
+      }
+      if (!exhibition.exists) {
+        res.status(404).json({ error: 'exhibition_not_found' })
+        return
+      }
+      const result = await boothReservations.reserve({
+        exhibitionId: req.params.exhibitionId,
+        boothId: req.params.boothId,
+        companyId: company.id,
+        actorId: actor.id,
+      })
+      if (!result.ok) {
+        if (result.error === 'catalogue_not_configured') {
+          res.status(400).json({ error: result.error })
+          return
+        }
+        res.status(409).json({ error: result.error })
+        return
+      }
+      res.status(201).json({ reservation: result.reservation })
+    } catch (error) { next(error) }
+  })
+
+  const getMyReservations = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'representative') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const company = await deps.companyStore.findByRepresentative(actor.id)
+      if (!company) {
+        res.status(404).json({ error: 'company_not_found' })
+        return
+      }
+      const items = await boothReservations.listByCompany(company.id, req.params.exhibitionId, actor.operationalRole)
+      res.json({ items })
+    } catch (error) { next(error) }
+  }
+  router.get('/exhibitions/:exhibitionId/my-reservations', getMyReservations)
+  router.get('/exhibitions/:exhibitionId/reservations/me', getMyReservations)
+
+  router.get('/exhibitions/:exhibitionId/reservations/:id', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isCompanyAdministrator(actor.operationalRole) && actor.operationalRole !== 'representative') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.id)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const reservation = await boothReservations.findById(req.params.id, actor.operationalRole)
+      if (!reservation || reservation.exhibitionId !== req.params.exhibitionId) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (isCompanyAdministrator(actor.operationalRole)) {
+        res.json({ reservation })
+        return
+      }
+      if (actor.operationalRole === 'representative') {
+        const company = await deps.companyStore.findByRepresentative(actor.id)
+        if (company && reservation.companyId === company.id) {
+          res.json({ reservation })
+          return
+        }
+      }
+      res.status(403).json({ error: 'forbidden' })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/exhibitions/:exhibitionId/reservations', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isCompanyAdministrator(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined
+      const status = statusParam === 'pending' || statusParam === 'approved' || statusParam === 'rejected'
+        ? statusParam
+        : 'all'
+      const items = await boothReservations.listByExhibition(req.params.exhibitionId, { status }, actor.operationalRole)
+      res.json({ items })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/exhibitions/:exhibitionId/reservations/:id', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isCompanyAdministrator(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.id)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const reservation = await boothReservations.findById(req.params.id, actor.operationalRole)
+      if (!reservation || reservation.exhibitionId !== req.params.exhibitionId) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const history = await boothReservations.listDecisionsHistory(reservation.id)
+      res.json({ reservation, history })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/exhibitions/:exhibitionId/reservations/:id/attendance', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isCompanyAdministrator(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.id)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const action = req.body?.action
+      if (action !== 'approve' && action !== 'reject') {
+        res.status(400).json({ error: 'invalid_action' })
+        return
+      }
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : null
+      if (action === 'reject' && !reason) {
+        res.status(400).json({ error: 'reason_required' })
+        return
+      }
+      const reservation = await boothReservations.findById(req.params.id, actor.operationalRole)
+      if (!reservation || reservation.exhibitionId !== req.params.exhibitionId) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const result = await boothReservations.decideAttendance({
+        id: reservation.id,
+        action,
+        reason,
+        actorId: actor.id,
+      })
+      if (!result.ok) {
+        if (result.error === 'not_found') {
+          res.status(404).json({ error: 'not_found' })
+          return
+        }
+        if (result.error === 'reason_required') {
+          res.status(400).json({ error: 'reason_required' })
+          return
+        }
+        res.status(409).json({ error: result.error })
+        return
+      }
+      res.json({ reservation: result.reservation })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/exhibitions/:exhibitionId/reservations/:id/receipt', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'representative') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.id)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const company = await deps.companyStore.findByRepresentative(actor.id)
+      if (!company) {
+        res.status(404).json({ error: 'company_not_found' })
+        return
+      }
+      const reservation = await boothReservations.findById(req.params.id, actor.operationalRole)
+      if (!reservation || reservation.exhibitionId !== req.params.exhibitionId) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (reservation.companyId !== company.id) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const eligibility = await boothReservations.canSubmitReceipt(reservation.id, company.id)
+      if (!eligibility.ok) {
+        const status = eligibility.error === 'not_found' ? 404
+          : eligibility.error === 'reservation_inactive' ? 409 : 403
+        res.status(status).json({
+          error: eligibility.error,
+          ...(eligibility.attendanceStatus ? { attendanceStatus: eligibility.attendanceStatus } : {}),
+        })
+        return
+      }
+      // T50 owns document validation, persistence and receipt versions. Never
+      // acknowledge a successful upload when no file has been stored.
+      res.status(501).json({ error: 'receipt_upload_not_implemented' })
     } catch (error) { next(error) }
   })
 

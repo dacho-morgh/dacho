@@ -406,6 +406,11 @@ export class InMemoryBoothCatalogueRepository implements BoothCatalogueRepositor
   private readonly settings = new Map<string, ExhibitionCatalogueSettings>()
   private readonly booths = new Map<string, StoredBooth>()
   private readonly priceVersions = new Map<string, BoothPriceVersion>()
+  private reservationChecker?: (boothId: string) => boolean
+
+  setReservationChecker(fn: (boothId: string) => boolean): void {
+    this.reservationChecker = fn
+  }
 
   async getSettings(exhibitionId: string): Promise<ExhibitionCatalogueSettings | undefined> {
     return this.settings.get(exhibitionId)
@@ -549,9 +554,10 @@ export class InMemoryBoothCatalogueRepository implements BoothCatalogueRepositor
   }
 
   private toBooth(booth: StoredBooth): Booth {
+    const isReserved = this.reservationChecker?.(booth.id) ?? false
     return {
       ...booth,
-      available: booth.active && booth.status === 'available',
+      available: booth.active && booth.status === 'available' && !isReserved,
     }
   }
 }

@@ -41,6 +41,7 @@ describe('SupportTicketActions', () => {
     await waitFor(() => expect(request).toHaveBeenCalledWith('/api/dashboard/support/ticket-1/respond', expect.objectContaining({
       method: 'POST', body: JSON.stringify({ body: 'پاسخ جدید' }),
     })))
+    await waitFor(() => expect(screen.getByText('پاسخ شما ارسال شد.')).toBeTruthy())
 
     fireEvent.click(screen.getByRole('button', { name: 'لغو تیکت' }))
     await waitFor(() => expect(screen.getByText('این تیکت لغو شده است.')).toBeTruthy())
