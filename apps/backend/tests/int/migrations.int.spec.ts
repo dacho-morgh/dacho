@@ -154,4 +154,26 @@ describe('dashboard migrations', () => {
     expect(rows[0]?.data_type).toBe('USER-DEFINED')
     expect(rows[0]?.udt_name).toBe('request_status')
   })
+
+  it('creates the event_categories table with event_id, title, and timestamps', async () => {
+    const cols = await tableColumns('event_categories')
+    expect(cols).toEqual(
+      expect.arrayContaining(['id', 'event_id', 'title', 'created_at', 'updated_at']),
+    )
+  })
+
+  it('creates the event_subtopics table with category_id, title, employer_id, and timestamps', async () => {
+    const cols = await tableColumns('event_subtopics')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'event_id',
+        'category_id',
+        'title',
+        'employer_id',
+        'created_at',
+        'updated_at',
+      ]),
+    )
+  })
 })
