@@ -4,7 +4,12 @@ import { Pool } from 'pg'
 import { InMemoryCompanyStore } from '../src/auth/company-store.js'
 import { InMemoryUserStore, type UserStore } from '../src/auth/user-store.js'
 import { createApp } from '../src/app.js'
+import type { EventCategoryStore } from '../src/dashboard/event-category-repo.js'
 import type { EventStore } from '../src/dashboard/event-repo.js'
+import {
+  PostgresNotificationOutbox,
+  type NotificationOutbox,
+} from '../src/dashboard/notification-outbox.js'
 import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
 import { InMemoryDossierDocumentSource } from '../src/dashboard/dossier.js'
 import {
@@ -12,6 +17,7 @@ import {
   type BoothCatalogueRepository,
 } from '../src/exhibitions/catalogue-repo.js'
 import type { ExhibitionStore } from '../src/exhibitions/exhibition-store.js'
+import type { EvaluationStore } from '../src/reviews/evaluation-repo.js'
 import { JwtSigner } from '../src/jwt.js'
 import { InMemoryCodeStore } from '../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../src/otp/console-delivery.js'
@@ -25,23 +31,28 @@ export interface TestApp {
   dossierDocuments: InMemoryDossierDocumentSource
   boothCatalogue: BoothCatalogueRepository
   jwt: JwtSigner
+  notificationOutbox: NotificationOutbox
 }
 
 export interface TestAppOptions {
   /** Swap the in-memory identity store for a remote-backed implementation. */
   userStore?: UserStore
+  companyStore?: InMemoryCompanyStore
   /** Keep event authorization/validation tests independent of Postgres. */
   eventStore?: EventStore
+  eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
+  evaluationStore?: EvaluationStore
   pool?: Pool
+  notificationOutbox?: NotificationOutbox
 }
 
 export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
   const delivery = new ConsoleOtpDelivery()
   const codeStore = new InMemoryCodeStore()
   const userStore = options.userStore ?? new InMemoryUserStore()
-  const companyStore = new InMemoryCompanyStore([
+  const companyStore = options.companyStore ?? new InMemoryCompanyStore([
     { name: 'Company 1', nationalId: '10000000001', representativeId: 'user-1' },
     { name: 'Company 2', nationalId: '10000000002', representativeId: 'user-2' },
   ])
@@ -50,6 +61,8 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const jwt = await JwtSigner.create('test-kid')
   // Tests that query dashboard routes inject a pool stub; default stays unconnected.
   const pool = options.pool ?? new Pool()
+  const notificationOutbox =
+    options.notificationOutbox ?? new PostgresNotificationOutbox(pool)
   const app = createApp({
     codeStore,
     delivery,
@@ -61,8 +74,21 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     serviceCatalog: new InMemoryServiceCatalog(),
     proxySecret: 'test-proxy-secret',
     eventStore: options.eventStore,
+    eventCategoryStore: options.eventCategoryStore,
     boothCatalogue,
     exhibitionStore: options.exhibitionStore,
+    evaluationStore: options.evaluationStore,
+    notificationOutbox,
   })
-  return { app, delivery, codeStore, userStore, companyStore, dossierDocuments, boothCatalogue, jwt }
+  return {
+    app,
+    delivery,
+    codeStore,
+    userStore,
+    companyStore,
+    dossierDocuments,
+    boothCatalogue,
+    jwt,
+    notificationOutbox,
+  }
 }

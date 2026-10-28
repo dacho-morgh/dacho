@@ -121,11 +121,59 @@ describe('dashboard migrations', () => {
     )
   })
 
+  it('creates the notification_jobs table with the outbox fields', async () => {
+    const cols = await tableColumns('notification_jobs')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'request_id',
+        'recipient_id',
+        'actor_id',
+        'action',
+        'from_state',
+        'to_state',
+        'revision',
+        'channel',
+        'title',
+        'body',
+        'status',
+        'attempts',
+        'last_error',
+        'letter_id',
+        'created_at',
+        'updated_at',
+        'processed_at',
+      ]),
+    )
+  })
+
   it('types requests.status with the request_status enum', async () => {
     const { rows } = await pool.query(
       `SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'requests' AND table_schema = 'dashboard' AND column_name = 'status'`,
     )
     expect(rows[0]?.data_type).toBe('USER-DEFINED')
     expect(rows[0]?.udt_name).toBe('request_status')
+  })
+
+  it('creates the event_categories table with event_id, title, and timestamps', async () => {
+    const cols = await tableColumns('event_categories')
+    expect(cols).toEqual(
+      expect.arrayContaining(['id', 'event_id', 'title', 'created_at', 'updated_at']),
+    )
+  })
+
+  it('creates the event_subtopics table with category_id, title, employer_id, and timestamps', async () => {
+    const cols = await tableColumns('event_subtopics')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'event_id',
+        'category_id',
+        'title',
+        'employer_id',
+        'created_at',
+        'updated_at',
+      ]),
+    )
   })
 })

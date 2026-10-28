@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import { EventsView, type EventItem } from '@/components/dashboard/events-view'
+import { OwnerEvents } from '@/components/dashboard/owner-events'
 import { dashboardOperationalRole } from '@/utilities/dashboard-server'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
@@ -24,6 +25,23 @@ export default async function EventsPage(props: PageProps) {
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isOwner = dashboardOperationalRole(user) === 'system-owner'
 
+  if (isOwner) {
+    const exhibitions = await payload.find({
+      collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate',
+    })
+    return (
+      <>
+        <OwnerEvents />
+        <div className="flex w-full flex-col items-center bg-[#fafafa] px-4 pb-12 sm:px-6 lg:px-8">
+          <EventsView
+            initialEventsList={exhibitions.docs.map((item) => mapEvent(item, 'exhibitions'))}
+            state={state}
+            isOwner
+          />
+        </div>
+      </>
+    )
+  }
   const [eventResult, exhibitionResult] = await Promise.all([
     payload.find({ collection: 'events', limit: 100, depth: 1, sort: 'startDate' }),
     payload.find({ collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate' }),
