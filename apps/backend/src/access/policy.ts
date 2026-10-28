@@ -160,7 +160,6 @@ export const UNSUPPORTED_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = [
   'rfp',
   'supplementaryCaseFiles',
   'boothPaymentReceipt',
-  'correspondenceAttachment',
 ]
 
 const COMPANY_CATEGORIES: readonly DocumentCategory[] = [
@@ -229,6 +228,10 @@ export function canUploadOwnedDocument(
   if (!ownsRequest) return false
   // Draft-only company editing keeps submitted/financial snapshots immutable
   // until T30 introduces versioned package submissions.
+  // Correspondence and supplementary files requested in review can be added while in review.
+  if (category === 'correspondenceAttachment' || category === 'supplementaryCaseFiles') {
+    return true
+  }
   return parent.requestStatus === undefined || parent.requestStatus === null || parent.requestStatus === 'draft'
 }
 
@@ -276,10 +279,10 @@ export function canReadDocument(
     case 'chief-reviewer':
     case 'reviewer':
     case 'employer-reviewer':
+      if (document.category === 'correspondenceAttachment') return false
       return document.assigned && audience === 'case'
     case 'investment-reviewer':
-      // The persisted financial handoff workflow is not implemented yet.
-      // Assignment alone must never expose a financial package.
+      if (document.category === 'correspondenceAttachment') return document.assigned
       return document.assigned && audience === 'case'
   }
 }

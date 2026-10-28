@@ -18,7 +18,7 @@ const companyCategories: readonly DocumentCategory[] = [
   'catalogues', 'certificatesLicenses',
 ]
 const unsupportedCategories: readonly DocumentCategory[] = [
-  'rfp', 'supplementaryCaseFiles', 'boothPaymentReceipt', 'correspondenceAttachment',
+  'rfp', 'supplementaryCaseFiles', 'boothPaymentReceipt',
 ]
 
 const contexts = [
@@ -40,7 +40,7 @@ describe('T42 current backend document authority matrix', () => {
             const expected = supported && (
               privileged || (role === 'representative'
                 ? context.companyId === 'company' || (!companyDocument && context.requestOwnerId === 'actor')
-                : assigned && category === 'proposal')
+                : assigned && (category === 'proposal' || (role === 'investment-reviewer' && category === 'correspondenceAttachment')))
             )
             expect(canReadDocument(role, {
               category,
@@ -58,7 +58,7 @@ describe('T42 current backend document authority matrix', () => {
             const expected = supported && validParent && (
               privileged || (role === 'representative' && (companyDocument
                 ? context.companyId === 'company'
-                : context.requestOwnerId === 'actor' && requestStatus === 'draft'))
+                : context.requestOwnerId === 'actor' && (requestStatus === 'draft' || category === 'correspondenceAttachment')))
             )
             expect(canUploadOwnedDocument(role, category, {
               companyId: companyDocument ? context.companyId : null,
