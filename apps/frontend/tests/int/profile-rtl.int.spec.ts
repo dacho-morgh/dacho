@@ -8,6 +8,11 @@ import { CompanyProfileView } from '@/components/dashboard/profile/company-profi
 import { ResumeProfileView } from '@/components/dashboard/profile/resume-profile-view'
 import type { DossierResponseDto, ProfileDto } from '@/utilities/dashboard-api'
 
+// Document transport is covered separately; these tests focus on profile layout and editing.
+vi.mock('@/components/documents/private-document-field', () => ({
+  PrivateDocumentField: () => null,
+}))
+
 const profile: ProfileDto = {
   company: {
     name: 'شرکت نمونه',
