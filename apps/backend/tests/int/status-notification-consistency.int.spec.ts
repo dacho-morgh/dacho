@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Pool } from 'pg'
 import request from 'supertest'
 
@@ -83,6 +83,82 @@ describe('T37 — Status transition and notification consistency (Integration)',
 
   afterAll(async () => {
     await pool.end()
+  })
+
+  it.each([false, true])('submits and records delivery with one pooled connection (failure=%s)', async (failure) => {
+    const oneConnection = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 500 })
+    try {
+      const outbox = new PostgresNotificationOutbox(oneConnection)
+      outbox.setSimulationFailure(failure)
+      const repo = new RequestRepository(oneConnection, outbox)
+      const draft = await repo.create({
+        serviceId: '1', serviceKey: 'financing', serviceName: 'Financing',
+        title: 'Single connection', ownerId: OWNER, answers: {},
+      })
+      expect(await repo.submit(draft.id, OWNER)).toMatchObject({ status: 'in_review' })
+      const jobs = await outbox.list({ requestId: draft.id })
+      expect(jobs.items).toHaveLength(1)
+      expect(jobs.items[0]?.status).toBe(failure ? 'failed' : 'delivered')
+      expect(oneConnection.waitingCount).toBe(0)
+    } finally {
+      await oneConnection.end()
+    }
+  })
+
+  async function pendingNotification(outbox: PostgresNotificationOutbox) {
+    const repo = new RequestRepository(pool, outbox)
+    const draft = await repo.create({
+      serviceId: '1', serviceKey: 'financing', serviceName: 'Financing',
+      title: 'Recovery', ownerId: OWNER, answers: {},
+    })
+    // Model failure to begin delivery after the business transaction committed.
+    const delivery = vi.spyOn(outbox, 'deliver').mockRejectedValueOnce(new Error('worker unavailable'))
+    try {
+      await repo.submit(draft.id, OWNER)
+    } finally {
+      delivery.mockRestore()
+    }
+    const job = (await outbox.list({ requestId: draft.id })).items[0]!
+    expect(job.status).toBe('pending')
+    return job
+  }
+
+  it('bulk retry recovers committed pending jobs without repeating the transition or letter', async () => {
+    const outbox = new PostgresNotificationOutbox(pool)
+    const job = await pendingNotification(outbox)
+    expect(await outbox.retryAllUndelivered()).toEqual([
+      expect.objectContaining({ jobId: job.id, status: 'delivered' }),
+    ])
+    expect(await outbox.retryAllUndelivered()).toEqual([])
+    expect((await pool.query('SELECT id FROM dashboard.letters WHERE request_id = $1', [job.requestId])).rows).toHaveLength(1)
+    expect((await pool.query('SELECT id FROM dashboard.activities WHERE request_id = $1', [job.requestId])).rows).toHaveLength(1)
+  })
+
+  it('never downgrades another worker\'s successful delivery when an older attempt fails', async () => {
+    const outbox = new PostgresNotificationOutbox(pool)
+    const job = await pendingNotification(outbox)
+    const failingPool = {
+      connect: async () => {
+        const client = await pool.connect()
+        return {
+          query: async (sql: string, values?: unknown[]) => {
+            if (sql.includes('INSERT INTO dashboard.letters')) throw new Error('first worker failed')
+            const result = await client.query(sql, values)
+            if (sql === 'ROLLBACK') {
+              // The lock is released: another worker completes delivery before failure logging.
+              expect(await outbox.deliver(job.id)).toMatchObject({ status: 'delivered' })
+            }
+            return result
+          },
+          release: () => client.release(),
+        }
+      },
+      query: pool.query.bind(pool),
+    } as unknown as Pool
+    expect(await new PostgresNotificationOutbox(failingPool).deliver(job.id)).toMatchObject({ status: 'failed' })
+    expect((await outbox.findById(job.id))?.status).toBe('delivered')
+    expect(await outbox.retry(job.id)).toMatchObject({ alreadyDelivered: true })
+    expect((await pool.query('SELECT id FROM dashboard.letters WHERE request_id = $1', [job.requestId])).rows).toHaveLength(1)
   })
 
   it('criterion 1: notification delivery failure does not lose the recorded transition', async () => {

@@ -70,7 +70,7 @@ export interface NotificationOutbox {
   enqueue(client: PoolClient, input: EnqueueNotificationInput): Promise<NotificationJobDto>
   deliver(jobId: string): Promise<DeliverResult>
   retry(jobId: string): Promise<DeliverResult>
-  retryAllFailed(): Promise<DeliverResult[]>
+  retryAllUndelivered(): Promise<DeliverResult[]>
   list(options?: {
     requestId?: string
     recipientId?: string
@@ -217,10 +217,12 @@ export class PostgresNotificationOutbox implements NotificationOutbox {
 
       const errorMessage = err instanceof Error ? err.message : String(err)
       try {
-        await this.pool.query(
+        // Reuse this connection after rollback; acquiring another while holding
+        // it can deadlock a full pool. A concurrent retry may already have delivered.
+        await client.query(
           `UPDATE dashboard.notification_jobs
            SET status = 'failed', attempts = attempts + 1, last_error = $1, updated_at = now()
-           WHERE id = $2`,
+           WHERE id = $2 AND status <> 'delivered'`,
           [errorMessage, jobId],
         )
       } catch {
@@ -241,9 +243,9 @@ export class PostgresNotificationOutbox implements NotificationOutbox {
     return this.deliver(jobId)
   }
 
-  async retryAllFailed(): Promise<DeliverResult[]> {
+  async retryAllUndelivered(): Promise<DeliverResult[]> {
     const { rows } = await this.pool.query<{ id: string }>(
-      `SELECT id FROM dashboard.notification_jobs WHERE status = 'failed' ORDER BY created_at ASC`,
+      `SELECT id FROM dashboard.notification_jobs WHERE status IN ('pending', 'failed') ORDER BY created_at ASC`,
     )
     const results: DeliverResult[] = []
     for (const { id } of rows) {

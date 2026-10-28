@@ -52,6 +52,10 @@ to implement the transactional outbox pattern for workflow state transitions and
 notification delivery. It enforces atomic persistence of request transitions, activity
 history, and notification jobs, guarantees delivery retry idempotency via a unique
 `(request_id, revision, action, recipient_id)` constraint, and prevents partial state on transaction failure.
+The operator retry-all command recovers both failed jobs and pending jobs left by
+an interrupted delivery attempt. Delivery releases the business transaction's
+connection first and uses one pooled connection for its own attempt and failure
+recording. A late failed attempt cannot overwrite another worker's delivered status.
 
 ## Read-only aggregate inventory (T04 tooling slice)
 

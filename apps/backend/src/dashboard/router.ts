@@ -1160,7 +1160,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(403).json({ error: 'forbidden' })
         return
       }
-      const results = await notificationOutbox.retryAllFailed()
+      const results = await notificationOutbox.retryAllUndelivered()
       res.json({ results })
     } catch (error) { next(error) }
   })

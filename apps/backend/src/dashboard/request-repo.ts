@@ -305,6 +305,8 @@ export class RequestRepository {
       ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
       : '(company_id IS NULL AND owner_id = $2)'
     const client = await this.pool.connect()
+    let submittedRequest: RequestDto
+    let notificationJobId: string
     try {
       await client.query('BEGIN')
       const { rows } = await client.query<RequestRow & { revision: number }>(
@@ -347,18 +349,22 @@ export class RequestRepository {
         title: 'ارسال درخواست',
         body: `درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} ارسال شد.`,
       })
+      submittedRequest = mapRequestRow(updated)
+      notificationJobId = job.id
       await client.query('COMMIT')
-      try {
-        await this.notificationOutbox.deliver(job.id)
-      } catch {
-        // Outbox pattern: delivery failure never reverts or fails the committed business transaction
-      }
-      return mapRequestRow(updated)
     } catch (err) {
       await client.query('ROLLBACK').catch(() => undefined)
       throw err
     } finally {
       client.release()
     }
+    // Delivery needs its own connection. Return the transaction client to the
+    // pool first so concurrent submissions cannot exhaust it while awaiting delivery.
+    try {
+      await this.notificationOutbox.deliver(notificationJobId)
+    } catch {
+      // The committed pending job remains available for operator recovery.
+    }
+    return submittedRequest
   }
 }
