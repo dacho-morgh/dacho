@@ -13,6 +13,20 @@ export function parseRequestStatus(value?: string | string[]): RequestStatus | u
     : undefined
 }
 
+/** Invalid or repeated page parameters return to the first page. */
+export function parseRequestPage(value?: string | string[]): number {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return 1
+  const page = Number(value)
+  return Number.isSafeInteger(page) && Number.isSafeInteger((page - 1) * 50) ? page : 1
+}
+
+export function requestQueueHref(basePath: string, status?: RequestStatus, page = 1): string {
+  const query = new URLSearchParams()
+  if (status) query.set('status', status)
+  if (page > 1) query.set('page', String(page))
+  return query.size ? `${basePath}?${query}` : basePath
+}
+
 export type RequestStatus = 'in_review' | 'action_needed' | 'rejected' | 'draft' | 'approved'
 
 export type RequestAllowedAction =

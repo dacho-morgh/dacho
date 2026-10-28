@@ -29,7 +29,7 @@ export function DashboardRouteError({
         </Typography>
       )}
       <Button type="button" onClick={reset}>
-        تلاش دوباره
+        <Typography>تلاش دوباره</Typography>
       </Button>
     </section>
   )

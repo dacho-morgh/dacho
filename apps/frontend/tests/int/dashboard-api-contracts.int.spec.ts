@@ -4,10 +4,10 @@ vi.mock('next/headers', () => ({
   cookies: async () => ({ toString: () => 'payload-token=test-session' }),
 }))
 
+import { parseRequestStatus, REQUEST_STATUS_VALUES } from '@/components/dashboard/requests'
 import { mapRequestItem, REQUEST_STATUS_LABELS, type RequestDto } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
-import { parseRequestStatus, REQUEST_STATUS_VALUES } from '@/components/dashboard/requests'
 
 // FE30 — dashboard API contracts. Covers the seams every queue depends on:
 // transport outcome → surface notice (denied is not empty), status filter
@@ -74,10 +74,13 @@ describe('serverDashboardFetchResult — denied vs empty vs unavailable', () => 
 
   it('treats 404 and 5xx as unavailable rather than "no records"', async () => {
     fetchMock.mockResolvedValueOnce(respond(404, { error: 'not_found' }))
-    expect((await serverDashboardFetchResult('/requests/missing')).kind).toBe('unavailable')
+    expect(await serverDashboardFetchResult('/requests/missing')).toEqual({
+      kind: 'unavailable',
+      status: 404,
+    })
 
     fetchMock.mockResolvedValueOnce(respond(500, { error: 'boom' }))
-    expect((await serverDashboardFetchResult('/stats')).kind).toBe('unavailable')
+    expect(await serverDashboardFetchResult('/stats')).toEqual({ kind: 'unavailable', status: 500 })
   })
 
   it('maps a transport failure to unavailable without throwing', async () => {
@@ -89,7 +92,10 @@ describe('serverDashboardFetchResult — denied vs empty vs unavailable', () => 
     fetchMock.mockResolvedValue(respond(200, {}))
     await serverDashboardFetchResult('/stats')
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }]
+    const [, init] = fetchMock.mock.calls[0] as [
+      string,
+      RequestInit & { headers: Record<string, string> },
+    ]
     expect(init.headers.cookie).toBe('payload-token=test-session')
     expect(init.headers['sec-fetch-site']).toBe('same-origin')
     expect(init.cache).toBe('no-store')

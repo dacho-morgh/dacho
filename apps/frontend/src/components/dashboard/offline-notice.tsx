@@ -1,8 +1,8 @@
-import React from 'react'
 import Link from 'next/link'
-
+import React from 'react'
+import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
-
+import { getLoginUrl } from '@/utilities/auth-return-url'
 /**
  * A failed request is not an empty list. Every dashboard surface renders this
  * notice for `unavailable`/`denied`/`expired` results so a network or session
@@ -48,14 +48,13 @@ export function OfflineNotice({ reason, retryHref, className = '' }: OfflineNoti
         {copy.description}
       </Typography>
       {retryHref && (
-        <Link
-          href={retryHref}
-          className="mt-2 inline-flex h-8 items-center rounded-[10px] bg-white px-3 text-brand-600 hover:bg-neutral-100"
-        >
-          <Typography as="span" variant="14/regular" className="text-inherit">
-            تلاش دوباره
-          </Typography>
-        </Link>
+        <Button asChild variant="outline-gray" size="32" className="mt-2">
+          <Link href={reason === 'expired' ? getLoginUrl(retryHref, { expired: true }) : retryHref}>
+            <Typography as="span" variant="14/regular" className="text-inherit">
+              {reason === 'expired' ? 'ورود دوباره' : 'تلاش دوباره'}
+            </Typography>
+          </Link>
+        </Button>
       )}
     </section>
   )

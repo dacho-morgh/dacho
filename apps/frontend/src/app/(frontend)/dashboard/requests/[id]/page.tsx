@@ -6,9 +6,15 @@ import { AdminRequestDetail } from '@/components/dashboard/admin-request-detail'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Typography } from '@/components/ui/typography'
-import { canDeleteDocuments, canUploadDocuments, formatDate, type RequestDetail } from '@/utilities/dashboard-api'
+import {
+  canDeleteDocuments,
+  canUploadDocuments,
+  formatDate,
+  type RequestDetail,
+} from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { isInternalDashboardUser, serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +28,7 @@ const NEXT_ACTION_LABELS: Record<string, string> = {
 export default async function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
+  const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isInternal = isInternalDashboardUser(user)
 
   if (isInternal) {
@@ -35,7 +41,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   if (result.kind !== 'ok') {
     const notice = unavailableReasonFor(result)
     // A failed read is not a missing case: only a genuine 404 renders notFound.
-    if (notice === 'expired') notFound()
+    if (result.kind === 'unavailable' && result.status === 404) notFound()
     return (
       <main className="mx-auto w-full max-w-4xl p-6 sm:p-10" dir="rtl">
         <OfflineNotice
@@ -51,7 +57,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   const allowedActions = data.request.allowedActions ?? []
   const nextAction =
-    allowedActions.find((action) => action !== 'read') ?? (allowedActions.length ? 'read' : undefined)
+    allowedActions.find((action) => action !== 'read') ??
+    (allowedActions.length ? 'read' : undefined)
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6 sm:p-10" dir="rtl">
@@ -64,7 +71,11 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
         <Field label="گام جاری" value={data.request.currentStep || 'ثبت نشده'} />
         <Field
           label="اقدام بعدی شما"
-          value={nextAction ? NEXT_ACTION_LABELS[nextAction] ?? nextAction : 'اقدامی برای شما تعریف نشده است'}
+          value={
+            nextAction
+              ? (NEXT_ACTION_LABELS[nextAction] ?? nextAction)
+              : 'اقدامی برای شما تعریف نشده است'
+          }
         />
         <Field label="تاریخ ثبت" value={formatDate(data.request.submissionDate) || 'ثبت نشده'} />
         <Field label="آخرین به‌روزرسانی" value={formatDate(data.request.updatedAt)} />
@@ -101,14 +112,16 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
             canUpload={canUpload}
             canDelete={canDelete}
           />
-          {([
-            ['financialStatements', 'صورت‌های مالی'],
-            ['debtFacilityEvidence', 'بدهی‌ها و تسهیلات'],
-            ['taxInsuranceRecords', 'اظهارنامه مالیاتی و بیمه'],
-            ['contractsOrdersMousCommitments', 'قراردادها و تعهدات'],
-            ['projectEstimateUseOfFunds', 'برآورد و مصرف منابع'],
-            ['guaranteeCollateral', 'تضامین و وثایق'],
-          ] as const).map(([category, label]) => (
+          {(
+            [
+              ['financialStatements', 'صورت‌های مالی'],
+              ['debtFacilityEvidence', 'بدهی‌ها و تسهیلات'],
+              ['taxInsuranceRecords', 'اظهارنامه مالیاتی و بیمه'],
+              ['contractsOrdersMousCommitments', 'قراردادها و تعهدات'],
+              ['projectEstimateUseOfFunds', 'برآورد و مصرف منابع'],
+              ['guaranteeCollateral', 'تضامین و وثایق'],
+            ] as const
+          ).map(([category, label]) => (
             <PrivateDocumentField
               key={category}
               category={category}
@@ -135,7 +148,10 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
                   className={`rounded-lg p-3 ${isCurrent ? 'bg-brand-50 text-brand-700' : 'bg-neutral-50'}`}
                   aria-current={isCurrent ? 'step' : undefined}
                 >
-                  <Typography variant="16/regular" className={isCurrent ? 'text-brand-700' : 'text-neutral-800'}>
+                  <Typography
+                    variant="16/regular"
+                    className={isCurrent ? 'text-brand-700' : 'text-neutral-800'}
+                  >
                     {step.order}. {step.title}
                     {step.roleName ? ` · ${step.roleName}` : ''}
                   </Typography>
@@ -192,7 +208,10 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
       <Typography variant="12/regular" className="text-neutral-500">
         {label}
       </Typography>
-      <Typography variant="16/regular" className={`mt-1 text-neutral-800 ${mono ? 'font-mono' : ''}`}>
+      <Typography
+        variant="16/regular"
+        className={`mt-1 text-neutral-800 ${mono ? 'font-mono' : ''}`}
+      >
         {value}
       </Typography>
     </div>

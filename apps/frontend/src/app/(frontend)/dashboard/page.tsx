@@ -1,9 +1,9 @@
 import configPromise from '@payload-config'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
+import Link from 'next/link'
 import { getPayload } from 'payload'
 import React from 'react'
-import { Typography } from '@/components/ui/typography'
 import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import { CompanyList } from '@/components/dashboard/company-list'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
@@ -15,8 +15,11 @@ import {
   type RecentRequestItem,
   type RecentRequestServiceType,
 } from '@/components/dashboard/requests'
+import { requestQueueHref } from '@/components/dashboard/requests/types'
 import { ServicesQuickAccess, type ServiceCard } from '@/components/dashboard/services-quick-access'
 import { StatCards } from '@/components/dashboard/stat-cards'
+import { Button } from '@/components/ui/button'
+import { Typography } from '@/components/ui/typography'
 import {
   formatDate,
   type ActivityDto,
@@ -25,7 +28,11 @@ import {
   type RequestStats,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
-import { dashboardOperationalRole, dashboardWorkspace, serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import {
+  dashboardOperationalRole,
+  dashboardWorkspace,
+  serverDashboardFetchResult,
+} from '@/utilities/dashboard-server'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
@@ -38,7 +45,7 @@ export const metadata: Metadata = {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ access?: string; status?: string }>
+  searchParams: Promise<{ access?: string; status?: string | string[] }>
 }) {
   const params = await searchParams
   const showDeniedNotice = params.access === 'denied'
@@ -49,10 +56,20 @@ export default async function DashboardPage({
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })
   const workspace = dashboardWorkspace(dashboardOperationalRole(user))
   if (workspace === 'company-dossiers') {
-    return <>{showDeniedNotice && <DeniedNotice />}<CompanyList /></>
+    return (
+      <>
+        {showDeniedNotice && <DeniedNotice />}
+        <CompanyList />
+      </>
+    )
   }
   if (workspace === 'internal-queue') {
-    return <>{showDeniedNotice && <DeniedNotice />}<AdminRequestList /></>
+    return (
+      <>
+        {showDeniedNotice && <DeniedNotice />}
+        <AdminRequestList />
+      </>
+    )
   }
 
   // CMS-owned definitions read server-side via Payload's local API.
@@ -119,10 +136,15 @@ export default async function DashboardPage({
           }}
         />
         {queueNotice ? (
-          <OfflineNotice reason={queueNotice} retryHref="/dashboard" />
+          <OfflineNotice reason={queueNotice} retryHref={requestQueueHref('/dashboard', status)} />
         ) : (
           <RequestsTable items={recentRequests} showFilterTabs={false} />
         )}
+        <Button asChild variant="outline-gray">
+          <Link href={requestQueueHref('/dashboard/requests', status)}>
+            <Typography>مشاهده همه درخواست‌های این صف</Typography>
+          </Link>
+        </Button>
       </section>
 
       {/* 4. Recent Activities & Upcoming Deadlines */}
@@ -133,7 +155,12 @@ export default async function DashboardPage({
 
 function DeniedNotice() {
   return (
-    <Typography role="status" variant="14/regular" color="warning" className="rounded-lg border border-warning-500 bg-warning-50 p-3">
+    <Typography
+      role="status"
+      variant="14/regular"
+      color="warning"
+      className="rounded-lg border border-warning-500 bg-warning-50 p-3"
+    >
       به نشانی درخواستی دسترسی ندارید؛ پیشخوان نقش فعلی شما نمایش داده شده است.
     </Typography>
   )

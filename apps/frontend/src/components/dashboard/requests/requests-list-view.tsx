@@ -1,9 +1,9 @@
 import React from 'react'
-import { Typography } from '@/components/ui/typography'
 import { OfflineNotice, type UnavailableReason } from '@/components/dashboard/offline-notice'
-import { RequestsToolbar } from './requests-toolbar'
-import { RequestsStatusFilter } from './requests-status-filter'
+import { Typography } from '@/components/ui/typography'
 import { RequestsListTable } from './requests-list-table'
+import { RequestsStatusFilter } from './requests-status-filter'
+import { RequestsToolbar } from './requests-toolbar'
 import type { RequestItem, RequestStatus } from './types'
 
 export interface RequestsListViewProps {
@@ -13,6 +13,7 @@ export interface RequestsListViewProps {
   items?: RequestItem[]
   activeStatus?: RequestStatus | 'all'
   basePath?: string
+  retryHref?: string
   onFilterClick?: () => void
   searchValue?: string
   onSearchChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
@@ -27,6 +28,7 @@ export function RequestsListView({
   items,
   activeStatus = 'all',
   basePath = '/dashboard/requests',
+  retryHref = basePath,
   onFilterClick,
   searchValue,
   onSearchChange,
@@ -46,14 +48,16 @@ export function RequestsListView({
 
       <RequestsStatusFilter basePath={basePath} active={activeStatus} className="mt-5" />
 
-      <RequestsToolbar
-        searchValue={searchValue}
-        onSearchChange={onSearchChange}
-        onFilterClick={onFilterClick}
-      />
+      {(onSearchChange || onFilterClick) && (
+        <RequestsToolbar
+          searchValue={searchValue}
+          onSearchChange={onSearchChange}
+          onFilterClick={onFilterClick}
+        />
+      )}
 
       {notice ? (
-        <OfflineNotice reason={notice} retryHref={basePath} className="mt-4" />
+        <OfflineNotice reason={notice} retryHref={retryHref} className="mt-4" />
       ) : (
         <RequestsListTable
           data={data}
