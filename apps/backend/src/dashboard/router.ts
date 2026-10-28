@@ -33,6 +33,10 @@ import {
   type DossierDocumentSource,
 } from './dossier.js'
 import {
+  EventCategoryRepository,
+  type EventCategoryStore,
+} from './event-category-repo.js'
+import {
   EventRepository,
   isEventId,
   type EventConfiguration,
@@ -68,6 +72,10 @@ import {
   type EvaluationStore,
 } from '../reviews/evaluation-repo.js'
 import { validateAndScoreReview } from '../reviews/scoring.js'
+import {
+  PostgresNotificationOutbox,
+  type NotificationOutbox,
+} from './notification-outbox.js'
 
 export interface DashboardDeps {
   pool: Pool
@@ -79,9 +87,11 @@ export interface DashboardDeps {
   /** Test seam for the company dossier's document inventory. */
   dossierDocuments?: DossierDocumentSource
   eventStore?: EventStore
+  eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
   evaluationStore?: EvaluationStore
+  notificationOutbox?: NotificationOutbox
 }
 
 const dashboardRoles = {
@@ -313,7 +323,9 @@ function missingRequiredFields(service: ServiceDefinition, answers: Record<strin
 
 export function createDashboardRouter(deps: DashboardDeps): Router {
   const router = Router()
-  const repo = new RequestRepository(deps.pool)
+  const notificationOutbox =
+    deps.notificationOutbox ?? new PostgresNotificationOutbox(deps.pool)
+  const repo = new RequestRepository(deps.pool, notificationOutbox)
   const letters = new LetterRepository(deps.pool)
   const activities = new ActivityRepository(deps.pool)
   const stats = new StatsRepository(deps.pool)
@@ -324,6 +336,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const evaluations =
     deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool)
   const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
+  const categoryStore =
+    deps.eventCategoryStore ?? new EventCategoryRepository(deps.pool)
   const catalogue =
     deps.boothCatalogue ?? new PostgresBoothCatalogueRepository(deps.pool)
 
@@ -992,6 +1006,169 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
+  router.post('/admin/events/:eventId/categories', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!canManageEvents(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const title = typeof req.body?.title === 'string' ? req.body.title.trim() : ''
+      if (!title) {
+        res.status(400).json({ error: 'invalid_category' })
+        return
+      }
+      const category = await categoryStore.createCategory(req.params.eventId, title)
+      res.status(201).json({ category })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/events/:eventId/categories', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isInternalOperationalRole(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event || !canActOnEvent(actor.operationalRole, actor.id, event, 'read')) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const items = await categoryStore.listCategories(req.params.eventId)
+      res.json({ items })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/events/:eventId/categories', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const admin = actor.operationalRole === 'system-owner' || actor.operationalRole === 'central-secretariat'
+      const company = actor.operationalRole === 'representative' && (await deps.companyStore.findByRepresentative(actor.id))
+      if (!admin && !company) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const items = await categoryStore.listCategories(req.params.eventId)
+      res.json({ items })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/events/:eventId/subtopics', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!canManageEvents(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const title = typeof req.body?.title === 'string' ? req.body.title.trim() : ''
+      const categoryId = typeof req.body?.categoryId === 'string' ? req.body.categoryId.trim() : ''
+      const employerId = typeof req.body?.employerId === 'string' ? req.body.employerId.trim() : ''
+      if (!title || !categoryId || !isUuid(categoryId) || !employerId) {
+        res.status(400).json({ error: 'invalid_subtopic' })
+        return
+      }
+      const category = await categoryStore.findCategoryById(categoryId)
+      if (!category || category.eventId !== req.params.eventId) {
+        res.status(400).json({ error: 'invalid_category_event' })
+        return
+      }
+      const user = await deps.userStore.findById(employerId)
+      // User and company IDs belong to different collections and may overlap.
+      // Resolve the employer as a person; an unrelated company's ID is not evidence of its type.
+      if (!user || user.companyId) {
+        res.status(400).json({ error: 'ineligible_employer' })
+        return
+      }
+      if (operationalRoleOf(user) !== 'employer-reviewer') {
+        res.status(400).json({ error: 'ineligible_employer' })
+        return
+      }
+      const subtopic = await categoryStore.createSubtopic({
+        eventId: req.params.eventId,
+        categoryId,
+        title,
+        employerId,
+      })
+      res.status(201).json({ subtopic })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/events/:eventId/subtopics', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isInternalOperationalRole(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event || !canActOnEvent(actor.operationalRole, actor.id, event, 'read')) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const items = await categoryStore.listSubtopics(req.params.eventId)
+      res.json({ items })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/events/:eventId/subtopics', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const admin = actor.operationalRole === 'system-owner' || actor.operationalRole === 'central-secretariat'
+      const company = actor.operationalRole === 'representative' && (await deps.companyStore.findByRepresentative(actor.id))
+      if (!admin && !company) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!isUuid(req.params.eventId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const event = await eventStore.findById(req.params.eventId)
+      if (!event) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const items = await categoryStore.listSubtopics(req.params.eventId)
+      res.json({ items })
+    } catch (error) { next(error) }
+  })
+
   router.get('/letters', async (req, res, next) => {
     try {
     const actor = actorOf(res)
@@ -1313,6 +1490,59 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (!recipient || operationalRoleOf(recipient) !== 'representative') { res.status(404).json({ error: 'recipient_not_found' }); return }
     const letterType = type === 'approved' || type === 'needs_fix' || type === 'rejected' || type === 'notification' ? type : 'official'
     res.status(201).json({ letter: await letters.create({ type: letterType, title: trimmedTitle, body: trimmedBody, recipientId: trimmedRecipientId, senderId: actor.id, senderRole: actor.operationalRole }) })
+  })
+
+  router.get('/admin/notifications/jobs', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isCompanyAdministrator(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const status = typeof req.query.status === 'string' ? (req.query.status as any) : undefined
+      const requestId = typeof req.query.requestId === 'string' ? req.query.requestId : undefined
+      const recipientId = typeof req.query.recipientId === 'string' ? req.query.recipientId : undefined
+      const page = parsePositiveInt(req.query.page, 1)
+      const limit = parsePositiveInt(req.query.limit, 25)
+      res.json(await notificationOutbox.list({ status, requestId, recipientId, page, limit }))
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/notifications/jobs/:id/retry', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isCompanyAdministrator(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const result = await notificationOutbox.retry(req.params.id)
+      res.json({ result })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/notifications/retry-all', async (_req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isCompanyAdministrator(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const results = await notificationOutbox.retryAllUndelivered()
+      res.json({ results })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/notifications/simulate-failure', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const enabled = Boolean(req.body?.enabled)
+      notificationOutbox.setSimulationFailure(enabled)
+      res.json({ simulationFailure: notificationOutbox.isSimulationFailure() })
+    } catch (error) { next(error) }
   })
 
   router.get('/support', async (req, res) => {
