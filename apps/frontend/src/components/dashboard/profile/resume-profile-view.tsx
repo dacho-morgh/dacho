@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { DashboardAddIcon, DashboardTrashIcon } from '@/components/icons'
+import { useEffect, useRef, useState } from 'react'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
+import { DashboardAddIcon, DashboardTrashIcon } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -17,6 +17,7 @@ import {
   type KeyMemberDto,
   type PastProjectCustomerDto,
 } from '@/utilities/dashboard-api'
+import { hasStaleDossierSlice } from '@/utilities/dossier-edits'
 import { ProfileDialog } from './profile-dialog'
 
 const emptyDossier: CompanyDossierDto = {
@@ -45,6 +46,10 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
   const [dossier, setDossier] = useState<CompanyDossierDto>(initialDossier?.dossier ?? emptyDossier)
   const [isLoading, setIsLoading] = useState(!initialDossier)
   const [isSaving, setIsSaving] = useState(false)
+  const saveLock = useRef(false)
+  const [loaded, setLoaded] = useState(Boolean(initialDossier))
+  const [pendingDocuments, setPendingDocuments] = useState<Record<string, boolean>>({})
+  const documentsPending = Object.values(pendingDocuments).some(Boolean)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -58,7 +63,11 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
 
   // Past project dialog state
   const [projectDialog, setProjectDialog] = useState(false)
-  const [projectForm, setProjectForm] = useState<PastProjectCustomerDto>({ project: '', customer: '', summary: '' })
+  const [projectForm, setProjectForm] = useState<PastProjectCustomerDto>({
+    project: '',
+    customer: '',
+    summary: '',
+  })
 
   // Requested service dialog state
   const [requestedDialog, setRequestedDialog] = useState(false)
@@ -66,15 +75,21 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
 
   // Certificate dialog state
   const [certDialog, setCertDialog] = useState(false)
-  const [certForm, setCertForm] = useState<CertificateLicenceDto>({ title: '', issuer: '', reference: '' })
+  const [certForm, setCertForm] = useState<CertificateLicenceDto>({
+    title: '',
+    issuer: '',
+    reference: '',
+  })
 
   useEffect(() => {
     if (initialDossier) return
     let active = true
     fetchProfileDossier()
       .then((res) => {
+        if (!res?.dossier) throw new Error('dossier_load_failed')
         if (!active) return
-        if (res?.dossier) setDossier(res.dossier)
+        setDossier(res.dossier)
+        setLoaded(true)
       })
       .catch(() => {
         if (active) setError('دریافت اطلاعات رزومه انجام نشد.')
@@ -88,10 +103,20 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
   }, [initialDossier])
 
   const saveDossierSlice = async (update: Partial<CompanyDossierDto>): Promise<boolean> => {
+    if (!loaded || saveLock.current || documentsPending) return false
+    saveLock.current = true
     setIsSaving(true)
     setError(null)
     setSuccess(null)
     try {
+      const latest = await fetchProfileDossier()
+      if (!latest) throw new Error('dossier_load_failed')
+      // Array endpoints replace a slice. Refuse to overwrite a slice changed since it was shown.
+      if (hasStaleDossierSlice(dossier, latest.dossier, update)) {
+        setDossier(latest.dossier)
+        setError('اطلاعات این بخش تغییر کرده است. نسخه تازه را بررسی و دوباره تلاش کنید.')
+        return false
+      }
       const res = await updateProfileDossier(update)
       if (!res?.dossier) throw new Error('update_failed')
       setDossier(res.dossier)
@@ -101,6 +126,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       setError('ذخیره تغییرات انجام نشد. ورودی‌ها را بررسی کنید.')
       return false
     } finally {
+      saveLock.current = false
       setIsSaving(false)
     }
   }
@@ -149,7 +175,10 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       setError('نام و سمت عضو کلیدی الزامی است.')
       return
     }
-    const updated = [...dossier.keyMembers, { name: memberForm.name.trim(), role: memberForm.role.trim() }]
+    const updated = [
+      ...dossier.keyMembers,
+      { name: memberForm.name.trim(), role: memberForm.role.trim() },
+    ]
     const ok = await saveDossierSlice({ keyMembers: updated })
     if (ok) {
       setMemberDialog(false)
@@ -245,10 +274,23 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           <Typography as="span" className="sr-only">
             در حال بارگذاری رزومه…
           </Typography>
-          <div className="h-48 w-full animate-pulse rounded-2xl bg-neutral-100" />
-          <div className="h-48 w-full animate-pulse rounded-2xl bg-neutral-100" />
-          <div className="h-48 w-full animate-pulse rounded-2xl bg-neutral-100" />
+          <div className="h-48 w-full rounded-2xl bg-neutral-100" />
+          <div className="h-48 w-full rounded-2xl bg-neutral-100" />
+          <div className="h-48 w-full rounded-2xl bg-neutral-100" />
         </div>
+      </div>
+    )
+  }
+
+  if (!loaded) {
+    return (
+      <div className="flex flex-col gap-4" dir="rtl">
+        <Typography role="alert" color="error">
+          {error ?? 'دریافت اطلاعات رزومه انجام نشد.'}
+        </Typography>
+        <Button type="button" onClick={() => window.location.reload()}>
+          <Typography>تلاش دوباره</Typography>
+        </Button>
       </div>
     )
   }
@@ -259,7 +301,11 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
   const isCataloguesAbsent = dossier.notAvailable.includes('catalogues')
 
   return (
-    <div className="flex w-full flex-col gap-6" dir="rtl">
+    <fieldset
+      disabled={isSaving || documentsPending}
+      className="flex w-full min-w-0 flex-col gap-6"
+      dir="rtl"
+    >
       <div className="flex flex-col gap-2">
         <Typography as="h2" variant="20/bold" color="neutral-600">
           رزومه و سوابق شرکت
@@ -270,13 +316,22 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       </div>
 
       {error && (
-        <Typography role="alert" variant="14/regular" color="error" className="rounded-xl bg-error-50 p-4">
+        <Typography
+          role="alert"
+          variant="14/regular"
+          color="error"
+          className="rounded-xl bg-error-50 p-4"
+        >
           {error}
         </Typography>
       )}
 
       {success && (
-        <Typography role="status" variant="14/regular" className="rounded-xl bg-emerald-50 p-4 text-emerald-800">
+        <Typography
+          role="status"
+          variant="14/regular"
+          className="rounded-xl bg-success-50 p-4 text-success-700"
+        >
           {success}
         </Typography>
       )}
@@ -294,7 +349,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
           <Button type="button" variant="gray" size="32" onClick={() => setProductDialog(true)}>
             <DashboardAddIcon className="size-4" />
-            محصول جدید
+            <Typography>محصول جدید</Typography>
           </Button>
         </div>
 
@@ -312,15 +367,17 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Typography variant="14/semibold" color="neutral-700">
                 {product}
               </Typography>
-              <button
+              <Button
+                variant="text-gray"
+                size="icon-32"
                 type="button"
                 aria-label={`حذف ${product}`}
                 className="text-neutral-400 hover:text-error-500"
                 onClick={() => removeProduct(index)}
                 disabled={isSaving}
               >
-                ×
-              </button>
+                <DashboardTrashIcon className="size-4" />
+              </Button>
             </div>
           ))}
         </div>
@@ -339,7 +396,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
           <Button type="button" variant="gray" size="32" onClick={() => setMemberDialog(true)}>
             <DashboardAddIcon className="size-4" />
-            عضو جدید
+            <Typography>عضو جدید</Typography>
           </Button>
         </div>
 
@@ -388,7 +445,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
             </Typography>
           </div>
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <Typography as="label" className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
                 checked={isProjectsAbsent}
@@ -398,18 +455,22 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Typography variant="14/regular" color="neutral-500">
                 ندارم
               </Typography>
-            </label>
+            </Typography>
             {!isProjectsAbsent && (
               <Button type="button" variant="gray" size="32" onClick={() => setProjectDialog(true)}>
                 <DashboardAddIcon className="size-4" />
-                پروژه جدید
+                <Typography>پروژه جدید</Typography>
               </Button>
             )}
           </div>
         </div>
 
         {isProjectsAbsent ? (
-          <Typography variant="14/regular" color="neutral-400" className="rounded-xl bg-neutral-50 p-4">
+          <Typography
+            variant="14/regular"
+            color="neutral-400"
+            className="rounded-xl bg-neutral-50 p-4"
+          >
             ثبت شده است که شرکت سابقه پروژه یا مشتری قبلی ندارد.
           </Typography>
         ) : (
@@ -466,7 +527,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
             </Typography>
           </div>
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <Typography as="label" className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
                 checked={isRequestedAbsent}
@@ -476,25 +537,35 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Typography variant="14/regular" color="neutral-500">
                 ندارم
               </Typography>
-            </label>
+            </Typography>
             {!isRequestedAbsent && (
-              <Button type="button" variant="gray" size="32" onClick={() => setRequestedDialog(true)}>
+              <Button
+                type="button"
+                variant="gray"
+                size="32"
+                onClick={() => setRequestedDialog(true)}
+              >
                 <DashboardAddIcon className="size-4" />
-                خدمت جدید
+                <Typography>خدمت جدید</Typography>
               </Button>
             )}
           </div>
         </div>
 
         {isRequestedAbsent ? (
-          <Typography variant="14/regular" color="neutral-400" className="rounded-xl bg-neutral-50 p-4">
+          <Typography
+            variant="14/regular"
+            color="neutral-400"
+            className="rounded-xl bg-neutral-50 p-4"
+          >
             ثبت شده است که شرکت خدمات مورد تقاضایی ندارد.
           </Typography>
         ) : (
           <div className="flex flex-wrap gap-2">
             {dossier.requestedServices.length === 0 && (
               <Typography color="neutral-400" variant="14/regular">
-                خدمات مورد تقاضایی ثبت نشده است. در صورت نیاز موارد را اضافه کنید یا گزینه «ندارم» را بزنید.
+                خدمات مورد تقاضایی ثبت نشده است. در صورت نیاز موارد را اضافه کنید یا گزینه «ندارم»
+                را بزنید.
               </Typography>
             )}
             {dossier.requestedServices.map((service, index) => (
@@ -532,7 +603,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
             </Typography>
           </div>
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <Typography as="label" className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
                 checked={isCertsAbsent}
@@ -542,7 +613,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Typography variant="14/regular" color="neutral-500">
                 ندارم
               </Typography>
-            </label>
+            </Typography>
             {!isCertsAbsent && (
               <Button type="button" variant="gray" size="32" onClick={() => setCertDialog(true)}>
                 <DashboardAddIcon className="size-4" />
@@ -553,7 +624,11 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
         </div>
 
         {isCertsAbsent ? (
-          <Typography variant="14/regular" color="neutral-400" className="rounded-xl bg-neutral-50 p-4">
+          <Typography
+            variant="14/regular"
+            color="neutral-400"
+            className="rounded-xl bg-neutral-50 p-4"
+          >
             ثبت شده است که شرکت گواهی یا مجوزی ندارد.
           </Typography>
         ) : (
@@ -596,6 +671,14 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
                 companyId={companyId ?? undefined}
                 canUpload={Boolean(companyId)}
                 canDelete
+                disabled={isSaving}
+                onPendingChange={(pending) =>
+                  setPendingDocuments((current) =>
+                    current.certificatesLicenses === pending
+                      ? current
+                      : { ...current, certificatesLicenses: pending },
+                  )
+                }
               />
             </div>
           </div>
@@ -613,7 +696,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               فایل معرفی محصولات، خدمات یا کاتالوگ رسمی شرکت (Word یا PDF).
             </Typography>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
+          <Typography as="label" className="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
               checked={isCataloguesAbsent}
@@ -623,11 +706,15 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
             <Typography variant="14/regular" color="neutral-500">
               ندارم
             </Typography>
-          </label>
+          </Typography>
         </div>
 
         {isCataloguesAbsent ? (
-          <Typography variant="14/regular" color="neutral-400" className="rounded-xl bg-neutral-50 p-4">
+          <Typography
+            variant="14/regular"
+            color="neutral-400"
+            className="rounded-xl bg-neutral-50 p-4"
+          >
             ثبت شده است که شرکت کاتالوگ ندارد.
           </Typography>
         ) : (
@@ -637,6 +724,12 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
             companyId={companyId ?? undefined}
             canUpload={Boolean(companyId)}
             canDelete
+            disabled={isSaving}
+            onPendingChange={(pending) =>
+              setPendingDocuments((current) =>
+                current.catalogues === pending ? current : { ...current, catalogues: pending },
+              )
+            }
           />
         )}
       </section>
@@ -645,14 +738,27 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       {productDialog && (
         <ProfileDialog
           title="افزودن محصول یا خدمت جدید"
-          onClose={() => setProductDialog(false)}
+          onClose={() => {
+            if (!saveLock.current) setProductDialog(false)
+          }}
           actions={
             <>
-              <Button type="button" variant="outline-gray" className="flex-1" onClick={() => setProductDialog(false)}>
-                انصراف
+              <Button
+                type="button"
+                variant="outline-gray"
+                className="flex-1"
+                onClick={() => setProductDialog(false)}
+              >
+                <Typography>انصراف</Typography>
               </Button>
-              <Button type="button" variant="primary" className="flex-1" loading={isSaving} onClick={addProduct}>
-                ثبت
+              <Button
+                type="button"
+                variant="primary"
+                className="flex-1"
+                loading={isSaving}
+                onClick={addProduct}
+              >
+                <Typography>ثبت</Typography>
               </Button>
             </>
           }
@@ -675,14 +781,27 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       {requestedDialog && (
         <ProfileDialog
           title="افزودن خدمت مورد تقاضا"
-          onClose={() => setRequestedDialog(false)}
+          onClose={() => {
+            if (!saveLock.current) setRequestedDialog(false)
+          }}
           actions={
             <>
-              <Button type="button" variant="outline-gray" className="flex-1" onClick={() => setRequestedDialog(false)}>
-                انصراف
+              <Button
+                type="button"
+                variant="outline-gray"
+                className="flex-1"
+                onClick={() => setRequestedDialog(false)}
+              >
+                <Typography>انصراف</Typography>
               </Button>
-              <Button type="button" variant="primary" className="flex-1" loading={isSaving} onClick={addRequestedService}>
-                ثبت
+              <Button
+                type="button"
+                variant="primary"
+                className="flex-1"
+                loading={isSaving}
+                onClick={addRequestedService}
+              >
+                <Typography>ثبت</Typography>
               </Button>
             </>
           }
@@ -705,14 +824,27 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       {memberDialog && (
         <ProfileDialog
           title="افزودن عضو کلیدی"
-          onClose={() => setMemberDialog(false)}
+          onClose={() => {
+            if (!saveLock.current) setMemberDialog(false)
+          }}
           actions={
             <>
-              <Button type="button" variant="outline-gray" className="flex-1" onClick={() => setMemberDialog(false)}>
-                انصراف
+              <Button
+                type="button"
+                variant="outline-gray"
+                className="flex-1"
+                onClick={() => setMemberDialog(false)}
+              >
+                <Typography>انصراف</Typography>
               </Button>
-              <Button type="button" variant="primary" className="flex-1" loading={isSaving} onClick={addMember}>
-                ثبت
+              <Button
+                type="button"
+                variant="primary"
+                className="flex-1"
+                loading={isSaving}
+                onClick={addMember}
+              >
+                <Typography>ثبت</Typography>
               </Button>
             </>
           }
@@ -744,14 +876,27 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       {projectDialog && (
         <ProfileDialog
           title="افزودن پروژه یا مشتری قبلی"
-          onClose={() => setProjectDialog(false)}
+          onClose={() => {
+            if (!saveLock.current) setProjectDialog(false)
+          }}
           actions={
             <>
-              <Button type="button" variant="outline-gray" className="flex-1" onClick={() => setProjectDialog(false)}>
-                انصراف
+              <Button
+                type="button"
+                variant="outline-gray"
+                className="flex-1"
+                onClick={() => setProjectDialog(false)}
+              >
+                <Typography>انصراف</Typography>
               </Button>
-              <Button type="button" variant="primary" className="flex-1" loading={isSaving} onClick={addProject}>
-                ثبت
+              <Button
+                type="button"
+                variant="primary"
+                className="flex-1"
+                loading={isSaving}
+                onClick={addProject}
+              >
+                <Typography>ثبت</Typography>
               </Button>
             </>
           }
@@ -792,14 +937,27 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       {certDialog && (
         <ProfileDialog
           title="افزودن گواهی یا مجوز"
-          onClose={() => setCertDialog(false)}
+          onClose={() => {
+            if (!saveLock.current) setCertDialog(false)
+          }}
           actions={
             <>
-              <Button type="button" variant="outline-gray" className="flex-1" onClick={() => setCertDialog(false)}>
-                انصراف
+              <Button
+                type="button"
+                variant="outline-gray"
+                className="flex-1"
+                onClick={() => setCertDialog(false)}
+              >
+                <Typography>انصراف</Typography>
               </Button>
-              <Button type="button" variant="primary" className="flex-1" loading={isSaving} onClick={addCertificate}>
-                ثبت
+              <Button
+                type="button"
+                variant="primary"
+                className="flex-1"
+                loading={isSaving}
+                onClick={addCertificate}
+              >
+                <Typography>ثبت</Typography>
               </Button>
             </>
           }
@@ -835,6 +993,6 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
         </ProfileDialog>
       )}
-    </div>
+    </fieldset>
   )
 }

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-
 import { ResumeProfileView } from '@/components/dashboard/profile/resume-profile-view'
 import type { DossierResponseDto, ProfileDto } from '@/utilities/dashboard-api'
 import { serverDashboardFetch } from '@/utilities/dashboard-server'
@@ -20,10 +19,7 @@ export default async function ResumePage() {
     serverDashboardFetch<DossierResponseDto>('/profile/dossier'),
   ])
 
-  return (
-    <ResumeProfileView
-      initialDossier={dossier}
-      companyId={profile?.companyId ?? undefined}
-    />
-  )
+  if (!profile?.companyId) throw new Error('profile_load_failed')
+
+  return <ResumeProfileView initialDossier={dossier} companyId={profile.companyId} />
 }
