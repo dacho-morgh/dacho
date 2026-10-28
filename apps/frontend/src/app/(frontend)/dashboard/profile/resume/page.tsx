@@ -1,14 +1,29 @@
 import type { Metadata } from 'next'
-import { ResumeProfileView } from '@/components/dashboard/profile/resume-profile-view'
 import { redirect } from 'next/navigation'
+
+import { ResumeProfileView } from '@/components/dashboard/profile/resume-profile-view'
+import type { DossierResponseDto, ProfileDto } from '@/utilities/dashboard-api'
+import { serverDashboardFetch } from '@/utilities/dashboard-server'
 import { getProfileSessionUser, isInternalUser } from '@/utilities/profile-session'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
-  title: 'رزومه',
+  title: 'رزومه شرکت',
 }
 
 export default async function ResumePage() {
   if (isInternalUser(await getProfileSessionUser())) redirect('/dashboard/profile/staff')
 
-  return <ResumeProfileView />
+  const [profile, dossier] = await Promise.all([
+    serverDashboardFetch<ProfileDto>('/profile'),
+    serverDashboardFetch<DossierResponseDto>('/profile/dossier'),
+  ])
+
+  return (
+    <ResumeProfileView
+      initialDossier={dossier}
+      companyId={profile?.companyId ?? undefined}
+    />
+  )
 }
