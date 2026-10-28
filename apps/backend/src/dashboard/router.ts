@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import type { NextFunction, Request, Response } from 'express'
 import type { Pool } from 'pg'
 
 import {
@@ -40,6 +41,7 @@ import {
   type EventStore,
 } from './event-repo.js'
 import { LetterRepository } from './letter-repo.js'
+import { canSendLetter } from './letter-policy.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
 import { RequestRepository } from './request-repo.js'
@@ -1101,21 +1103,44 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json({ letter })
   })
 
-  router.post('/admin/letters', async (req, res) => {
+  const sendLetter = async (req: Request, res: Response, next: NextFunction) => {
+    try {
     const actor = actorOf(res)
-    if (!isCompanyAdministrator(actor.operationalRole)) {
-      res.status(403).json({ error: 'forbidden' })
-      return
-    }
-    const { title, body, recipientId, type } = req.body ?? {}
+    const { title, body, recipientId, type, requestId } = req.body ?? {}
     const trimmedTitle = typeof title === 'string' ? title.trim() : ''
     const trimmedBody = typeof body === 'string' ? body.trim() : ''
     const trimmedRecipientId = typeof recipientId === 'string' ? recipientId.trim() : ''
     if (!trimmedTitle || !trimmedBody || !trimmedRecipientId) { res.status(400).json({ error: 'invalid_letter' }); return }
+    if (requestId !== undefined && (typeof requestId !== 'string' || !isUuid(requestId))) { res.status(400).json({ error: 'invalid_request_id' }); return }
     const recipient = await deps.userStore.findById(trimmedRecipientId)
-    if (!recipient || operationalRoleOf(recipient) !== 'representative') { res.status(404).json({ error: 'recipient_not_found' }); return }
-    const letterType = type === 'approved' || type === 'needs_fix' || type === 'rejected' || type === 'notification' ? type : 'official'
-    res.status(201).json({ letter: await letters.create({ type: letterType, title: trimmedTitle, body: trimmedBody, recipientId: trimmedRecipientId, senderId: actor.id, senderRole: actor.operationalRole }) })
+    const recipientRole = operationalRoleOf(recipient)
+    if (!recipientRole || !canSendLetter(actor.operationalRole, recipientRole, Boolean(requestId))) { res.status(403).json({ error: 'forbidden' }); return }
+    if (requestId) {
+      const senderScope = await resolveScope(actor.id, actor.operationalRole)
+      const recipientScope = await resolveScope(trimmedRecipientId, recipientRole)
+      const [senderCase, recipientCase] = await Promise.all([
+        repo.findByIdScoped(requestId, senderScope.scope),
+        repo.findByIdScoped(requestId, recipientScope.scope),
+      ])
+      if (!senderCase || !recipientCase) { res.status(403).json({ error: 'forbidden' }); return }
+      if (actor.operationalRole === 'reviewer' || actor.operationalRole === 'employer-reviewer') {
+        const chiefs = (await assignments.listForRequest(requestId)).filter(
+          (assignment) => assignment.active && assignment.role === 'chief-reviewer',
+        )
+        if (chiefs.length !== 1 || chiefs[0]?.userId !== trimmedRecipientId) { res.status(403).json({ error: 'forbidden' }); return }
+      }
+    }
+    const letterType = isCompanyAdministrator(actor.operationalRole) && (type === 'approved' || type === 'needs_fix' || type === 'rejected' || type === 'notification') ? type : 'official'
+    res.status(201).json({ letter: await letters.create({ type: letterType, title: trimmedTitle, body: trimmedBody, recipientId: trimmedRecipientId, senderId: actor.id, senderRole: actor.operationalRole, requestId: requestId ?? null }) })
+    } catch (error) { next(error) }
+  }
+  router.post('/letters', sendLetter)
+  router.post('/admin/letters', (req, res, next) => {
+    if (!isCompanyAdministrator(actorOf(res).operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    void sendLetter(req, res, next)
   })
 
   router.get('/support', async (req, res) => {

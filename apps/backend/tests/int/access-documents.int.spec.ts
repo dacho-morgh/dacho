@@ -566,6 +566,30 @@ describe('shared access policy and private documents (T09/T10)', () => {
     expect((await request(payload).delete(`/admin/requests/${id}/assignments/${people.chief.id}`).set(headers(people.chief.id))).status).toBe(403)
   })
 
+  it('enforces recipient roles and current case scope when sending letters', async () => {
+    const id = await createRequest()
+    const send = (from: string, recipientId: string, requestId?: string) => request(payload)
+      .post('/letters').set(headers(from)).send({ title: 'نامه', body: 'متن', recipientId, requestId })
+
+    await send(people.repA.id, people.secretariat.id).expect(201)
+    await send(people.repA.id, people.chief.id).expect(403)
+    await send(people.reviewer.id, people.chief.id, id).expect(403)
+    await assign(id, people.reviewer.id, 'reviewer').expect(201)
+    await assign(id, people.chief.id, 'chief-reviewer').expect(201)
+    await send(people.reviewer.id, people.chief.id, id).expect(201)
+    await send(people.reviewer.id, people.secretariat.id, id).expect(403)
+    await send(people.owner.id, people.repB.id).expect(201)
+    await send(people.chief.id, people.repB.id).expect(201)
+    await send(people.chief.id, people.repB.id, id).expect(403)
+    await send(people.investment.id, people.secretariat.id, id).expect(403)
+    await assign(id, people.investment.id, 'investment-reviewer').expect(201)
+    await send(people.investment.id, people.secretariat.id, id).expect(201)
+    await request(payload).delete(`/admin/requests/${id}/assignments/${people.chief.id}`).set(headers(people.owner.id)).expect(200)
+    await send(people.reviewer.id, people.chief.id, id).expect(403)
+    await send(people.owner.id, 'nonexistent').expect(403)
+    await request(payload).get(`/requests/${id}`).set(headers(people.repB.id)).expect(404)
+  })
+
   it('scopes letter reads to participant/assignment and supports draft-only deletion', async () => {
     const id = await createRequest()
     const participantLetter = await pool.query<{ id: string }>(
