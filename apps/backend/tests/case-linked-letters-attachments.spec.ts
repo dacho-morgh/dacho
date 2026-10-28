@@ -199,16 +199,5 @@ describe('T35 - Case-linked letters and private attachments policy', () => {
       expect(sql).toContain('attachments')
       expect(params).toContain(JSON.stringify([sampleAttachment]))
     })
-
-    it('verifies actor access to document attachment via hasAccessToAttachment', async () => {
-      const query = vi.fn().mockResolvedValue({ rows: [{ has_access: true }] })
-      const repo = new LetterRepository({ query } as unknown as Pool)
-      const allowed = await repo.hasAccessToAttachment(docId, 'sec-1')
-      expect(allowed).toBe(true)
-      expect(query).toHaveBeenCalledTimes(1)
-      const [sql, params] = query.mock.calls[0]!
-      expect(sql).toContain('dashboard.letters')
-      expect(params).toEqual(['sec-1', docId])
-    })
   })
 })

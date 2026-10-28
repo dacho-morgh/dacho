@@ -370,17 +370,4 @@ export class LetterRepository {
     return (result.rowCount ?? 0) > 0
   }
 
-  async hasAccessToAttachment(documentId: string, actorId: string): Promise<boolean> {
-    if (!isUuid(documentId)) return false
-    const { rows } = await this.pool.query<{ has_access: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1 FROM dashboard.letters l,
-         jsonb_array_elements(l.attachments) att
-         WHERE (l.recipient_id = $1 OR l.sender_id = $1)
-           AND att->>'id' = $2
-       ) AS has_access`,
-      [actorId, documentId],
-    )
-    return Boolean(rows[0]?.has_access)
-  }
 }

@@ -68,6 +68,12 @@ Company-dossier deletion is not exposed in this slice.
 Unknown and unauthorized document ids both return `404`; a missing stored file
 returns `410 document_unavailable`.
 
+Letter attachment metadata and both download routes use this same current
+category, ownership and assignment policy. A historic letter never grants
+additional document access. Sending an attachment checks both sender and
+recipient; a request document must be sent with its exact request id. Existing
+letters omit attachment metadata when current document access is denied.
+
 ## API
 
 | Endpoint | Behavior |

@@ -18,7 +18,6 @@ import { AssignmentRepository } from '../dashboard/assignment-repo.js'
 import { actorOf } from '../dashboard/proxy-auth.js'
 import { RequestRepository } from '../dashboard/request-repo.js'
 import { isUuid } from '../exhibitions/catalogue.js'
-import { LetterRepository } from '../dashboard/letter-repo.js'
 import {
   MAX_DOCUMENT_BYTES,
   validateDocumentFile,
@@ -140,16 +139,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       actorId,
       companyId,
     )
-    if (directAllowed) return true
-
-    const letters = new LetterRepository(deps.pool)
-    const hasAccess = await letters.hasAccessToAttachment(record.id, actorId)
-    if (!hasAccess) return false
-    const audience = documentAudience(record.category)
-    if (audience === 'financial' && (role === 'chief-reviewer' || role === 'reviewer' || role === 'employer-reviewer')) {
-      return false
-    }
-    return true
+    return directAllowed
   }
 
   router.get('/documents', asyncHandler(async (req: Request, res: Response) => {

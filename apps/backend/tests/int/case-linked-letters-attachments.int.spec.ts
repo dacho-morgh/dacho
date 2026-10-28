@@ -114,6 +114,73 @@ describe('T35 - Case-linked letters and private attachments integration', () => 
     }
   })
 
+  it('rejects attachment sends to unauthorized recipients and detached or mismatched cases', async () => {
+    const requestId = await createRequest()
+    const otherRequestId = await createRequest(people.repB.id)
+    const upload = await request(payload).post('/documents').set(headers(people.repA.id))
+      .field('category', 'financialStatements').field('requestId', requestId)
+      .attach('file', pdf(), { filename: 'private-finance.pdf', contentType: 'application/pdf' }).expect(201)
+    const documentId = upload.body.document.id as string
+    await submit(requestId).expect(200)
+    await assign(requestId, people.chief.id, 'chief-reviewer').expect(201)
+    const send = (recipientId: string, linkedRequest?: string) => request(payload).post('/letters')
+      .set(headers(people.secretariat.id)).send({ title: 'Private', body: 'Attachment', recipientId,
+        ...(linkedRequest ? { requestId: linkedRequest } : {}), attachmentIds: [documentId] })
+    await send(people.chief.id, requestId).expect(403)
+    await send(people.repB.id).expect(403)
+    await send(people.repB.id, otherRequestId).expect(403)
+    await send(people.repA.id, requestId).expect(201)
+    const company = await companyStore.findByRepresentative(people.repA.id)
+    const dossier = await request(payload).post('/documents').set(headers(people.repA.id))
+      .field('category', 'articlesOfAssociation').field('companyId', company!.id)
+      .attach('file', pdf(), { filename: 'private-dossier.pdf', contentType: 'application/pdf' }).expect(201)
+    await request(payload).post('/letters').set(headers(people.secretariat.id))
+      .send({ title: 'Private', body: 'Attachment', recipientId: people.repB.id,
+        attachmentIds: [dossier.body.document.id] }).expect(403)
+  })
+
+  it('does not expose legacy financial attachments through mailbox metadata or either download route', async () => {
+    const requestId = await createRequest()
+    const upload = await request(payload).post('/documents').set(headers(people.repA.id))
+      .field('category', 'financialStatements').field('requestId', requestId)
+      .attach('file', pdf(), { filename: 'secret-finance.pdf', contentType: 'application/pdf' }).expect(201)
+    const documentId = upload.body.document.id as string
+    await submit(requestId).expect(200)
+    await assign(requestId, people.chief.id, 'chief-reviewer').expect(201)
+    const { rows } = await pool.query<{ id: string }>(`INSERT INTO dashboard.letters
+      (type, title, body, sender_id, recipient_id, request_id, attachments)
+      VALUES ('official', 'Legacy', 'Legacy', $1, $2, $3, $4::jsonb) RETURNING id`,
+      [people.secretariat.id, people.chief.id, requestId, JSON.stringify([{ id: documentId, filename: 'secret-finance.pdf' }])])
+    const letterId = rows[0]!.id
+    const detail = await request(payload).get(`/letters/${letterId}`).set(headers(people.chief.id)).expect(200)
+    expect(detail.body.letter.attachments).toEqual([])
+    const mailbox = await request(payload).get('/letters').set(headers(people.chief.id)).expect(200)
+    expect(mailbox.body.items.find((letter: { id: string }) => letter.id === letterId).attachments).toEqual([])
+    for (const url of [`/documents/${documentId}`, `/documents/${documentId}/download`,
+      `/letters/${letterId}/attachments/${documentId}/download`]) {
+      await request(payload).get(url).set(headers(people.chief.id)).expect(404)
+    }
+  })
+
+  it('a historic letter cannot restore proposal access after assignment revocation', async () => {
+    const requestId = await createRequest()
+    const upload = await request(payload).post('/documents').set(headers(people.repA.id))
+      .field('category', 'proposal').field('requestId', requestId)
+      .attach('file', pdf(), { filename: 'proposal.pdf', contentType: 'application/pdf' }).expect(201)
+    const documentId = upload.body.document.id as string
+    await submit(requestId).expect(200)
+    await assign(requestId, people.chief.id, 'chief-reviewer').expect(201)
+    const sent = await request(payload).post('/letters').set(headers(people.secretariat.id))
+      .send({ title: 'Proposal', body: 'Review', recipientId: people.chief.id, requestId,
+        attachmentIds: [documentId] }).expect(201)
+    const url = `/letters/${sent.body.letter.id}/attachments/${documentId}/download`
+    await request(payload).get(url).set(headers(people.chief.id)).expect(200)
+    await pool.query('UPDATE dashboard.case_assignments SET active = false WHERE request_id = $1', [requestId])
+    for (const target of [url, `/documents/${documentId}`, `/documents/${documentId}/download`]) {
+      await request(payload).get(target).set(headers(people.chief.id)).expect(404)
+    }
+  })
+
   it('handles the full flow: secretariat requests supplementary docs, company replies with attachment, download works and enforces confidentiality', async () => {
     // 1. Company creates request and submits it
     const reqId = await createRequest(people.repA.id, 'پرونده رویداد')
