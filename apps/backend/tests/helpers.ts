@@ -6,6 +6,10 @@ import { InMemoryUserStore, type UserStore } from '../src/auth/user-store.js'
 import { createApp } from '../src/app.js'
 import type { EventCategoryStore } from '../src/dashboard/event-category-repo.js'
 import type { EventStore } from '../src/dashboard/event-repo.js'
+import {
+  PostgresNotificationOutbox,
+  type NotificationOutbox,
+} from '../src/dashboard/notification-outbox.js'
 import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
 import { InMemoryDossierDocumentSource } from '../src/dashboard/dossier.js'
 import {
@@ -26,6 +30,7 @@ export interface TestApp {
   dossierDocuments: InMemoryDossierDocumentSource
   boothCatalogue: BoothCatalogueRepository
   jwt: JwtSigner
+  notificationOutbox: NotificationOutbox
 }
 
 export interface TestAppOptions {
@@ -38,6 +43,7 @@ export interface TestAppOptions {
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
   pool?: Pool
+  notificationOutbox?: NotificationOutbox
 }
 
 export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
@@ -53,6 +59,8 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const jwt = await JwtSigner.create('test-kid')
   // Tests that query dashboard routes inject a pool stub; default stays unconnected.
   const pool = options.pool ?? new Pool()
+  const notificationOutbox =
+    options.notificationOutbox ?? new PostgresNotificationOutbox(pool)
   const app = createApp({
     codeStore,
     delivery,
@@ -67,6 +75,17 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     eventCategoryStore: options.eventCategoryStore,
     boothCatalogue,
     exhibitionStore: options.exhibitionStore,
+    notificationOutbox,
   })
-  return { app, delivery, codeStore, userStore, companyStore, dossierDocuments, boothCatalogue, jwt }
+  return {
+    app,
+    delivery,
+    codeStore,
+    userStore,
+    companyStore,
+    dossierDocuments,
+    boothCatalogue,
+    jwt,
+    notificationOutbox,
+  }
 }

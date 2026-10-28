@@ -121,6 +121,32 @@ describe('dashboard migrations', () => {
     )
   })
 
+  it('creates the notification_jobs table with the outbox fields', async () => {
+    const cols = await tableColumns('notification_jobs')
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'request_id',
+        'recipient_id',
+        'actor_id',
+        'action',
+        'from_state',
+        'to_state',
+        'revision',
+        'channel',
+        'title',
+        'body',
+        'status',
+        'attempts',
+        'last_error',
+        'letter_id',
+        'created_at',
+        'updated_at',
+        'processed_at',
+      ]),
+    )
+  })
+
   it('types requests.status with the request_status enum', async () => {
     const { rows } = await pool.query(
       `SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'requests' AND table_schema = 'dashboard' AND column_name = 'status'`,

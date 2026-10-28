@@ -9,6 +9,7 @@ import type { ServiceCatalog } from './catalog/service-catalog.js'
 import type { DossierDocumentSource } from './dashboard/dossier.js'
 import type { EventCategoryStore } from './dashboard/event-category-repo.js'
 import type { EventStore } from './dashboard/event-repo.js'
+import type { NotificationOutbox } from './dashboard/notification-outbox.js'
 import { createDashboardRouter } from './dashboard/router.js'
 import { PrivateDocumentStorage } from './documents/storage.js'
 import type { BoothCatalogueRepository } from './exhibitions/catalogue-repo.js'
@@ -28,6 +29,7 @@ export interface AppDeps extends AuthDeps {
   eventCategoryStore?: EventCategoryStore
   boothCatalogue?: BoothCatalogueRepository
   exhibitionStore?: ExhibitionStore
+  notificationOutbox?: NotificationOutbox
 }
 
 export function createApp(deps: AppDeps): Express {
