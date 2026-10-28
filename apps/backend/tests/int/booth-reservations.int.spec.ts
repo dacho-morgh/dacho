@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import { runMigrations } from '../../src/db/migrate.js'
 import { PostgresBoothCatalogueRepository } from '../../src/exhibitions/catalogue-repo.js'
@@ -10,14 +10,27 @@ const exhibitionId = 'reservation-concurrency-test'
 const catalogue = new PostgresBoothCatalogueRepository(pool)
 const reservations = new BoothReservationRepository(pool)
 
+async function clearFixtures() {
+  await pool.query('DELETE FROM dashboard.booth_reservations WHERE exhibition_id = $1', [exhibitionId])
+  await pool.query('UPDATE dashboard.exhibition_booths SET price_version_id = NULL WHERE exhibition_id = $1', [exhibitionId])
+  await pool.query('DELETE FROM dashboard.booth_price_versions WHERE exhibition_id = $1', [exhibitionId])
+  await pool.query('DELETE FROM dashboard.exhibition_booths WHERE exhibition_id = $1', [exhibitionId])
+  await pool.query('DELETE FROM dashboard.exhibition_catalogue_settings WHERE exhibition_id = $1', [exhibitionId])
+}
+
+async function createBooth(identifier: string) {
+  const result = await catalogue.createBooth({ exhibitionId, identifier, specification: 'test', location: null,
+    status: 'available', active: true, priceAmount: 100, priceUnit: 'toman', createdBy: 'owner' })
+  if (!result.ok) throw new Error('fixture creation failed')
+  return result.booth
+}
+
+// Internal repository coverage only. No endpoint may invoke this before T15 eligibility exists.
 describe('booth reservation concurrency', () => {
   beforeAll(async () => { await runMigrations(connectionString) })
+  beforeEach(clearFixtures)
   afterAll(async () => {
-    await pool.query('DELETE FROM dashboard.booth_reservations WHERE exhibition_id = $1', [exhibitionId])
-    await pool.query('UPDATE dashboard.exhibition_booths SET price_version_id = NULL WHERE exhibition_id = $1', [exhibitionId])
-    await pool.query('DELETE FROM dashboard.booth_price_versions WHERE exhibition_id = $1', [exhibitionId])
-    await pool.query('DELETE FROM dashboard.exhibition_booths WHERE exhibition_id = $1', [exhibitionId])
-    await pool.query('DELETE FROM dashboard.exhibition_catalogue_settings WHERE exhibition_id = $1', [exhibitionId])
+    await clearFixtures()
     await pool.end()
   })
 
@@ -37,4 +50,36 @@ describe('booth reservation concurrency', () => {
     const active = await pool.query<{ count: string }>('SELECT count(*) FROM dashboard.booth_reservations WHERE exhibition_id = $1 AND active', [exhibitionId])
     expect(active.rows[0]?.count).toBe('2')
   })
+
+  it('keeps reserved booths unavailable across catalogue reads and price edits, and preserves the captured price', async () => {
+    await catalogue.upsertSettings(exhibitionId, { companyBoothLimit: 2, guideMapReference: null }, 'owner')
+    const booth = await createBooth('captured-price')
+    const result = await reservations.reserve({ exhibitionId, boothId: booth.id, companyId: 'price-company', actorId: 'representative' })
+    if (!result.ok) throw new Error('reservation failed')
+    expect((await catalogue.getBooth(exhibitionId, booth.id))?.available).toBe(false)
+    expect((await catalogue.listBooths(exhibitionId))[0]?.available).toBe(false)
+    const edited = await catalogue.updateBooth({ exhibitionId, boothId: booth.id, priceAmount: 200, priceUnit: 'toman', updatedBy: 'owner' })
+    expect(edited).toMatchObject({ ok: true, booth: { available: false, status: 'available', priceAmount: 200 } })
+    expect(await catalogue.findPriceVersion(result.reservation.priceVersionId)).toMatchObject({ priceAmount: 100, priceUnit: 'toman' })
+    // Synthetic release models a later authorized transition; it is not an exposed command.
+    await pool.query('UPDATE dashboard.booth_reservations SET active = false WHERE id = $1', [result.reservation.id])
+    expect((await catalogue.getBooth(exhibitionId, booth.id))?.available).toBe(true)
+    await catalogue.updateBooth({ exhibitionId, boothId: booth.id, status: 'unavailable', updatedBy: 'owner' })
+    expect((await catalogue.getBooth(exhibitionId, booth.id))?.available).toBe(false)
+  })
+
+  it('does not reserve a booth from another exhibition', async () => {
+    await catalogue.upsertSettings(exhibitionId, { companyBoothLimit: 1, guideMapReference: null }, 'owner')
+    const booth = await createBooth('scope')
+    const otherExhibition = `${exhibitionId}-other`
+    await catalogue.upsertSettings(otherExhibition, { companyBoothLimit: 1, guideMapReference: null }, 'owner')
+    try {
+      const result = await reservations.reserve({ exhibitionId: otherExhibition, boothId: booth.id, companyId: 'company', actorId: 'representative' })
+      expect(result).toEqual({ ok: false, error: 'booth_unavailable' })
+      expect((await pool.query('SELECT id FROM dashboard.booth_reservations WHERE booth_id = $1', [booth.id])).rows).toHaveLength(0)
+    } finally {
+      await pool.query('DELETE FROM dashboard.exhibition_catalogue_settings WHERE exhibition_id = $1', [otherExhibition])
+    }
+  })
+
 })

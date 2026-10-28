@@ -60,3 +60,10 @@ catalogue definition, per the permission matrix.
 - No automatic expiry or timed release.
 - No rial storage or conversion path because the approved catalogue price is
   fixed in toman.
+
+
+## Draft reservation storage foundation — T48
+
+The internal reservation repository locks exhibition settings before the selected booth, checks active company capacity and booth exclusivity, and records the locked price-version ID. The partial unique index also prohibits two active reservations for one booth. Reservations have no automatic expiration. Effective catalogue availability includes active reservations while preserving the owner's separate `active/status` controls; a later authorized release restores inventory only if those controls still permit sale. Catalogue price edits retain the reservation's captured historic version.
+
+This is storage only. T15's verified-company eligibility and re-verification gate is absent, so no reservation HTTP endpoint is exposed. Atomic independent booth-application creation, application identity/state, idempotent submission/recovery and attendance/receipt/cancellation transitions remain unimplemented. The caller comment is not an eligibility guard and must not be presented as one. Keep the PR draft and T48 open until those prerequisites and guarded integration/human validation are complete.
