@@ -63,6 +63,7 @@ interface BoothRow {
   price_amount: string
   price_unit: PriceUnit
   price_version_id: string | null
+  has_active_reservation: boolean
   created_at: Date
   updated_at: Date
 }
@@ -80,12 +81,16 @@ interface PriceVersionRow {
 
 const BOOTH_COLUMNS = `
   b.id, b.exhibition_id, b.identifier, b.specification, b.location, b.status,
-  b.active, b.price_amount, b.price_unit, b.price_version_id, b.created_at, b.updated_at
+  b.active, b.price_amount, b.price_unit, b.price_version_id, b.created_at, b.updated_at,
+  EXISTS (SELECT 1 FROM dashboard.booth_reservations reservation
+    WHERE reservation.booth_id = b.id AND reservation.active) AS has_active_reservation
 `
 
 const BOOTH_RETURNING = `
   id, exhibition_id, identifier, specification, location, status,
-  active, price_amount, price_unit, price_version_id, created_at, updated_at
+  active, price_amount, price_unit, price_version_id, created_at, updated_at,
+  EXISTS (SELECT 1 FROM dashboard.booth_reservations reservation
+    WHERE reservation.booth_id = exhibition_booths.id AND reservation.active) AS has_active_reservation
 `
 
 const SETTINGS_COLUMNS = `
@@ -119,7 +124,7 @@ function mapBooth(row: BoothRow): Booth {
     location: row.location,
     status: row.status,
     active: row.active,
-    available: row.active && row.status === 'available',
+    available: row.active && row.status === 'available' && !row.has_active_reservation,
     priceAmount: Number(row.price_amount),
     priceUnit: row.price_unit,
     priceVersionId: row.price_version_id,
