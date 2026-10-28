@@ -47,6 +47,38 @@ function setup() {
 }
 
 describe('document router input and error boundaries', () => {
+  it.each([
+    {}, { companyId: '123' }, { requestId, companyId: '123' },
+  ])('requires exactly one request parent for correspondence uploads: %j', async (parent) => {
+    const { invoke, query, res } = setup()
+    await invoke('post', '/documents', { body: { category: 'correspondenceAttachment', ...parent } })
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_document_parent' })
+    expect(query).not.toHaveBeenCalled()
+  })
+  it.each(['chief-reviewer', 'reviewer', 'employer-reviewer', 'investment-reviewer', 'representative'])(
+    'historic letters cannot grant %s financial metadata or bytes', async (role) => {
+      const { app, query, res } = setup()
+      res.locals.actor = { id: 'other-user', operationalRole: role }
+      const documentId = '00000000-0000-4000-8000-000000000002'
+      query.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM dashboard.private_documents')) return { rows: [{
+          id: documentId, storage_key: 'private-key.pdf', category: 'financialStatements',
+          original_filename: 'secret-finance.pdf', mime_type: 'application/pdf', size_bytes: 64,
+          logical_version: 1, request_id: requestId, company_id: 'other-company', uploader_id: 'owner',
+          created_at: new Date(), updated_at: new Date(), request_owner_id: 'original-owner',
+          request_status: 'in_review', request_company_id: 'other-company',
+        }] }
+        // A historic letter and even an active assignment must not authorize finance.
+        return { rows: [{ has_access: true }], rowCount: 1 }
+      })
+      for (const url of [`/documents/${documentId}`, `/documents/${documentId}/download`]) {
+        await request(app).get(url).expect(404, { error: 'not_found' })
+      }
+      expect(query.mock.calls.every(([sql]) => !String(sql).includes('dashboard.letters'))).toBe(true)
+    },
+  )
+
   it('returns not_found for CI request over HTTP and stays healthy', async () => {
     const { app, query } = setup()
     await request(app).get('/documents').query({ requestId: malformedId }).expect(404, { error: 'not_found' })

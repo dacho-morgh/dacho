@@ -90,10 +90,11 @@ describe('server-derived allowedActions', () => {
 
 describe('document audience and policy', () => {
   it('keeps future workflow categories explicitly unsupported', () => {
-    for (const category of ['rfp', 'supplementaryCaseFiles', 'boothPaymentReceipt', 'correspondenceAttachment'] as const) {
+    for (const category of ['rfp', 'supplementaryCaseFiles', 'boothPaymentReceipt'] as const) {
       expect(documentAudience(category)).toBe('unsupported')
     }
     expect(documentAudience('proposal')).toBe('case')
+    expect(documentAudience('correspondenceAttachment')).toBe('case')
     expect(documentAudience('articlesOfAssociation')).toBe('company')
     expect(documentAudience('financialStatements')).toBe('financial')
   })

@@ -1,10 +1,21 @@
 import type { Pool } from 'pg'
 
-import type { RequestScope } from '../access/policy.js'
+import type { RequestScope, DocumentCategory } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
 import { requestScopeClause } from './request-repo.js'
 
 export type LetterType = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
+
+export interface LetterAttachmentDto {
+  id: string
+  name: string
+  filename: string
+  category: DocumentCategory
+  mimeType: string
+  sizeBytes: number
+  size?: string
+  downloadUrl?: string
+}
 
 export interface LetterDto {
   id: string
@@ -157,16 +168,18 @@ export interface CreateLetterInput {
   senderName?: string | null
   senderRole?: string | null
   requestId?: string | null
+  attachments?: LetterAttachmentDto[]
 }
 
 export class LetterRepository {
   constructor(private readonly pool: Pool) {}
 
   async create(input: CreateLetterInput): Promise<LetterDto> {
+    const attachmentsJson = JSON.stringify(input.attachments ?? [])
     const { rows } = await this.pool.query<LetterRow>(
-      `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false) RETURNING ${LETTER_COLUMNS}`,
-      [input.type, input.title, input.body, input.senderId ?? null, input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId ?? null],
+      `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, attachments, read)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, false) RETURNING ${LETTER_COLUMNS}`,
+      [input.type, input.title, input.body, input.senderId ?? null, input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId ?? null, attachmentsJson],
     )
     if (!rows[0]) throw new Error('INSERT dashboard.letters returned no row')
     return mapRow(rows[0])
@@ -181,8 +194,9 @@ export class LetterRepository {
     requireResponsibleChief: boolean,
   ): Promise<LetterDto | undefined> {
     if (!input.requestId) return this.create(input)
+    const attachmentsJson = JSON.stringify(input.attachments ?? [])
     const params: unknown[] = [input.type, input.title, input.body, input.senderId ?? null,
-      input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId]
+      input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId, attachmentsJson]
     const scopeClause = (scope: RequestScope): string => {
       if (scope.kind !== 'assigned') return requestScopeClause(scope, params, 'r')
       params.push(scope.userId, scope.role)
@@ -200,8 +214,8 @@ export class LetterRepository {
          SELECT user_id, role FROM dashboard.case_assignments
          WHERE request_id = $8 AND active FOR SHARE
        )
-       INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
-       SELECT $1, $2, $3, $4, $5, $6, $7, $8, false
+       INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, attachments, read)
+       SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, false
        FROM dashboard.requests r
        WHERE r.id = $8 AND (${senderClause}) AND (${recipientClause}) ${chiefClause}
        RETURNING ${LETTER_COLUMNS}`,
@@ -355,4 +369,5 @@ export class LetterRepository {
     const result = await this.pool.query('DELETE FROM dashboard.letters WHERE id = $1 AND ($2::boolean OR recipient_id = $3)', [id, staff, ownerId])
     return (result.rowCount ?? 0) > 0
   }
+
 }

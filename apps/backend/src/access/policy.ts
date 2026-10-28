@@ -154,13 +154,12 @@ export type DocumentAudience = 'company' | 'case' | 'financial' | 'unsupported'
 /**
  * Categories whose prerequisite workflow does not exist yet stay denied rather
  * than becoming permissive stubs: RFP/versioning is T18, supplementary files T33,
- * correspondence attachments T35 and booth receipts T50.
+ * and booth receipts T50. T35 supports request-linked correspondence.
  */
 export const UNSUPPORTED_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = [
   'rfp',
   'supplementaryCaseFiles',
   'boothPaymentReceipt',
-  'correspondenceAttachment',
 ]
 
 const COMPANY_CATEGORIES: readonly DocumentCategory[] = [
@@ -229,6 +228,10 @@ export function canUploadOwnedDocument(
   if (!ownsRequest) return false
   // Draft-only company editing keeps submitted/financial snapshots immutable
   // until T30 introduces versioned package submissions.
+  // Supplementary correspondence is additive and does not edit submitted files.
+  if (category === 'correspondenceAttachment') {
+    return true
+  }
   return parent.requestStatus === undefined || parent.requestStatus === null || parent.requestStatus === 'draft'
 }
 
@@ -276,10 +279,12 @@ export function canReadDocument(
     case 'chief-reviewer':
     case 'reviewer':
     case 'employer-reviewer':
+      if (document.category === 'correspondenceAttachment') return false
       return document.assigned && audience === 'case'
     case 'investment-reviewer':
-      // The persisted financial handoff workflow is not implemented yet.
-      // Assignment alone must never expose a financial package.
+      // Supplementary financial replies need the same persisted handoff as the
+      // financial package. Generic assignment must not bypass that boundary.
+      if (document.category === 'correspondenceAttachment') return false
       return document.assigned && audience === 'case'
   }
 }
