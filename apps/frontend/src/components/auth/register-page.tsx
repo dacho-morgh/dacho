@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, Check, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import { Controller, useForm, type FieldErrors, type Resolver } from 'react-hook-form'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -31,27 +33,12 @@ const COMPANY_TYPES = [
 // fullName/mobile/email map to name/phone/email, and company fields carry a
 // `company` prefix. `role`/`cmsRole` are deliberately omitted — the server
 // forces every self-signup to `applicant` / `cmsRole: null`.
-type FormState = {
-  companyName: string
-  companyNationalId: string
-  companyRegistrationNumber: string
-  companyType: string
-  companyProvince: string
-  companyCity: string
-  companyEstablishmentDate: string
-  companyStatus: string
-  companyEconomicCode: string
-  name: string
-  position: string
-  phone: string
-  email: string
-  password: string
-  passwordConfirmation: string
-}
+type FormState = z.infer<typeof signupSchema>
 
 const EMPTY_FORM: FormState = {
   companyName: '',
   companyNationalId: '',
+  activityDomain: '',
   companyRegistrationNumber: '',
   companyType: '',
   companyProvince: '',
@@ -88,11 +75,8 @@ const registerInputClasses = {
     'gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700',
 } as const
 
-const required = (value: string, label: string): string | undefined =>
-  value.trim() ? undefined : `${label} را وارد کنید.`
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const NATIONAL_ID_RE = /^\d{11}$/
+const NATIONAL_ID_RE = /^\d+$/
 const IRANIAN_MOBILE_RE = /^09\d{9}$/
 
 const toEnglishDigits = (value: string): string =>
@@ -100,9 +84,64 @@ const toEnglishDigits = (value: string): string =>
     .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
     .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
 
+const requiredText = (label: string) =>
+  z.string().refine((value) => value.trim().length > 0, `${label} را وارد کنید.`)
+
+const signupSchema = z
+  .object({
+    companyName: requiredText('نام شرکت'),
+    companyNationalId: requiredText('شناسه ملی').refine(
+      (value) => !value.trim() || NATIONAL_ID_RE.test(toEnglishDigits(value.trim())),
+      'شناسه ملی باید فقط شامل رقم باشد.',
+    ),
+    activityDomain: requiredText('حوزه فعالیت'),
+    companyRegistrationNumber: z.string(),
+    companyType: z.string(),
+    companyProvince: z.string(),
+    companyCity: z.string(),
+    companyEstablishmentDate: z.string(),
+    companyStatus: z.string(),
+    companyEconomicCode: z.string(),
+    name: requiredText('نام و نام خانوادگی'),
+    position: requiredText('سمت'),
+    phone: requiredText('شماره موبایل').refine(
+      (value) => !value.trim() || IRANIAN_MOBILE_RE.test(toEnglishDigits(value.trim())),
+      'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.',
+    ),
+    email: requiredText('ایمیل').refine(
+      (value) => !value.trim() || EMAIL_RE.test(value.trim()),
+      'ایمیل معتبر نیست.',
+    ),
+    password: requiredText('رمز عبور').refine(
+      (value) => !value || value.length >= 8,
+      'رمز عبور باید حداقل ۸ کاراکتر باشد.',
+    ),
+    passwordConfirmation: requiredText('تکرار رمز عبور'),
+  })
+  .refine(
+    (values) =>
+      !values.password ||
+      !values.passwordConfirmation ||
+      values.password === values.passwordConfirmation,
+    { path: ['passwordConfirmation'], message: 'رمز عبور و تکرار آن یکسان نیستند.' },
+  )
+
+// ponytail: flat fields need only Zod's first issue; use a resolver package if nested fields arrive.
+const signupResolver: Resolver<FormState> = (values) => {
+  const result = signupSchema.safeParse(values)
+  if (result.success) return { values: result.data, errors: {} }
+  const errors: FieldErrors<FormState> = {}
+  for (const issue of result.error.issues) {
+    const name = issue.path[0] as keyof FormState
+    errors[name] ??= { type: issue.code, message: issue.message }
+  }
+  return { values: {}, errors }
+}
+
 const fieldStep: Record<keyof FormState, number> = {
   companyName: 1,
   companyNationalId: 1,
+  activityDomain: 1,
   companyRegistrationNumber: 1,
   companyType: 1,
   companyProvince: 1,
@@ -121,7 +160,9 @@ const fieldStep: Record<keyof FormState, number> = {
 const fieldElementId: Partial<Record<keyof FormState, string>> = {
   companyName: 'register-companyName',
   companyNationalId: 'register-companyNationalId',
+  activityDomain: 'register-activityDomain',
   companyRegistrationNumber: 'register-companyRegistrationNumber',
+  companyType: 'register-companyType',
   companyProvince: 'register-companyProvince',
   companyCity: 'register-companyCity',
   companyEstablishmentDate: 'register-companyEstablishmentDate',
@@ -140,7 +181,8 @@ function payloadErrors(body: PayloadErrorBody | null): PayloadError[] {
 }
 
 function payloadErrorField(error: PayloadError): keyof FormState | undefined {
-  const raw = typeof error.path === 'string' ? error.path : typeof error.field === 'string' ? error.field : ''
+  const raw =
+    typeof error.path === 'string' ? error.path : typeof error.field === 'string' ? error.field : ''
   const message = typeof error.message === 'string' ? error.message : ''
   const messageField = message.match(/field is invalid:\s*([\w.-]+)/i)?.[1]
   const candidate = (raw || messageField || '').split('.').at(-1)
@@ -159,79 +201,57 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
   const router = useRouter()
   const safeReturnUrl = getSafeReturnUrl(returnUrl)
   const [step, setStep] = useState(1)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
-  const [errors, setErrors] = useState<FormErrors>({})
+  const {
+    register,
+    control,
+    trigger,
+    clearErrors,
+    setError,
+    handleSubmit,
+    formState: { errors, isSubmitting: submitting },
+  } = useForm<FormState>({
+    defaultValues: EMPTY_FORM,
+    resolver: signupResolver,
+    shouldFocusError: false,
+  })
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [confirmationVisible, setConfirmationVisible] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
+  const submissionLock = useRef(false)
 
-  // Marks the form hydrated so e2e tests wait until React has attached its
-  // handlers before filling the controlled inputs (a fill before hydration is
-  // discarded when React re-renders the initial empty state).
+  // E2E fills only after RHF has attached refs and change handlers.
   useEffect(() => {
     formRef.current?.setAttribute('data-hydrated', 'true')
   }, [])
 
-  const setField = (name: keyof FormState) => (value: string) => {
-    setForm((current) => ({ ...current, [name]: value }))
-    setErrors((current) => ({ ...current, [name]: undefined }))
+  const clearFieldError = (name: keyof FormState) => {
+    clearErrors(name)
     setNotice(null)
   }
+
+  const registerField = (name: keyof FormState) =>
+    register(name, {
+      onChange: () => clearFieldError(name),
+    })
 
   const focusField = (name: keyof FormState) => {
     const id = fieldElementId[name]
     if (id) requestAnimationFrame(() => document.getElementById(id)?.focus())
   }
 
-  const validateStep = (stepNumber: number): boolean => {
-    const next: FormErrors = {}
+  const focusNotice = () => {
+    requestAnimationFrame(() => document.getElementById('register-notice')?.focus())
+  }
 
-    if (stepNumber === 1) {
-      next.companyName = required(form.companyName, 'نام شرکت')
-      next.companyNationalId = required(form.companyNationalId, 'شناسه ملی')
-      if (form.companyNationalId.trim() && !NATIONAL_ID_RE.test(toEnglishDigits(form.companyNationalId.trim()))) {
-        next.companyNationalId = 'شناسه ملی باید دقیقاً ۱۱ رقم باشد.'
-      }
-      next.companyRegistrationNumber = required(form.companyRegistrationNumber, 'شماره ثبت')
-      next.companyType = required(form.companyType, 'نوع شرکت')
-      next.companyProvince = required(form.companyProvince, 'استان')
-      next.companyCity = required(form.companyCity, 'شهر')
+  const focusErrors = (invalid: FieldErrors<FormState>) => {
+    const firstField = (Object.keys(fieldStep) as Array<keyof FormState>).find(
+      (name) => invalid[name],
+    )
+    if (firstField) {
+      setStep(fieldStep[firstField])
+      focusField(firstField)
     }
-
-    if (stepNumber === 2) {
-      next.name = required(form.name, 'نام و نام خانوادگی')
-      next.position = required(form.position, 'سمت')
-      next.phone = required(form.phone, 'شماره موبایل')
-      if (form.phone.trim() && !IRANIAN_MOBILE_RE.test(toEnglishDigits(form.phone.trim()))) {
-        next.phone = 'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.'
-      }
-      next.email = required(form.email, 'ایمیل')
-      if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) {
-        next.email = 'ایمیل معتبر نیست.'
-      }
-    }
-
-    if (stepNumber === 3) {
-      next.password = required(form.password, 'رمز عبور')
-      if (form.password && form.password.length < 8) {
-        next.password = 'رمز عبور باید حداقل ۸ کاراکتر باشد.'
-      }
-      next.passwordConfirmation = required(form.passwordConfirmation, 'تکرار رمز عبور')
-      if (
-        form.password &&
-        form.passwordConfirmation &&
-        form.password !== form.passwordConfirmation
-      ) {
-        next.passwordConfirmation = 'رمز عبور و تکرار آن یکسان نیستند.'
-      }
-    }
-
-    setErrors(next)
-    const firstInvalidField = (Object.keys(next) as Array<keyof FormState>).find((name) => next[name])
-    if (firstInvalidField) focusField(firstInvalidField)
-    return !firstInvalidField
   }
 
   const goBack = () => {
@@ -239,16 +259,18 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
     setNotice(null)
     setStep((current) => Math.max(1, current - 1))
   }
-  const goForward = () => {
-    if (validateStep(step)) {
+  const goForward = async () => {
+    if (submitting) return
+    const fields = (Object.keys(fieldStep) as Array<keyof FormState>).filter(
+      (name) => fieldStep[name] === step,
+    )
+    if (await trigger(fields, { shouldFocus: true })) {
       setNotice(null)
-      setStep((current) => Math.min(3, current + 1))
+      setStep(Math.min(3, step + 1))
     }
   }
 
-  const handleSubmit = async () => {
-    if (submitting || !validateStep(3)) return
-    setSubmitting(true)
+  const submitSignup = async (form: FormState) => {
     setNotice(null)
 
     try {
@@ -263,6 +285,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
           position: form.position.trim(),
           companyName: form.companyName.trim(),
           companyNationalId: toEnglishDigits(form.companyNationalId.trim()),
+          activityDomain: form.activityDomain.trim(),
           companyRegistrationNumber: toEnglishDigits(form.companyRegistrationNumber.trim()),
           companyType: form.companyType,
           companyProvince: form.companyProvince.trim(),
@@ -288,7 +311,9 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
           if (!field) continue
           const message = typeof error.message === 'string' ? error.message : ''
           const code = typeof error.code === 'string' ? error.code : ''
-          const payloadInvalidUniqueField = /field is invalid:\s*(username|phone|email)/i.test(message)
+          const payloadInvalidUniqueField = /field is invalid:\s*(username|phone|email)/i.test(
+            message,
+          )
 
           // One company, one representative: a national id that already belongs
           // to a company cannot register a second person.
@@ -297,24 +322,38 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
               'این شناسه ملی قبلاً ثبت شده است. هر شرکت تنها یک نماینده دارد؛ برای افزودن نماینده جدید با دبیرخانه تماس بگیرید.'
           } else if (code === 'missing_field') {
             serverErrors[field] = 'این فیلد الزامی است.'
+          } else if (code === 'invalid_field') {
+            serverErrors[field] =
+              field === 'companyNationalId'
+                ? 'شناسه ملی باید فقط شامل رقم باشد.'
+                : field === 'phone'
+                  ? 'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.'
+                  : 'مقدار واردشده معتبر نیست.'
           } else if ((isDuplicateError(error) || payloadInvalidUniqueField) && field === 'phone') {
             serverErrors.phone = 'این شماره موبایل قبلاً ثبت شده است.'
           } else if ((isDuplicateError(error) || payloadInvalidUniqueField) && field === 'email') {
             serverErrors.email = 'این ایمیل قبلاً ثبت شده است.'
-          } else if (typeof error.message === 'string' && error.message.trim()) {
-            serverErrors[field] = error.message.trim()
+          } else {
+            serverErrors[field] = 'مقدار واردشده معتبر نیست.'
           }
         }
 
         const invalidFields = Object.keys(serverErrors) as Array<keyof FormState>
         if (invalidFields.length > 0) {
-          const firstField = invalidFields.sort((left, right) => fieldStep[left] - fieldStep[right])[0]
-          setErrors(serverErrors)
+          const firstField = invalidFields.sort(
+            (left, right) => fieldStep[left] - fieldStep[right],
+          )[0]
+          for (const field of invalidFields) {
+            setError(field, { type: 'server', message: serverErrors[field] })
+          }
           if (firstField) {
             setStep(fieldStep[firstField])
             focusField(firstField)
           }
           setNotice('لطفاً موارد مشخص‌شده را اصلاح کنید.')
+        } else if (responseErrors.some((error) => error.code === 'signup_rejected')) {
+          setNotice('اطلاعات ارسالی پذیرفته نشد. موارد واردشده را بررسی و دوباره تلاش کنید.')
+          focusNotice()
         } else if (hasAmbiguousIdentityError || response.status === 409) {
           setStep(2)
           setNotice('شماره موبایل یا ایمیل واردشده قبلاً ثبت شده است.')
@@ -323,8 +362,10 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
           setNotice(
             'ثبت‌نام به دلیل خطای سامانه انجام نشد. اطلاعات شما حفظ شده است؛ لطفاً دوباره تلاش کنید.',
           )
+          focusNotice()
         } else {
           setNotice('اطلاعات ارسالی پذیرفته نشد. موارد واردشده را بررسی و دوباره تلاش کنید.')
+          focusNotice()
         }
         return
       }
@@ -332,8 +373,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
       router.replace(getLoginUrl(safeReturnUrl, { registered: true }))
     } catch {
       setNotice('در حال حاضر ارتباط با سامانه برقرار نیست. کمی بعد دوباره تلاش کنید.')
-    } finally {
-      setSubmitting(false)
+      focusNotice()
     }
   }
 
@@ -415,8 +455,14 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
         ref={formRef}
         onSubmit={(event) => {
           event.preventDefault()
-          if (step < 3) goForward()
-          else void handleSubmit()
+          if (submissionLock.current) return
+          if (step < 3) void goForward()
+          else {
+            submissionLock.current = true
+            void handleSubmit(submitSignup, focusErrors)().finally(() => {
+              submissionLock.current = false
+            })
+          }
         }}
       >
         <div
@@ -427,116 +473,138 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
             <>
               <Input
                 {...registerInputClasses}
-                error={errors.companyName}
+                error={errors.companyName?.message}
                 id="register-companyName"
                 inputSize="lg"
                 label="نام شرکت"
-                name="companyName"
-                onChange={(event) => setField('companyName')(event.target.value)}
+                {...registerField('companyName')}
                 placeholder="نام رسمی شرکت را وارد کنید"
-                value={form.companyName}
               />
               <Input
                 {...registerInputClasses}
-                error={errors.companyNationalId}
+                error={errors.companyNationalId?.message}
                 id="register-companyNationalId"
+                inputMode="numeric"
                 inputSize="lg"
                 label="شناسه ملی"
-                name="companyNationalId"
-                onChange={(event) => setField('companyNationalId')(event.target.value)}
-                placeholder="شناسه ملی ۱۱ رقمی شرکت"
-                value={form.companyNationalId}
+                {...registerField('companyNationalId')}
+                placeholder="شناسه ملی شرکت را وارد کنید"
               />
               <Input
                 {...registerInputClasses}
-                error={errors.companyRegistrationNumber}
+                error={errors.activityDomain?.message}
+                id="register-activityDomain"
+                inputSize="lg"
+                label="حوزه فعالیت"
+                {...registerField('activityDomain')}
+                placeholder="حوزه فعالیت شرکت را وارد کنید"
+              />
+              <Input
+                {...registerInputClasses}
+                error={errors.companyRegistrationNumber?.message}
                 id="register-companyRegistrationNumber"
                 inputSize="lg"
-                label="شماره ثبت"
-                name="companyRegistrationNumber"
-                onChange={(event) => setField('companyRegistrationNumber')(event.target.value)}
+                label="شماره ثبت (اختیاری)"
+                {...registerField('companyRegistrationNumber')}
                 placeholder="شماره ثبت شرکت را وارد کنید"
-                value={form.companyRegistrationNumber}
               />
               <div className="flex flex-col gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700">
-                <Typography as="label" color="neutral-700" variant="14/regular">
-                  نوع شرکت
-                </Typography>
-                <Select
-                  onValueChange={(value) => setField('companyType')(value)}
-                  value={form.companyType || undefined}
+                <Typography
+                  as="label"
+                  htmlFor="register-companyType"
+                  color="neutral-700"
+                  variant="14/regular"
                 >
-                  <SelectTrigger className="h-12 rounded-lg border-neutral-200 px-3 py-2 shadow-none">
-                    <SelectValue placeholder="نوع شرکت را انتخاب کنید" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COMPANY_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  نوع شرکت (اختیاری)
+                </Typography>
+                <Controller
+                  control={control}
+                  name="companyType"
+                  render={({ field }) => (
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value)
+                        clearFieldError('companyType')
+                      }}
+                      value={field.value || undefined}
+                    >
+                      <SelectTrigger
+                        ref={field.ref}
+                        onBlur={field.onBlur}
+                        aria-describedby={
+                          errors.companyType ? 'register-companyType-error' : undefined
+                        }
+                        aria-invalid={Boolean(errors.companyType) || undefined}
+                        className="h-12 rounded-lg border-neutral-200 px-3 py-2 shadow-none"
+                        id="register-companyType"
+                      >
+                        <SelectValue placeholder="نوع شرکت را انتخاب کنید" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMPANY_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {errors.companyType && (
-                  <Typography as="p" color="error" variant="12/light">
-                    {errors.companyType}
+                  <Typography
+                    as="p"
+                    id="register-companyType-error"
+                    color="error"
+                    variant="12/light"
+                  >
+                    {errors.companyType.message}
                   </Typography>
                 )}
               </div>
               <Input
                 {...registerInputClasses}
-                error={errors.companyProvince}
+                error={errors.companyProvince?.message}
                 id="register-companyProvince"
                 inputSize="lg"
-                label="استان"
-                name="companyProvince"
-                onChange={(event) => setField('companyProvince')(event.target.value)}
+                label="استان (اختیاری)"
+                {...registerField('companyProvince')}
                 placeholder="استان محل ثبت را وارد کنید"
-                value={form.companyProvince}
               />
               <Input
                 {...registerInputClasses}
-                error={errors.companyCity}
+                error={errors.companyCity?.message}
                 id="register-companyCity"
                 inputSize="lg"
-                label="شهر"
-                name="companyCity"
-                onChange={(event) => setField('companyCity')(event.target.value)}
+                label="شهر (اختیاری)"
+                {...registerField('companyCity')}
                 placeholder="شهر محل ثبت را وارد کنید"
-                value={form.companyCity}
               />
               <Input
                 {...registerInputClasses}
-                error={errors.companyEstablishmentDate}
+                error={errors.companyEstablishmentDate?.message}
                 id="register-companyEstablishmentDate"
                 inputSize="lg"
                 label="تاریخ تأسیس"
-                name="companyEstablishmentDate"
-                onChange={(event) => setField('companyEstablishmentDate')(event.target.value)}
+                {...registerField('companyEstablishmentDate')}
                 placeholder="۱۳۷۵/۰۵/۱۲"
-                value={form.companyEstablishmentDate}
               />
               <Input
                 {...registerInputClasses}
-                error={errors.companyStatus}
+                error={errors.companyStatus?.message}
                 id="register-companyStatus"
                 inputSize="lg"
                 label="وضعیت شرکت"
-                name="companyStatus"
-                onChange={(event) => setField('companyStatus')(event.target.value)}
+                {...registerField('companyStatus')}
                 placeholder="فعال"
-                value={form.companyStatus}
               />
               <Input
                 {...registerInputClasses}
-                error={errors.companyEconomicCode}
+                error={errors.companyEconomicCode?.message}
                 id="register-companyEconomicCode"
                 inputSize="lg"
                 label="کد اقتصادی"
-                name="companyEconomicCode"
-                onChange={(event) => setField('companyEconomicCode')(event.target.value)}
+                {...registerField('companyEconomicCode')}
                 placeholder="کد اقتصادی شرکت"
-                value={form.companyEconomicCode}
               />
             </>
           )}
@@ -545,51 +613,43 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
             <>
               <Input
                 {...registerInputClasses}
-                error={errors.name}
+                error={errors.name?.message}
                 id="register-name"
                 inputMode="text"
                 inputSize="lg"
                 label="نام و نام خانوادگی"
-                name="name"
-                onChange={(event) => setField('name')(event.target.value)}
+                {...registerField('name')}
                 placeholder="نام و نام خانوادگی را وارد کنید"
-                value={form.name}
               />
               <Input
                 {...registerInputClasses}
-                error={errors.position}
+                error={errors.position?.message}
                 id="register-position"
                 inputMode="text"
                 inputSize="lg"
                 label="سمت"
-                name="position"
-                onChange={(event) => setField('position')(event.target.value)}
+                {...registerField('position')}
                 placeholder="سمت خود را در شرکت انتخاب کنید"
-                value={form.position}
               />
               <Input
                 {...registerInputClasses}
-                error={errors.phone}
+                error={errors.phone?.message}
                 id="register-phone"
                 inputMode="tel"
                 inputSize="lg"
                 label="شماره موبایل"
-                name="phone"
-                onChange={(event) => setField('phone')(event.target.value)}
+                {...registerField('phone')}
                 placeholder="مثلاً ۰۹۱۲۱۲۳۴۵۶۷"
-                value={form.phone}
               />
               <Input
                 {...registerInputClasses}
-                error={errors.email}
+                error={errors.email?.message}
                 id="register-email"
                 inputMode="email"
                 inputSize="lg"
                 label="ایمیل"
-                name="email"
-                onChange={(event) => setField('email')(event.target.value)}
+                {...registerField('email')}
                 placeholder="مثلاً example@company.ir"
-                value={form.email}
               />
             </>
           )}
@@ -613,15 +673,13 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                     )}
                   </button>
                 }
-                error={errors.password}
+                error={errors.password?.message}
                 id="register-password"
                 inputSize="lg"
                 label="رمز عبور"
-                name="password"
-                onChange={(event) => setField('password')(event.target.value)}
+                {...registerField('password')}
                 placeholder="رمز عبور خود را وارد کنید"
                 type={passwordVisible ? 'text' : 'password'}
-                value={form.password}
               />
 
               <Input
@@ -643,15 +701,13 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                     )}
                   </button>
                 }
-                error={errors.passwordConfirmation}
+                error={errors.passwordConfirmation?.message}
                 id="register-password-confirmation"
                 inputSize="lg"
                 label="تکرار رمز عبور"
-                name="passwordConfirmation"
-                onChange={(event) => setField('passwordConfirmation')(event.target.value)}
+                {...registerField('passwordConfirmation')}
                 placeholder="رمز عبور خود را دوباره وارد کنید"
                 type={confirmationVisible ? 'text' : 'password'}
-                value={form.passwordConfirmation}
               />
             </>
           )}
@@ -663,7 +719,9 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
             as="p"
             className="mt-4 text-center"
             color="error"
+            id="register-notice"
             role="alert"
+            tabIndex={-1}
             variant="12/regular"
           >
             {notice}
