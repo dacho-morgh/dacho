@@ -87,7 +87,7 @@ describe('T19: Independent application per subtopic', () => {
     await pool.end()
   })
 
-  it('allows a company to create independent applications for multiple subtopics under the same event', async () => {
+  it.each(['lowercase', 'uppercase'])('allows independent applications with %s UUID context', async (uuidCase) => {
     const app = await makeApp()
 
     // 1. Setup Event 1 with 2 subtopics and published RFPs
@@ -120,9 +120,9 @@ describe('T19: Independent application per subtopic', () => {
       .send({
         serviceId: 'event-service',
         title: 'درخواست برای هوش مصنوعی',
-        eventId: event1Id,
+        eventId: uuidCase === 'uppercase' ? event1Id.toUpperCase() : event1Id,
         subtopicId: subtopic1Id,
-        rfpVersionId: rfp1.id,
+        rfpVersionId: uuidCase === 'uppercase' ? rfp1.id.toUpperCase() : rfp1.id,
       })
       .expect(201)
 

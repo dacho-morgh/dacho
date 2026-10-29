@@ -241,10 +241,10 @@ export class RequestRepository {
           [subtopicId],
         )
         const current = subtopic.rows[0]
-        if (!current || current.event_id !== eventId) {
+        if (!current || current.event_id !== eventId.toLowerCase()) {
           throw new Error('invalid_event_subtopic')
         }
-        if (current.current_rfp_version_id !== versionId) {
+        if (current.current_rfp_version_id !== versionId.toLowerCase()) {
           throw new Error('stale_rfp')
         }
 
