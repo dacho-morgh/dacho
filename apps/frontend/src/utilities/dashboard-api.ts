@@ -273,8 +273,73 @@ export function createRequest(input: {
   })
 }
 
-export function submitRequest(id: string): Promise<{ request: RequestDto }> {
-  return dashboardFetch<{ request: RequestDto }>(`/requests/${id}/submit`, { method: 'POST' })
+export function updateRequest(
+  id: string,
+  input: { title?: string; answers?: Record<string, unknown> },
+): Promise<{ request: RequestDto }> {
+  return dashboardFetch<{ request: RequestDto }>(`/requests/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+}
+
+export function submitRequest(
+  id: string,
+  body?: {
+    nonCompeteAcceptance?: { accepted: boolean; textVersionId?: string }
+    eventRulesAcceptance?: { accepted: boolean; textVersionId?: string }
+  },
+): Promise<{ request: RequestDto }> {
+  return dashboardFetch<{ request: RequestDto }>(`/requests/${encodeURIComponent(id)}/submit`, {
+    method: 'POST',
+    headers: body ? { 'content-type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+}
+
+export interface AgreementDefinition {
+  type: 'non_compete' | 'event_rules'
+  version: string
+  title: string
+  summary: string
+}
+
+export function listAgreements(): Promise<{ agreements: AgreementDefinition[] }> {
+  return dashboardFetch<{ agreements: AgreementDefinition[] }>('/agreements')
+}
+
+export interface RequestProposalDetail {
+  proposal: {
+    requestId: string
+    revision: number
+    formVersion: string
+    applicationTeam: Array<{ name: string; role: string; relation?: string }>
+    proposalDocuments: Array<{
+      id: string
+      filename: string
+      mimeType: string
+      sizeBytes: number
+      storageKey: string
+      logicalVersion: number
+      createdAt: string
+    }>
+    createdAt: string
+  } | null
+  agreements: Array<{
+    id: string
+    requestId: string
+    revision: number
+    agreementType: 'non_compete' | 'event_rules'
+    textVersionId: string
+    acceptedBy: string
+    acceptedAt: string
+  }>
+}
+
+export function getRequestProposal(id: string, revision?: number): Promise<RequestProposalDetail> {
+  const qs = revision ? `?revision=${revision}` : ''
+  return dashboardFetch<RequestProposalDetail>(`/requests/${encodeURIComponent(id)}/proposal${qs}`)
 }
 
 export function toEnglishDigits(value: string): string {

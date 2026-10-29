@@ -171,12 +171,33 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
       request(app)
         .post('/requests')
         .set(auth(actor))
-        .send({ serviceId: 'event-service', title: 'Application', eventId, subtopicId, rfpVersionId: v1.id })
+        .send({
+          serviceId: 'event-service',
+          title: 'Application',
+          eventId,
+          subtopicId,
+          rfpVersionId: v1.id,
+          answers: { applicationTeam: [{ name: 'تیم فنی', role: 'توسعه‌دهنده' }] },
+        })
 
     const first = await create()
     expect(first.status).toBe(201)
 
-    const submitted = await request(app).post(`/requests/${first.body.request.id}/submit`).set(auth('company'))
+    await request(app)
+      .post('/documents')
+      .set(auth('company'))
+      .field('category', 'proposal')
+      .field('requestId', first.body.request.id)
+      .attach('file', Buffer.from('%PDF-Proposal-Fixture'), { filename: 'prop.pdf', contentType: 'application/pdf' })
+      .expect(201)
+
+    const submitted = await request(app)
+      .post(`/requests/${first.body.request.id}/submit`)
+      .set(auth('company'))
+      .send({
+        nonCompeteAcceptance: { accepted: true },
+        eventRulesAcceptance: { accepted: true },
+      })
     expect(submitted.status).toBe(200)
 
     const context = await request(app).get(`/requests/${first.body.request.id}/rfp`).set(auth('company'))

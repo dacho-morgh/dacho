@@ -281,4 +281,31 @@ describe('dashboard migrations', () => {
     const rfpCols = await tableColumns('request_rfps')
     expect(rfpCols).toEqual(expect.arrayContaining(['company_id']))
   })
+
+  it('creates request_proposals and request_agreements tables for T20', async () => {
+    const proposalCols = await tableColumns('request_proposals')
+    expect(proposalCols).toEqual(
+      expect.arrayContaining([
+        'request_id',
+        'revision',
+        'form_version',
+        'application_team',
+        'proposal_documents',
+        'created_at',
+      ]),
+    )
+
+    const agreementCols = await tableColumns('request_agreements')
+    expect(agreementCols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'request_id',
+        'revision',
+        'agreement_type',
+        'text_version_id',
+        'accepted_by',
+        'accepted_at',
+      ]),
+    )
+  })
 })

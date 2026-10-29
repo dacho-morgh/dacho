@@ -123,6 +123,7 @@ describe('T19: Independent application per subtopic', () => {
         eventId: uuidCase === 'uppercase' ? event1Id.toUpperCase() : event1Id,
         subtopicId: subtopic1Id,
         rfpVersionId: uuidCase === 'uppercase' ? rfp1.id.toUpperCase() : rfp1.id,
+        answers: { applicationTeam: [{ name: 'تیم فنی', role: 'توسعه‌دهنده' }] },
       })
       .expect(201)
 
@@ -132,6 +133,14 @@ describe('T19: Independent application per subtopic', () => {
     expect(req1.status).toBe('draft')
     expect(req1.companyId).toBe('1')
     expect(req1.ownerId).toBe('company-user-1')
+
+    await request(app)
+      .post('/documents')
+      .set(auth('company-user-1'))
+      .field('category', 'proposal')
+      .field('requestId', req1.id)
+      .attach('file', Buffer.from('%PDF-Proposal-Fixture'), { filename: 'prop.pdf', contentType: 'application/pdf' })
+      .expect(201)
 
     // 3. Company A applies to subtopic 2
     const res2 = await request(app)
@@ -161,6 +170,10 @@ describe('T19: Independent application per subtopic', () => {
       const submit1 = await request(app)
         .post(`/requests/${req1.id}/submit`)
         .set(auth('company-user-2'))
+        .send({
+          nonCompeteAcceptance: { accepted: true },
+          eventRulesAcceptance: { accepted: true },
+        })
         .expect(200)
 
       expect(submit1.body.request.status).toBe('in_review')

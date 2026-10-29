@@ -51,7 +51,7 @@ import { DocumentRepository, type PrivateDocumentRecord } from '../documents/rep
 import { canSendLetter } from './letter-policy.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
-import { RequestRepository } from './request-repo.js'
+import { RequestRepository, DEFAULT_EVENT_RULES_VERSION, DEFAULT_NON_COMPETE_VERSION } from './request-repo.js'
 import { StatsRepository } from './stats-repo.js'
 import type { CompanyStore } from '../auth/company-store.js'
 import type { User, UserStore } from '../auth/user-store.js'
@@ -565,6 +565,62 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
   })
 
+  router.get('/agreements', (_req, res) => {
+    res.json({
+      agreements: [
+        {
+          type: 'non_compete',
+          version: DEFAULT_NON_COMPETE_VERSION,
+          title: 'قرارداد عدم رقابت و محرمانگی',
+          summary: 'تعهدنامه عدم رقابت و حفظ اطلاعات محرمانه رویداد',
+        },
+        {
+          type: 'event_rules',
+          version: DEFAULT_EVENT_RULES_VERSION,
+          title: 'قوانین و مقررات شرکت در رویداد',
+          summary: 'قوانین عمومی و ضوابط پذیرش طرح‌ها در رویداد',
+        },
+      ],
+    })
+  })
+
+  router.patch('/requests/:id', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isRepresentative(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { title, answers } = req.body ?? {}
+      if (title !== undefined) {
+        if (typeof title !== 'string' || title.trim() === '') {
+          res.status(400).json({ error: 'invalid_title' })
+          return
+        }
+      }
+      if (answers !== undefined) {
+        if (typeof answers !== 'object' || answers === null || Array.isArray(answers)) {
+          res.status(400).json({ error: 'invalid_answers' })
+          return
+        }
+      }
+      const companyId = await actorCompanyId(actor.id, actor.operationalRole)
+      const result = await repo.updateDraft(req.params.id, actor.id, companyId, {
+        title,
+        answers,
+      })
+      if (result === 'not_found') {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (result === 'not_draft') {
+        res.status(409).json({ error: 'request_not_draft' })
+        return
+      }
+      res.json({ request: requestWithActions(actor.operationalRole, actor.id, result, companyId) })
+    } catch (error) { next(error) }
+  })
+
   router.get('/requests', async (req, res, next) => {
     try {
     const actor = actorOf(res)
@@ -692,14 +748,79 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
 
+    const rfpEntry = await deps.pool.query<{ version_id: string; current_rfp_version_id: string | null }>(
+      `SELECT c.version_id, s.current_rfp_version_id
+       FROM dashboard.request_rfps c
+       JOIN dashboard.event_subtopics s ON s.id = c.subtopic_id
+       WHERE c.request_id = $1`,
+      [request.id],
+    )
+    if (rfpEntry.rows[0] && rfpEntry.rows[0].version_id !== rfpEntry.rows[0].current_rfp_version_id) {
+      res.status(409).json({ error: 'stale_rfp' })
+      return
+    }
+    const isEventRequest = (rfpEntry.rowCount ?? 0) > 0
+
     // Validate answers against the service's form schema (required fields present).
     const service = await deps.serviceCatalog.findById(request.serviceId)
+    const missing: string[] = []
     if (service) {
-      const missing = missingRequiredFields(service, request.answers)
-      if (missing) {
-        res.status(400).json({ error: 'invalid_answers', missingFields: missing })
-        return
+      const serviceMissing = missingRequiredFields(service, request.answers)
+      if (serviceMissing) {
+        missing.push(...serviceMissing)
       }
+    }
+
+    let nonCompeteVersion: string | undefined
+    let eventRulesVersion: string | undefined
+
+    if (isEventRequest) {
+      const answers = request.answers ?? {}
+      const team = (answers as { applicationTeam?: unknown }).applicationTeam
+      const hasValidTeam =
+        Array.isArray(team) &&
+        team.length > 0 &&
+        team.every(
+          (m: unknown) =>
+            m &&
+            typeof m === 'object' &&
+            typeof (m as { name?: unknown }).name === 'string' &&
+            (m as { name: string }).name.trim() !== '' &&
+            typeof (m as { role?: unknown }).role === 'string' &&
+            (m as { role: string }).role.trim() !== '',
+        )
+      if (!hasValidTeam) {
+        missing.push('applicationTeam')
+      }
+
+      const proposalDocs = await deps.pool.query(
+        `SELECT 1 FROM dashboard.private_documents WHERE request_id = $1 AND category = 'proposal'`,
+        [request.id],
+      )
+      if ((proposalDocs.rowCount ?? 0) === 0) {
+        missing.push('proposalDocuments')
+      }
+
+      const nonCompete =
+        req.body?.nonCompeteAcceptance ?? (answers as { nonCompeteAcceptance?: unknown }).nonCompeteAcceptance
+      if (!nonCompete || typeof nonCompete !== 'object' || (nonCompete as { accepted?: unknown }).accepted !== true) {
+        missing.push('nonCompeteAcceptance')
+      } else if (typeof (nonCompete as { textVersionId?: unknown }).textVersionId === 'string' && (nonCompete as { textVersionId: string }).textVersionId.trim() !== '') {
+        nonCompeteVersion = (nonCompete as { textVersionId: string }).textVersionId.trim()
+      }
+
+      const eventRules =
+        req.body?.eventRulesAcceptance ?? (answers as { eventRulesAcceptance?: unknown }).eventRulesAcceptance
+      if (!eventRules || typeof eventRules !== 'object' || (eventRules as { accepted?: unknown }).accepted !== true) {
+        missing.push('eventRulesAcceptance')
+      } else if (typeof (eventRules as { textVersionId?: unknown }).textVersionId === 'string' && (eventRules as { textVersionId: string }).textVersionId.trim() !== '') {
+        eventRulesVersion = (eventRules as { textVersionId: string }).textVersionId.trim()
+      }
+    }
+
+    if (missing.length > 0) {
+      res.status(400).json({ error: 'invalid_answers', missingFields: missing })
+      return
     }
 
     const firstStep = service?.workflow[0]
@@ -709,6 +830,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       firstStep ? { assignedRole: firstStep.roleName, currentStep: firstStep.title } : undefined,
       companyId,
       true,
+      isEventRequest ? { nonCompeteVersion, eventRulesVersion } : undefined,
     )
     if (result === 'company_not_verified') {
       res.status(403).json({ error: 'company_not_verified' })
@@ -757,6 +879,22 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         }
       }
       res.json({ verification: pinned })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/requests/:id/proposal', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const { scope } = await resolveScope(actor.id, actor.operationalRole)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const revision = req.query.revision ? Number(req.query.revision) : undefined
+      const proposal = await repo.findRequestProposal(request.id, revision)
+      const agreements = await repo.listRequestAgreements(request.id, revision)
+      res.json({ proposal, agreements })
     } catch (error) { next(error) }
   })
 
