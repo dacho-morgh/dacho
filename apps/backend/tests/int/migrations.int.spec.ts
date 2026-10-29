@@ -187,6 +187,7 @@ describe('dashboard migrations', () => {
         'attendance_reason',
         'attendance_decided_by',
         'attendance_decided_at',
+        'payment_status',
       ]),
     )
 
@@ -200,6 +201,39 @@ describe('dashboard migrations', () => {
         'to_status',
         'reason',
         'decided_by',
+        'created_at',
+      ]),
+    )
+  })
+
+  it('creates booth_payment_receipts and booth_receipt_files tables with required columns', async () => {
+    const receiptCols = await tableColumns('booth_payment_receipts')
+    expect(receiptCols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'reservation_id',
+        'version',
+        'tracking_code',
+        'amount_toman',
+        'paid_at',
+        'description',
+        'status',
+        'submitted_by',
+        'created_at',
+      ]),
+    )
+
+    const fileCols = await tableColumns('booth_receipt_files')
+    expect(fileCols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'receipt_id',
+        'reservation_id',
+        'storage_key',
+        'filename',
+        'mime_type',
+        'size_bytes',
+        'file_hash',
         'created_at',
       ]),
     )
