@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import request from 'supertest'
 
@@ -78,6 +78,8 @@ async function cleanup() {
   await Promise.all(
     [...files, ...docFiles].map(({ storage_key }) => storage.remove(storage_key).catch(() => undefined)),
   )
+  await clearVerifiedCompanies(pool)
+  await pool.query("DELETE FROM dashboard.company_verifications WHERE representative_id = 'company-user-1'")
 }
 
 describe('T20: Proposal draft, fixed form, server validation and versioned agreements (int)', () => {
@@ -86,6 +88,11 @@ describe('T20: Proposal draft, fixed form, server validation and versioned agree
   })
 
   beforeEach(async () => {
+    await cleanup()
+    await seedVerifiedCompanies(pool, companyStore)
+  })
+
+  afterEach(async () => {
     await cleanup()
   })
 
@@ -97,7 +104,6 @@ describe('T20: Proposal draft, fixed form, server validation and versioned agree
   it('runs the complete T20 lifecycle: draft, edit, proposal upload, validation, submit, and immutability', async () => {
     const app = await makeApp()
     const company = (await companyStore.findByRepresentative('company-user-1'))!
-    await seedVerifiedCompanies(pool, companyStore)
 
     // 1. Create event, category, subtopic and RFP
     const eventRes = await request(app).post('/admin/events').set(auth('owner')).send(eventPayload)
