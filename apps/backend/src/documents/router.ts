@@ -18,6 +18,7 @@ import { AssignmentRepository } from '../dashboard/assignment-repo.js'
 import { actorOf } from '../dashboard/proxy-auth.js'
 import { RequestRepository } from '../dashboard/request-repo.js'
 import { isUuid } from '../exhibitions/catalogue.js'
+import type { VerificationStore } from '../dashboard/verification-repo.js'
 import {
   MAX_DOCUMENT_BYTES,
   validateDocumentFile,
@@ -31,6 +32,7 @@ export interface DocumentRouterDeps {
   userStore: UserStore
   companyStore: CompanyStore
   privateDocumentStorage: PrivateDocumentStorage
+  verificationStore?: VerificationStore
 }
 
 const MAX_MULTIPART_BYTES = MAX_DOCUMENT_BYTES + 1
@@ -325,6 +327,13 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const storageKey = await storage.save(validated.file.body, validated.file.extension)
       let record: PrivateDocumentRecord
       try {
+        if (audience === 'company' && parentCompanyId &&
+            ['articlesOfAssociation', 'establishmentNotices', 'amendmentNotices'].includes(category)) {
+          await deps.verificationStore?.invalidateApproval(
+            parentCompanyId,
+            'تغییر مدارک ثبتی؛ نیازمند احراز مجدد',
+          )
+        }
         const input = {
           storageKey,
           category: validated.file.category,

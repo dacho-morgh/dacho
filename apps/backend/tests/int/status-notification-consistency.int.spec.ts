@@ -1,3 +1,4 @@
+import { seedVerifiedCompanies, clearVerifiedCompanies } from './verified-company-fixtures.js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Pool } from 'pg'
 import request from 'supertest'
@@ -44,6 +45,7 @@ async function createAppUnderTest(outbox?: PostgresNotificationOutbox) {
     { name: 'شرکت ۱', nationalId: '10000000001', representativeId: OWNER },
     { name: 'شرکت ۲', nationalId: '10000000002', representativeId: OTHER },
   ])
+  await seedVerifiedCompanies(pool, companyStore)
   const serviceCatalog = new InMemoryServiceCatalog()
   serviceCatalog.set(service)
   const jwt = await JwtSigner.create('test-kid')
@@ -82,6 +84,7 @@ describe('T37 — Status transition and notification consistency (Integration)',
   })
 
   afterAll(async () => {
+    await clearVerifiedCompanies(pool)
     await pool.end()
   })
 

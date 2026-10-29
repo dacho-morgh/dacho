@@ -3,6 +3,7 @@ import { Pool } from 'pg'
 import { runMigrations } from '../../src/db/migrate.js'
 import { PostgresBoothCatalogueRepository } from '../../src/exhibitions/catalogue-repo.js'
 import { PostgresBoothReservationRepository } from '../../src/exhibitions/reservation-repo.js'
+import { PostgresVerificationStore } from '../../src/dashboard/verification-repo.js'
 
 const connectionString = process.env.DATABASE_URL ?? 'postgres://dacho:***@localhost:5432/dacho-cms'
 const pool = new Pool({ connectionString, application_name: 'booth-reservations-integration' })
@@ -16,6 +17,8 @@ async function clearFixtures() {
   await pool.query('DELETE FROM dashboard.booth_price_versions WHERE exhibition_id = $1', [exhibitionId])
   await pool.query('DELETE FROM dashboard.exhibition_booths WHERE exhibition_id = $1', [exhibitionId])
   await pool.query('DELETE FROM dashboard.exhibition_catalogue_settings WHERE exhibition_id = $1', [exhibitionId])
+  await pool.query("DELETE FROM dashboard.company_verifications WHERE company_id = 'booth-eligibility-fixture'")
+  await pool.query("DELETE FROM dashboard.activities WHERE owner_id = 'booth-eligibility-representative'")
 }
 
 async function createBooth(identifier: string) {
@@ -32,6 +35,27 @@ describe('booth reservation concurrency', () => {
   afterAll(async () => {
     await clearFixtures()
     await pool.end()
+  })
+
+  it('enforces current verification inside the reservation transaction', async () => {
+    const companyId = 'booth-eligibility-fixture'
+    const actorId = 'booth-eligibility-representative'
+    const verification = new PostgresVerificationStore(pool)
+    await catalogue.upsertSettings(exhibitionId, { companyBoothLimit: 2, guideMapReference: null }, 'owner')
+    const booth = await createBooth('verified-only')
+    const reserve = (boothId = booth.id) => reservations.reserve({
+      exhibitionId, boothId, companyId, actorId, requireVerification: true,
+    })
+    expect(await reserve()).toEqual({ ok: false, error: 'company_not_verified' })
+    const submitted = await verification.submit({ companyId, representativeId: actorId, snapshot: {} })
+    if (!submitted.ok) throw new Error('Verification fixture failed')
+    expect(await reserve()).toEqual({ ok: false, error: 'company_not_verified' })
+    await verification.decide({ id: submitted.verification.id, action: 'approve', reviewerId: 'secretariat' })
+    expect(await reserve()).toMatchObject({ ok: true })
+    await verification.invalidateApproval(companyId, 'Changed registration')
+    const secondBooth = await createBooth('after-invalidation')
+    expect(await reserve(secondBooth.id)).toEqual({ ok: false, error: 'company_not_verified' })
+    expect(await reservations.listByCompany(companyId)).toHaveLength(1)
   })
 
   it('allows only one simultaneous reservation per booth and enforces the company limit across booths', async () => {

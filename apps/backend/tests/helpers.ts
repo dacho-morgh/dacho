@@ -55,6 +55,7 @@ export interface TestAppOptions {
   boothCatalogue?: BoothCatalogueRepository
   boothReservations?: BoothReservationRepository
   boothCompanyEligibility?: BoothCompanyEligibility
+  eventCompanyEligibility?: BoothCompanyEligibility
   exhibitionStore?: ExhibitionStore
   evaluationStore?: EvaluationStore
   pool?: Pool
@@ -97,6 +98,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     boothCatalogue,
     boothReservations,
     boothCompanyEligibility: options.boothCompanyEligibility,
+    eventCompanyEligibility: options.eventCompanyEligibility,
     exhibitionStore: options.exhibitionStore,
     evaluationStore: options.evaluationStore,
     notificationOutbox,

@@ -1,3 +1,4 @@
+import { seedVerifiedCompanies, clearVerifiedCompanies } from './verified-company-fixtures.js'
 import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -137,6 +138,7 @@ describe('shared access policy and private documents (T09/T10)', () => {
     await pool.query('DELETE FROM dashboard.case_assignments')
     await pool.query('DELETE FROM dashboard.letters')
     await pool.query('DELETE FROM dashboard.requests')
+    await seedVerifiedCompanies(pool, companyStore)
     const stableRoles: Record<string, string> = {
       [people.secretariat.id]: 'central-secretariat',
       [people.chief.id]: 'chief-reviewer',
@@ -157,10 +159,48 @@ describe('shared access policy and private documents (T09/T10)', () => {
     mkdirSync(storageRoot, { recursive: true })
   })
 
+  it('projects pinned verification dossiers for assigned staff and denies unassigned staff', async () => {
+    const company = (await companyStore.findByRepresentative(people.repA.id))!
+    const snapshot = {
+      company: { name: 'Approved company', nationalId: company.nationalId, economicCode: 'private-code' },
+      dossier: { legalEntityType: 'سهامی خاص', activityDomain: 'AI', insuredEmployeeCount: 99 },
+      documents: [{ id: 'private-file', filename: 'private-registration.pdf' }],
+      representative: { phone: 'private-phone', email: 'private@example.invalid' },
+      addresses: [{ address: 'Private address' }],
+    }
+    await pool.query('UPDATE dashboard.company_verifications SET snapshot = $1 WHERE company_id = $2',
+      [JSON.stringify(snapshot), company.id])
+    const id = await createRequest()
+    await submit(id).then((response) => expect(response.status).toBe(200))
+    const read = (userId: string) => request(payload).get(`/requests/${id}/verification`).set(headers(userId))
+    expect((await read(people.repA.id)).body.verification.snapshot).toEqual(snapshot)
+    expect((await read(people.secretariat.id)).body.verification.snapshot).toEqual(snapshot)
+    await read(people.repB.id).expect(404)
+    for (const person of [people.chief, people.reviewer, people.employer, people.investment]) {
+      await read(person.id).expect(404)
+      await assign(id, person.id, person.operationalRole).expect(201)
+      const response = await read(person.id).expect(200)
+      expect(response.body.verification.snapshot).toEqual({
+        company: { name: 'Approved company', nationalId: company.nationalId },
+        dossier: { legalEntityType: 'سهامی خاص', activityDomain: 'AI' },
+      })
+    }
+  })
+
+  it.each(['approved', 'pending'] as const)('invalidates %s verification when a registration document is uploaded', async (status) => {
+    const company = (await companyStore.findByRepresentative(people.repA.id))!
+    await pool.query('UPDATE dashboard.company_verifications SET status = $1 WHERE company_id = $2', [status, company.id])
+    await upload({ userId: people.repA.id, category: 'articlesOfAssociation', filename: 'changed.pdf',
+      contentType: 'application/pdf', body: pdf(), companyId: company.id }).expect(201)
+    expect((await pool.query('SELECT status FROM dashboard.company_verifications WHERE company_id = $1 ORDER BY revision DESC LIMIT 1', [company.id])).rows)
+      .toEqual([{ status: 'returned' }])
+  })
+
   afterAll(async () => {
     await pool.query('DELETE FROM dashboard.private_documents')
     await pool.query('DELETE FROM dashboard.case_assignments')
     await pool.query('DELETE FROM dashboard.requests')
+    await clearVerifiedCompanies(pool)
     await pool.end()
     rmSync(storageRoot, { recursive: true, force: true })
   })

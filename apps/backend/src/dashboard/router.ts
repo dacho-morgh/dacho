@@ -30,6 +30,7 @@ import {
   DossierValidationError,
   dossierOfCompany,
   missingDossierItems,
+  mergeDossier,
   pickDossierUpdate,
   SqlDossierDocumentSource,
   type DossierDocumentSource,
@@ -102,6 +103,7 @@ export interface DashboardDeps {
   boothCatalogue?: BoothCatalogueRepository
   boothReservations?: BoothReservationRepository
   boothCompanyEligibility?: BoothCompanyEligibility
+  eventCompanyEligibility?: BoothCompanyEligibility
   exhibitionStore?: ExhibitionStore
   evaluationStore?: EvaluationStore
   notificationOutbox?: NotificationOutbox
@@ -425,7 +427,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   }
 
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
-  router.use(createDocumentRouter({ ...deps }))
+  router.use(createDocumentRouter({ ...deps, verificationStore }))
   router.use(
     createRfpRouter({
       pool: deps.pool,
@@ -673,6 +675,15 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
 
+    const currentVerification = companyId
+      ? await verificationStore.findCurrentByCompanyId(companyId)
+      : null
+    if (currentVerification?.status !== 'approved' ||
+        (deps.eventCompanyEligibility && !await deps.eventCompanyEligibility.isVerified(companyId!))) {
+      res.status(403).json({ error: 'company_not_verified' })
+      return
+    }
+
     // Validate answers against the service's form schema (required fields present).
     const service = await deps.serviceCatalog.findById(request.serviceId)
     if (service) {
@@ -689,7 +700,12 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       actor.id,
       firstStep ? { assignedRole: firstStep.roleName, currentStep: firstStep.title } : undefined,
       companyId,
+      true,
     )
+    if (result === 'company_not_verified') {
+      res.status(403).json({ error: 'company_not_verified' })
+      return
+    }
     if (result === 'not_found') {
       res.status(404).json({ error: 'not_found' })
       return
@@ -703,6 +719,36 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     res.json({ request: requestWithActions(actor.operationalRole, actor.id, result, companyId) })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/requests/:id/verification', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const { scope } = await resolveScope(actor.id, actor.operationalRole)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const pinned = await repo.findRequestVerification(request.id)
+      if (!pinned) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!isCompanyAdministrator(actor.operationalRole) && !isRepresentative(actor.operationalRole)) {
+        // Case assignment permits only the profile fields needed for review;
+        // it never grants access to the private verification dossier or files.
+        const company = (pinned.snapshot.company ?? {}) as Record<string, unknown>
+        const dossier = (pinned.snapshot.dossier ?? {}) as Record<string, unknown>
+        pinned.snapshot = {
+          company: { name: company.name, nationalId: company.nationalId, type: company.type,
+            province: company.province, city: company.city },
+          dossier: { legalEntityType: dossier.legalEntityType, classification: dossier.classification,
+            activityDomain: dossier.activityDomain, productsServices: dossier.productsServices },
+        }
+      }
+      res.json({ verification: pinned })
     } catch (error) { next(error) }
   })
 
@@ -1319,10 +1365,12 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     res.json(dashboardSelfProfile(actor.user, actor.operationalRole))
   })
 
-  router.patch('/profile', async (req, res) => {
+  router.patch('/profile', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
     const { company, contacts } = req.body ?? {}
     let profile = await profileRepo.getProfile(actor.id)
+    const initialProfile = profile
     if (company?.nationalId !== undefined && company.nationalId !== profile.company.nationalId) {
       res.status(403).json({ error: 'protected_company_identity' })
       return
@@ -1330,12 +1378,41 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     let dossierUpdate
     try {
       dossierUpdate = pickDossierUpdate(req.body?.dossier ?? req.body)
+      mergeDossier(profile.dossier, dossierUpdate)
     } catch (error) {
       if (error instanceof DossierValidationError) {
         res.status(400).json({ error: error.code })
         return
       }
       throw error
+    }
+
+    let identityChanged = false
+    if (company && typeof company === 'object') {
+      if (
+        (company.name !== undefined && company.name !== initialProfile.company.name) ||
+        (company.registrationNumber !== undefined && company.registrationNumber !== initialProfile.company.registrationNumber) ||
+        (company.type !== undefined && company.type !== initialProfile.company.type)
+      ) {
+        identityChanged = true
+      }
+    }
+    if (dossierUpdate) {
+      if (
+        dossierUpdate.legalEntityType !== undefined &&
+        dossierUpdate.legalEntityType !== initialProfile.dossier.legalEntityType
+      ) {
+        identityChanged = true
+      }
+    }
+
+    // Invalidate before any external write: a later contact/storage failure
+    // must not leave changed identity data eligible under the old approval.
+    if (identityChanged && initialProfile.companyId) {
+      await verificationStore.invalidateApproval(
+        initialProfile.companyId,
+        'تغییر اطلاعات هویتی؛ نیازمند احراز مجدد',
+      )
     }
     // Write the dossier first: its merge validation is the only 400-producing
     // part of this combined PATCH, so a rejected request must not leave the
@@ -1361,6 +1438,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       profile = await profileRepo.updateExecutives(actor.id, req.body.executives)
     }
     res.json(profile)
+    } catch (error) { next(error) }
   })
 
   router.get('/profile/dossier', async (_req, res, next) => {
@@ -1393,17 +1471,33 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
-  router.patch('/profile/dossier', async (req, res) => {
+  router.patch('/profile/dossier', async (req, res, next) => {
+    try {
     const actor = actorOf(res)
+    const currentProfile = await profileRepo.getProfile(actor.id)
     let update
     try {
       update = pickDossierUpdate(req.body?.dossier ?? req.body)
+      mergeDossier(currentProfile.dossier, update)
     } catch (error) {
       if (error instanceof DossierValidationError) {
         res.status(400).json({ error: error.code })
         return
       }
       throw error
+    }
+    let identityChanged = false
+    if (
+      update.legalEntityType !== undefined &&
+      update.legalEntityType !== currentProfile.dossier.legalEntityType
+    ) {
+      identityChanged = true
+    }
+    if (identityChanged && currentProfile.companyId) {
+      await verificationStore.invalidateApproval(
+        currentProfile.companyId,
+        'تغییر اطلاعات هویتی؛ نیازمند احراز مجدد',
+      )
     }
     let profile
     try {
@@ -1426,6 +1520,27 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       documents,
       missing: missingDossierItems(company, profile.dossier, documents),
     })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/profile/verification/invalidate', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isRepresentative(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const company = await deps.companyStore.findByRepresentative(actor.id)
+      if (!company) {
+        res.status(404).json({ error: 'company_not_found' })
+        return
+      }
+      const reason = typeof req.body?.reason === 'string' && req.body.reason.trim() !== ''
+        ? req.body.reason.trim()
+        : 'درخواست احراز مجدد'
+      const invalidated = await verificationStore.invalidateApproval(company.id, reason)
+      res.json({ invalidated })
+    } catch (error) { next(error) }
   })
 
   router.post('/profile/addresses', async (req, res) => {
@@ -2222,12 +2337,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'company_not_found' })
         return
       }
-      // Fail closed until the authoritative verification workflow is connected.
-      if (!deps.boothCompanyEligibility) {
-        res.status(503).json({ error: 'company_verification_unavailable' })
-        return
-      }
-      if (!await deps.boothCompanyEligibility.isVerified(company.id)) {
+      const eligibility = deps.boothCompanyEligibility ?? verificationStore
+      if (!await eligibility.isVerified(company.id)) {
         res.status(403).json({ error: 'company_not_verified' })
         return
       }
@@ -2249,8 +2360,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         boothId: req.params.boothId,
         companyId: company.id,
         actorId: actor.id,
+        requireVerification: true,
       })
       if (!result.ok) {
+        if (result.error === 'company_not_verified') {
+          res.status(403).json({ error: result.error })
+          return
+        }
         if (result.error === 'catalogue_not_configured') {
           res.status(400).json({ error: result.error })
           return
