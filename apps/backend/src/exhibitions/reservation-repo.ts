@@ -192,7 +192,9 @@ export class PostgresBoothReservationRepository implements BoothReservationRepos
       const created = await client.query<ReservationRow>(
         `INSERT INTO dashboard.booth_reservations (exhibition_id, booth_id, company_id, requested_by, price_version_id, attendance_status, active)
          VALUES ($1, $2, $3, $4, $5, 'pending', true)
-         RETURNING id, exhibition_id, booth_id, company_id, requested_by, price_version_id, active, attendance_status, attendance_reason, attendance_decided_by, attendance_decided_at, created_at`,
+         RETURNING id, exhibition_id, booth_id, company_id, requested_by, price_version_id, active, attendance_status, attendance_reason, attendance_decided_by, attendance_decided_at, created_at,
+           (SELECT pv.price_amount FROM dashboard.booth_price_versions pv WHERE pv.id = price_version_id) AS price_amount,
+           (SELECT pv.price_unit FROM dashboard.booth_price_versions pv WHERE pv.id = price_version_id) AS price_unit`,
         [input.exhibitionId, input.boothId, input.companyId, input.actorId, booth.rows[0].price_version_id],
       )
       await client.query('COMMIT')
@@ -305,7 +307,9 @@ export class PostgresBoothReservationRepository implements BoothReservationRepos
              attendance_decided_at = now(),
              active = $4
          WHERE id = $5
-         RETURNING *`,
+         RETURNING *,
+           (SELECT pv.price_amount FROM dashboard.booth_price_versions pv WHERE pv.id = price_version_id) AS price_amount,
+           (SELECT pv.price_unit FROM dashboard.booth_price_versions pv WHERE pv.id = price_version_id) AS price_unit`,
         [nextStatus, cleanReason, input.actorId, nextActive, input.id],
       )
 

@@ -92,6 +92,42 @@ describe('booth reservation concurrency', () => {
     expect((await catalogue.getBooth(exhibitionId, booth.id))?.available).toBe(false)
   })
 
+  it('returns each request cost at creation and retains its version through price edits and attendance decisions', async () => {
+    await catalogue.upsertSettings(exhibitionId, { companyBoothLimit: 2, guideMapReference: null }, 'owner')
+    const firstBooth = await createBooth('cost-one')
+    const secondBooth = await createBooth('cost-two')
+    await catalogue.updateBooth({ exhibitionId, boothId: secondBooth.id, priceAmount: 350, priceUnit: 'toman', updatedBy: 'owner' })
+    const first = await reservations.reserve({ exhibitionId, boothId: firstBooth.id, companyId: 'cost-company', actorId: 'representative' })
+    const second = await reservations.reserve({ exhibitionId, boothId: secondBooth.id, companyId: 'cost-company', actorId: 'representative' })
+    if (!first.ok || !second.ok) throw new Error('reservation failed')
+    const firstCost = { id: first.reservation.id, priceVersionId: firstBooth.priceVersionId, priceAmount: 100, priceUnit: 'toman' }
+    const secondCost = { id: second.reservation.id, priceVersionId: second.reservation.priceVersionId, priceAmount: 350, priceUnit: 'toman' }
+    expect(first.reservation).toMatchObject(firstCost)
+    expect(second.reservation).toMatchObject(secondCost)
+    expect(first.reservation.id).not.toBe(second.reservation.id)
+    expect(first.reservation.priceVersionId).not.toBe(second.reservation.priceVersionId)
+    await catalogue.updateBooth({ exhibitionId, boothId: firstBooth.id, priceAmount: 900, priceUnit: 'toman', updatedBy: 'owner' })
+    expect(await reservations.findById(first.reservation.id)).toMatchObject(firstCost)
+    expect(await reservations.listByCompany('cost-company')).toEqual(expect.arrayContaining([
+      expect.objectContaining(firstCost), expect.objectContaining(secondCost),
+    ]))
+    expect(await reservations.listByExhibition(exhibitionId)).toEqual(expect.arrayContaining([
+      expect.objectContaining(firstCost), expect.objectContaining(secondCost),
+    ]))
+    const approved = await reservations.decideAttendance({ id: first.reservation.id, action: 'approve', actorId: 'secretariat' })
+    expect(approved).toMatchObject({ ok: true, reservation: { ...firstCost, attendanceStatus: 'approved' } })
+    const rejected = await reservations.decideAttendance({ id: second.reservation.id, action: 'reject', reason: 'Unavailable', actorId: 'secretariat' })
+    expect(rejected).toMatchObject({ ok: true, reservation: { ...secondCost, attendanceStatus: 'rejected', active: false } })
+    expect(await reservations.findById(second.reservation.id)).toMatchObject(secondCost)
+    await catalogue.updateBooth({ exhibitionId, boothId: secondBooth.id, priceAmount: 700, priceUnit: 'toman', updatedBy: 'owner' })
+    const newer = await reservations.reserve({ exhibitionId, boothId: secondBooth.id, companyId: 'next-company', actorId: 'next-representative' })
+    expect(newer).toMatchObject({ ok: true, reservation: { priceAmount: 700, priceUnit: 'toman' } })
+    if (!newer.ok) throw new Error('reservation failed')
+    expect(newer.reservation.id).not.toBe(second.reservation.id)
+    expect(newer.reservation.priceVersionId).not.toBe(second.reservation.priceVersionId)
+    expect(await reservations.findById(second.reservation.id)).toMatchObject(secondCost)
+  })
+
   it('does not reserve a booth from another exhibition', async () => {
     await catalogue.upsertSettings(exhibitionId, { companyBoothLimit: 1, guideMapReference: null }, 'owner')
     const booth = await createBooth('scope')
