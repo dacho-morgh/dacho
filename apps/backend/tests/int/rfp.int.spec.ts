@@ -167,10 +167,10 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
         .attach('files', Buffer.from(content), { filename: 'rfp.pdf', contentType: 'application/pdf' })
 
     const v1 = (await publish('', '%PDF-Version one')).body.version
-    const create = () =>
+    const create = (actor = 'company') =>
       request(app)
         .post('/requests')
-        .set(auth('company'))
+        .set(auth(actor))
         .send({ serviceId: 'event-service', title: 'Application', eventId, subtopicId, rfpVersionId: v1.id })
 
     const first = await create()
@@ -198,7 +198,7 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
     expect((await request(app).get(`/events/${eventId}/subtopics/${otherSubtopicId}/rfp/${v1.id}/files/${v1.files[0].id}`).set(auth('company'))).status).toBe(404)
     expect((await request(app).get(`/requests/${first.body.request.id}/rfp/files/${other.body.version.files[0].id}`).set(auth('company'))).status).toBe(404)
 
-    const stale = await create()
+    const stale = await create('outsider')
     const v2 = await publish(v1.id, '%PDF-Version two')
     expect(v2.status).toBe(201)
     expect((await publish(v1.id, '%PDF-Lost update')).status).toBe(409)
@@ -216,7 +216,7 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
     }
 
     // Stale draft submit is rejected
-    expect((await request(app).post(`/requests/${stale.body.request.id}/submit`).set(auth('company'))).body).toEqual({ error: 'stale_rfp' })
+    expect((await request(app).post(`/requests/${stale.body.request.id}/submit`).set(auth('outsider'))).body).toEqual({ error: 'stale_rfp' })
 
     // Immutability trigger checks
     await expect(pool.query('UPDATE dashboard.rfp_files SET filename=$2 WHERE id=$1', [v1.files[0].id, 'rewritten.pdf'])).rejects.toThrow(
