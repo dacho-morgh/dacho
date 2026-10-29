@@ -241,4 +241,12 @@ describe('dashboard migrations', () => {
       ]),
     )
   })
+
+  it('adds submitted_by to requests and company_id to request_rfps for independent subtopic requests', async () => {
+    const requestCols = await tableColumns('requests')
+    expect(requestCols).toEqual(expect.arrayContaining(['submitted_by']))
+
+    const rfpCols = await tableColumns('request_rfps')
+    expect(rfpCols).toEqual(expect.arrayContaining(['company_id']))
+  })
 })

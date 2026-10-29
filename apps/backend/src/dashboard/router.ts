@@ -553,6 +553,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(409).json({ error: 'stale_rfp' })
         return
       }
+      if (error instanceof Error && error.message === 'duplicate_subtopic_request') {
+        res.status(409).json({ error: 'duplicate_subtopic_request' })
+        return
+      }
+      if (error instanceof Error && error.message === 'invalid_event_subtopic') {
+        res.status(400).json({ error: 'invalid_event_subtopic' })
+        return
+      }
       next(error)
     }
   })

@@ -25,6 +25,7 @@ export interface RequestDto {
   answers: Record<string, unknown>
   submissionDate: string | null
   dueDate: string | null
+  submittedBy?: string | null
   createdAt: string
   updatedAt: string
   allowedActions?: ('read' | 'submit' | 'assign' | 'uploadDocument' | 'deleteDocument')[]
