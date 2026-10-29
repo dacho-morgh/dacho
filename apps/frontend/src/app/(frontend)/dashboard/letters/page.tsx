@@ -109,17 +109,22 @@ export default async function LettersPage(props: PageProps) {
   const fetchedLetters = lettersRes?.items ?? []
   const fetchedTickets = ticketsRes?.items ?? []
 
-  const letters: ApplicantLetterItem[] = fetchedLetters.map((dto) => ({
-    id: dto.id,
-    title: dto.title,
-    type: dto.type,
-    typeLabel: LETTER_TYPE_LABELS[dto.type] ?? 'نامه رسمی',
-    senderName: dto.senderName ?? 'کارخانه نوآوری',
-    senderRole: dto.senderRole ?? 'دبیرخانه',
-    sentDate: formatDate(dto.sentAt),
-    senderAvatar: (dto as unknown as { senderAvatar?: string }).senderAvatar,
-    source: 'letter',
-  }))
+  const letters: ApplicantLetterItem[] = fetchedLetters.map((dto) => {
+    const isSent = user ? String(dto.senderId) === String(user.id) : false
+    return {
+      id: dto.id,
+      title: dto.title,
+      type: dto.type,
+      typeLabel: LETTER_TYPE_LABELS[dto.type] ?? 'نامه رسمی',
+      senderName: isSent ? (dto.recipientId || 'دبیرخانه') : (dto.senderName ?? 'کارخانه نوآوری'),
+      senderRole: isSent ? 'گیرنده' : (dto.senderRole ?? 'دبیرخانه'),
+      sentDate: formatDate(dto.sentAt),
+      senderAvatar: (dto as unknown as { senderAvatar?: string }).senderAvatar,
+      source: 'letter',
+      direction: isSent ? 'sent' : 'received',
+      read: dto.read,
+    }
+  })
 
   const tickets: ApplicantLetterItem[] = fetchedTickets.map((t) => ({
     id: `support:${t.id}`,

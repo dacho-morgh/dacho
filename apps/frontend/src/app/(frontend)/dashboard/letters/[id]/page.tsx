@@ -6,8 +6,9 @@ import type { ReactNode } from 'react'
 
 import { MailDetailView, type MailData } from '@/components/dashboard/mail-detail-view'
 import { SupportTicketActions } from '@/components/dashboard/support-ticket-actions'
-import { formatDate, formatTime, formatWeekday, mapMailData, type LetterDto, type SupportTicketDto } from '@/utilities/dashboard-api'
+import { formatDate, formatTime, formatWeekday, mapMailData, type LetterDto, type Paginated, type SupportTicketDto } from '@/utilities/dashboard-api'
 import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
+import type { ThreadMessage } from '@/components/dashboard/mail-detail-view'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +45,28 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
   } else {
     const result = await serverDashboardFetch<{ letter: LetterDto }>(`${admin ? '/admin/letters' : '/letters'}/${encodeURIComponent(id)}`)
     if (!result?.letter) notFound()
-    mail = mapMailData(result.letter)
+    let thread: ThreadMessage[] | undefined
+    if (result.letter.requestId) {
+      const lettersList = await serverDashboardFetch<Paginated<LetterDto>>(`${admin ? '/admin/letters' : '/letters'}?limit=50`)
+      if (lettersList?.items) {
+        const related = lettersList.items
+          .filter((l) => l.requestId === result.letter.requestId && l.id !== result.letter.id)
+          .sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
+        if (related.length > 0) {
+          thread = related.map((l) => ({
+            id: l.id,
+            title: l.title,
+            senderName: l.senderName ?? 'کاربر',
+            senderRole: l.senderRole ?? '',
+            datePersian: formatDate(l.sentAt),
+            dayOfWeek: formatWeekday(l.sentAt),
+            timeStr: formatTime(l.sentAt),
+            body: l.body,
+          }))
+        }
+      }
+    }
+    mail = { ...mapMailData(result.letter), ...(thread ? { thread } : {}) }
   }
   return (
     <>

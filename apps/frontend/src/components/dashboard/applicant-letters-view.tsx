@@ -36,6 +36,8 @@ export interface ApplicantLetterItem {
   senderAvatar?: string
   sentDate: string
   source?: 'letter' | 'ticket'
+  direction?: 'sent' | 'received'
+  read?: boolean
 }
 
 const statusTagStyles: Record<ApplicantLetterStatus, { bg: string; text: string }> = {
@@ -146,8 +148,8 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
     return initialLetters
       .filter((item) => {
         if (tab === 'support') return item.source === 'ticket'
-        if (tab === 'sent') return false
-        return item.source !== 'ticket'
+        if (tab === 'sent') return item.direction === 'sent'
+        return item.source !== 'ticket' && item.direction !== 'sent'
       })
       .filter((item) => !query || [item.title, item.senderName, item.typeLabel].some((value) => value?.includes(query)))
   }, [initialLetters, searchQuery, tab])
