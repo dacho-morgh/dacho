@@ -25,6 +25,7 @@ export interface RequestDto {
   answers: Record<string, unknown>
   submissionDate: string | null
   dueDate: string | null
+  submittedBy?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -55,6 +56,7 @@ export interface RequestRow {
   answers: Record<string, unknown>
   submission_date: Date | null
   due_date: Date | null
+  submitted_by?: string | null
   created_at: Date
   updated_at: Date
 }
@@ -62,13 +64,13 @@ export interface RequestRow {
 export const REQUEST_COLUMNS = `
   id, tracking_code, title, service_id, service_key, service_name, owner_id, company_id, status,
   current_step_index, assigned_role, current_step, answers, submission_date, due_date,
-  created_at, updated_at, revision
+  created_at, updated_at, revision, submitted_by
 `
 
 const REQUEST_COLUMNS_ALIASED = `
   r.id, r.tracking_code, r.title, r.service_id, r.service_key, r.service_name, r.owner_id,
   r.company_id, r.status, r.current_step_index, r.assigned_role, r.current_step, r.answers,
-  r.submission_date, r.due_date, r.created_at, r.updated_at, r.revision
+  r.submission_date, r.due_date, r.created_at, r.updated_at, r.revision, r.submitted_by
 `
 
 export function mapRequestRow(row: RequestRow): RequestDto {
@@ -89,6 +91,7 @@ export function mapRequestRow(row: RequestRow): RequestDto {
     answers: row.answers,
     submissionDate: row.submission_date ? row.submission_date.toISOString() : null,
     dueDate: row.due_date ? row.due_date.toISOString() : null,
+    submittedBy: row.submitted_by ?? null,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   }
@@ -233,11 +236,27 @@ export class RequestRepository {
       await client.query('BEGIN')
       if (input.rfp) {
         const { eventId, subtopicId, versionId } = input.rfp
-        const current = await client.query(
-          'SELECT id FROM dashboard.event_subtopics WHERE id = $1 AND event_id = $2 AND current_rfp_version_id = $3 FOR SHARE',
-          [subtopicId, eventId, versionId],
+        const subtopic = await client.query<{ id: string; event_id: string; current_rfp_version_id: string | null }>(
+          'SELECT id, event_id, current_rfp_version_id FROM dashboard.event_subtopics WHERE id = $1 FOR SHARE',
+          [subtopicId],
         )
-        if (!current.rows[0]) throw new Error('stale_rfp')
+        const current = subtopic.rows[0]
+        if (!current || current.event_id !== eventId.toLowerCase()) {
+          throw new Error('invalid_event_subtopic')
+        }
+        if (current.current_rfp_version_id !== versionId.toLowerCase()) {
+          throw new Error('stale_rfp')
+        }
+
+        if (input.companyId) {
+          const duplicate = await client.query(
+            'SELECT 1 FROM dashboard.request_rfps WHERE company_id = $1 AND event_id = $2 AND subtopic_id = $3',
+            [input.companyId, eventId, subtopicId],
+          )
+          if (duplicate.rows.length > 0) {
+            throw new Error('duplicate_subtopic_request')
+          }
+        }
       }
       const year = new Date().getFullYear()
       const trackingCode = await nextTrackingCode(client, year)
@@ -251,14 +270,20 @@ export class RequestRepository {
       if (!created) throw new Error('INSERT requests returned no row')
       if (input.rfp) {
         await client.query(
-          'INSERT INTO dashboard.request_rfps (request_id, event_id, subtopic_id, version_id) VALUES ($1, $2, $3, $4)',
-          [created.id, input.rfp.eventId, input.rfp.subtopicId, input.rfp.versionId],
+          'INSERT INTO dashboard.request_rfps (request_id, event_id, subtopic_id, version_id, company_id) VALUES ($1, $2, $3, $4, $5)',
+          [created.id, input.rfp.eventId, input.rfp.subtopicId, input.rfp.versionId, input.companyId ?? null],
         )
       }
       await client.query('COMMIT')
       return mapRequestRow(created)
     } catch (err) {
       await client.query('ROLLBACK')
+      if (
+        (err as { code?: string; constraint?: string })?.code === '23505' &&
+        (err as { constraint?: string })?.constraint?.includes('request_rfps_company_subtopic_unique')
+      ) {
+        throw new Error('duplicate_subtopic_request')
+      }
       throw err
     } finally {
       client.release()
@@ -341,7 +366,8 @@ export class RequestRepository {
       const { rows } = await client.query<RequestRow & { revision: number }>(
         `UPDATE dashboard.requests
          SET status = 'in_review', submission_date = now(), updated_at = now(),
-             assigned_role = $3, current_step = $4, revision = revision + 1
+             assigned_role = $3, current_step = $4, revision = revision + 1,
+             submitted_by = $2
          WHERE id = $1 AND ${ownership} AND status = 'draft'
          RETURNING ${REQUEST_COLUMNS}`,
         [id, ownerId, step?.assignedRole ?? null, step?.currentStep ?? null, ...(companyId ? [companyId] : [])],
