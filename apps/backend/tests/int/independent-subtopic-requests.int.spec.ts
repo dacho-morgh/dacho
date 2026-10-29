@@ -153,14 +153,27 @@ describe('T19: Independent application per subtopic', () => {
     expect(req2.status).toBe('draft')
     expect(req2.companyId).toBe('1')
 
-    // 4. Submit req1; req2 remains draft
-    const submit1 = await request(app)
-      .post(`/requests/${req1.id}/submit`)
-      .set(auth('company-user-1'))
-      .expect(200)
+    // A replacement representative submits; company and creator stay unchanged.
+    const company = (await companyStore.findById('1'))!
+    company.representativeId = 'company-user-2'
+    try {
+      await request(app).get(`/requests/${req1.id}`).set(auth('company-user-1')).expect(404)
+      const submit1 = await request(app)
+        .post(`/requests/${req1.id}/submit`)
+        .set(auth('company-user-2'))
+        .expect(200)
 
-    expect(submit1.body.request.status).toBe('in_review')
-    expect(submit1.body.request.submittedBy).toBe('company-user-1')
+      expect(submit1.body.request.status).toBe('in_review')
+      expect(submit1.body.request.companyId).toBe('1')
+      expect(submit1.body.request.ownerId).toBe('company-user-1')
+      expect(submit1.body.request.submittedBy).toBe('company-user-2')
+      const retry = await request(app).post(`/requests/${req1.id}/submit`).set(auth('company-user-2')).expect(409)
+      expect(retry.body).toEqual({ error: 'already_submitted' })
+      const persisted = await pool.query('SELECT company_id, owner_id, submitted_by FROM dashboard.requests WHERE id = $1', [req1.id])
+      expect(persisted.rows[0]).toEqual({ company_id: '1', owner_id: 'company-user-1', submitted_by: 'company-user-2' })
+    } finally {
+      company.representativeId = 'company-user-1'
+    }
 
     // Verify req2 is still draft and unchanged
     const get2 = await request(app)
@@ -185,18 +198,18 @@ describe('T19: Independent application per subtopic', () => {
       .attach('files', Buffer.from('%PDF-RFP'), { filename: 'rfp.pdf', contentType: 'application/pdf' })
       .expect(201)).body.version
 
-    // First application by Company A succeeds
-    await request(app)
+    const create = () => request(app)
       .post('/requests')
       .set(auth('company-user-1'))
-      .send({
-        serviceId: 'event-service',
-        title: 'ثبت اول',
-        eventId,
-        subtopicId,
-        rfpVersionId: rfp.id,
-      })
-      .expect(201)
+      .send({ serviceId: 'event-service', title: 'ثبت همزمان', eventId, subtopicId, rfpVersionId: rfp.id })
+    const concurrent = await Promise.all([create(), create()])
+    expect(concurrent.map((res) => res.status).sort()).toEqual([201, 409])
+    expect(concurrent.find((res) => res.status === 409)!.body).toEqual({ error: 'duplicate_subtopic_request' })
+    const persisted = await pool.query(
+      'SELECT r.id FROM dashboard.requests r JOIN dashboard.request_rfps f ON f.request_id = r.id WHERE f.company_id = $1 AND f.event_id = $2 AND f.subtopic_id = $3',
+      ['1', eventId, subtopicId],
+    )
+    expect(persisted.rows).toHaveLength(1)
 
     // Second application by Company A for SAME subtopic fails with 409
     const dupRes = await request(app)

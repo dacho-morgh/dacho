@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 
 import { runMigrations } from '../../src/db/migrate.js'
+import type { MigrationBuilder } from 'node-pg-migrate'
+import { up as migrateIndependentRequests } from '../../migrations/1780511400023_independent_subtopic_requests.js'
 
 // Slice 2 — backend migrations: node-pg-migrate creates the dashboard tables
 // (requests, letters, activities) in the `dashboard` schema.
@@ -240,6 +242,36 @@ describe('dashboard migrations', () => {
         'created_at',
       ]),
     )
+  })
+
+  it('upgrades legacy duplicate applications without deleting cases and still blocks new duplicates', async () => {
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(`
+        DROP INDEX dashboard.request_rfps_company_subtopic_unique;
+        ALTER TABLE dashboard.requests RENAME TO requests_t19_original;
+        ALTER TABLE dashboard.request_rfps RENAME TO request_rfps_t19_original;
+        CREATE TABLE dashboard.requests (id text PRIMARY KEY, company_id text);
+        CREATE TABLE dashboard.request_rfps (request_id text PRIMARY KEY, event_id text, subtopic_id text);
+        CREATE FUNCTION dashboard.t19_test_trigger() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
+        CREATE TRIGGER immutable_request_rfp BEFORE UPDATE ON dashboard.request_rfps FOR EACH ROW EXECUTE FUNCTION dashboard.t19_test_trigger();
+        INSERT INTO dashboard.requests VALUES ('legacy-a', 'company-1'), ('legacy-b', 'company-1'), ('other', 'company-2');
+        INSERT INTO dashboard.request_rfps VALUES ('legacy-a', 'event-1', 'sub-1'), ('legacy-b', 'event-1', 'sub-1'), ('other', 'event-1', 'sub-1');
+      `)
+      const statements: string[] = []
+      await migrateIndependentRequests({ sql: (sql: string) => { statements.push(sql) } } as unknown as MigrationBuilder)
+      for (const sql of statements) await client.query(sql)
+      expect((await client.query('SELECT count(*)::int AS count FROM dashboard.request_rfps')).rows[0].count).toBe(3)
+      expect((await client.query('SELECT count(*)::int AS count FROM dashboard.requests')).rows[0].count).toBe(3)
+      expect((await client.query("SELECT count(*)::int AS count FROM dashboard.request_rfps WHERE company_id = 'company-1'")).rows[0].count).toBe(1)
+      await client.query('SAVEPOINT duplicate_insert')
+      await expect(client.query("INSERT INTO dashboard.request_rfps (request_id, event_id, subtopic_id, company_id) VALUES ('new', 'event-1', 'sub-1', 'company-1')")).rejects.toMatchObject({ code: '23505' })
+      await client.query('ROLLBACK TO SAVEPOINT duplicate_insert')
+    } finally {
+      await client.query('ROLLBACK')
+      client.release()
+    }
   })
 
   it('adds submitted_by to requests and company_id to request_rfps for independent subtopic requests', async () => {
