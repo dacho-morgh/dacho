@@ -8,7 +8,11 @@ import { InMemoryCompanyStore } from '../../src/auth/company-store.js'
 import { InMemoryUserStore, type User } from '../../src/auth/user-store.js'
 import { InMemoryServiceCatalog } from '../../src/catalog/service-catalog.js'
 import { runMigrations } from '../../src/db/migrate.js'
-import { RequestRepository } from '../../src/dashboard/request-repo.js'
+import {
+  CURRENT_EVENT_RULES_VERSION,
+  CURRENT_NON_COMPETE_VERSION,
+  RequestRepository,
+} from '../../src/dashboard/request-repo.js'
 import { JwtSigner } from '../../src/jwt.js'
 import { InMemoryCodeStore } from '../../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../../src/otp/console-delivery.js'
@@ -195,8 +199,8 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
       .post(`/requests/${first.body.request.id}/submit`)
       .set(auth('company'))
       .send({
-        nonCompeteAcceptance: { accepted: true },
-        eventRulesAcceptance: { accepted: true },
+        nonCompeteAcceptance: { accepted: true, textVersionId: CURRENT_NON_COMPETE_VERSION },
+        eventRulesAcceptance: { accepted: true, textVersionId: CURRENT_EVENT_RULES_VERSION },
       })
     expect(submitted.status).toBe(200)
 

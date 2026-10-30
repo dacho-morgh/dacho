@@ -479,6 +479,11 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         res.status(403).json({ error: 'forbidden' })
         return
       }
+      if (await documents.isPinnedToProposal(record.id, record.requestId, client)) {
+        await client.query('ROLLBACK')
+        res.status(409).json({ error: 'document_pinned' })
+        return
+      }
       removed = await documents.delete(record.id, client)
       await client.query('COMMIT')
     } catch (error) {

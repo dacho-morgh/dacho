@@ -287,8 +287,8 @@ export function updateRequest(
 export function submitRequest(
   id: string,
   body?: {
-    nonCompeteAcceptance?: { accepted: boolean; textVersionId?: string }
-    eventRulesAcceptance?: { accepted: boolean; textVersionId?: string }
+    nonCompeteAcceptance?: { accepted: boolean; textVersionId: string }
+    eventRulesAcceptance?: { accepted: boolean; textVersionId: string }
   },
 ): Promise<{ request: RequestDto }> {
   return dashboardFetch<{ request: RequestDto }>(`/requests/${encodeURIComponent(id)}/submit`, {
@@ -302,7 +302,8 @@ export interface AgreementDefinition {
   type: 'non_compete' | 'event_rules'
   version: string
   title: string
-  summary: string
+  /** False while the text is unapproved: acceptance must not be presented as final. */
+  approved: boolean
 }
 
 export function listAgreements(): Promise<{ agreements: AgreementDefinition[] }> {
@@ -320,7 +321,6 @@ export interface RequestProposalDetail {
       filename: string
       mimeType: string
       sizeBytes: number
-      storageKey: string
       logicalVersion: number
       createdAt: string
     }>

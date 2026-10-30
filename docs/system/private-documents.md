@@ -90,7 +90,7 @@ invalid entries. Repeated document ids are persisted once.
 | `POST /documents` | multipart `file` + `category` + exactly one parent (`requestId` or `companyId`), optional `logicalVersion`; returns safe metadata |
 | `GET /documents/:id` | authorized metadata only; `allowedActions` may include `download` and, while the request is a draft and the actor owns it, `delete` |
 | `GET /documents/:id/download` | authorized bytes with `Content-Disposition`, `Cache-Control: private, no-store`, `nosniff` and a sandbox CSP |
-| `DELETE /documents/:id` | draft-owner or System Owner request file |
+| `DELETE /documents/:id` | draft-owner or System Owner request file; a file pinned by a submitted proposal snapshot returns `409 document_pinned` |
 
 The same-origin `/api/dashboard/*` proxy forwards multipart bytes without
 corrupting the boundary, preserves the authorized download headers, and never

@@ -13,8 +13,8 @@ import { InMemoryCodeStore } from '../../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../../src/otp/console-delivery.js'
 import { clearVerifiedCompanies, seedVerifiedCompanies } from './verified-company-fixtures.js'
 import {
-  DEFAULT_EVENT_RULES_VERSION,
-  DEFAULT_NON_COMPETE_VERSION,
+  CURRENT_EVENT_RULES_VERSION,
+  CURRENT_NON_COMPETE_VERSION,
   APPLICATION_FORM_VERSION,
 } from '../../src/dashboard/request-repo.js'
 
@@ -193,20 +193,44 @@ describe('T20: Proposal draft, fixed form, server validation and versioned agree
       .post(`/requests/${reqId}/submit`)
       .set(auth('company-user-1'))
       .send({
-        nonCompeteAcceptance: { accepted: false },
-        eventRulesAcceptance: { accepted: true },
+        nonCompeteAcceptance: { accepted: false, textVersionId: CURRENT_NON_COMPETE_VERSION },
+        eventRulesAcceptance: { accepted: true, textVersionId: CURRENT_EVENT_RULES_VERSION },
       })
     expect(badConsentSubmit.status).toBe(400)
     expect(badConsentSubmit.body.error).toBe('invalid_answers')
     expect(badConsentSubmit.body.missingFields).toEqual(['nonCompeteAcceptance'])
+
+    // Consent saved in draft answers or naming an unpublished version does not count.
+    const preacceptedAnswers = await request(app)
+      .patch(`/requests/${reqId}`)
+      .set(auth('company-user-1'))
+      .send({
+        answers: {
+          applicationTeam: team,
+          nonCompeteAcceptance: { accepted: true, textVersionId: CURRENT_NON_COMPETE_VERSION },
+          eventRulesAcceptance: { accepted: true, textVersionId: CURRENT_EVENT_RULES_VERSION },
+        },
+      })
+    expect(preacceptedAnswers.status).toBe(200)
+    const preacceptedSubmit = await request(app)
+      .post(`/requests/${reqId}/submit`)
+      .set(auth('company-user-1'))
+      .send({
+        nonCompeteAcceptance: { accepted: true, textVersionId: 'made-up-v9' },
+      })
+    expect(preacceptedSubmit.status).toBe(400)
+    expect(preacceptedSubmit.body.missingFields).toEqual(['nonCompeteAcceptance', 'eventRulesAcceptance'])
+    const draftAfterFailure = await request(app).get(`/requests/${reqId}`).set(auth('company-user-1'))
+    expect(draftAfterFailure.body.request.status).toBe('draft')
+    expect(draftAfterFailure.body.request.revision).toBe(1)
 
     // 7. Successful submit with valid agreements
     const validSubmit = await request(app)
       .post(`/requests/${reqId}/submit`)
       .set(auth('company-user-1'))
       .send({
-        nonCompeteAcceptance: { accepted: true, textVersionId: DEFAULT_NON_COMPETE_VERSION },
-        eventRulesAcceptance: { accepted: true, textVersionId: DEFAULT_EVENT_RULES_VERSION },
+        nonCompeteAcceptance: { accepted: true, textVersionId: CURRENT_NON_COMPETE_VERSION },
+        eventRulesAcceptance: { accepted: true, textVersionId: CURRENT_EVENT_RULES_VERSION },
       })
     expect(validSubmit.status).toBe(200)
     expect(validSubmit.body.request.status).toBe('in_review')
@@ -227,6 +251,7 @@ describe('T20: Proposal draft, fixed form, server validation and versioned agree
     expect(proposalDb.rows[0]?.application_team).toHaveLength(2)
     expect(proposalDb.rows[0]?.proposal_documents).toHaveLength(1)
     expect(proposalDb.rows[0]?.proposal_documents[0].filename).toBe('proposal.pdf')
+    expect(JSON.stringify(proposalDb.rows[0]?.proposal_documents)).not.toMatch(/storage/i)
 
     const agreementsDb = await pool.query<{
       agreement_type: string
@@ -239,13 +264,13 @@ describe('T20: Proposal draft, fixed form, server validation and versioned agree
     expect(agreementsDb.rows).toHaveLength(2)
     expect(agreementsDb.rows[0]).toMatchObject({
       agreement_type: 'event_rules',
-      text_version_id: DEFAULT_EVENT_RULES_VERSION,
+      text_version_id: CURRENT_EVENT_RULES_VERSION,
       accepted_by: 'company-user-1',
       revision: 2,
     })
     expect(agreementsDb.rows[1]).toMatchObject({
       agreement_type: 'non_compete',
-      text_version_id: DEFAULT_NON_COMPETE_VERSION,
+      text_version_id: CURRENT_NON_COMPETE_VERSION,
       accepted_by: 'company-user-1',
       revision: 2,
     })
@@ -285,5 +310,20 @@ describe('T20: Proposal draft, fixed form, server validation and versioned agree
     expect(getProposalRes.body.proposal.applicationTeam).toHaveLength(2)
     expect(getProposalRes.body.proposal.proposalDocuments).toHaveLength(1)
     expect(getProposalRes.body.agreements).toHaveLength(2)
+    expect(JSON.stringify(getProposalRes.body)).not.toMatch(/storage/i)
+
+    const badRevision = await request(app)
+      .get(`/requests/${reqId}/proposal`)
+      .query({ revision: 'abc' })
+      .set(auth('company-user-1'))
+    expect(badRevision.status).toBe(400)
+
+    // 13. A file pinned by the submitted snapshot cannot be deleted, even by the System Owner
+    const pinnedId = getProposalRes.body.proposal.proposalDocuments[0].id
+    const pinnedDelete = await request(app).delete(`/documents/${pinnedId}`).set(auth('owner'))
+    expect(pinnedDelete.status).toBe(409)
+    expect(pinnedDelete.body.error).toBe('document_pinned')
+    const pinnedDownload = await request(app).get(`/documents/${pinnedId}/download`).set(auth('company-user-1'))
+    expect(pinnedDownload.status).toBe(200)
   })
 })

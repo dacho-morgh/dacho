@@ -11,8 +11,8 @@ import { InMemoryServiceCatalog } from '../src/catalog/service-catalog.js'
 import { InMemoryVerificationStore } from '../src/dashboard/verification-repo.js'
 import { PrivateDocumentStorage } from '../src/documents/storage.js'
 import {
-  DEFAULT_EVENT_RULES_VERSION,
-  DEFAULT_NON_COMPETE_VERSION,
+  CURRENT_EVENT_RULES_VERSION,
+  CURRENT_NON_COMPETE_VERSION,
   APPLICATION_FORM_VERSION,
 } from '../src/dashboard/request-repo.js'
 
@@ -139,7 +139,7 @@ async function buildFixture(role = 'representative') {
             request_id: reqId,
             revision: 2,
             agreement_type: 'non_compete',
-            text_version_id: DEFAULT_NON_COMPETE_VERSION,
+            text_version_id: CURRENT_NON_COMPETE_VERSION,
             accepted_by: repId,
             accepted_at: new Date(),
           },
@@ -148,7 +148,7 @@ async function buildFixture(role = 'representative') {
             request_id: reqId,
             revision: 2,
             agreement_type: 'event_rules',
-            text_version_id: DEFAULT_EVENT_RULES_VERSION,
+            text_version_id: CURRENT_EVENT_RULES_VERSION,
             accepted_by: repId,
             accepted_at: new Date(),
           },
@@ -223,6 +223,74 @@ async function buildFixture(role = 'representative') {
     getCurrentRequest: () => currentRequest,
     setCurrentRequest: (r: any) => { currentRequest = r },
   }
+}
+
+const acceptance = {
+  nonCompeteAcceptance: { accepted: true, textVersionId: CURRENT_NON_COMPETE_VERSION },
+  eventRulesAcceptance: { accepted: true, textVersionId: CURRENT_EVENT_RULES_VERSION },
+}
+const teamAnswers = { applicationTeam: [{ name: ' محمد محمدی ', role: 'مدیر پروژه', extra: 'dropped' }] }
+
+function mockEventSubmission(
+  query: ReturnType<typeof vi.fn>,
+  reqId: string,
+  options: {
+    answers?: Record<string, unknown>
+    proposalDocs?: () => unknown[]
+  } = {},
+) {
+  const row = {
+    id: reqId,
+    revision: 1,
+    tracking_code: 'DCH-2026-0001',
+    title: 'پیش‌نویس',
+    status: 'draft',
+    owner_id: 'rep-1',
+    company_id: '1',
+    service_id: 'srv-event',
+    service_key: 'event-application',
+    service_name: 'ثبت‌نام در رویداد',
+    answers: options.answers ?? teamAnswers,
+    current_step_index: 0,
+    assigned_role: null,
+    current_step: null,
+    submission_date: null,
+    due_date: null,
+    submitted_by: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+  }
+  const proposalDocs = options.proposalDocs ?? (() => [
+    { id: 'doc-1', original_filename: 'proposal.pdf', mime_type: 'application/pdf', size_bytes: 1024, logical_version: 1, created_at: new Date() },
+  ])
+  query.mockImplementation((sql: string) => {
+    if (sql.includes('UPDATE dashboard.requests')) {
+      return Promise.resolve({ rows: [{ ...row, status: 'in_review', revision: 2, submission_date: new Date(), submitted_by: 'rep-1' }] })
+    }
+    if (sql.includes('FROM dashboard.requests')) return Promise.resolve({ rows: [row] })
+    if (sql.includes('FROM dashboard.company_verifications')) {
+      return Promise.resolve({
+        rows: [{ id: randomUUID(), company_id: '1', representative_id: 'rep-1', status: 'approved', revision: 1, snapshot: {} }],
+      })
+    }
+    if (sql.includes('FROM dashboard.request_rfps')) {
+      return Promise.resolve({ rows: [{ version_id: 'ver-1', current_rfp_version_id: 'ver-1' }], rowCount: 1 })
+    }
+    if (sql.includes('FROM dashboard.private_documents')) {
+      const rows = proposalDocs()
+      return Promise.resolve({ rows, rowCount: rows.length })
+    }
+    if (sql.includes('INSERT INTO dashboard.notification_jobs')) {
+      return Promise.resolve({
+        rows: [{
+          id: 'job-1', request_id: reqId, recipient_id: 'rep-1', actor_id: 'rep-1', action: 'submit',
+          from_state: 'draft', to_state: 'in_review', revision: 2, channel: 'in_app', title: 'ارسال', body: 'ارسال',
+          status: 'pending', attempts: 0, created_at: new Date(), updated_at: new Date(),
+        }],
+      })
+    }
+    return Promise.resolve({ rows: [], rowCount: 0 })
+  })
 }
 
 describe('T20: Fixed form, draft saving, server validation and versioned proposal/agreements (unit)', () => {
@@ -346,8 +414,8 @@ describe('T20: Fixed form, draft saving, server validation and versioned proposa
     })
 
     const res = await request(app).post(`/requests/${reqId}/submit`).set(authHeaders).send({
-      nonCompeteAcceptance: { accepted: false },
-      eventRulesAcceptance: { accepted: true },
+      nonCompeteAcceptance: { accepted: false, textVersionId: CURRENT_NON_COMPETE_VERSION },
+      eventRulesAcceptance: { accepted: true, textVersionId: CURRENT_EVENT_RULES_VERSION },
     })
     expect(res.status).toBe(400)
     expect(res.body.error).toBe('invalid_answers')
@@ -469,8 +537,8 @@ describe('T20: Fixed form, draft saving, server validation and versioned proposa
     })
 
     const res = await request(app).post(`/requests/${reqId}/submit`).set(authHeaders).send({
-      nonCompeteAcceptance: { accepted: true, textVersionId: DEFAULT_NON_COMPETE_VERSION },
-      eventRulesAcceptance: { accepted: true, textVersionId: DEFAULT_EVENT_RULES_VERSION },
+      nonCompeteAcceptance: { accepted: true, textVersionId: CURRENT_NON_COMPETE_VERSION },
+      eventRulesAcceptance: { accepted: true, textVersionId: CURRENT_EVENT_RULES_VERSION },
     })
 
     expect(res.status).toBe(200)
@@ -478,19 +546,93 @@ describe('T20: Fixed form, draft saving, server validation and versioned proposa
     expect(res.body.request.revision).toBe(2)
   })
 
-  it('exposes GET /agreements returning default agreement versions and metadata', async () => {
+  it('pins server-chosen versions and no storage key at submission', async () => {
+    const { app, reqId, authHeaders, query, client } = await buildFixture()
+    mockEventSubmission(query, reqId)
+
+    const res = await request(app).post(`/requests/${reqId}/submit`).set(authHeaders).send(acceptance)
+    expect(res.status).toBe(200)
+
+    const insertParams = (table: string) =>
+      client.query.mock.calls.find(([sql]) => String(sql).includes(`INSERT INTO dashboard.${table}`))?.[1] as unknown[]
+    expect(insertParams('request_proposals')[3]).toBe(JSON.stringify([{ name: 'محمد محمدی', role: 'مدیر پروژه' }]))
+    expect(insertParams('request_proposals')[4]).not.toMatch(/storage/i)
+    expect(insertParams('request_agreements')).toEqual(
+      expect.arrayContaining([CURRENT_NON_COMPETE_VERSION, CURRENT_EVENT_RULES_VERSION]),
+    )
+  })
+
+  it.each([
+    ['without a text version', { accepted: true }],
+    ['against an unknown text version', { accepted: true, textVersionId: 'made-up-v9' }],
+    ['with a non-boolean acceptance', { accepted: 'true', textVersionId: CURRENT_NON_COMPETE_VERSION }],
+  ])('rejects consent %s', async (_label, nonCompeteAcceptance) => {
+    const { app, reqId, authHeaders, query } = await buildFixture()
+    mockEventSubmission(query, reqId)
+
+    const res = await request(app)
+      .post(`/requests/${reqId}/submit`)
+      .set(authHeaders)
+      .send({ ...acceptance, nonCompeteAcceptance })
+    expect(res.status).toBe(400)
+    expect(res.body.missingFields).toEqual(['nonCompeteAcceptance'])
+  })
+
+  it('does not accept consent saved in draft answers', async () => {
+    const { app, reqId, authHeaders, query } = await buildFixture()
+    mockEventSubmission(query, reqId, { answers: { ...teamAnswers, ...acceptance } })
+
+    const res = await request(app).post(`/requests/${reqId}/submit`).set(authHeaders).send({})
+    expect(res.status).toBe(400)
+    expect(res.body.missingFields).toEqual(['nonCompeteAcceptance', 'eventRulesAcceptance'])
+  })
+
+  it('rejects team members with a malformed relation', async () => {
+    const { app, reqId, authHeaders, query } = await buildFixture()
+    mockEventSubmission(query, reqId, { answers: { applicationTeam: [{ name: 'الف', role: 'ب', relation: 7 }] } })
+
+    const res = await request(app).post(`/requests/${reqId}/submit`).set(authHeaders).send(acceptance)
+    expect(res.status).toBe(400)
+    expect(res.body.missingFields).toEqual(['applicationTeam'])
+  })
+
+  it('rechecks the proposal under the row lock and rolls back when it has gone', async () => {
+    const { app, reqId, authHeaders, query, client } = await buildFixture()
+    const proposal = { id: 'doc-1', original_filename: 'proposal.pdf', mime_type: 'application/pdf', size_bytes: 1024, logical_version: 1, created_at: new Date() }
+    const docs = vi.fn().mockReturnValueOnce([proposal]).mockReturnValue([])
+    mockEventSubmission(query, reqId, { proposalDocs: docs })
+
+    const res = await request(app).post(`/requests/${reqId}/submit`).set(authHeaders).send(acceptance)
+    expect(res.status).toBe(400)
+    expect(res.body.missingFields).toEqual(['proposalDocuments'])
+    const statements = client.query.mock.calls.map(([sql]) => String(sql))
+    expect(statements).toContain('ROLLBACK')
+    expect(statements).not.toContain('COMMIT')
+    expect(statements.some((sql) => sql.includes('INSERT INTO dashboard.request_agreements'))).toBe(false)
+  })
+
+  it('marks the current agreement versions as not approved', async () => {
     const { app, authHeaders } = await buildFixture()
     const res = await request(app).get('/agreements').set(authHeaders)
     expect(res.status).toBe(200)
     expect(res.body.agreements).toHaveLength(2)
     expect(res.body.agreements.find((a: any) => a.type === 'non_compete')).toMatchObject({
       type: 'non_compete',
-      version: DEFAULT_NON_COMPETE_VERSION,
+      version: CURRENT_NON_COMPETE_VERSION,
+      approved: false,
     })
     expect(res.body.agreements.find((a: any) => a.type === 'event_rules')).toMatchObject({
       type: 'event_rules',
-      version: DEFAULT_EVENT_RULES_VERSION,
+      version: CURRENT_EVENT_RULES_VERSION,
+      approved: false,
     })
+  })
+
+  it.each(['abc', '0', '-1', '1.5', '99999999999'])('rejects a proposal revision of %s', async (revision) => {
+    const { app, reqId, authHeaders } = await buildFixture()
+    const res = await request(app).get(`/requests/${reqId}/proposal`).query({ revision }).set(authHeaders)
+    expect(res.status).toBe(400)
+    expect(res.body).toEqual({ error: 'invalid_revision' })
   })
 
   it('exposes GET /requests/:id/proposal returning proposal snapshot and agreements', async () => {

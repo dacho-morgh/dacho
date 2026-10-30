@@ -6,6 +6,7 @@ import { createApp } from '../../src/app.js'
 import { InMemoryCompanyStore } from '../../src/auth/company-store.js'
 import { InMemoryUserStore } from '../../src/auth/user-store.js'
 import { InMemoryServiceCatalog } from '../../src/catalog/service-catalog.js'
+import { CURRENT_EVENT_RULES_VERSION, CURRENT_NON_COMPETE_VERSION } from '../../src/dashboard/request-repo.js'
 import { runMigrations } from '../../src/db/migrate.js'
 import { PrivateDocumentStorage } from '../../src/documents/storage.js'
 import { JwtSigner } from '../../src/jwt.js'
@@ -171,8 +172,8 @@ describe('T19: Independent application per subtopic', () => {
         .post(`/requests/${req1.id}/submit`)
         .set(auth('company-user-2'))
         .send({
-          nonCompeteAcceptance: { accepted: true },
-          eventRulesAcceptance: { accepted: true },
+          nonCompeteAcceptance: { accepted: true, textVersionId: CURRENT_NON_COMPETE_VERSION },
+          eventRulesAcceptance: { accepted: true, textVersionId: CURRENT_EVENT_RULES_VERSION },
         })
         .expect(200)
 

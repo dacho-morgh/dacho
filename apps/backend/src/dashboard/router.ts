@@ -51,7 +51,13 @@ import { DocumentRepository, type PrivateDocumentRecord } from '../documents/rep
 import { canSendLetter } from './letter-policy.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
-import { RequestRepository, DEFAULT_EVENT_RULES_VERSION, DEFAULT_NON_COMPETE_VERSION } from './request-repo.js'
+import {
+  AGREEMENT_TEXTS_APPROVED,
+  CURRENT_EVENT_RULES_VERSION,
+  CURRENT_NON_COMPETE_VERSION,
+  RequestRepository,
+  parseApplicationTeam,
+} from './request-repo.js'
 import { StatsRepository } from './stats-repo.js'
 import type { CompanyStore } from '../auth/company-store.js'
 import type { User, UserStore } from '../auth/user-store.js'
@@ -153,6 +159,19 @@ function parsePositiveInt(value: unknown, fallback: number): number {
   const n = Number.parseInt(value, 10)
   if (!Number.isFinite(n) || n < 1) return fallback
   return n
+}
+
+/** Nine digits at most, so the value always fits the integer revision column. */
+function parseRevisionQuery(value: unknown): number | null {
+  if (typeof value !== 'string' || !/^[1-9]\d{0,8}$/.test(value)) return null
+  return Number(value)
+}
+
+/** Consent counts only when the submit itself accepts the exact current text. */
+function acceptsAgreementVersion(value: unknown, currentVersion: string): boolean {
+  if (!value || typeof value !== 'object') return false
+  const { accepted, textVersionId } = value as { accepted?: unknown; textVersionId?: unknown }
+  return accepted === true && textVersionId === currentVersion
 }
 
 function parseBoolean(value: unknown): boolean | undefined {
@@ -570,15 +589,15 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       agreements: [
         {
           type: 'non_compete',
-          version: DEFAULT_NON_COMPETE_VERSION,
-          title: 'قرارداد عدم رقابت و محرمانگی',
-          summary: 'تعهدنامه عدم رقابت و حفظ اطلاعات محرمانه رویداد',
+          version: CURRENT_NON_COMPETE_VERSION,
+          title: 'قرارداد عدم رقابت',
+          approved: AGREEMENT_TEXTS_APPROVED,
         },
         {
           type: 'event_rules',
-          version: DEFAULT_EVENT_RULES_VERSION,
-          title: 'قوانین و مقررات شرکت در رویداد',
-          summary: 'قوانین عمومی و ضوابط پذیرش طرح‌ها در رویداد',
+          version: CURRENT_EVENT_RULES_VERSION,
+          title: 'قوانین رویداد',
+          approved: AGREEMENT_TEXTS_APPROVED,
         },
       ],
     })
@@ -759,7 +778,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(409).json({ error: 'stale_rfp' })
       return
     }
-    const isEventRequest = (rfpEntry.rowCount ?? 0) > 0
+    const isEventRequest = rfpEntry.rows.length > 0
 
     // Validate answers against the service's form schema (required fields present).
     const service = await deps.serviceCatalog.findById(request.serviceId)
@@ -771,25 +790,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
     }
 
-    let nonCompeteVersion: string | undefined
-    let eventRulesVersion: string | undefined
-
     if (isEventRequest) {
-      const answers = request.answers ?? {}
-      const team = (answers as { applicationTeam?: unknown }).applicationTeam
-      const hasValidTeam =
-        Array.isArray(team) &&
-        team.length > 0 &&
-        team.every(
-          (m: unknown) =>
-            m &&
-            typeof m === 'object' &&
-            typeof (m as { name?: unknown }).name === 'string' &&
-            (m as { name: string }).name.trim() !== '' &&
-            typeof (m as { role?: unknown }).role === 'string' &&
-            (m as { role: string }).role.trim() !== '',
-        )
-      if (!hasValidTeam) {
+      if (!parseApplicationTeam(request.answers?.applicationTeam)) {
         missing.push('applicationTeam')
       }
 
@@ -801,20 +803,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         missing.push('proposalDocuments')
       }
 
-      const nonCompete =
-        req.body?.nonCompeteAcceptance ?? (answers as { nonCompeteAcceptance?: unknown }).nonCompeteAcceptance
-      if (!nonCompete || typeof nonCompete !== 'object' || (nonCompete as { accepted?: unknown }).accepted !== true) {
+      if (!acceptsAgreementVersion(req.body?.nonCompeteAcceptance, CURRENT_NON_COMPETE_VERSION)) {
         missing.push('nonCompeteAcceptance')
-      } else if (typeof (nonCompete as { textVersionId?: unknown }).textVersionId === 'string' && (nonCompete as { textVersionId: string }).textVersionId.trim() !== '') {
-        nonCompeteVersion = (nonCompete as { textVersionId: string }).textVersionId.trim()
       }
-
-      const eventRules =
-        req.body?.eventRulesAcceptance ?? (answers as { eventRulesAcceptance?: unknown }).eventRulesAcceptance
-      if (!eventRules || typeof eventRules !== 'object' || (eventRules as { accepted?: unknown }).accepted !== true) {
+      if (!acceptsAgreementVersion(req.body?.eventRulesAcceptance, CURRENT_EVENT_RULES_VERSION)) {
         missing.push('eventRulesAcceptance')
-      } else if (typeof (eventRules as { textVersionId?: unknown }).textVersionId === 'string' && (eventRules as { textVersionId: string }).textVersionId.trim() !== '') {
-        eventRulesVersion = (eventRules as { textVersionId: string }).textVersionId.trim()
       }
     }
 
@@ -830,8 +823,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       firstStep ? { assignedRole: firstStep.roleName, currentStep: firstStep.title } : undefined,
       companyId,
       true,
-      isEventRequest ? { nonCompeteVersion, eventRulesVersion } : undefined,
+      isEventRequest
+        ? { nonCompeteVersion: CURRENT_NON_COMPETE_VERSION, eventRulesVersion: CURRENT_EVENT_RULES_VERSION }
+        : undefined,
     )
+    if (typeof result === 'object' && 'missingFields' in result) {
+      res.status(400).json({ error: 'invalid_answers', missingFields: result.missingFields })
+      return
+    }
     if (result === 'company_not_verified') {
       res.status(403).json({ error: 'company_not_verified' })
       return
@@ -891,9 +890,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const revision = req.query.revision ? Number(req.query.revision) : undefined
+      const revision = req.query.revision === undefined ? undefined : parseRevisionQuery(req.query.revision)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
       const proposal = await repo.findRequestProposal(request.id, revision)
-      const agreements = await repo.listRequestAgreements(request.id, revision)
+      const agreements = proposal ? await repo.listRequestAgreements(request.id, proposal.revision) : []
       res.json({ proposal, agreements })
     } catch (error) { next(error) }
   })

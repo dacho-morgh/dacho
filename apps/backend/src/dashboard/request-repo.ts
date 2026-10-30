@@ -39,11 +39,38 @@ export interface RequestVerificationDto {
   createdAt: string
 }
 
-export const DEFAULT_NON_COMPETE_VERSION = 'non-compete-v1'
-export const DEFAULT_EVENT_RULES_VERSION = 'event-rules-v1'
+/*
+ * Product has not approved the agreement texts yet. These IDs name no published
+ * text, so an acceptance recorded against them is not final consent and must be
+ * collected again once real versions replace them.
+ */
+export const CURRENT_NON_COMPETE_VERSION = 'non-compete-unapproved-placeholder'
+export const CURRENT_EVENT_RULES_VERSION = 'event-rules-unapproved-placeholder'
+export const AGREEMENT_TEXTS_APPROVED = false
 export const APPLICATION_FORM_VERSION = 'event-application-2026-v1'
 
 export type AgreementType = 'non_compete' | 'event_rules'
+
+export interface ApplicationTeamMember {
+  name: string
+  role: string
+  relation?: string
+}
+
+/** The trimmed team, or null unless it is a nonempty list of named members. */
+export function parseApplicationTeam(value: unknown): ApplicationTeamMember[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+  const team: ApplicationTeamMember[] = []
+  for (const member of value) {
+    if (!member || typeof member !== 'object') return null
+    const { name, role, relation } = member as Record<string, unknown>
+    if (typeof name !== 'string' || !name.trim() || typeof role !== 'string' || !role.trim()) return null
+    if (relation !== undefined && typeof relation !== 'string') return null
+    const trimmedRelation = typeof relation === 'string' ? relation.trim() : ''
+    team.push({ name: name.trim(), role: role.trim(), ...(trimmedRelation ? { relation: trimmedRelation } : {}) })
+  }
+  return team
+}
 
 export interface RequestAgreementDto {
   id: string
@@ -60,7 +87,6 @@ export interface PinnedProposalDocument {
   filename: string
   mimeType: string
   sizeBytes: number
-  storageKey: string
   logicalVersion: number
   createdAt: string
 }
@@ -69,7 +95,7 @@ export interface RequestProposalDto {
   requestId: string
   revision: number
   formVersion: string
-  applicationTeam: Array<{ name: string; role: string; relation?: string }>
+  applicationTeam: ApplicationTeamMember[]
   proposalDocuments: PinnedProposalDocument[]
   createdAt: string
 }
@@ -429,8 +455,8 @@ export class RequestRepository {
     step?: { assignedRole: string; currentStep: string },
     companyId?: string | null,
     requireVerification = false,
-    eventSubmission?: { nonCompeteVersion?: string; eventRulesVersion?: string },
-  ): Promise<RequestDto | 'not_found' | 'already_submitted' | 'stale_rfp' | 'company_not_verified'> {
+    eventSubmission?: { nonCompeteVersion: string; eventRulesVersion: string },
+  ): Promise<RequestDto | 'not_found' | 'already_submitted' | 'stale_rfp' | 'company_not_verified' | { missingFields: string[] }> {
     if (!isUuid(id)) return 'not_found'
     const ownership = companyId
       ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
@@ -492,31 +518,41 @@ export class RequestRepository {
         )
       }
       if (context) {
+        // The UPDATE above holds the row lock that draft edits and document
+        // uploads/deletes take, so these checks see exactly what gets pinned.
         const { rows: docRows } = await client.query<{
           id: string
           original_filename: string
           mime_type: string
           size_bytes: number
-          storage_key: string
           logical_version: number
           created_at: Date
         }>(
-          `SELECT id, original_filename, mime_type, size_bytes, storage_key, logical_version, created_at
+          `SELECT id, original_filename, mime_type, size_bytes, logical_version, created_at
            FROM dashboard.private_documents
            WHERE request_id = $1 AND category = 'proposal'
            ORDER BY created_at ASC`,
           [updated.id],
         )
+        const team = parseApplicationTeam(updated.answers?.applicationTeam)
+        if (!team || docRows.length === 0 || !eventSubmission) {
+          await client.query('ROLLBACK')
+          return {
+            missingFields: [
+              ...(team ? [] : ['applicationTeam']),
+              ...(docRows.length > 0 ? [] : ['proposalDocuments']),
+              ...(eventSubmission ? [] : ['nonCompeteAcceptance', 'eventRulesAcceptance']),
+            ],
+          }
+        }
         const proposalDocs: PinnedProposalDocument[] = docRows.map((doc) => ({
           id: doc.id,
           filename: doc.original_filename,
           mimeType: doc.mime_type,
           sizeBytes: doc.size_bytes,
-          storageKey: doc.storage_key,
           logicalVersion: doc.logical_version,
           createdAt: doc.created_at.toISOString(),
         }))
-        const team = (updated.answers as { applicationTeam?: unknown })?.applicationTeam ?? []
         await client.query(
           `INSERT INTO dashboard.request_proposals
              (request_id, revision, form_version, application_team, proposal_documents)
@@ -529,15 +565,13 @@ export class RequestRepository {
             JSON.stringify(proposalDocs),
           ],
         )
-        const nonCompeteVer = eventSubmission?.nonCompeteVersion ?? DEFAULT_NON_COMPETE_VERSION
-        const eventRulesVer = eventSubmission?.eventRulesVersion ?? DEFAULT_EVENT_RULES_VERSION
         await client.query(
           `INSERT INTO dashboard.request_agreements
              (request_id, revision, agreement_type, text_version_id, accepted_by)
            VALUES
              ($1, $2, 'non_compete', $3, $4),
              ($1, $2, 'event_rules', $5, $4)`,
-          [updated.id, updated.revision, nonCompeteVer, ownerId, eventRulesVer],
+          [updated.id, updated.revision, eventSubmission.nonCompeteVersion, ownerId, eventSubmission.eventRulesVersion],
         )
       }
       await appendTransition(client, {
@@ -621,7 +655,7 @@ export class RequestRepository {
       request_id: string
       revision: number
       form_version: string
-      application_team: Array<{ name: string; role: string; relation?: string }>
+      application_team: ApplicationTeamMember[]
       proposal_documents: PinnedProposalDocument[]
       created_at: Date
     }>(sql, params)
@@ -646,7 +680,7 @@ export class RequestRepository {
       params.push(revision)
       sql += ` AND revision = $${params.length}`
     }
-    sql += ` ORDER BY accepted_at ASC`
+    sql += ` ORDER BY revision ASC, agreement_type ASC`
     const { rows } = await this.pool.query<{
       id: string
       request_id: string
