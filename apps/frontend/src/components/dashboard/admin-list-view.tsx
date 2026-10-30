@@ -58,6 +58,7 @@ export function AdminListView<T>({
   columns,
   loadState = 'ready',
   onRetry,
+  filterTabs,
 }: {
   title: string
   addLabel: string
@@ -68,6 +69,7 @@ export function AdminListView<T>({
   columns: AdminColumn<T>[]
   loadState?: AdminListLoadState
   onRetry?: () => void
+  filterTabs?: React.ReactNode
 }) {
   const [query, setQuery] = useState('')
   const pathname = usePathname()
@@ -82,6 +84,7 @@ export function AdminListView<T>({
       <Typography variant="h3" color="neutral-900">
         {title}
       </Typography>
+      {filterTabs}
       <div className="flex flex-row-reverse flex-wrap items-center justify-between gap-3">
         <Button disabled size="48" icon={<DashboardAddIcon className="size-6" />}>
           <Typography variant="16/regular" color="white">
