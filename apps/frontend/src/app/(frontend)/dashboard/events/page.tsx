@@ -15,12 +15,13 @@ export const metadata: Metadata = {
 }
 
 interface PageProps {
-  searchParams?: Promise<{ state?: 'default' | 'loading' | 'empty' }>
+  searchParams?: Promise<{ state?: 'default' | 'loading' | 'empty'; eventId?: string }>
 }
 
 export default async function EventsPage(props: PageProps) {
   const searchParams = await props.searchParams
   const state = searchParams?.state ?? 'default'
+  const eventId = searchParams?.eventId
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isOwner = dashboardOperationalRole(user) === 'system-owner'
@@ -37,6 +38,7 @@ export default async function EventsPage(props: PageProps) {
             initialEventsList={exhibitions.docs.map((item) => mapEvent(item, 'exhibitions'))}
             state={state}
             isOwner
+            initialSelectedEventId={eventId}
           />
         </div>
       </>
@@ -53,7 +55,12 @@ export default async function EventsPage(props: PageProps) {
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">
-      <EventsView initialEventsList={events} state={state} isOwner={isOwner} />
+      <EventsView
+        initialEventsList={events}
+        state={state}
+        isOwner={isOwner}
+        initialSelectedEventId={eventId}
+      />
     </div>
   )
 }
@@ -62,6 +69,7 @@ function mapEvent(
   item: {
     id: number | string
     title?: unknown
+    description?: unknown
     status?: unknown
     startDate?: unknown
     endDate?: unknown
@@ -80,8 +88,10 @@ function mapEvent(
       : null
   return {
     id: `${serviceKey}-${item.id}`,
+    rawId: String(item.id),
     serviceKey,
     title: String(item.title ?? ''),
+    description: extractDescription(item.description),
     badgeText: status === 'ended' ? 'تمام شده' : status === 'active' ? 'در حال برگزاری' : 'پیش رو',
     badgeType: status as 'ended' | 'active' | 'upcoming',
     dates: formatDateRange(startDate, endDate),
@@ -96,6 +106,29 @@ function mapEvent(
     actionButtonText: 'ثبت درخواست',
     startTimestamp: startDate ? new Date(startDate).getTime() : Number.MAX_SAFE_INTEGER,
   }
+}
+
+function extractDescription(desc: unknown): string {
+  if (typeof desc === 'string') return desc
+  if (!desc || typeof desc !== 'object') return ''
+  try {
+    const root = (
+      desc as {
+        root?: {
+          children?: Array<{ text?: string; children?: Array<{ text?: string }> }>
+        }
+      }
+    ).root
+    if (root?.children) {
+      return root.children
+        .flatMap((c) => (c.text ? [c.text] : (c.children?.map((sub) => sub.text ?? '') ?? [])))
+        .filter(Boolean)
+        .join(' ')
+    }
+  } catch {
+    return ''
+  }
+  return ''
 }
 
 function formatDateRange(start: string, end: string): string {
