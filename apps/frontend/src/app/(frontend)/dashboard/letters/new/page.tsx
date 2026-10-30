@@ -2,9 +2,9 @@ import configPromise from '@payload-config'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
+import { getPayload, type Where } from 'payload'
 import { NewLetterForm, type LetterRecipient } from '@/components/dashboard/new-letter-form'
-import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
+import { dashboardOperationalRole, isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
 import type { LetterDto, RequestDto } from '@/utilities/dashboard-api'
 
 export const dynamic = 'force-dynamic'
@@ -19,6 +19,16 @@ interface PageProps {
   }>
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  'system-owner': 'صاحب سیستم',
+  'central-secretariat': 'دبیرخانه مرکزی',
+  'chief-reviewer': 'سردبیر رویداد',
+  reviewer: 'داور',
+  'employer-reviewer': 'کارفرما',
+  'investment-reviewer': 'کمیته سرمایه‌گذاری',
+  representative: 'نماینده شرکت',
+}
+
 export default async function NewLetterPage(props: PageProps) {
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: await headers() })
@@ -26,7 +36,7 @@ export default async function NewLetterPage(props: PageProps) {
 
   const isSeniorManager = await isSeniorManagerUser(payload, user)
   const searchParams = await props.searchParams
-  const userRole = (user as unknown as { operationalRole?: string }).operationalRole ?? ''
+  const userRole = dashboardOperationalRole(user)
 
   if (searchParams?.mode === 'support') {
     return <NewLetterForm mode="support" />
@@ -36,6 +46,12 @@ export default async function NewLetterPage(props: PageProps) {
   let initialRecipientId = searchParams?.recipientId
   let initialTitle: string | undefined
   let caseTitle: string | undefined
+  let replySender: LetterRecipient | undefined
+
+  // Without a case or a letter to answer, a company writes through support.
+  if (userRole === 'representative' && !requestId && !searchParams?.replyTo) {
+    return <NewLetterForm mode="support" />
+  }
 
   if (searchParams?.replyTo) {
     const letterRes = await serverDashboardFetch<{ letter: LetterDto }>(
@@ -44,7 +60,13 @@ export default async function NewLetterPage(props: PageProps) {
     if (letterRes?.letter) {
       const orig = letterRes.letter
       requestId = orig.requestId ?? requestId
-      initialRecipientId = orig.senderId ?? initialRecipientId
+      if (orig.senderId && orig.senderId !== String(user.id)) {
+        initialRecipientId = orig.senderId
+        replySender = {
+          id: orig.senderId,
+          name: [orig.senderName, orig.senderRole && ROLE_LABELS[orig.senderRole]].filter(Boolean).join(' — ') || orig.senderId,
+        }
+      }
       initialTitle = orig.title.startsWith('پاسخ به:') ? orig.title : `پاسخ به: ${orig.title}`
     }
   }
@@ -57,68 +79,52 @@ export default async function NewLetterPage(props: PageProps) {
     if (request?.title) caseTitle = request.title
   }
 
+  // Recipient lists mirror the backend letter policy (canSendLetter); the API
+  // still authorizes every send.
+  const userId = user.id
+  async function activeUsers(where: Where): Promise<LetterRecipient[]> {
+    const result = await payload.find({
+      collection: 'users',
+      where: { and: [{ isActive: { equals: true } }, { id: { not_equals: userId } }, where] },
+      depth: 0,
+      limit: 100,
+    })
+    return result.docs.map((u) => {
+      const roleLabel = (u.operationalRole && ROLE_LABELS[u.operationalRole]) || ''
+      return { id: String(u.id), name: [u.name, roleLabel].filter(Boolean).join(' — ') || String(u.id) }
+    })
+  }
+
   let recipients: LetterRecipient[] = []
   let recipientsError = false
 
   if (userRole === 'representative') {
-    const secUsers = await payload.find({
-      collection: 'users',
-      where: {
-        operationalRole: { equals: 'central-secretariat' },
-        isActive: { equals: true },
-      },
-      limit: 20,
-    })
-    recipients = secUsers.docs.map((u) => ({
-      id: String(u.id),
-      name: u.name || 'دبیرخانه مرکزی',
-      companyName: 'دبیرخانه مرکزی',
-    }))
-    if (recipients.length === 0) {
-      recipients = [{ id: 'secretariat', name: 'دبیرخانه مرکزی', companyName: 'دبیرخانه مرکزی' }]
-    }
+    recipients = await activeUsers({ operationalRole: { equals: 'central-secretariat' } })
   } else if (userRole === 'reviewer' || userRole === 'employer-reviewer') {
-    const chiefUsers = await payload.find({
-      collection: 'users',
-      where: {
-        operationalRole: { equals: 'chief-reviewer' },
-        isActive: { equals: true },
-      },
-      limit: 20,
-    })
-    recipients = chiefUsers.docs.map((u) => ({
-      id: String(u.id),
-      name: u.name || 'سردبیر رویداد',
-      companyName: 'سردبیر رویداد',
-    }))
-  } else if (userRole === 'investment-reviewer') {
-    if (requestId) {
-      const assignRes = await serverDashboardFetch<{ items: Array<{ userId: string; role: string }> }>(
-        `/admin/requests/${encodeURIComponent(requestId)}/assignments`,
-      )
-      if (assignRes?.items) {
-        recipients = assignRes.items.map((item) => ({
-          id: item.userId,
-          name: item.role === 'chief-reviewer' ? 'سردبیر رویداد' : item.userId,
-          companyName: item.role,
-        }))
-      }
-    }
-  } else {
+    // Reviewers may only write to the event chief inside a case.
+    if (requestId) recipients = await activeUsers({ operationalRole: { equals: 'chief-reviewer' } })
+  } else if (userRole === 'chief-reviewer') {
+    // The chief may write to anyone, except investment reviewers inside a case.
+    recipients = await activeUsers(
+      requestId
+        ? { and: [{ operationalRole: { exists: true } }, { operationalRole: { not_equals: 'investment-reviewer' } }] }
+        : { operationalRole: { exists: true } },
+    )
+  } else if (isSeniorManager) {
     const result = await serverDashboardFetch<{ items: LetterRecipient[] }>('/admin/companies?limit=100')
     recipients = result?.items ?? []
     recipientsError = !result
   }
+  // Investment reviewers have no persisted financial handoff yet (T31), so the
+  // backend rejects every letter they send; no recipient is offered.
 
-  const mode = searchParams?.mode === 'support' || (!isSeniorManager && userRole === 'representative' && !searchParams?.requestId)
-    ? 'support'
-    : isSeniorManager
-      ? 'admin'
-      : 'letter'
+  if (replySender && !recipients.some((recipient) => recipient.id === replySender.id)) {
+    recipients = [replySender, ...recipients]
+  }
 
   return (
     <NewLetterForm
-      mode={mode}
+      mode={isSeniorManager ? 'admin' : 'letter'}
       companies={recipients}
       recipientsError={recipientsError}
       requestId={requestId}

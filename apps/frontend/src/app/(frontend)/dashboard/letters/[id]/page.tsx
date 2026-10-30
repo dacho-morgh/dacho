@@ -23,6 +23,7 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
   let mail: MailData
   let actions: ReactNode = null
   let supportClosed = false
+  let replyHref: string | undefined
   if (prefix === 'support') {
     const result = await serverDashboardFetch<{ ticket: SupportTicketDto }>(`/support/${encodeURIComponent(id)}`)
     if (!result?.ticket) notFound()
@@ -45,9 +46,14 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
   } else {
     const result = await serverDashboardFetch<{ letter: LetterDto }>(`${admin ? '/admin/letters' : '/letters'}/${encodeURIComponent(id)}`)
     if (!result?.letter) notFound()
+    if (result.letter.senderId && result.letter.senderId !== String(user?.id)) {
+      replyHref = `/dashboard/letters/new?replyTo=${encodeURIComponent(result.letter.id)}`
+    }
     let thread: ThreadMessage[] | undefined
     if (result.letter.requestId) {
-      const lettersList = await serverDashboardFetch<Paginated<LetterDto>>(`${admin ? '/admin/letters' : '/letters'}?limit=50`)
+      // The letters API has no case filter yet, so the thread is assembled from
+      // the same recent page the mailbox list shows.
+      const lettersList = await serverDashboardFetch<Paginated<LetterDto>>(`${admin ? '/admin/letters' : '/letters'}?limit=100`)
       if (lettersList?.items) {
         const related = lettersList.items
           .filter((l) => l.requestId === result.letter.requestId && l.id !== result.letter.id)
@@ -70,7 +76,7 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
   }
   return (
     <>
-      <MailDetailView mail={mail} showActions={prefix === 'letter'} supportReply={prefix === 'support' && !!actions} supportClosed={supportClosed} />
+      <MailDetailView mail={mail} showActions={prefix === 'letter'} replyHref={replyHref} supportReply={prefix === 'support' && !!actions} supportClosed={supportClosed} />
       {actions}
     </>
   )

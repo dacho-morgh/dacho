@@ -471,18 +471,11 @@ export function mapLetterItem(dto: LetterDto): LetterItem {
 }
 
 export function mapMailData(dto: LetterDto): MailData {
-  const rawAttachments = Array.isArray(dto.attachments) ? dto.attachments : []
-  const attachments = rawAttachments.map((item) => {
-    if (typeof item === 'string') {
-      return {
-        id: item,
-        name: item,
-        size: '—',
-        ext: item.split('.').pop() ?? '',
-        downloadUrl: `/api/dashboard/letters/${dto.id}/attachments/${item}/download`,
-      }
-    }
-    const att = item as Record<string, unknown>
+  // The API presents only attachments the reader may open, as objects.
+  const rawAttachments = Array.isArray(dto.attachments)
+    ? dto.attachments.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    : []
+  const attachments = rawAttachments.map((att) => {
     const id = typeof att.id === 'string' ? att.id : undefined
     const name = String(att.name ?? att.filename ?? 'پیوست')
     const size = typeof att.size === 'string'
@@ -494,7 +487,7 @@ export function mapMailData(dto: LetterDto): MailData {
     const downloadUrl = typeof att.downloadUrl === 'string'
       ? att.downloadUrl
       : id
-        ? `/api/dashboard/letters/${dto.id}/attachments/${id}/download`
+        ? `/api/dashboard/letters/${encodeURIComponent(dto.id)}/attachments/${encodeURIComponent(id)}/download`
         : undefined
     return { id, name, size, ext, downloadUrl }
   })
@@ -513,21 +506,6 @@ export function mapMailData(dto: LetterDto): MailData {
     body: dto.body,
     attachments,
   }
-}
-
-export function createLetter(input: {
-  recipientId: string
-  title: string
-  type?: LetterType
-  body: string
-  requestId?: string
-  attachmentIds?: string[]
-}): Promise<{ letter: LetterDto }> {
-  return dashboardFetch<{ letter: LetterDto }>('/letters', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(input),
-  })
 }
 
 export function deleteLetter(id: string): Promise<{ success: boolean }> {

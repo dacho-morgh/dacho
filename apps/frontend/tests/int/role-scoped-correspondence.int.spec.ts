@@ -97,6 +97,25 @@ describe('FE22 - Role-scoped correspondence, support and private attachments', (
       expect(downloadLink.getAttribute('href')).toBe('/api/dashboard/letters/letter-10/attachments/doc-1/download')
     })
 
+    it('links the feedback action to a reply that keeps the letter scope', () => {
+      const mail: MailData = {
+        id: 'letter-11',
+        title: 'استعلام پرونده',
+        category: 'نامه رسمی',
+        senderName: 'دبیرخانه',
+        senderRole: 'دبیرخانه',
+        datePersian: '۱۴۰۵/۰۷/۲۹',
+        dayOfWeek: 'سه‌شنبه',
+        timeStr: '۱۰:۳۰',
+        body: 'لطفاً پاسخ دهید.',
+      }
+
+      render(createElement(MailDetailView, { mail, showActions: true, replyHref: '/dashboard/letters/new?replyTo=letter-11' }))
+
+      const reply = screen.getByRole('link', { name: 'ثبت بازخورد' })
+      expect(reply.getAttribute('href')).toBe('/dashboard/letters/new?replyTo=letter-11')
+    })
+
     it('renders thread history when thread messages are provided', () => {
       const mail: MailData = {
         id: 'letter-reply',

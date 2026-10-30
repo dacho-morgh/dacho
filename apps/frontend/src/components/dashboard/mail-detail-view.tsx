@@ -52,9 +52,11 @@ interface MailDetailViewProps {
   showActions?: boolean
   supportReply?: boolean
   supportClosed?: boolean
+  /** Compose link that answers this letter while keeping its case scope. */
+  replyHref?: string
 }
 
-export function MailDetailView({ mail, showActions = false, supportReply = false, supportClosed = false }: MailDetailViewProps) {
+export function MailDetailView({ mail, showActions = false, supportReply = false, supportClosed = false, replyHref }: MailDetailViewProps) {
   const router = useRouter()
   const deletingRef = useRef(false)
   const [deleting, setDeleting] = useState(false)
@@ -132,10 +134,19 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
             </Button>}
             {showActions && (
               <div className="mr-auto flex items-center gap-1">
-                <Button type="button" variant="white" size="40" onClick={() => setNotice('ثبت بازخورد هنوز در دسترس نیست.')}>
-                  <DashboardMessageTextIcon aria-hidden="true" className="size-6" />
-                  <Typography as="span" variant="16/semibold" className="text-neutral-700">ثبت بازخورد</Typography>
-                </Button>
+                {replyHref ? (
+                  <Button asChild variant="white" size="40">
+                    <Link href={replyHref}>
+                      <DashboardMessageTextIcon aria-hidden="true" className="size-6" />
+                      <Typography as="span" variant="16/semibold" className="text-neutral-700">ثبت بازخورد</Typography>
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button type="button" variant="white" size="40" onClick={() => setNotice('ثبت بازخورد هنوز در دسترس نیست.')}>
+                    <DashboardMessageTextIcon aria-hidden="true" className="size-6" />
+                    <Typography as="span" variant="16/semibold" className="text-neutral-700">ثبت بازخورد</Typography>
+                  </Button>
+                )}
                 <DropdownMenu dir="rtl">
                   <DropdownMenuTrigger asChild>
                     <Button type="button" variant="white" size="icon-40" aria-label="عملیات بیشتر" disabled={deleting}>
