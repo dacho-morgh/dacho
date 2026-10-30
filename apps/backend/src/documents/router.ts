@@ -109,6 +109,8 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           requestOwnerId: record.requestOwnerId,
           requestCompanyId: record.requestCompanyId,
           requestStatus: record.requestStatus,
+          requestReviewStage: record.requestReviewStage,
+          category: record.category,
         },
         actorId,
         companyId,
@@ -254,6 +256,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
 
       let requestOwnerId: string | null = null
       let requestStatus: string | null = null
+      let requestReviewStage: string | null = null
       let requestCompanyId: string | null = null
       let parentCompanyId: string | null = requestedCompanyId
       if (requestId) {
@@ -271,6 +274,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         }
         requestOwnerId = request.ownerId
         requestStatus = request.status
+        requestReviewStage = request.reviewStage
         requestCompanyId = request.companyId
         parentCompanyId = request.companyId ?? parentCompanyId
         if (!parentCompanyId) {
@@ -286,6 +290,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           companyId: audience === 'company' ? parentCompanyId : null,
           requestOwnerId,
           requestStatus,
+          requestReviewStage,
           requestCompanyId,
         },
         actor.id,
@@ -349,15 +354,15 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           const client = await deps.pool.connect()
           try {
             await client.query('BEGIN')
-            const locked = await client.query<{ owner_id: string; company_id: string | null; status: string }>(
-              'SELECT owner_id, company_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+            const locked = await client.query<{ owner_id: string; company_id: string | null; status: string; review_stage: string | null }>(
+              'SELECT owner_id, company_id, status::text AS status, review_stage FROM dashboard.requests WHERE id = $1 FOR UPDATE',
               [requestId],
             )
             const current = locked.rows[0]
             const currentPermission = current && canUploadOwnedDocument(
               actor.operationalRole,
               category,
-              { requestOwnerId: current.owner_id, requestStatus: current.status, requestCompanyId: current.company_id },
+              { requestOwnerId: current.owner_id, requestStatus: current.status, requestReviewStage: current.review_stage, requestCompanyId: current.company_id },
               actor.id,
               companyId,
             )
@@ -456,8 +461,8 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     let removed: PrivateDocumentRecord | undefined
     try {
       await client.query('BEGIN')
-      const { rows } = await client.query<{ owner_id: string; company_id: string | null; status: string }>(
-        'SELECT owner_id, company_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+      const { rows } = await client.query<{ owner_id: string; company_id: string | null; status: string; review_stage: string | null }>(
+        'SELECT owner_id, company_id, status::text AS status, review_stage FROM dashboard.requests WHERE id = $1 FOR UPDATE',
         [record.requestId],
       )
       const current = rows[0]
@@ -470,7 +475,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       if (
         !canDeleteDocument(
           actor.operationalRole,
-          { requestOwnerId: current.owner_id, requestCompanyId: current.company_id, requestStatus: current.status },
+          { requestOwnerId: current.owner_id, requestCompanyId: current.company_id, requestStatus: current.status, requestReviewStage: current.review_stage, category: record.category },
           actor.id,
           companyId,
         )

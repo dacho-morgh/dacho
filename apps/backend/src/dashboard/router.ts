@@ -12,6 +12,7 @@ import {
   bindRequestScope,
   canReadDocument,
   canRequestAction,
+  isChiefCorrectionStatus,
   requestScopeFor,
   type RequestScope,
 } from '../access/policy.js'
@@ -220,12 +221,29 @@ function requestWithActions(
   actorId: string,
   request: Awaited<ReturnType<RequestRepository['findByIdAny']>>,
   companyId?: string | null,
+  actorIsResponsibleChief = false,
 ) {
   if (!request) return request
   return {
     ...request,
-    allowedActions: allowedRequestActions(role, request, actorId, companyId),
+    allowedActions: allowedRequestActions(
+      role,
+      { ...request, actorIsResponsibleChief },
+      actorId,
+      companyId,
+    ),
   }
+}
+
+function parseExpectedRevision(value: unknown): number | undefined | null {
+  if (value === undefined) return undefined
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 ? value : null
+}
+
+function parseDecisionReason(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
 }
 
 type EventValidation =
@@ -395,6 +413,26 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (role !== 'representative') return null
     const company = await deps.companyStore.findByRepresentative(actorId)
     return company?.id ?? null
+  }
+
+  /** Adds server-derived actions; chiefs also need event-level responsibility per case. */
+  const presentRequests = async <T extends NonNullable<Awaited<ReturnType<RequestRepository['findByIdAny']>>>>(
+    actor: { id: string; operationalRole: OperationalRole },
+    items: T[],
+    companyId?: string | null,
+  ) => {
+    const chiefCases =
+      actor.operationalRole === 'chief-reviewer'
+        ? await repo.requestsOfResponsibleChief(
+            items
+              .filter((item) => item.status === 'in_review' && item.reviewStage === 'chief_triage')
+              .map((item) => item.id),
+            actor.id,
+          )
+        : new Set<string>()
+    return items.map((item) =>
+      requestWithActions(actor.operationalRole, actor.id, item, companyId, chiefCases.has(item.id))!,
+    )
   }
 
   const resolveScope = async (actorId: string, role: OperationalRole): Promise<{ scope: RequestScope; companyId: string | null }> => {
@@ -650,7 +688,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const result = await repo.listScoped(scope, { status, page, limit })
     res.json({
       ...result,
-      items: result.items.map((item) => requestWithActions(actor.operationalRole, actor.id, item, companyId)),
+      items: await presentRequests(actor, result.items, companyId),
     })
     } catch (error) { next(error) }
   })
@@ -669,9 +707,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       page: parsePositiveInt(req.query.page, 1),
       limit: parsePositiveInt(req.query.limit, 25),
     })
+    const presented = await presentRequests(actor, result.items)
     const items = await Promise.all(
-      result.items.map(async (item) => ({
-        ...requestWithActions(actor.operationalRole, actor.id, item),
+      presented.map(async (item) => ({
+        ...item,
         owner: safeOwner(await deps.userStore.findById(item.ownerId)),
       })),
     )
@@ -691,7 +730,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     const service = await deps.serviceCatalog.findById(request.serviceId)
     res.json({
-      request: requestWithActions(actor.operationalRole, actor.id, request),
+      request: (await presentRequests(actor, [request]))[0],
       owner: safeOwner(await deps.userStore.findById(request.ownerId)),
       timeline: await activities.listForRequestScoped(request.id, scope),
       workflow: service?.workflow ?? [],
@@ -712,7 +751,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const service = await deps.serviceCatalog.findById(request.serviceId)
     const timeline = await activities.listForRequestScoped(request.id, scope)
     res.json({
-      request: requestWithActions(actor.operationalRole, actor.id, request, companyId),
+      request: (await presentRequests(actor, [request], companyId))[0],
       timeline,
       workflow: service?.workflow ?? [],
       owner: safeOwner(await deps.userStore.findById(request.ownerId)),
@@ -897,7 +936,127 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
       const proposal = await repo.findRequestProposal(request.id, revision)
       const agreements = proposal ? await repo.listRequestAgreements(request.id, proposal.revision) : []
-      res.json({ proposal, agreements })
+      res.json({ proposal, agreements, revisions: await repo.listProposalRevisions(request.id) })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/requests/:id/triage', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { action, reason, expectedRevision } = req.body ?? {}
+      if (action !== 'accept' && action !== 'return' && action !== 'reject') {
+        res.status(400).json({ error: 'invalid_action' })
+        return
+      }
+      const trimmedReason = parseDecisionReason(reason)
+      if (action !== 'accept' && !trimmedReason) {
+        res.status(400).json({ error: 'reason_required' })
+        return
+      }
+      const revision = parseExpectedRevision(expectedRevision)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      const result = await repo.decideTriage({
+        requestId: req.params.id,
+        actorId: actor.id,
+        action,
+        reason: action === 'accept' ? null : trimmedReason,
+        expectedRevision: revision,
+      })
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'forbidden') { res.status(403).json({ error: 'forbidden' }); return }
+      if (result === 'invalid_state') { res.status(409).json({ error: 'invalid_triage_state' }); return }
+      if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
+      res.json({ request: (await presentRequests(actor, [result.request]))[0] })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/requests/:id/resubmit', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isRepresentative(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!isChiefCorrectionStatus(request.status, request.reviewStage)) {
+        res.status(409).json({ error: 'not_correctable' })
+        return
+      }
+
+      const missing: string[] = []
+      const service = await deps.serviceCatalog.findById(request.serviceId)
+      if (service) missing.push(...(missingRequiredFields(service, request.answers) ?? []))
+      if (!parseApplicationTeam(request.answers?.applicationTeam)) missing.push('applicationTeam')
+      const proposalDocs = await deps.pool.query(
+        `SELECT 1 FROM dashboard.private_documents WHERE request_id = $1 AND category = 'proposal'`,
+        [request.id],
+      )
+      if ((proposalDocs.rowCount ?? 0) === 0) missing.push('proposalDocuments')
+      if (!acceptsAgreementVersion(req.body?.nonCompeteAcceptance, CURRENT_NON_COMPETE_VERSION)) {
+        missing.push('nonCompeteAcceptance')
+      }
+      if (!acceptsAgreementVersion(req.body?.eventRulesAcceptance, CURRENT_EVENT_RULES_VERSION)) {
+        missing.push('eventRulesAcceptance')
+      }
+      if (missing.length > 0) {
+        res.status(400).json({ error: 'invalid_answers', missingFields: missing })
+        return
+      }
+
+      const result = await repo.resubmitCorrection(request.id, actor.id, companyId, {
+        nonCompeteVersion: CURRENT_NON_COMPETE_VERSION,
+        eventRulesVersion: CURRENT_EVENT_RULES_VERSION,
+      })
+      if (typeof result === 'object' && 'missingFields' in result) {
+        res.status(400).json({ error: 'invalid_answers', missingFields: result.missingFields })
+        return
+      }
+      if (result === 'company_not_verified') { res.status(403).json({ error: 'company_not_verified' }); return }
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'not_correctable') { res.status(409).json({ error: 'not_correctable' }); return }
+      res.json({ request: requestWithActions(actor.operationalRole, actor.id, result, companyId) })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/requests/:id/reopen', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const reason = parseDecisionReason(req.body?.reason)
+      if (!reason) {
+        res.status(400).json({ error: 'reason_required' })
+        return
+      }
+      const revision = parseExpectedRevision(req.body?.expectedRevision)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      const result = await repo.reopenRejected({
+        requestId: req.params.id,
+        actorId: actor.id,
+        reason,
+        expectedRevision: revision,
+      })
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'not_rejected') { res.status(409).json({ error: 'invalid_reopen_state' }); return }
+      if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
+      res.json({ request: (await presentRequests(actor, [result]))[0] })
     } catch (error) { next(error) }
   })
 

@@ -86,6 +86,32 @@ describe('server-derived allowedActions', () => {
     expect(allowedRequestActions('representative', submitted, 'p1')).toEqual(['read'])
     expect(allowedRequestActions('representative', draft, 'other')).toEqual([])
   })
+
+  it('advertises T21 triage, correction and reopen only where the endpoint will allow them', () => {
+    const triage = { ownerId: 'p1', status: 'in_review', reviewStage: 'chief_triage' }
+    const returned = { ownerId: 'p1', status: 'action_needed', reviewStage: 'chief_triage' }
+    const rejected = { ownerId: 'p1', status: 'rejected', reviewStage: 'chief_triage' }
+
+    expect(allowedRequestActions('chief-reviewer', { ...triage, actorIsResponsibleChief: true }, 'c1')).toEqual([
+      'read', 'triage',
+    ])
+    expect(allowedRequestActions('chief-reviewer', triage, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('chief-reviewer', { ...returned, actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('chief-reviewer', { ...triage, reviewStage: 'triaged', actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('reviewer', { ...triage, actorIsResponsibleChief: true }, 'r1')).toEqual(['read'])
+
+    expect(allowedRequestActions('representative', returned, 'p1')).toEqual([
+      'read', 'correct', 'uploadDocument', 'deleteDocument',
+    ])
+    expect(allowedRequestActions('representative', { ownerId: 'p1', status: 'action_needed' }, 'p1')).toEqual(['read'])
+    expect(allowedRequestActions('representative', triage, 'p1')).toEqual(['read'])
+    expect(allowedRequestActions('representative', rejected, 'p1')).toEqual(['read'])
+
+    expect(allowedRequestActions('system-owner', rejected, 'o1')).toContain('reopen')
+    expect(allowedRequestActions('system-owner', { ownerId: 'p1', status: 'rejected' }, 'o1')).not.toContain('reopen')
+    expect(allowedRequestActions('system-owner', triage, 'o1')).not.toContain('reopen')
+    expect(allowedRequestActions('central-secretariat', rejected, 's1')).toEqual(['read', 'uploadDocument'])
+  })
 })
 
 describe('document audience and policy', () => {
@@ -197,5 +223,22 @@ describe('document read authority', () => {
     expect(canUploadOwnedDocument('representative', 'financialStatements', { requestOwnerId: 'rep-1', requestStatus: 'in_review' }, 'rep-1', 'company-1')).toBe(false)
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'draft' }, 'rep-1')).toBe(true)
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'in_review' }, 'rep-1')).toBe(false)
+  })
+
+  it('reopens only proposal files when the chief returns an event case for correction (T21)', () => {
+    const returned = { requestOwnerId: 'rep-1', requestStatus: 'action_needed', requestReviewStage: 'chief_triage' }
+    expect(canUploadOwnedDocument('representative', 'proposal', returned, 'rep-1', null)).toBe(true)
+    expect(canUploadOwnedDocument('representative', 'financialStatements', returned, 'rep-1', null)).toBe(false)
+    expect(canDeleteDocument('representative', { ...returned, category: 'proposal' }, 'rep-1')).toBe(true)
+    expect(canDeleteDocument('representative', { ...returned, category: 'financialStatements' }, 'rep-1')).toBe(false)
+    expect(canDeleteDocument('representative', returned, 'rep-1')).toBe(false)
+    // Drafts keep their existing all-category editing.
+    expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'draft', category: 'financialStatements' }, 'rep-1')).toBe(true)
+    // `action_needed` outside the chief correction is not a company edit state.
+    for (const stage of [null, 'triaged']) {
+      const other = { requestOwnerId: 'rep-1', requestStatus: 'action_needed', requestReviewStage: stage }
+      expect(canUploadOwnedDocument('representative', 'proposal', other, 'rep-1', null)).toBe(false)
+      expect(canDeleteDocument('representative', { ...other, category: 'proposal' }, 'rep-1')).toBe(false)
+    }
   })
 })
