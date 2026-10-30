@@ -340,4 +340,8 @@ describe('dashboard migrations', () => {
     )
     expect(rows).toHaveLength(2)
   })
+
+  it('adds the T27 completion time to review rounds', async () => {
+    expect(await tableColumns('review_rounds')).toEqual(expect.arrayContaining(['completed_at']))
+  })
 })

@@ -70,11 +70,15 @@ export interface ActivityList {
 }
 
 /**
- * Changes to the review panel (T26) and their reasons are oversight history:
- * only the owner, Secretariat and the case's chief see them, never the company
- * or an assigned reviewer/employer/investment person.
+ * Changes to the review panel (T26), their reasons and the round's completion
+ * (T27) are oversight history: only the owner, Secretariat and the case's chief
+ * see them, never the company or an assigned reviewer/employer/investment person.
  */
-export const OVERSIGHT_ONLY_ACTIONS = ['chief_replace_reviewer', 'owner_replace_employer'] as const
+export const OVERSIGHT_ONLY_ACTIONS = [
+  'chief_replace_reviewer',
+  'owner_replace_employer',
+  'review_round_complete',
+] as const
 
 function oversightOnlyClause(scope: RequestScope): string {
   if (scope.kind === 'all' || (scope.kind === 'assigned' && scope.role === 'chief-reviewer')) return 'TRUE'
