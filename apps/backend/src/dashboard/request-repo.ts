@@ -311,13 +311,20 @@ async function pinEventSubmission(
 /**
  * Gives the event's current responsible chief an active assignment so the case
  * appears in the same scoped queue the chief reads. Idempotent.
+ *
+ * The chief is read under the event row lock that a chief change takes, so a
+ * concurrent handover cannot leave the case assigned to the outgoing chief.
+ * Callers hold the request with a NO KEY UPDATE lock (plain UPDATE), which the
+ * handover's assignment inserts (FK KEY SHARE) do not wait on, so the
+ * request → event order here cannot deadlock with event → request there.
  */
 async function ensureChiefAssignment(client: PoolClient, requestId: string): Promise<string | null> {
   const { rows } = await client.query<{ chief_id: string }>(
     `SELECT e.responsible_chief_id AS chief_id
      FROM dashboard.request_rfps rfp
      JOIN dashboard.events e ON e.id = rfp.event_id
-     WHERE rfp.request_id = $1`,
+     WHERE rfp.request_id = $1
+     FOR SHARE OF e`,
     [requestId],
   )
   const chiefId = rows[0]?.chief_id
@@ -571,7 +578,7 @@ export class RequestRepository {
              answers = CASE WHEN $4::text IS NOT NULL THEN $4::jsonb ELSE answers END,
              updated_at = now()
          WHERE id = $1 AND ${ownership}
-           AND (status = 'draft' OR (status = 'action_needed' AND review_stage IS NOT NULL))
+           AND (status = 'draft' OR (status = 'action_needed' AND review_stage = 'chief_triage'))
          RETURNING ${REQUEST_COLUMNS}`,
         [
           id,
@@ -742,7 +749,7 @@ export class RequestRepository {
          JOIN dashboard.request_rfps rfp ON rfp.request_id = r.id
          JOIN dashboard.events e ON e.id = rfp.event_id
          WHERE r.id = $1
-         FOR UPDATE OF r FOR SHARE OF e`,
+         FOR NO KEY UPDATE OF r FOR SHARE OF e`,
         [input.requestId],
       )
       const current = locked.rows[0]
@@ -904,7 +911,7 @@ export class RequestRepository {
     try {
       await client.query('BEGIN')
       const locked = await client.query<RequestRow>(
-        `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1 FOR UPDATE`,
+        `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1 FOR NO KEY UPDATE`,
         [input.requestId],
       )
       const current = locked.rows[0]

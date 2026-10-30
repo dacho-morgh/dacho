@@ -12,6 +12,7 @@ import {
   bindRequestScope,
   canReadDocument,
   canRequestAction,
+  isChiefCorrectionStatus,
   requestScopeFor,
   type RequestScope,
 } from '../access/policy.js'
@@ -989,7 +990,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      if (request.status !== 'action_needed' || !request.reviewStage) {
+      if (!isChiefCorrectionStatus(request.status, request.reviewStage)) {
         res.status(409).json({ error: 'not_correctable' })
         return
       }

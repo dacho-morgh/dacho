@@ -224,4 +224,21 @@ describe('document read authority', () => {
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'draft' }, 'rep-1')).toBe(true)
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'in_review' }, 'rep-1')).toBe(false)
   })
+
+  it('reopens only proposal files when the chief returns an event case for correction (T21)', () => {
+    const returned = { requestOwnerId: 'rep-1', requestStatus: 'action_needed', requestReviewStage: 'chief_triage' }
+    expect(canUploadOwnedDocument('representative', 'proposal', returned, 'rep-1', null)).toBe(true)
+    expect(canUploadOwnedDocument('representative', 'financialStatements', returned, 'rep-1', null)).toBe(false)
+    expect(canDeleteDocument('representative', { ...returned, category: 'proposal' }, 'rep-1')).toBe(true)
+    expect(canDeleteDocument('representative', { ...returned, category: 'financialStatements' }, 'rep-1')).toBe(false)
+    expect(canDeleteDocument('representative', returned, 'rep-1')).toBe(false)
+    // Drafts keep their existing all-category editing.
+    expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'draft', category: 'financialStatements' }, 'rep-1')).toBe(true)
+    // `action_needed` outside the chief correction is not a company edit state.
+    for (const stage of [null, 'triaged']) {
+      const other = { requestOwnerId: 'rep-1', requestStatus: 'action_needed', requestReviewStage: stage }
+      expect(canUploadOwnedDocument('representative', 'proposal', other, 'rep-1', null)).toBe(false)
+      expect(canDeleteDocument('representative', { ...other, category: 'proposal' }, 'rep-1')).toBe(false)
+    }
+  })
 })

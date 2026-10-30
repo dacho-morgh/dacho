@@ -24,9 +24,28 @@ export interface RequestForPolicy {
   actorIsResponsibleChief?: boolean
 }
 
+/** An event case the responsible chief returned at triage; it is resubmitted as a new revision. */
+export function isChiefCorrectionStatus(status: string | null | undefined, reviewStage?: string | null): boolean {
+  return status === 'action_needed' && reviewStage === 'chief_triage'
+}
+
 /** Company edits are open on drafts and on event cases the chief returned for correction. */
 export function isCompanyEditableStatus(status: string | null | undefined, reviewStage?: string | null): boolean {
-  return status === 'draft' || (status === 'action_needed' && Boolean(reviewStage))
+  return status === 'draft' || isChiefCorrectionStatus(status, reviewStage)
+}
+
+/**
+ * Request-linked company files. A draft is fully editable; a chief correction
+ * reopens the proposal only (UAT12), so files of other categories submitted with
+ * the case stay as they were.
+ */
+function isCompanyChangeableRequestDocument(
+  category: DocumentCategory | undefined,
+  status: string | null | undefined,
+  reviewStage?: string | null,
+): boolean {
+  if (status === 'draft') return true
+  return category === 'proposal' && isChiefCorrectionStatus(status, reviewStage)
 }
 
 /**
@@ -85,7 +104,7 @@ export function allowedRequestActions(
       return [
         'read',
         'assign',
-        ...(request.status === 'rejected' && request.reviewStage ? (['reopen'] as const) : []),
+        ...(request.status === 'rejected' && request.reviewStage === 'chief_triage' ? (['reopen'] as const) : []),
         'uploadDocument',
         'deleteDocument',
       ]
@@ -263,7 +282,7 @@ export function canUploadOwnedDocument(
   return (
     parent.requestStatus === undefined ||
     parent.requestStatus === null ||
-    isCompanyEditableStatus(parent.requestStatus, parent.requestReviewStage)
+    isCompanyChangeableRequestDocument(category, parent.requestStatus, parent.requestReviewStage)
   )
 }
 
@@ -328,13 +347,17 @@ export function canDeleteDocument(
     requestCompanyId?: string | null
     requestStatus: string | null
     requestReviewStage?: string | null
+    /** Needed outside drafts: a chief correction only reopens proposal files. */
+    category?: DocumentCategory
   },
   actorId: string,
   actorCompanyId?: string | null,
 ): boolean {
   if (role === 'system-owner') return true
   if (role !== 'representative') return false
-  if (!isCompanyEditableStatus(document.requestStatus, document.requestReviewStage)) return false
+  if (!isCompanyChangeableRequestDocument(document.category, document.requestStatus, document.requestReviewStage)) {
+    return false
+  }
   if (document.requestCompanyId) {
     return Boolean(actorCompanyId && document.requestCompanyId === actorCompanyId)
   }

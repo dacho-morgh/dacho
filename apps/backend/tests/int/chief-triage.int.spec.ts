@@ -513,10 +513,16 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
     expect(secondReopen.body.error).toBe('invalid_reopen_state')
   })
 
-  it('refuses a triage decision once the event has a different responsible chief', async () => {
+  it('moves case access and triage to the new responsible chief when the event chief changes', async () => {
     const app = await makeApp()
     const event = await createEvent(app, 'chief', ['پردازش تصویر'])
     const submitted = await submitApplication(app, 'company-user-1', event)
+    // A grant the owner made by hand is not part of the chief handover.
+    await pool.query(
+      `INSERT INTO dashboard.case_assignments (request_id, user_id, role, assigned_by)
+       VALUES ($1, 'reviewer-1', 'reviewer', 'owner')`,
+      [submitted.id],
+    )
     const current = await request(app).get(`/admin/events/${event.eventId}`).set(auth('owner'))
     const swap = await request(app)
       .patch(`/admin/events/${event.eventId}`)
@@ -524,10 +530,102 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
       .send({ responsibleChiefId: 'chief-2', revision: current.body.event.revision, reason: 'تغییر مسئول' })
     expect(swap.status).toBe(200)
 
+    // The former chief neither decides nor keeps reading the dossier.
     expect((await triage(app, 'chief', submitted.id, { action: 'accept' })).status).toBe(403)
-    const detail = await request(app).get(`/admin/requests/${submitted.id}`).set(auth('chief'))
-    expect(detail.body.request.allowedActions).toEqual(['read'])
+    expect((await request(app).get(`/admin/requests/${submitted.id}`).set(auth('chief'))).status).toBe(404)
+    expect((await request(app).get(`/requests/${submitted.id}/proposal`).set(auth('chief'))).status).toBe(404)
+    const oldQueue = await request(app).get('/admin/requests').set(auth('chief'))
+    expect(oldQueue.body.items.map((entry: { id: string }) => entry.id)).not.toContain(submitted.id)
+
+    // The new chief finds the case in the queue with the triage action.
+    const newQueue = await request(app).get('/admin/requests').set(auth('chief-2'))
+    const item = newQueue.body.items.find((entry: { id: string }) => entry.id === submitted.id)
+    expect(item?.allowedActions).toEqual(['read', 'triage'])
+
+    // The revoked grant is kept as history; the manual grant is untouched.
+    const grants = await pool.query(
+      `SELECT user_id, active, revoked_by, revoke_reason FROM dashboard.case_assignments
+       WHERE request_id = $1 ORDER BY assigned_at, user_id`,
+      [submitted.id],
+    )
+    expect(grants.rows).toEqual(
+      expect.arrayContaining([
+        { user_id: 'chief', active: false, revoked_by: 'owner', revoke_reason: 'تغییر مسئول' },
+        { user_id: 'chief-2', active: true, revoked_by: null, revoke_reason: null },
+        { user_id: 'reviewer-1', active: true, revoked_by: null, revoke_reason: null },
+      ]),
+    )
+    expect(grants.rows).toHaveLength(3)
+
     expect((await triage(app, 'chief-2', submitted.id, { action: 'accept' })).status).toBe(200)
+  })
+
+  it('hands over chief assignments without deadlock while decisions run concurrently', async () => {
+    const app = await makeApp()
+    const event = await createEvent(app, 'chief', ['پردازش تصویر', 'پردازش گفتار', 'رباتیک'])
+    const cases: string[] = []
+    for (const user of ['company-user-1', 'company-user-2']) {
+      for (const index of [0, 1, 2]) cases.push((await submitApplication(app, user, event, index)).id)
+    }
+    const current = await request(app).get(`/admin/events/${event.eventId}`).set(auth('owner'))
+    const [swap, ...decisions] = await Promise.all([
+      request(app)
+        .patch(`/admin/events/${event.eventId}`)
+        .set(auth('owner'))
+        .send({ responsibleChiefId: 'chief-2', revision: current.body.event.revision, reason: 'تغییر مسئول' }),
+      ...cases.map((id) => triage(app, 'chief', id, { action: 'return', reason: 'اصلاح' })),
+    ])
+    expect(swap!.status).toBe(200)
+    for (const decision of decisions) expect([200, 403]).toContain(decision.status)
+
+    const { rows } = await pool.query<{ user_id: string }>(
+      `SELECT user_id FROM dashboard.case_assignments
+       WHERE request_id = ANY($1::uuid[]) AND role = 'chief-reviewer' AND active ORDER BY user_id`,
+      [cases],
+    )
+    expect(rows.map((row) => row.user_id)).toEqual(cases.map(() => 'chief-2'))
+  })
+
+  it('reopens only proposal files of a returned case to the company', async () => {
+    const app = await makeApp()
+    const event = await createEvent(app, 'chief', ['پردازش تصویر'])
+    const created = await request(app)
+      .post('/requests')
+      .set(auth('company-user-1'))
+      .send({
+        serviceId: 'event-service',
+        title: 'طرح سامانه بینایی ماشین',
+        answers: { applicationTeam: team },
+        eventId: event.eventId,
+        subtopicId: event.subtopics[0]!.subtopicId,
+        rfpVersionId: event.subtopics[0]!.rfpVersionId,
+      })
+    const requestId = created.body.request.id as string
+    await uploadProposal(app, 'company-user-1', requestId, 'proposal.pdf')
+    const financial = await request(app)
+      .post('/documents')
+      .set(auth('company-user-1'))
+      .field('category', 'financialStatements')
+      .field('requestId', requestId)
+      .attach('file', Buffer.from('%PDF-1.4 statements'), { filename: 'statements.pdf', contentType: 'application/pdf' })
+    expect(financial.status).toBe(201)
+    expect((await request(app).post(`/requests/${requestId}/submit`).set(auth('company-user-1')).send(consent)).status).toBe(200)
+    await triage(app, 'chief', requestId, { action: 'return', reason: 'اصلاح لازم است' })
+
+    // A submitted non-proposal file survives the correction cycle.
+    const del = await request(app).delete(`/documents/${financial.body.document.id}`).set(auth('company-user-1'))
+    expect(del.status).toBe(403)
+    const upload = await request(app)
+      .post('/documents')
+      .set(auth('company-user-1'))
+      .field('category', 'financialStatements')
+      .field('requestId', requestId)
+      .attach('file', Buffer.from('%PDF-1.4 late'), { filename: 'late.pdf', contentType: 'application/pdf' })
+    expect(upload.status).toBe(404)
+
+    // A proposal file added during the correction stays removable until resubmission.
+    const added = await uploadProposal(app, 'company-user-1', requestId, 'proposal-draft.pdf')
+    expect((await request(app).delete(`/documents/${added}`).set(auth('company-user-1'))).status).toBe(200)
   })
 
   it('serializes concurrent decisions so exactly one transition and notification is recorded', async () => {

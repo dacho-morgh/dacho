@@ -110,6 +110,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           requestCompanyId: record.requestCompanyId,
           requestStatus: record.requestStatus,
           requestReviewStage: record.requestReviewStage,
+          category: record.category,
         },
         actorId,
         companyId,
@@ -474,7 +475,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       if (
         !canDeleteDocument(
           actor.operationalRole,
-          { requestOwnerId: current.owner_id, requestCompanyId: current.company_id, requestStatus: current.status, requestReviewStage: current.review_stage },
+          { requestOwnerId: current.owner_id, requestCompanyId: current.company_id, requestStatus: current.status, requestReviewStage: current.review_stage, category: record.category },
           actor.id,
           companyId,
         )

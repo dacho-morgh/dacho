@@ -47,6 +47,8 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 export async function down(pgm: MigrationBuilder): Promise<void> {
   pgm.sql(`
     ALTER TABLE dashboard.activities DROP CONSTRAINT IF EXISTS activities_triage_reason_required;
+    -- Responsible-chief case access exists only with T21; manual assignments stay.
+    DELETE FROM dashboard.case_assignments WHERE role = 'chief-reviewer' AND assigned_by = 'system';
     ALTER TABLE dashboard.request_proposals DROP COLUMN IF EXISTS answers;
     ALTER TABLE dashboard.requests DROP COLUMN IF EXISTS review_stage;
   `)
