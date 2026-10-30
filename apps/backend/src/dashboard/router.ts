@@ -29,6 +29,12 @@ import { ActivityRepository } from './activity-repo.js'
 import { AssignmentRepository } from './assignment-repo.js'
 import { ReviewRoundRepository } from './review-round-repo.js'
 import {
+  isReviewerRole,
+  necessaryCompanyProfile,
+  parseQueueView,
+  ReviewCaseRepository,
+} from './review-case-repo.js'
+import {
   DossierValidationError,
   dossierOfCompany,
   missingDossierItems,
@@ -389,6 +395,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
   const rounds = new ReviewRoundRepository(deps.pool)
+  const reviewCases = new ReviewCaseRepository(deps.pool)
   const evaluations =
     deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool)
   const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
@@ -915,14 +922,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       if (!isCompanyAdministrator(actor.operationalRole) && !isRepresentative(actor.operationalRole)) {
         // Case assignment permits only the profile fields needed for review;
         // it never grants access to the private verification dossier or files.
-        const company = (pinned.snapshot.company ?? {}) as Record<string, unknown>
-        const dossier = (pinned.snapshot.dossier ?? {}) as Record<string, unknown>
-        pinned.snapshot = {
-          company: { name: company.name, nationalId: company.nationalId, type: company.type,
-            province: company.province, city: company.city },
-          dossier: { legalEntityType: dossier.legalEntityType, classification: dossier.classification,
-            activityDomain: dossier.activityDomain, productsServices: dossier.productsServices },
-        }
+        pinned.snapshot = { ...necessaryCompanyProfile(pinned.snapshot) }
       }
       res.json({ verification: pinned })
     } catch (error) { next(error) }
@@ -940,6 +940,24 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       const revision = req.query.revision === undefined ? undefined : parseRevisionQuery(req.query.revision)
       if (revision === null) {
         res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      if (isReviewerRole(actor.operationalRole)) {
+        // A reviewer sees only the proposal revision the assignment covers, never
+        // other revisions of the same case or the company's later corrections.
+        const reviewed = await reviewCases.reviewedProposalRevision(
+          request.id, { id: actor.id, role: actor.operationalRole },
+        )
+        if (reviewed === null || (revision !== undefined && revision !== reviewed)) {
+          res.status(404).json({ error: 'not_found' })
+          return
+        }
+        const proposal = await repo.findRequestProposal(request.id, reviewed)
+        res.json({
+          proposal,
+          agreements: proposal ? await repo.listRequestAgreements(request.id, proposal.revision) : [],
+          revisions: [reviewed],
+        })
         return
       }
       const proposal = await repo.findRequestProposal(request.id, revision)
@@ -982,6 +1000,67 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       if (result === 'invalid_state') { res.status(409).json({ error: 'invalid_triage_state' }); return }
       if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
       res.json({ request: (await presentRequests(actor, [result.request]))[0] })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Assigned reviewer queue and case file (T23) ───────────────────── */
+
+  /** Reviewer and employer inbox, fed only by the actor's active server-side assignments. */
+  router.get('/review/queue', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isReviewerRole(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const view = parseQueueView(req.query.view)
+      if (!view) {
+        res.status(400).json({ error: 'invalid_view' })
+        return
+      }
+      const queue = await reviewCases.listQueue(
+        { id: actor.id, role: actor.operationalRole },
+        { view, page: parsePositiveInt(req.query.page, 1), limit: Math.min(parsePositiveInt(req.query.limit, 25), 100) },
+      )
+      res.set('Cache-Control', 'private, no-store, max-age=0').json(queue)
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * The assigned case file: the reviewed proposal revision with its pinned files,
+   * the pinned RFP and the necessary company profile. Another reviewer's work, the
+   * round roster, financial files and the private dossier are not part of it.
+   */
+  router.get('/review/cases/:id', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isReviewerRole(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const found = await reviewCases.findCase({ id: actor.id, role: actor.operationalRole }, req.params.id)
+      if (!found) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const requestId = found.case.requestId
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({
+        ...found,
+        proposal: found.proposal && {
+          ...found.proposal,
+          documents: found.proposal.documents.map((document) => ({
+            ...document,
+            downloadUrl: `/api/dashboard/documents/${document.id}/download`,
+          })),
+        },
+        rfp: found.rfp && {
+          ...found.rfp,
+          files: found.rfp.files.map((file) => ({
+            ...file,
+            downloadUrl: `/api/dashboard/requests/${requestId}/rfp/files/${file.id}`,
+          })),
+        },
+      })
     } catch (error) { next(error) }
   })
 
