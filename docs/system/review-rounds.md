@@ -28,4 +28,4 @@ The assigned people's queue and case file are in [reviewer-queue.md](reviewer-qu
 
 ## Not in this slice
 
-Replacing an unfinished reviewer or the employer (done in [T26](review-replacement.md)), 4/4 completion (done in [T27](review-completion.md)), the chief's advance/reject/correct decision (T28–T29), and notifications to the assigned people.
+Replacing an unfinished reviewer or the employer (done in [T26](review-replacement.md)), 4/4 completion (done in [T27](review-completion.md)), the chief's advance/reject/correct decision (done in [T28](chief-decision.md)), and notifications to the assigned people.

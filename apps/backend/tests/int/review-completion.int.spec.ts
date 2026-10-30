@@ -299,12 +299,12 @@ describe('T27: Atomic 4/4 completion and confidentiality (int)', () => {
       { actor_id: 'employer-1', from_state: 'in_review', to_state: 'in_review', revision },
     ])
 
-    // Readiness only: state and revision stand still, and no one is offered an advance.
+    // Readiness only: state and revision stand still until the chief decides (T28).
     const company = await request(app).get(`/requests/${id}`).set(auth('company-user-1'))
     expect(company.body.request).toMatchObject({ status: 'in_review', reviewStage: 'triaged', revision })
     expect(company.body.request.allowedActions).toEqual(['read'])
     const chiefView = await request(app).get(`/requests/${id}`).set(auth('chief'))
-    expect(chiefView.body.request.allowedActions).toEqual(['read', 'replaceReviewer'])
+    expect(chiefView.body.request.allowedActions).toEqual(['read', 'decideReview'])
   })
 
   it('produces one completion when all four finalize at the same moment', async () => {

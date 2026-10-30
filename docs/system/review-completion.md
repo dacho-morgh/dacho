@@ -2,7 +2,7 @@
 
 Backend slice only. Human acceptance (UAT19, UAT38) has not been run and the frontend (FE15, FE16, FE18) is not built. It builds on the [review rounds (T22)](review-rounds.md), the [evaluation guard (T25)](evaluation-foundation.md) and [reviewer replacement (T26)](review-replacement.md).
 
-A round is complete when its four **active** slots each hold a final evaluation for the round's request revision. Completion is readiness for the chief's decision and nothing more: it changes neither the case state nor its revision, and it opens no action. The explicit decision is T28.
+A round is complete when its four **active** slots each hold a final evaluation for the round's request revision. Completion is readiness for the chief's decision and nothing more: it changes neither the case state nor its revision, and it opens no action except the chief's explicit decision, which is [T28](chief-decision.md).
 
 ## API
 
@@ -13,7 +13,7 @@ A round is complete when its four **active** slots each hold a final evaluation 
 | `GET /requests/:id/evaluations` | Owner, Secretariat, the case's chief | Adds `requiredCount` and `readyForChiefDecision` beside `completedCount`. |
 | `GET /requests/:id/evaluation` | Assigned reviewer/employer | Returns only `{ evaluation, revision }`. `completedEvaluationsCount` is **removed**: the frontend never read it, and it told a reviewer how far the other three had got. |
 
-`ready` is true only while `completedAt` is set, the round covers the request's current revision and the case is `in_review`. T28 must re-check it under the request lock when the chief decides.
+`ready` is true only while `completedAt` is set, the round covers the request's current revision and the case is `in_review`. T28 re-checks it under the request lock when the chief decides.
 
 ## Rules enforced
 
@@ -22,7 +22,7 @@ A round is complete when its four **active** slots each hold a final evaluation 
 - **Who counts.** Only final evaluations of the round's revision whose author still holds an active slot with the same role. Drafts, revoked or replaced people and earlier revisions do not count; their rows stay stored.
 - **Completion follows the slots.** The owner's exceptional employer replacement can take back a finished slot (T26). The same function runs in that transaction: `completed_at` is cleared and the new employer has to finish. Their finalization is a new completion with its own history row, so a case can have more than one such row, but never two for one reaching of 4/4.
 - **Earlier locked evaluations.** Starting a round runs the same function. A person picked for the round may already hold a locked final evaluation of this revision from an earlier hand-made grant, which can never be sent again, so without this the round could wait forever.
-- **Old slots cannot write forward.** The evaluation write guard refuses a slot whose round reviews another revision (`409 stale_evaluation`), even if the request has moved on and no new round has started yet. No current path reaches this state; T28's correction round will.
+- **Old slots cannot write forward.** The evaluation write guard refuses a slot whose round reviews another revision (`409 stale_evaluation`), even if the request has moved on and no new round has started yet. T28's return for correction reaches this state.
 
 ## Confidentiality
 
@@ -36,4 +36,4 @@ A round is complete when its four **active** slots each hold a final evaluation 
 
 ## Not in this slice
 
-The chief's advance, reject and correct decision and its action (T28), historical rounds in the chief's view (T28), the screens (FE15, FE16, FE18), and a notification to the chief when a round completes. `replaceReviewer` is still advertised on a complete round, where every attempt ends in `evaluation_final`.
+The chief's advance, reject and correct decision, its action and historical rounds in the chief's view ([T28](chief-decision.md)), the screens (FE15, FE16, FE18), and a notification to the chief when a round completes.

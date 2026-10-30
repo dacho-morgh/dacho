@@ -19,6 +19,8 @@ T26 adds `dashboard.review_replacements` in `1780511400027_review_replacements`:
 
 T27 adds the nullable `dashboard.review_rounds.completed_at` in `1780511400028_review_round_completion`. Its only data change sets the column on rounds that already hold four final evaluations on active slots, using the last finalization time, because their locked evaluations leave no later write that could complete them. Those rounds get no `review_round_complete` history row. It creates no rows. See [four-of-four completion](review-completion.md).
 
+T28 adds the `advanced` review stage, the nullable `decision`, `decided_by`, `decided_at` and `decision_reason` columns on `dashboard.review_rounds` with a consistency check, and extends the reason-required activity check with `chief_review_return` and `chief_review_reject`, in `1780511400029_chief_review_decision`. It creates and rewrites no rows. Its rollback puts any `advanced` request back to `triaged` and drops the recorded decisions; the history rows stay. See [chief decision](chief-decision.md).
+
 T08 preserves legacy assignments, quarantines ambiguous accounts and requires explicit owner mapping; see [personnel foundation](personnel-foundation.md). Existing editorial privilege is independent of operational authority. No real accounts have been mapped by this implementation.
 
 T09/T10 add only additive backend tables: `dashboard.case_assignments` (with an

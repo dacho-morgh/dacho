@@ -522,8 +522,8 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
           if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
             return { rows: [] }
           }
-          if (sql.includes('SELECT revision, status FROM dashboard.requests')) {
-            return { rows: [{ revision: 1, status: 'in_review' }] }
+          if (sql.includes('SELECT revision, status, review_stage FROM dashboard.requests')) {
+            return { rows: [{ revision: 1, status: 'in_review', review_stage: 'triaged' }] }
           }
           if (sql.includes('FROM dashboard.case_assignments')) {
             return { rows: [{ round_revision: null }] }

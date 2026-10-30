@@ -9,6 +9,7 @@ export const REQUEST_ACTIONS = [
   'startReview',
   'replaceReviewer',
   'replaceEmployer',
+  'decideReview',
   'correct',
   'reopen',
   'uploadDocument',
@@ -27,6 +28,8 @@ export interface RequestForPolicy {
   actorIsResponsibleChief?: boolean
   /** True when a review round already exists for the request's current revision. */
   reviewRoundStarted?: boolean
+  /** True when that round holds its four final evaluations and awaits the chief's decision. */
+  reviewRoundComplete?: boolean
 }
 
 /** An event case the responsible chief returned at triage; it is resubmitted as a new revision. */
@@ -124,7 +127,9 @@ export function allowedRequestActions(
       if (!request.actorIsResponsibleChief || request.status !== 'in_review') return ['read']
       if (request.reviewStage === 'chief_triage') return ['read', 'triage']
       if (request.reviewStage === 'triaged') {
-        return request.reviewRoundStarted ? ['read', 'replaceReviewer'] : ['read', 'startReview']
+        if (!request.reviewRoundStarted) return ['read', 'startReview']
+        // Every slot of a complete round is final, so nobody is left to replace.
+        return request.reviewRoundComplete ? ['read', 'decideReview'] : ['read', 'replaceReviewer']
       }
       return ['read']
     case 'reviewer':

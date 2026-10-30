@@ -144,6 +144,26 @@ describe('server-derived allowedActions', () => {
     }
     expect(allowedRequestActions('representative', started, 'p1')).toEqual(['read'])
   })
+
+  it('advertises the T28 decision only to the responsible chief on a complete round', () => {
+    const started = { ownerId: 'p1', status: 'in_review', reviewStage: 'triaged', reviewRoundStarted: true }
+    const complete = { ...started, reviewRoundComplete: true }
+
+    expect(allowedRequestActions('chief-reviewer', { ...complete, actorIsResponsibleChief: true }, 'c1')).toEqual(['read', 'decideReview'])
+    expect(allowedRequestActions('chief-reviewer', { ...started, actorIsResponsibleChief: true }, 'c1')).not.toContain('decideReview')
+    expect(allowedRequestActions('chief-reviewer', complete, 'c1')).toEqual(['read'])
+    // A decided case has nothing left for the chief, whichever way it went.
+    expect(allowedRequestActions('chief-reviewer', { ...complete, reviewStage: 'advanced', actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('chief-reviewer', { ...complete, status: 'rejected', actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+
+    for (const role of ['system-owner', 'central-secretariat', 'reviewer', 'employer-reviewer', 'investment-reviewer'] as const) {
+      expect(allowedRequestActions(role, { ...complete, actorIsResponsibleChief: true }, 'x1'), role).not.toContain('decideReview')
+    }
+    expect(allowedRequestActions('representative', complete, 'p1')).toEqual(['read'])
+    // The owner keeps the employer replacement, which takes completion back (T27).
+    expect(allowedRequestActions('system-owner', complete, 'o1')).toContain('replaceEmployer')
+    expect(allowedRequestActions('system-owner', { ...complete, reviewStage: 'advanced' }, 'o1')).not.toContain('replaceEmployer')
+  })
 })
 
 describe('document audience and policy', () => {

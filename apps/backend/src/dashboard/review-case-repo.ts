@@ -206,7 +206,8 @@ const ASSIGNMENT_ROWS_SQL = `
            (SELECT max(p.revision) FROM dashboard.request_proposals p
             WHERE p.request_id = r.id AND p.revision <= r.revision)
          ) AS proposal_revision,
-         (r.status = 'in_review' AND (a.round_id IS NULL OR rr.request_revision = r.revision)) AS actionable,
+         (r.status = 'in_review' AND r.review_stage IS DISTINCT FROM 'advanced'
+          AND (a.round_id IS NULL OR rr.request_revision = r.revision)) AS actionable,
          ev.state AS evaluation_state, ev.revision AS evaluation_revision,
          ev.updated_at AS evaluation_updated_at, ev.finalized_at AS evaluation_finalized_at
   FROM dashboard.case_assignments a
@@ -406,6 +407,22 @@ export class ReviewCaseRepository {
     if (!row) return null
     if (!row.is_event) return 'unrestricted'
     return new Set((row.proposal_documents ?? []).map((document) => document.id))
+  }
+
+  /** The request revision of this actor's round, or null without a round assignment. */
+  async reviewedRequestRevision(
+    requestId: string,
+    actor: { id: string; role: ReviewerRole },
+  ): Promise<number | null> {
+    if (!isUuid(requestId)) return null
+    const { rows } = await this.pool.query<{ request_revision: number }>(
+      `SELECT rr.request_revision
+       FROM dashboard.case_assignments a
+       JOIN dashboard.review_rounds rr ON rr.id = a.round_id
+       WHERE a.request_id = $1 AND a.user_id = $2 AND a.role = $3 AND a.active`,
+      [requestId, actor.id, actor.role],
+    )
+    return rows[0]?.request_revision ?? null
   }
 
   /** The proposal revision this actor reviews on the request, or null without an assignment. */

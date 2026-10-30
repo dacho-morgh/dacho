@@ -31,6 +31,7 @@ Updated: 2026-10-26. This is the English specification for the event, review, in
 | [Evaluation foundation](evaluation-foundation.md) | T25 author-owned drafts, final locking, scoped oversight, revision/revocation guards and remaining round dependencies |
 | [Review rounds](review-rounds.md) / [Replacement](review-replacement.md) | T22 round and four assignments; T26 ordinary-reviewer and owner-only employer replacement with retained history |
 | [Four-of-four completion](review-completion.md) | T27 atomic round completion, readiness for the chief's decision and evaluation confidentiality |
+| [Chief decision](chief-decision.md) | T28 explicit advance, return or reject after 4/4, correction rounds and readable past rounds |
 | [Shared authorization](authorization.md) | T09 seven-role/assignment scope, server-derived actions, CMS/proxy projections and current denials |
 | [Private documents](private-documents.md) | T10 private storage, document policy, access audiences, API contract, migrations and FE07 scope |
 | [Reviewer queue and case file](reviewer-queue.md) | T23 assignment-derived queue, reviewer case file, pinned proposal/RFP files and necessary company profile |

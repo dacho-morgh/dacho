@@ -38,4 +38,4 @@ It never carries the owner or representative, the private verification dossier o
 
 ## Not in this slice
 
-The reviewer frontend (FE16), the rubric/evaluation screens, replacing a reviewer or the employer (T26), the chief's decision (T27–T29) and notifications. The chief and investment roles keep their own surfaces. Reviewer screens should use the two routes above.
+The reviewer frontend (FE16), the rubric/evaluation screens, replacing a reviewer or the employer (T26), the chief's decision ([T28](chief-decision.md)) and notifications. The chief and investment roles keep their own surfaces. Reviewer screens should use the two routes above.
