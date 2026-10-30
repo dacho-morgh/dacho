@@ -15,6 +15,8 @@ person and revision. It stores draft/final state, rubric scores, answers and fin
 time. See [evaluation foundation](evaluation-foundation.md) for authorization, locking
 and the remaining dedicated review-round dependencies.
 
+T26 adds `dashboard.review_replacements` in `1780511400027_review_replacements`: one row per replaced round assignment (round, slot, outgoing/incoming assignment and person, actor, reason, time), with database checks for distinct people and a mandatory employer reason, and extends the reason-required activity check with `owner_replace_employer`. It creates no rows and rewrites no assignments; see [review replacement](review-replacement.md).
+
 T08 preserves legacy assignments, quarantines ambiguous accounts and requires explicit owner mapping; see [personnel foundation](personnel-foundation.md). Existing editorial privilege is independent of operational authority. No real accounts have been mapped by this implementation.
 
 T09/T10 add only additive backend tables: `dashboard.case_assignments` (with an

@@ -69,6 +69,19 @@ export interface ActivityList {
   totalPages: number
 }
 
+/**
+ * Changes to the review panel (T26) and their reasons are oversight history:
+ * only the owner, Secretariat and the case's chief see them, never the company
+ * or an assigned reviewer/employer/investment person.
+ */
+export const OVERSIGHT_ONLY_ACTIONS = ['chief_replace_reviewer', 'owner_replace_employer'] as const
+
+function oversightOnlyClause(scope: RequestScope): string {
+  if (scope.kind === 'all' || (scope.kind === 'assigned' && scope.role === 'chief-reviewer')) return 'TRUE'
+  const actions = OVERSIGHT_ONLY_ACTIONS.map((action) => `'${action}'`).join(', ')
+  return `(a.action IS NULL OR a.action NOT IN (${actions}))`
+}
+
 export class ActivityRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -113,6 +126,7 @@ export class ActivityRepository {
         )`
         break
     }
+    whereSql = `(${whereSql}) AND ${oversightOnlyClause(scope)}`
 
     const { rows: countRows } = await this.pool.query<{ total: string }>(
       `SELECT COUNT(*) AS total FROM dashboard.activities a WHERE ${whereSql}`,
@@ -168,7 +182,7 @@ export class ActivityRepository {
       `SELECT ${ACTIVITY_COLUMNS_ALIASED}
        FROM dashboard.activities a
        JOIN dashboard.requests r ON r.id = a.request_id
-       WHERE a.request_id = $1 AND ${scopeSql}
+       WHERE a.request_id = $1 AND ${scopeSql} AND ${oversightOnlyClause(scope)}
        ORDER BY a.at ASC`,
       params,
     )
