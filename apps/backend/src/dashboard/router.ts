@@ -998,7 +998,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       const context = await rounds.findStartContext(req.params.id)
       if (!context) { res.status(404).json({ error: 'not_found' }); return }
       if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
-      const users = await deps.userStore.list({})
+      const users = await deps.userStore.list({ operationalRole: 'reviewer' })
       const items = users
         .filter((user) => operationalRoleOf(user) === 'reviewer' && user.id !== context.employerId)
         .map((user) => ({ id: user.id, name: user.name ?? null }))
@@ -1215,11 +1215,6 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(400).json({ error: 'assignment_role_mismatch' })
       return
     }
-    if ((role === 'reviewer' || role === 'employer-reviewer') && await rounds.hasCurrentRound(request.id)) {
-      // The four slots belong to the review round; replacement is its own command.
-      res.status(409).json({ error: 'managed_by_review_round' })
-      return
-    }
     const created = await assignments.create({
       requestId: request.id,
       userId,
@@ -1227,7 +1222,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       assignedBy: actor.id,
     })
     if (!created.ok) {
-      res.status(409).json({ error: 'already_assigned' })
+      // The four slots belong to the review round; replacement is its own command.
+      res.status(409).json({ error: created.reason })
       return
     }
     res.status(201).json({ assignment: created.assignment })

@@ -442,6 +442,43 @@ describe('T22: Review rounds and four distinct assignments (int)', () => {
     expect(listing.body.items.filter((item: { roundId: string | null }) => item.roundId)).toHaveLength(4)
   })
 
+  it('makes a hand-made reviewer grant wait for a round start in progress, then refuses it', async () => {
+    const app = await makeApp()
+    const event = await createEvent(app, 'chief', ['پردازش تصویر'])
+    const triaged = await triagedCase(app, event)
+
+    // Hold the request lock a start takes, with its round written but not committed.
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query('SELECT 1 FROM dashboard.requests WHERE id = $1 FOR NO KEY UPDATE', [triaged.id])
+      await client.query(
+        `INSERT INTO dashboard.review_rounds (request_id, request_revision, proposal_revision, employer_id, started_by)
+         VALUES ($1, $2, $3, 'employer-1', 'chief')`,
+        [triaged.id, triaged.revision, triaged.submittedRevision],
+      )
+      const pending = request(app)
+        .post(`/admin/requests/${triaged.id}/assignments`)
+        .set(auth('owner'))
+        .send({ userId: 'reviewer-4', role: 'reviewer' })
+        .then((res) => res)
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      await client.query('COMMIT')
+      const res = await pending
+      expect(res.status).toBe(409)
+      expect(res.body.error).toBe('managed_by_review_round')
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined)
+      client.release()
+    }
+    expect(
+      (await pool.query(
+        `SELECT 1 FROM dashboard.case_assignments WHERE request_id = $1 AND user_id = 'reviewer-4' AND active`,
+        [triaged.id],
+      )).rowCount,
+    ).toBe(0)
+  })
+
   it('supersedes the previous round when a new revision starts a new one, keeping history', async () => {
     const app = await makeApp()
     const event = await createEvent(app, 'chief', ['پردازش تصویر'])

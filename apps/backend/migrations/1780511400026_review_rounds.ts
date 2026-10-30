@@ -46,8 +46,8 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
   pgm.sql(`
-    -- Slot assignments exist only with their round.
-    DELETE FROM dashboard.case_assignments WHERE round_id IS NOT NULL;
+    -- Slot assignments stay as ordinary case assignments (their pre-T22 form):
+    -- reviewers keep active access and revoked slots keep their history.
     DROP INDEX IF EXISTS dashboard.case_assignments_round_idx;
     DROP INDEX IF EXISTS dashboard.case_assignments_round_employer_active_unique;
     DROP INDEX IF EXISTS dashboard.case_assignments_round_person_active_unique;

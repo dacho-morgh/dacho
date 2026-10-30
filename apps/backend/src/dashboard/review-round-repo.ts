@@ -148,10 +148,6 @@ export class ReviewRoundRepository {
     return new Set(rows.map((row) => row.request_id))
   }
 
-  async hasCurrentRound(requestId: string): Promise<boolean> {
-    return (await this.requestsWithCurrentRound([requestId])).has(requestId)
-  }
-
   /** The round for the request's current revision, or the latest earlier one. */
   async findLatest(requestId: string): Promise<ReviewRoundDto | null> {
     if (!isUuid(requestId)) return null
