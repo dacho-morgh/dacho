@@ -308,4 +308,13 @@ describe('dashboard migrations', () => {
       ]),
     )
   })
+
+  it('adds the T21 review stage, proposal answers snapshot and triage reason guard', async () => {
+    expect(await tableColumns('requests')).toEqual(expect.arrayContaining(['review_stage']))
+    expect(await tableColumns('request_proposals')).toEqual(expect.arrayContaining(['answers']))
+    const { rows } = await pool.query(
+      `SELECT 1 FROM pg_constraint WHERE conname = 'activities_triage_reason_required'`,
+    )
+    expect(rows).toHaveLength(1)
+  })
 })

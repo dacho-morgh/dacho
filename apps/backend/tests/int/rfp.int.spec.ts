@@ -249,9 +249,12 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
     )
 
     // Access authorization checks for request-pinned RFP
-    for (const id of ['outsider', 'unassociated', 'chief', 'reviewer', 'employer', 'investment']) {
+    for (const id of ['outsider', 'unassociated', 'reviewer', 'employer', 'investment']) {
       expect((await request(app).get(`/requests/${first.body.request.id}/rfp`).set(auth(id))).status).toBe(404)
     }
+
+    // A submitted application is assigned to the event's responsible chief for triage (T21).
+    expect((await request(app).get(`/requests/${first.body.request.id}/rfp`).set(auth('chief'))).status).toBe(200)
 
     // Assigned reviewer can read
     await pool.query(

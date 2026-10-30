@@ -5,6 +5,9 @@ export const REQUEST_ACTIONS = [
   'read',
   'submit',
   'assign',
+  'triage',
+  'correct',
+  'reopen',
   'uploadDocument',
   'deleteDocument',
 ] as const
@@ -15,6 +18,15 @@ export interface RequestForPolicy {
   ownerId: string
   companyId?: string | null
   status: string
+  /** Set on event applications once submitted; null for drafts and other services. */
+  reviewStage?: string | null
+  /** True when the actor is the current responsible chief of the request's event. */
+  actorIsResponsibleChief?: boolean
+}
+
+/** Company edits are open on drafts and on event cases the chief returned for correction. */
+export function isCompanyEditableStatus(status: string | null | undefined, reviewStage?: string | null): boolean {
+  return status === 'draft' || (status === 'action_needed' && Boolean(reviewStage))
 }
 
 /**
@@ -70,14 +82,26 @@ export function allowedRequestActions(
 ): RequestAction[] {
   switch (role) {
     case 'system-owner':
-      return ['read', 'assign', 'uploadDocument', 'deleteDocument']
+      return [
+        'read',
+        'assign',
+        ...(request.status === 'rejected' && request.reviewStage ? (['reopen'] as const) : []),
+        'uploadDocument',
+        'deleteDocument',
+      ]
     case 'central-secretariat':
       return ['read', 'uploadDocument']
     case 'chief-reviewer':
+      // Triage belongs to the event's current responsible chief at the initial stage.
+      return request.actorIsResponsibleChief &&
+        request.status === 'in_review' &&
+        request.reviewStage === 'chief_triage'
+        ? ['read', 'triage']
+        : ['read']
     case 'reviewer':
     case 'employer-reviewer':
     case 'investment-reviewer':
-      // Future triage/evaluation/memo actions are not implemented; do not
+      // Future evaluation/memo actions are not implemented; do not
       // advertise routes that do not exist yet.
       return ['read']
     case 'representative': {
@@ -87,6 +111,9 @@ export function allowedRequestActions(
       if (!belongsToCompany) return []
       const actions: RequestAction[] = ['read']
       if (request.status === 'draft') actions.push('submit', 'uploadDocument', 'deleteDocument')
+      else if (isCompanyEditableStatus(request.status, request.reviewStage)) {
+        actions.push('correct', 'uploadDocument', 'deleteDocument')
+      }
       return actions
     }
   }
@@ -194,6 +221,7 @@ export interface DocumentParent {
   /** The company that owns the request. */
   requestCompanyId?: string | null
   requestStatus?: string | null
+  requestReviewStage?: string | null
   /** True when the current actor holds an active assignment on the request. */
   assigned?: boolean
 }
@@ -232,7 +260,11 @@ export function canUploadOwnedDocument(
   if (category === 'correspondenceAttachment') {
     return true
   }
-  return parent.requestStatus === undefined || parent.requestStatus === null || parent.requestStatus === 'draft'
+  return (
+    parent.requestStatus === undefined ||
+    parent.requestStatus === null ||
+    isCompanyEditableStatus(parent.requestStatus, parent.requestReviewStage)
+  )
 }
 
 export interface DocumentForPolicy {
@@ -295,13 +327,14 @@ export function canDeleteDocument(
     requestOwnerId: string | null
     requestCompanyId?: string | null
     requestStatus: string | null
+    requestReviewStage?: string | null
   },
   actorId: string,
   actorCompanyId?: string | null,
 ): boolean {
   if (role === 'system-owner') return true
   if (role !== 'representative') return false
-  if (document.requestStatus !== 'draft') return false
+  if (!isCompanyEditableStatus(document.requestStatus, document.requestReviewStage)) return false
   if (document.requestCompanyId) {
     return Boolean(actorCompanyId && document.requestCompanyId === actorCompanyId)
   }
