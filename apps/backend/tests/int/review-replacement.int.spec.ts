@@ -309,6 +309,34 @@ describe('T26: Reviewer replacement and assignment history (int)', () => {
     }
     expect((await request(app).get(`/requests/${triaged.id}/review-round`).set(auth('company-user-1'))).status).toBe(403)
 
+    // The case history and activity feed carry the same oversight-only entries (with their reasons).
+    expect((await replaceEmployer(app, 'owner', triaged.id, { employerId: 'employer-2', reason: 'تعارض منافع' })).status).toBe(200)
+    const replacementActions = ['chief_replace_reviewer', 'owner_replace_employer']
+    const actionsOf = (items: { action: string | null; requestId: string | null }[]) =>
+      items
+        .filter((entry) => entry.requestId === triaged.id)
+        .map((entry) => entry.action)
+        .filter((action) => replacementActions.includes(action ?? ''))
+    for (const user of ['chief', 'owner', 'secretariat']) {
+      const history = await request(app).get(`/requests/${triaged.id}/history`).set(auth(user))
+      expect(history.status, user).toBe(200)
+      expect(actionsOf(history.body.items), user).toEqual(replacementActions)
+      const feed = await request(app).get('/activities?limit=50').set(auth(user))
+      expect(actionsOf(feed.body.items).sort(), user).toEqual([...replacementActions].sort())
+    }
+    for (const user of ['company-user-1', 'reviewer-4', 'reviewer-2', 'employer-2', 'investment']) {
+      const history = await request(app).get(`/requests/${triaged.id}/history`).set(auth(user))
+      if (history.status === 200) expect(actionsOf(history.body.items), user).toEqual([])
+      const detail = await request(app).get(`/requests/${triaged.id}`).set(auth(user))
+      if (detail.status === 200) expect(actionsOf(detail.body.timeline), user).toEqual([])
+      const feed = await request(app).get('/activities?limit=50').set(auth(user))
+      expect(feed.status, user).toBe(200)
+      expect(actionsOf(feed.body.items), user).toEqual([])
+    }
+    const company = await request(app).get(`/requests/${triaged.id}/history`).set(auth('company-user-1'))
+    expect(company.status).toBe(200)
+    expect(company.body.items.map((entry: { action: string | null }) => entry.action)).toContain('review_round_start')
+
     // The reason is optional for the chief; a blank one is stored as none.
     const blank = await replaceReviewer(app, 'chief', triaged.id, 'reviewer-2', { replacementId: 'reviewer-5', reason: '   ' })
     expect(blank.status).toBe(200)
@@ -535,6 +563,8 @@ describe('T26: Reviewer replacement and assignment history (int)', () => {
 
     const candidates = await request(app).get(`/requests/${triaged.id}/review-round/candidates`).set(auth('chief'))
     expect(candidates.body.employerId).toBe('employer-2')
+    // The earlier revision's round does not narrow the pick for the new round.
+    expect(idsOf(candidates).sort()).toEqual(['reviewer-1', 'reviewer-2', 'reviewer-3', 'reviewer-4', 'reviewer-5'])
     const second = await request(app)
       .post(`/requests/${triaged.id}/review-round`)
       .set(auth('chief'))

@@ -1039,9 +1039,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       if (!context) { res.status(404).json({ error: 'not_found' }); return }
       if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
       const users = await deps.userStore.list({ operationalRole: 'reviewer' })
-      // Once a round exists the list serves replacement: nobody who already held a slot returns.
-      const seen = new Set((await rounds.findLatest(req.params.id))?.slots.map((slot) => slot.userId) ?? [])
-      const employerId = (await roundEmployerOf(context)) ?? context.employerId
+      // Once a round exists for the current revision the list serves replacement:
+      // nobody who already held a slot of it returns. An earlier revision's round
+      // does not narrow the pick for a new round.
+      const latest = await rounds.findLatest(req.params.id)
+      const current = latest && latest.requestRevision === context.revision ? latest : null
+      const seen = new Set(current?.slots.map((slot) => slot.userId) ?? [])
+      const employerId = current?.employerId ?? (await roundEmployerOf(context)) ?? context.employerId
       const items = users
         .filter((user) => operationalRoleOf(user) === 'reviewer' && user.id !== employerId && !seen.has(user.id))
         .map((user) => ({ id: user.id, name: user.name ?? null }))
