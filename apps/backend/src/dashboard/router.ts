@@ -27,6 +27,7 @@ import {
 import type { ServiceCatalog, ServiceDefinition } from '../catalog/service-catalog.js'
 import { ActivityRepository } from './activity-repo.js'
 import { AssignmentRepository } from './assignment-repo.js'
+import { ReviewRoundRepository } from './review-round-repo.js'
 import {
   DossierValidationError,
   dossierOfCompany,
@@ -222,13 +223,14 @@ function requestWithActions(
   request: Awaited<ReturnType<RequestRepository['findByIdAny']>>,
   companyId?: string | null,
   actorIsResponsibleChief = false,
+  reviewRoundStarted = false,
 ) {
   if (!request) return request
   return {
     ...request,
     allowedActions: allowedRequestActions(
       role,
-      { ...request, actorIsResponsibleChief },
+      { ...request, actorIsResponsibleChief, reviewRoundStarted },
       actorId,
       companyId,
     ),
@@ -386,6 +388,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const dossierDocuments = deps.dossierDocuments ?? new SqlDossierDocumentSource(deps.pool)
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
+  const rounds = new ReviewRoundRepository(deps.pool)
   const evaluations =
     deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool)
   const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
@@ -421,17 +424,22 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     items: T[],
     companyId?: string | null,
   ) => {
+    const reviewable = (item: T) =>
+      item.status === 'in_review' && (item.reviewStage === 'chief_triage' || item.reviewStage === 'triaged')
     const chiefCases =
       actor.operationalRole === 'chief-reviewer'
-        ? await repo.requestsOfResponsibleChief(
-            items
-              .filter((item) => item.status === 'in_review' && item.reviewStage === 'chief_triage')
-              .map((item) => item.id),
-            actor.id,
+        ? await repo.requestsOfResponsibleChief(items.filter(reviewable).map((item) => item.id), actor.id)
+        : new Set<string>()
+    const startedRounds =
+      chiefCases.size > 0
+        ? await rounds.requestsWithCurrentRound(
+            items.filter((item) => chiefCases.has(item.id) && item.reviewStage === 'triaged').map((item) => item.id),
           )
         : new Set<string>()
     return items.map((item) =>
-      requestWithActions(actor.operationalRole, actor.id, item, companyId, chiefCases.has(item.id))!,
+      requestWithActions(
+        actor.operationalRole, actor.id, item, companyId, chiefCases.has(item.id), startedRounds.has(item.id),
+      )!,
     )
   }
 
@@ -977,6 +985,113 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
+  /* ── Review round and the four assignments (T22) ───────────────────── */
+
+  /** Reviewers the responsible chief may pick: active ordinary reviewers, never other roles. */
+  router.get('/requests/:id/review-round/candidates', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const context = await rounds.findStartContext(req.params.id)
+      if (!context) { res.status(404).json({ error: 'not_found' }); return }
+      if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
+      const users = await deps.userStore.list({})
+      const items = users
+        .filter((user) => operationalRoleOf(user) === 'reviewer' && user.id !== context.employerId)
+        .map((user) => ({ id: user.id, name: user.name ?? null }))
+      res.json({ items, employerId: context.employerId })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/requests/:id/review-round', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const revision = parseExpectedRevision(req.body?.expectedRevision)
+      if (revision === null) { res.status(400).json({ error: 'invalid_revision' }); return }
+      const rawReviewers: unknown = req.body?.reviewerIds
+      const reviewerIds = Array.isArray(rawReviewers)
+        ? rawReviewers.map((value) => (typeof value === 'string' ? value.trim() : ''))
+        : []
+      if (reviewerIds.length !== 3 || reviewerIds.some((id) => !id)) {
+        res.status(400).json({ error: 'three_reviewers_required' })
+        return
+      }
+
+      const context = await rounds.findStartContext(req.params.id)
+      if (!context) { res.status(404).json({ error: 'not_found' }); return }
+      if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
+
+      // Four distinct active people: the subtopic employer plus three other reviewers.
+      if (new Set([...reviewerIds, context.employerId]).size !== 4) {
+        res.status(400).json({ error: 'duplicate_people' })
+        return
+      }
+      const employer = await deps.userStore.findById(context.employerId).catch(() => undefined)
+      if (!employer || operationalRoleOf(employer) !== 'employer-reviewer') {
+        res.status(409).json({ error: 'employer_unavailable' })
+        return
+      }
+      for (const reviewerId of reviewerIds) {
+        const reviewer = await deps.userStore.findById(reviewerId).catch(() => undefined)
+        if (!reviewer || operationalRoleOf(reviewer) !== 'reviewer') {
+          res.status(400).json({ error: 'reviewer_not_eligible', userId: reviewerId })
+          return
+        }
+      }
+
+      const result = await rounds.start({
+        requestId: req.params.id,
+        actorId: actor.id,
+        employerId: context.employerId,
+        reviewerIds,
+        expectedRevision: revision,
+      })
+      if (typeof result === 'object') { res.status(201).json({ round: result.round }); return }
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'forbidden') { res.status(403).json({ error: 'forbidden' }); return }
+      if (result === 'invalid_state') { res.status(409).json({ error: 'invalid_round_state' }); return }
+      if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
+      if (result === 'round_exists') { res.status(409).json({ error: 'round_already_started' }); return }
+      res.status(409).json({ error: result })
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * Oversight (owner, Secretariat, the case's chief) sees all four slots; an
+   * assigned reviewer or employer sees only their own slot, never who else was
+   * picked. Companies and investment people have no part in a review round.
+   */
+  router.get('/requests/:id/review-round', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role === 'representative' || role === 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) { res.status(404).json({ error: 'not_found' }); return }
+      const round = await rounds.findLatest(request.id)
+      if (!round) { res.json({ round: null }); return }
+      if (role === 'reviewer' || role === 'employer-reviewer') {
+        const mine = round.slots.find((slot) => slot.userId === actor.id && slot.active)
+        if (!mine) { res.status(404).json({ error: 'not_found' }); return }
+        const { id, requestId, requestRevision, proposalRevision, startedAt } = round
+        res.json({ round: { id, requestId, requestRevision, proposalRevision, startedAt, slots: [mine] } })
+        return
+      }
+      res.json({ round })
+    } catch (error) { next(error) }
+  })
+
   router.post('/requests/:id/resubmit', async (req, res, next) => {
     try {
       const actor = actorOf(res)
@@ -1100,6 +1215,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(400).json({ error: 'assignment_role_mismatch' })
       return
     }
+    if ((role === 'reviewer' || role === 'employer-reviewer') && await rounds.hasCurrentRound(request.id)) {
+      // The four slots belong to the review round; replacement is its own command.
+      res.status(409).json({ error: 'managed_by_review_round' })
+      return
+    }
     const created = await assignments.create({
       requestId: request.id,
       userId,
@@ -1123,6 +1243,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     if (!canRequestAction(actor.operationalRole, request, actor.id, 'assign')) {
       res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const held = (await assignments.listForRequest(request.id)).find(
+      (item) => item.active && item.userId === req.params.userId,
+    )
+    if (held?.roundId) {
+      res.status(409).json({ error: 'managed_by_review_round' })
       return
     }
     const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : null

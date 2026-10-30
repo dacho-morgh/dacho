@@ -13,6 +13,9 @@ export interface CaseAssignmentDto {
   revokedBy: string | null
   revokedAt: string | null
   revokeReason: string | null
+  /** Set when a review round created the assignment (T22); null for manual grants. */
+  roundId: string | null
+  slot: 'employer' | 'ordinary' | null
 }
 
 interface AssignmentRow {
@@ -26,11 +29,13 @@ interface AssignmentRow {
   revoked_by: string | null
   revoked_at: Date | null
   revoke_reason: string | null
+  round_id: string | null
+  slot: 'employer' | 'ordinary' | null
 }
 
 const ASSIGNMENT_COLUMNS = `
   id, request_id, user_id, role, active, assigned_by, assigned_at,
-  revoked_by, revoked_at, revoke_reason
+  revoked_by, revoked_at, revoke_reason, round_id, slot
 `
 
 function mapRow(row: AssignmentRow): CaseAssignmentDto {
@@ -45,6 +50,8 @@ function mapRow(row: AssignmentRow): CaseAssignmentDto {
     revokedBy: row.revoked_by,
     revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
     revokeReason: row.revoke_reason,
+    roundId: row.round_id,
+    slot: row.slot,
   }
 }
 

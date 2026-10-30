@@ -97,7 +97,16 @@ describe('server-derived allowedActions', () => {
     ])
     expect(allowedRequestActions('chief-reviewer', triage, 'c1')).toEqual(['read'])
     expect(allowedRequestActions('chief-reviewer', { ...returned, actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
-    expect(allowedRequestActions('chief-reviewer', { ...triage, reviewStage: 'triaged', actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+    // T22: a triaged case offers the review round until one exists for its revision.
+    const triaged = { ...triage, reviewStage: 'triaged' }
+    expect(allowedRequestActions('chief-reviewer', { ...triaged, actorIsResponsibleChief: true }, 'c1')).toEqual(['read', 'startReview'])
+    expect(allowedRequestActions('chief-reviewer', { ...triaged, actorIsResponsibleChief: true, reviewRoundStarted: true }, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('chief-reviewer', triaged, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('chief-reviewer', { ...triaged, status: 'rejected', actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+    for (const role of ['system-owner', 'central-secretariat', 'reviewer', 'employer-reviewer', 'investment-reviewer'] as const) {
+      expect(allowedRequestActions(role, { ...triaged, actorIsResponsibleChief: true }, 'x1')).not.toContain('startReview')
+    }
+    expect(allowedRequestActions('representative', triaged, 'p1')).not.toContain('startReview')
     expect(allowedRequestActions('reviewer', { ...triage, actorIsResponsibleChief: true }, 'r1')).toEqual(['read'])
 
     expect(allowedRequestActions('representative', returned, 'p1')).toEqual([
