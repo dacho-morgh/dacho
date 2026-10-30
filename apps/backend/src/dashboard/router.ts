@@ -27,7 +27,7 @@ import {
 import type { ServiceCatalog, ServiceDefinition } from '../catalog/service-catalog.js'
 import { ActivityRepository } from './activity-repo.js'
 import { AssignmentRepository } from './assignment-repo.js'
-import { ReviewRoundRepository } from './review-round-repo.js'
+import { ReviewRoundRepository, type ReplaceSlotResult, type RoundStartContext } from './review-round-repo.js'
 import {
   DossierValidationError,
   dossierOfCompany,
@@ -242,6 +242,15 @@ function parseExpectedRevision(value: unknown): number | undefined | null {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 ? value : null
 }
 
+/** Optional free-text reason: undefined/blank -> null, a non-string or over-long value -> false. */
+function parseOptionalReason(value: unknown): string | null | false {
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'string') return false
+  const trimmed = value.trim()
+  if (trimmed.length > 1000) return false
+  return trimmed ? trimmed : null
+}
+
 function parseDecisionReason(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
@@ -430,12 +439,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       actor.operationalRole === 'chief-reviewer'
         ? await repo.requestsOfResponsibleChief(items.filter(reviewable).map((item) => item.id), actor.id)
         : new Set<string>()
-    const startedRounds =
-      chiefCases.size > 0
-        ? await rounds.requestsWithCurrentRound(
-            items.filter((item) => chiefCases.has(item.id) && item.reviewStage === 'triaged').map((item) => item.id),
-          )
-        : new Set<string>()
+    // Chiefs act on their own cases; the owner may replace the employer on any triaged case.
+    const roundCases = items.filter(
+      (item) =>
+        item.reviewStage === 'triaged' &&
+        (actor.operationalRole === 'system-owner' ? item.status === 'in_review' : chiefCases.has(item.id)),
+    )
+    const startedRounds = await rounds.requestsWithCurrentRound(roundCases.map((item) => item.id))
     return items.map((item) =>
       requestWithActions(
         actor.operationalRole, actor.id, item, companyId, chiefCases.has(item.id), startedRounds.has(item.id),
@@ -987,6 +997,36 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
   /* ── Review round and the four assignments (T22) ───────────────────── */
 
+  /**
+   * The employer for this case: the owner's last substitute (T26) while that
+   * person is still a usable employer-reviewer, otherwise the subtopic's own.
+   */
+  const roundEmployerOf = async (context: RoundStartContext): Promise<string | null> => {
+    for (const id of [context.replacementEmployerId, context.employerId]) {
+      if (!id) continue
+      const user = await deps.userStore.findById(id).catch(() => undefined)
+      if (user && operationalRoleOf(user) === 'employer-reviewer') return id
+    }
+    return null
+  }
+
+  const replaceSlotResponse = (res: Response, result: ReplaceSlotResult) => {
+    if (typeof result === 'object') { res.json({ round: result.round }); return }
+    const rejected: Record<Exclude<ReplaceSlotResult, { round: unknown }>, [number, string]> = {
+      not_found: [404, 'not_found'],
+      forbidden: [403, 'forbidden'],
+      invalid_state: [409, 'invalid_round_state'],
+      stale_revision: [409, 'stale_revision'],
+      no_round: [409, 'round_not_started'],
+      not_assigned: [404, 'not_assigned'],
+      evaluation_final: [409, 'evaluation_final'],
+      already_assigned: [409, 'already_assigned'],
+      previously_assigned: [409, 'previously_assigned'],
+    }
+    const [status, error] = rejected[result]
+    res.status(status).json({ error })
+  }
+
   /** Reviewers the responsible chief may pick: active ordinary reviewers, never other roles. */
   router.get('/requests/:id/review-round/candidates', async (req, res, next) => {
     try {
@@ -999,10 +1039,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       if (!context) { res.status(404).json({ error: 'not_found' }); return }
       if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
       const users = await deps.userStore.list({ operationalRole: 'reviewer' })
+      // Once a round exists the list serves replacement: nobody who already held a slot returns.
+      const seen = new Set((await rounds.findLatest(req.params.id))?.slots.map((slot) => slot.userId) ?? [])
+      const employerId = (await roundEmployerOf(context)) ?? context.employerId
       const items = users
-        .filter((user) => operationalRoleOf(user) === 'reviewer' && user.id !== context.employerId)
+        .filter((user) => operationalRoleOf(user) === 'reviewer' && user.id !== employerId && !seen.has(user.id))
         .map((user) => ({ id: user.id, name: user.name ?? null }))
-      res.json({ items, employerId: context.employerId })
+      res.json({ items, employerId })
     } catch (error) { next(error) }
   })
 
@@ -1028,14 +1071,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       if (!context) { res.status(404).json({ error: 'not_found' }); return }
       if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
 
-      // Four distinct active people: the subtopic employer plus three other reviewers.
-      if (new Set([...reviewerIds, context.employerId]).size !== 4) {
-        res.status(400).json({ error: 'duplicate_people' })
+      // Four distinct active people: the case's employer plus three other reviewers.
+      const employerId = await roundEmployerOf(context)
+      if (!employerId) {
+        res.status(409).json({ error: 'employer_unavailable' })
         return
       }
-      const employer = await deps.userStore.findById(context.employerId).catch(() => undefined)
-      if (!employer || operationalRoleOf(employer) !== 'employer-reviewer') {
-        res.status(409).json({ error: 'employer_unavailable' })
+      if (new Set([...reviewerIds, employerId]).size !== 4) {
+        res.status(400).json({ error: 'duplicate_people' })
         return
       }
       for (const reviewerId of reviewerIds) {
@@ -1049,7 +1092,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       const result = await rounds.start({
         requestId: req.params.id,
         actorId: actor.id,
-        employerId: context.employerId,
+        employerId,
         reviewerIds,
         expectedRevision: revision,
       })
@@ -1089,6 +1132,99 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       res.json({ round })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Replacing a round slot (T26) ───────────────────────────────────── */
+
+  /** The responsible chief replaces an ordinary reviewer who has not finalized. */
+  router.post('/requests/:id/review-round/reviewers/:userId/replace', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const revision = parseExpectedRevision(req.body?.expectedRevision)
+      if (revision === null) { res.status(400).json({ error: 'invalid_revision' }); return }
+      const replacementId = typeof req.body?.replacementId === 'string' ? req.body.replacementId.trim() : ''
+      if (!replacementId) { res.status(400).json({ error: 'replacement_required' }); return }
+      const reason = parseOptionalReason(req.body?.reason)
+      if (reason === false) { res.status(400).json({ error: 'invalid_reason' }); return }
+
+      const context = await rounds.findStartContext(req.params.id)
+      if (!context) { res.status(404).json({ error: 'not_found' }); return }
+      if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
+      if (replacementId === req.params.userId) { res.status(400).json({ error: 'duplicate_people' }); return }
+      const incoming = await deps.userStore.findById(replacementId).catch(() => undefined)
+      if (!incoming || operationalRoleOf(incoming) !== 'reviewer') {
+        res.status(400).json({ error: 'reviewer_not_eligible', userId: replacementId })
+        return
+      }
+      replaceSlotResponse(res, await rounds.replaceSlot({
+        requestId: req.params.id,
+        actorId: actor.id,
+        slot: 'ordinary',
+        outgoingUserId: req.params.userId,
+        incomingUserId: replacementId,
+        reason,
+        expectedRevision: revision,
+        authority: 'chief',
+      }))
+    } catch (error) { next(error) }
+  })
+
+  /** Employers the owner may put in place of the case's current one. */
+  router.get('/requests/:id/review-round/employer-candidates', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const round = await rounds.findLatest(req.params.id)
+      if (!round) { res.status(404).json({ error: 'not_found' }); return }
+      const seen = new Set(round.slots.map((slot) => slot.userId))
+      const users = await deps.userStore.list({ operationalRole: 'employer-reviewer' })
+      const items = users
+        .filter((user) => operationalRoleOf(user) === 'employer-reviewer' && !seen.has(user.id))
+        .map((user) => ({ id: user.id, name: user.name ?? null }))
+      res.json({ items, employerId: round.employerId })
+    } catch (error) { next(error) }
+  })
+
+  /** Only the system owner changes a case's employer, and always with a reason. */
+  router.post('/requests/:id/review-round/employer/replace', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const revision = parseExpectedRevision(req.body?.expectedRevision)
+      if (revision === null) { res.status(400).json({ error: 'invalid_revision' }); return }
+      const employerId = typeof req.body?.employerId === 'string' ? req.body.employerId.trim() : ''
+      if (!employerId) { res.status(400).json({ error: 'replacement_required' }); return }
+      const reason = parseOptionalReason(req.body?.reason)
+      if (reason === false) { res.status(400).json({ error: 'invalid_reason' }); return }
+      if (reason === null) { res.status(400).json({ error: 'reason_required' }); return }
+
+      const context = await rounds.findStartContext(req.params.id)
+      if (!context) { res.status(404).json({ error: 'not_found' }); return }
+      const incoming = await deps.userStore.findById(employerId).catch(() => undefined)
+      if (!incoming || operationalRoleOf(incoming) !== 'employer-reviewer') {
+        res.status(400).json({ error: 'employer_not_eligible', userId: employerId })
+        return
+      }
+      replaceSlotResponse(res, await rounds.replaceSlot({
+        requestId: req.params.id,
+        actorId: actor.id,
+        slot: 'employer',
+        incomingUserId: employerId,
+        reason,
+        expectedRevision: revision,
+        authority: 'owner',
+      }))
     } catch (error) { next(error) }
   })
 

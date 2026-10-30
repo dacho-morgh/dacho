@@ -267,7 +267,9 @@ describe('T22: Review rounds and four distinct assignments (int)', () => {
     expect(after.body.request).toMatchObject({ status: 'in_review', reviewStage: 'triaged', revision: triaged.revision })
 
     const refreshed = await request(app).get('/admin/requests').set(auth('chief'))
-    expect(refreshed.body.items.find((entry: { id: string }) => entry.id === triaged.id).allowedActions).toEqual(['read'])
+    expect(refreshed.body.items.find((entry: { id: string }) => entry.id === triaged.id).allowedActions).toEqual([
+      'read', 'replaceReviewer',
+    ])
 
     // Each of the four sees the case once in the scoped queue; others see nothing.
     for (const user of ['employer-1', ...THREE]) {

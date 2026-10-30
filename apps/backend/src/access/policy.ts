@@ -7,6 +7,8 @@ export const REQUEST_ACTIONS = [
   'assign',
   'triage',
   'startReview',
+  'replaceReviewer',
+  'replaceEmployer',
   'correct',
   'reopen',
   'uploadDocument',
@@ -108,6 +110,10 @@ export function allowedRequestActions(
         'read',
         'assign',
         ...(request.status === 'rejected' && request.reviewStage === 'chief_triage' ? (['reopen'] as const) : []),
+        // Only the owner may change a case's employer, and only inside a started round.
+        ...(request.status === 'in_review' && request.reviewStage === 'triaged' && request.reviewRoundStarted
+          ? (['replaceEmployer'] as const)
+          : []),
         'uploadDocument',
         'deleteDocument',
       ]
@@ -117,7 +123,9 @@ export function allowedRequestActions(
       // Triage and the review round belong to the event's current responsible chief.
       if (!request.actorIsResponsibleChief || request.status !== 'in_review') return ['read']
       if (request.reviewStage === 'chief_triage') return ['read', 'triage']
-      if (request.reviewStage === 'triaged' && !request.reviewRoundStarted) return ['read', 'startReview']
+      if (request.reviewStage === 'triaged') {
+        return request.reviewRoundStarted ? ['read', 'replaceReviewer'] : ['read', 'startReview']
+      }
       return ['read']
     case 'reviewer':
     case 'employer-reviewer':
