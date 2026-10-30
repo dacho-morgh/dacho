@@ -403,7 +403,7 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
       status: 'in_review',
       reviewStage: 'triaged',
       revision: submitted.revision + 1,
-      allowedActions: ['read'],
+      allowedActions: ['read', 'startReview'],
     })
     const again = await triage(app, 'chief', submitted.id, { action: 'return', reason: 'دیر است' })
     expect(again.status).toBe(409)

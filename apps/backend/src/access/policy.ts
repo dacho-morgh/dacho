@@ -6,6 +6,7 @@ export const REQUEST_ACTIONS = [
   'submit',
   'assign',
   'triage',
+  'startReview',
   'correct',
   'reopen',
   'uploadDocument',
@@ -22,6 +23,8 @@ export interface RequestForPolicy {
   reviewStage?: string | null
   /** True when the actor is the current responsible chief of the request's event. */
   actorIsResponsibleChief?: boolean
+  /** True when a review round already exists for the request's current revision. */
+  reviewRoundStarted?: boolean
 }
 
 /** An event case the responsible chief returned at triage; it is resubmitted as a new revision. */
@@ -111,12 +114,11 @@ export function allowedRequestActions(
     case 'central-secretariat':
       return ['read', 'uploadDocument']
     case 'chief-reviewer':
-      // Triage belongs to the event's current responsible chief at the initial stage.
-      return request.actorIsResponsibleChief &&
-        request.status === 'in_review' &&
-        request.reviewStage === 'chief_triage'
-        ? ['read', 'triage']
-        : ['read']
+      // Triage and the review round belong to the event's current responsible chief.
+      if (!request.actorIsResponsibleChief || request.status !== 'in_review') return ['read']
+      if (request.reviewStage === 'chief_triage') return ['read', 'triage']
+      if (request.reviewStage === 'triaged' && !request.reviewRoundStarted) return ['read', 'startReview']
+      return ['read']
     case 'reviewer':
     case 'employer-reviewer':
     case 'investment-reviewer':

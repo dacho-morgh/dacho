@@ -110,7 +110,14 @@ export interface UserStore {
   findOrCreateByPhone(phone: string): Promise<User>
   findById(id: string): Promise<User | undefined>
   update(id: string, fields: ProfileFields): Promise<User>
-  list(options?: { role?: UserRole; search?: string }): Promise<User[]>
+  list(options?: UserListOptions): Promise<User[]>
+}
+
+/** `operationalRole` narrows the listing so a capped page is not filled by other roles. */
+export interface UserListOptions {
+  role?: UserRole
+  operationalRole?: string
+  search?: string
 }
 
 /** True when the user holds the given role. */
@@ -146,9 +153,10 @@ export class InMemoryUserStore implements UserStore {
     return updated
   }
 
-  async list(options: { role?: UserRole; search?: string } = {}): Promise<User[]> {
+  async list(options: UserListOptions = {}): Promise<User[]> {
     return [...this.users.values()].filter((user) => {
       if (options.role && !hasUserRole(user, options.role)) return false
+      if (options.operationalRole && user.operationalRole !== options.operationalRole) return false
       if (options.search) {
         const needle = options.search.toLocaleLowerCase()
         return [user.name, user.email, user.phone]

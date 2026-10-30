@@ -13,6 +13,9 @@ export interface CaseAssignmentDto {
   revokedBy: string | null
   revokedAt: string | null
   revokeReason: string | null
+  /** Set when a review round created the assignment (T22); null for manual grants. */
+  roundId: string | null
+  slot: 'employer' | 'ordinary' | null
 }
 
 interface AssignmentRow {
@@ -26,11 +29,13 @@ interface AssignmentRow {
   revoked_by: string | null
   revoked_at: Date | null
   revoke_reason: string | null
+  round_id: string | null
+  slot: 'employer' | 'ordinary' | null
 }
 
 const ASSIGNMENT_COLUMNS = `
   id, request_id, user_id, role, active, assigned_by, assigned_at,
-  revoked_by, revoked_at, revoke_reason
+  revoked_by, revoked_at, revoke_reason, round_id, slot
 `
 
 function mapRow(row: AssignmentRow): CaseAssignmentDto {
@@ -45,12 +50,14 @@ function mapRow(row: AssignmentRow): CaseAssignmentDto {
     revokedBy: row.revoked_by,
     revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
     revokeReason: row.revoke_reason,
+    roundId: row.round_id,
+    slot: row.slot,
   }
 }
 
 export type CreateAssignmentResult =
   | { ok: true; assignment: CaseAssignmentDto }
-  | { ok: false; reason: 'already_assigned' }
+  | { ok: false; reason: 'already_assigned' | 'managed_by_review_round' }
 
 export class AssignmentRepository {
   constructor(private readonly pool: Pool) {}
@@ -61,8 +68,28 @@ export class AssignmentRepository {
     role: CaseAssignmentRole
     assignedBy: string
   }): Promise<CreateAssignmentResult> {
+    const client = await this.pool.connect()
     try {
-      const { rows } = await this.pool.query<AssignmentRow>(
+      await client.query('BEGIN')
+      if (input.role === 'reviewer' || input.role === 'employer-reviewer') {
+        // A review round starts under the request row lock (T22). Holding it in
+        // share mode here means a hand-made reviewer grant either commits first
+        // (and the start refuses it) or sees the round and stays out of it. The
+        // round is read in a later statement so its snapshot follows the lock wait.
+        const { rows: locked } = await client.query<{ revision: number }>(
+          'SELECT revision FROM dashboard.requests WHERE id = $1 FOR SHARE',
+          [input.requestId],
+        )
+        const round = await client.query(
+          'SELECT 1 FROM dashboard.review_rounds WHERE request_id = $1 AND request_revision = $2',
+          [input.requestId, locked[0]?.revision ?? 0],
+        )
+        if ((round.rowCount ?? 0) > 0) {
+          await client.query('ROLLBACK')
+          return { ok: false, reason: 'managed_by_review_round' }
+        }
+      }
+      const { rows } = await client.query<AssignmentRow>(
         `INSERT INTO dashboard.case_assignments (request_id, user_id, role, assigned_by)
          VALUES ($1, $2, $3, $4)
          RETURNING ${ASSIGNMENT_COLUMNS}`,
@@ -70,12 +97,16 @@ export class AssignmentRepository {
       )
       const row = rows[0]
       if (!row) throw new Error('INSERT case_assignments returned no row')
+      await client.query('COMMIT')
       return { ok: true, assignment: mapRow(row) }
     } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined)
       if ((error as { code?: string }).code === '23505') {
         return { ok: false, reason: 'already_assigned' }
       }
       throw error
+    } finally {
+      client.release()
     }
   }
 
@@ -88,6 +119,7 @@ export class AssignmentRepository {
     return rows.map(mapRow)
   }
 
+  /** Revokes hand-made grants only; review round slots change through their own commands. */
   async revoke(input: {
     requestId: string
     userId: string
@@ -97,7 +129,7 @@ export class AssignmentRepository {
     const { rows } = await this.pool.query<AssignmentRow>(
       `UPDATE dashboard.case_assignments
        SET active = false, revoked_by = $3, revoked_at = now(), revoke_reason = $4
-       WHERE request_id = $1 AND user_id = $2 AND active
+       WHERE request_id = $1 AND user_id = $2 AND active AND round_id IS NULL
        RETURNING ${ASSIGNMENT_COLUMNS}`,
       [input.requestId, input.userId, input.revokedBy, input.reason],
     )

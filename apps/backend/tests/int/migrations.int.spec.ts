@@ -317,4 +317,16 @@ describe('dashboard migrations', () => {
     )
     expect(rows).toHaveLength(1)
   })
+
+  it('adds the T22 review rounds and round-bound slot assignments', async () => {
+    expect(await tableColumns('review_rounds')).toEqual(
+      expect.arrayContaining(['request_revision', 'proposal_revision', 'employer_id', 'superseded_at']),
+    )
+    expect(await tableColumns('case_assignments')).toEqual(expect.arrayContaining(['round_id', 'slot']))
+    const { rows } = await pool.query(
+      `SELECT indexname FROM pg_indexes WHERE schemaname = 'dashboard'
+       AND indexname IN ('case_assignments_round_person_active_unique', 'case_assignments_round_employer_active_unique')`,
+    )
+    expect(rows).toHaveLength(2)
+  })
 })

@@ -6,6 +6,7 @@ export const TRANSITION_TITLES: Record<string, string> = {
   chief_return: 'برگشت درخواست جهت اصلاح',
   chief_reject: 'رد درخواست',
   correction_submit: 'ارسال اصلاحیه درخواست',
+  review_round_start: 'شروع دور داوری',
   owner_reopen: 'بازگشایی درخواست توسط صاحب سیستم',
   verification_submit: 'ارسال مدارک برای احراز',
   verification_approve: 'تأیید مدارک احراز',
