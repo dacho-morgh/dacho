@@ -98,6 +98,7 @@ import {
   type EvaluationDto,
   type EvaluationStore,
 } from '../reviews/evaluation-repo.js'
+import { ROUND_REQUIRED_EVALUATIONS } from '../reviews/round-completion.js'
 import { validateAndScoreReview } from '../reviews/scoring.js'
 import {
   PostgresNotificationOutbox,
@@ -1552,9 +1553,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       const revision = request.revision
+      // Own evaluation only: how far the other three are is not a reviewer's to see.
       const evaluation = await evaluations.findByRequestAndUser(request.id, actor.id, revision)
-      const completedCount = await currentCompletion(request.id, await evaluations.listForRequest(request.id, revision))
-      res.json({ evaluation, revision, completedEvaluationsCount: completedCount })
+      res.json({ evaluation, revision })
     } catch (error) { next(error) }
   })
 
@@ -1703,7 +1704,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       const revision = request.revision
       const items = await evaluations.listForRequest(request.id, revision)
       const completedCount = await currentCompletion(request.id, items)
-      res.json({ items: items.map(oversightEvaluation), revision, completedCount })
+      const round = await rounds.findLatest(request.id)
+      res.json({
+        items: items.map(oversightEvaluation),
+        revision,
+        completedCount,
+        requiredCount: ROUND_REQUIRED_EVALUATIONS,
+        readyForChiefDecision: round?.completion.ready ?? false,
+      })
     } catch (error) { next(error) }
   })
 

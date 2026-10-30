@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 
 import { isUuid } from '../db/uuid.js'
+import { countRoundFinals, ROUND_REQUIRED_EVALUATIONS, syncRoundCompletion } from '../reviews/round-completion.js'
 import { appendTransition } from './transition-history.js'
 
 export type ReviewSlot = 'employer' | 'ordinary'
@@ -26,6 +27,14 @@ export interface ReviewReplacementDto {
   replacedAt: string
 }
 
+/** Progress of a round; oversight only. `ready` only means the chief can now decide. */
+export interface ReviewRoundCompletionDto {
+  required: number
+  finalized: number
+  ready: boolean
+  completedAt: string | null
+}
+
 export interface ReviewRoundDto {
   id: string
   requestId: string
@@ -35,6 +44,7 @@ export interface ReviewRoundDto {
   startedBy: string
   startedAt: string
   supersededAt: string | null
+  completion: ReviewRoundCompletionDto
   slots: ReviewRoundSlotDto[]
   /** Slot replacements in the order they happened; oversight only. */
   replacements: ReviewReplacementDto[]
@@ -49,6 +59,7 @@ interface RoundRow {
   started_by: string
   started_at: Date
   superseded_at: Date | null
+  completed_at: Date | null
 }
 
 interface SlotRow {
@@ -75,7 +86,7 @@ interface ReplacementRow {
 }
 
 const ROUND_COLUMNS =
-  'id, request_id, request_revision, proposal_revision, employer_id, started_by, started_at, superseded_at'
+  'id, request_id, request_revision, proposal_revision, employer_id, started_by, started_at, superseded_at, completed_at'
 
 /** The last employer the owner substituted for this request, if any. */
 const REPLACEMENT_EMPLOYER_SQL = `(
@@ -109,7 +120,12 @@ function mapReplacement(row: ReplacementRow): ReviewReplacementDto {
   }
 }
 
-function mapRound(row: RoundRow, slots: SlotRow[], replacements: ReplacementRow[] = []): ReviewRoundDto {
+function mapRound(
+  row: RoundRow,
+  slots: SlotRow[],
+  replacements: ReplacementRow[],
+  progress: { finalized: number; current: boolean },
+): ReviewRoundDto {
   return {
     id: row.id,
     requestId: row.request_id,
@@ -119,6 +135,12 @@ function mapRound(row: RoundRow, slots: SlotRow[], replacements: ReplacementRow[
     startedBy: row.started_by,
     startedAt: row.started_at.toISOString(),
     supersededAt: row.superseded_at ? row.superseded_at.toISOString() : null,
+    completion: {
+      required: ROUND_REQUIRED_EVALUATIONS,
+      finalized: progress.finalized,
+      ready: progress.current && row.completed_at !== null,
+      completedAt: row.completed_at ? row.completed_at.toISOString() : null,
+    },
     slots: slots.filter((slot) => slot.round_id === row.id).map(mapSlot),
     replacements: replacements.filter((item) => item.round_id === row.id).map(mapReplacement),
   }
@@ -225,13 +247,16 @@ export class ReviewRoundRepository {
   /** The round for the request's current revision, or the latest earlier one. */
   async findLatest(requestId: string): Promise<ReviewRoundDto | null> {
     if (!isUuid(requestId)) return null
-    const { rows } = await this.pool.query<RoundRow>(
-      `SELECT ${ROUND_COLUMNS} FROM dashboard.review_rounds
-       WHERE request_id = $1 ORDER BY request_revision DESC LIMIT 1`,
+    const { rows } = await this.pool.query<RoundRow & { current: boolean }>(
+      `SELECT rr.*, (r.revision = rr.request_revision AND r.status = 'in_review') AS current
+       FROM dashboard.review_rounds rr
+       JOIN dashboard.requests r ON r.id = rr.request_id
+       WHERE rr.request_id = $1 ORDER BY rr.request_revision DESC LIMIT 1`,
       [requestId],
     )
     const round = rows[0]
     if (!round) return null
+    const finalized = await countRoundFinals(this.pool, { id: round.id, requestRevision: round.request_revision })
     const slots = await this.pool.query<SlotRow>(
       `SELECT id, round_id, user_id, role, slot, active, assigned_at, revoked_at, revoke_reason
        FROM dashboard.case_assignments WHERE round_id = $1 ORDER BY slot DESC, assigned_at ASC, user_id ASC`,
@@ -242,7 +267,7 @@ export class ReviewRoundRepository {
        FROM dashboard.review_replacements WHERE round_id = $1 ORDER BY replaced_at ASC, id ASC`,
       [round.id],
     )
-    return mapRound(round, slots.rows, replacements.rows)
+    return mapRound(round, slots.rows, replacements.rows, { finalized, current: round.current })
   }
 
   /**
@@ -363,8 +388,16 @@ export class ReviewRoundRepository {
         toState: current.status,
         revision: current.revision,
       })
+      // Someone picked here may already hold a final evaluation of this revision
+      // from an earlier hand-made grant; it is locked, so it can never be re-sent.
+      await syncRoundCompletion(client, { requestId: current.id, revision: current.revision, actorId: input.actorId })
+      const synced = await client.query<RoundRow>(
+        `SELECT ${ROUND_COLUMNS} FROM dashboard.review_rounds WHERE id = $1`,
+        [round.id],
+      )
+      const finalized = await countRoundFinals(client, { id: round.id, requestRevision: current.revision })
       await client.query('COMMIT')
-      return { round: mapRound(round, slots) }
+      return { round: mapRound(synced.rows[0]!, slots, [], { finalized, current: true }) }
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined)
       if ((error as { code?: string }).code === '23505') return 'already_assigned'
@@ -490,6 +523,8 @@ export class ReviewRoundRepository {
         revision: current.revision,
         reason: input.reason,
       })
+      // Whoever left may have held a counted evaluation; completion follows the active slots.
+      await syncRoundCompletion(client, { requestId: current.id, revision: current.revision, actorId: input.actorId })
       await client.query('COMMIT')
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined)

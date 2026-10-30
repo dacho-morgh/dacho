@@ -7,6 +7,7 @@ export const TRANSITION_TITLES: Record<string, string> = {
   chief_reject: 'رد درخواست',
   correction_submit: 'ارسال اصلاحیه درخواست',
   review_round_start: 'شروع دور داوری',
+  review_round_complete: 'تکمیل چهار ارزیابی دور داوری',
   chief_replace_reviewer: 'جایگزینی داور',
   owner_replace_employer: 'جایگزینی کارفرما توسط صاحب سیستم',
   owner_reopen: 'بازگشایی درخواست توسط صاحب سیستم',
