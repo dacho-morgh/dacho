@@ -33,6 +33,8 @@ import {
   necessaryCompanyProfile,
   parseQueueView,
   ReviewCaseRepository,
+  reviewerActivityView,
+  reviewerRequestView,
 } from './review-case-repo.js'
 import {
   DossierValidationError,
@@ -450,6 +452,28 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     )
   }
 
+  /** Reviewers and employers get the minimal case view from the generic request routes (T23). */
+  const limitRequest = async <T extends NonNullable<Awaited<ReturnType<RequestRepository['findByIdAny']>>>>(
+    actor: { id: string; operationalRole: OperationalRole },
+    item: T,
+    withAnswers: boolean,
+  ) => {
+    if (!isReviewerRole(actor.operationalRole)) return item
+    let answers: Record<string, unknown> = {}
+    if (withAnswers) {
+      // Event applications show the reviewed revision; requests with nothing pinned keep their own answers.
+      const reviewed = await reviewCases.reviewedProposalRevision(item.id, { id: actor.id, role: actor.operationalRole })
+      const proposal = reviewed === null ? null : await repo.findRequestProposal(item.id, reviewed)
+      answers = proposal ? (proposal.answers ?? {}) : item.answers
+    }
+    return reviewerRequestView(item, answers) as unknown as T
+  }
+
+  const limitActivities = <A extends Parameters<typeof reviewerActivityView>[0]>(
+    actor: { operationalRole: OperationalRole },
+    items: A[],
+  ) => (isReviewerRole(actor.operationalRole) ? items.map(reviewerActivityView) : items)
+
   const resolveScope = async (actorId: string, role: OperationalRole): Promise<{ scope: RequestScope; companyId: string | null }> => {
     const companyId = await actorCompanyId(actorId, role)
     const scope = bindRequestScope(requestScopeFor(role), actorId, companyId)
@@ -711,7 +735,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const result = await repo.listScoped(scope, { status, page, limit })
     res.json({
       ...result,
-      items: await presentRequests(actor, result.items, companyId),
+      items: await Promise.all(
+        (await presentRequests(actor, result.items, companyId)).map((item) => limitRequest(actor, item, false)),
+      ),
     })
     } catch (error) { next(error) }
   })
@@ -733,8 +759,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const presented = await presentRequests(actor, result.items)
     const items = await Promise.all(
       presented.map(async (item) => ({
-        ...item,
-        owner: safeOwner(await deps.userStore.findById(item.ownerId)),
+        ...(await limitRequest(actor, item, false)),
+        owner: isReviewerRole(actor.operationalRole) ? null : safeOwner(await deps.userStore.findById(item.ownerId)),
       })),
     )
     res.json({ ...result, items })
@@ -753,9 +779,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     const service = await deps.serviceCatalog.findById(request.serviceId)
     res.json({
-      request: (await presentRequests(actor, [request]))[0],
-      owner: safeOwner(await deps.userStore.findById(request.ownerId)),
-      timeline: await activities.listForRequestScoped(request.id, scope),
+      request: await limitRequest(actor, (await presentRequests(actor, [request]))[0]!, true),
+      owner: isReviewerRole(actor.operationalRole) ? null : safeOwner(await deps.userStore.findById(request.ownerId)),
+      timeline: limitActivities(actor, await activities.listForRequestScoped(request.id, scope)),
       workflow: service?.workflow ?? [],
     })
     } catch (error) { next(error) }
@@ -772,12 +798,12 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
 
     const service = await deps.serviceCatalog.findById(request.serviceId)
-    const timeline = await activities.listForRequestScoped(request.id, scope)
+    const timeline = limitActivities(actor, await activities.listForRequestScoped(request.id, scope))
     res.json({
-      request: (await presentRequests(actor, [request], companyId))[0],
+      request: await limitRequest(actor, (await presentRequests(actor, [request], companyId))[0]!, true),
       timeline,
       workflow: service?.workflow ?? [],
-      owner: safeOwner(await deps.userStore.findById(request.ownerId)),
+      owner: isReviewerRole(actor.operationalRole) ? null : safeOwner(await deps.userStore.findById(request.ownerId)),
     })
     } catch (error) { next(error) }
   })
@@ -791,7 +817,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(404).json({ error: 'not_found' })
       return
     }
-    res.json({ items: await activities.listForRequestScoped(request.id, scope) })
+    res.json({ items: limitActivities(actor, await activities.listForRequestScoped(request.id, scope)) })
     } catch (error) { next(error) }
   })
 
@@ -1874,7 +1900,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
-    res.json(await activities.listScoped(scope, page, limit))
+    const feed = await activities.listScoped(scope, page, limit)
+    res.json({ ...feed, items: limitActivities(actor, feed.items) })
     } catch (error) { next(error) }
   })
 

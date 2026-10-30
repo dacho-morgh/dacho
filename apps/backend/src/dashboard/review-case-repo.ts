@@ -67,6 +67,32 @@ export function necessaryCompanyProfile(snapshot: unknown): NecessaryCompanyProf
   }
 }
 
+/**
+ * What a reviewer or employer receives from the generic request routes: the case
+ * without who owns it, which company account submitted it, or who decided what.
+ * `answers` is passed in so event applications show the reviewed revision.
+ */
+export function reviewerRequestView<T extends {
+  ownerId: string
+  companyId: string | null
+  answers: Record<string, unknown>
+  submittedBy?: string | null
+}>(item: T, answers: Record<string, unknown>) {
+  const { ownerId: _ownerId, companyId: _companyId, submittedBy: _submittedBy, ...rest } = item
+  return { ...rest, answers }
+}
+
+/** Timeline entries without account ids or free-text decision reasons. */
+export function reviewerActivityView<T extends {
+  ownerId: string
+  actorId: string | null
+  reason: string | null
+  description: string | null
+}>(activity: T) {
+  const { ownerId: _ownerId, actorId: _actorId, reason: _reason, description: _description, ...rest } = activity
+  return rest
+}
+
 export interface OwnEvaluationSummary {
   state: 'draft' | 'final'
   revision: number

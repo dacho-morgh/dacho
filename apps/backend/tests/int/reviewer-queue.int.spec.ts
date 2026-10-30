@@ -487,6 +487,48 @@ describe('T23: Assigned reviewer queue and case file (int)', () => {
     expect((await queue(app, 'reviewer-3')).total).toBe(1)
   })
 
+  it('gives reviewers and employers a minimal view from the generic request routes', async () => {
+    const app = await makeApp()
+    const event = await createEvent(app, 'chief', ['پردازش تصویر'])
+    const triaged = await triagedCase(app, event)
+    expect((await startRound(app, 'chief', triaged.id, { reviewerIds: THREE })).status).toBe(201)
+
+    for (const user of ['reviewer-1', 'employer-1']) {
+      const list = await get(app, user, '/requests').expect(200)
+      const admin = await get(app, user, '/admin/requests').expect(200)
+      for (const body of [list.body, admin.body]) {
+        expect(body.items).toHaveLength(1)
+        expect(body.items[0]).toMatchObject({ id: triaged.id, answers: {}, allowedActions: ['read'] })
+        for (const hidden of ['ownerId', 'companyId', 'submittedBy']) expect(body.items[0], user).not.toHaveProperty(hidden)
+      }
+      expect(admin.body.items[0].owner).toBeNull()
+
+      for (const path of [`/requests/${triaged.id}`, `/admin/requests/${triaged.id}`]) {
+        const detail = await get(app, user, path).expect(200)
+        expect(detail.body.owner, path).toBeNull()
+        for (const hidden of ['ownerId', 'companyId', 'submittedBy']) expect(detail.body.request, path).not.toHaveProperty(hidden)
+        // Event applications show the reviewed revision's answers.
+        expect(detail.body.request.answers, path).toMatchObject({ summary: 'خلاصه اولیه' })
+        expect(detail.body.timeline.length, path).toBeGreaterThan(0)
+        for (const entry of detail.body.timeline) {
+          for (const hidden of ['ownerId', 'actorId', 'reason', 'description']) expect(entry, path).not.toHaveProperty(hidden)
+        }
+        expect(JSON.stringify(detail.body), path).not.toContain('company-user-1')
+      }
+      const history = await get(app, user, `/requests/${triaged.id}/history`).expect(200)
+      for (const entry of history.body.items) expect(entry).not.toHaveProperty('actorId')
+      const feed = await get(app, user, '/activities').expect(200)
+      for (const entry of feed.body.items) expect(entry).not.toHaveProperty('ownerId')
+    }
+
+    // Oversight and the owning company keep their full views.
+    const full = await get(app, 'owner', `/requests/${triaged.id}`).expect(200)
+    expect(full.body.owner).toEqual({ id: 'company-user-1', name: null })
+    expect(full.body.request.ownerId).toBe('company-user-1')
+    const own = await get(app, 'company-user-1', `/requests/${triaged.id}`).expect(200)
+    expect(own.body.request.ownerId).toBe('company-user-1')
+  })
+
   it('does not list a case that is no longer in review as open work', async () => {
     const app = await makeApp()
     const event = await createEvent(app, 'chief', ['پردازش تصویر'])

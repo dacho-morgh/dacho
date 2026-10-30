@@ -32,10 +32,10 @@ It never carries the owner or representative, the private verification dossier o
 - `GET /requests/:id/proposal` shows these roles only the reviewed revision (`revisions` lists just that one; another `revision` is `404`). `GET /requests/:id/verification` uses the same necessary-profile projection as the case file.
 - Responses are `Cache-Control: private, no-store`.
 
-## Known gap
+## Generic request routes
 
-The generic `GET /requests`, `GET /requests/:id` and `/history` still return reviewers the representative's `{id, name}`, the request's current `answers` and the timeline, because existing screens use them. Reviewer screens must use `/review/*`. Gating those routes for reviewer roles (and the letter-attachment name list now follows the same pinned-file rule) is the follow-up before the reviewer frontend (FE16) ships; it needs a decision on the existing dashboard request pages.
+`GET /requests`, `GET /admin/requests`, their `/:id` details, `/requests/:id/history` and `GET /activities` also return only a minimal view to reviewers and employers: no `ownerId`, `companyId`, `submittedBy` or `owner`, and timeline entries without account ids or decision reasons. Event applications show the reviewed revision's `answers` on the detail routes; lists carry empty `answers`. Requests of other services with nothing pinned keep their own answers. Oversight roles and the owning company are unchanged. The existing dashboard pages read `owner` and `ownerId` with optional chaining, so they show a dash instead of a company link for these roles.
 
 ## Not in this slice
 
-The reviewer frontend (FE16), the rubric/evaluation screens, replacing a reviewer or the employer (T26), the chief's decision (T27–T29) and notifications. The chief and investment roles keep their own surfaces; the generic `GET /requests` and `GET /requests/:id` keep their existing assignment scope (see Known gap), so reviewer screens should use the two routes above.
+The reviewer frontend (FE16), the rubric/evaluation screens, replacing a reviewer or the employer (T26), the chief's decision (T27–T29) and notifications. The chief and investment roles keep their own surfaces. Reviewer screens should use the two routes above.
