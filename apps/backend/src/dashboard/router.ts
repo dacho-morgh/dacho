@@ -459,8 +459,16 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   // Mailbox visibility never expands the underlying document audience.
   const canReadAttachment = async (doc: PrivateDocumentRecord, actorId: string, role: OperationalRole): Promise<boolean> => {
     const companyId = await actorCompanyId(actorId, role)
-    const assigned = doc.requestId && isCaseAssignmentRole(role)
-      ? await assignments.activeFor(doc.requestId, actorId, role) : false
+    let assigned = false
+    if (doc.requestId && isCaseAssignmentRole(role)) {
+      if (isReviewerRole(role)) {
+        // Reviewers see only the proposal files pinned to the revision they review (T23).
+        const pinned = await reviewCases.reviewableProposalDocumentIds(doc.requestId, { id: actorId, role })
+        assigned = pinned === 'unrestricted' || pinned?.has(doc.id) === true
+      } else {
+        assigned = await assignments.activeFor(doc.requestId, actorId, role)
+      }
+    }
     return canReadDocument(role, { ...doc, assigned }, actorId, companyId)
   }
 
@@ -948,14 +956,21 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         const reviewed = await reviewCases.reviewedProposalRevision(
           request.id, { id: actor.id, role: actor.operationalRole },
         )
-        if (reviewed === null || (revision !== undefined && revision !== reviewed)) {
+        if (reviewed === null) {
+          // Nothing pinned to review (for example a request of another service).
+          res.json({ proposal: null, agreements: [], revisions: [] })
+          return
+        }
+        if (revision !== undefined && revision !== reviewed) {
           res.status(404).json({ error: 'not_found' })
           return
         }
         const proposal = await repo.findRequestProposal(request.id, reviewed)
+        // The accepting representative's id is not the reviewer's business.
+        const agreements = proposal ? await repo.listRequestAgreements(request.id, proposal.revision) : []
         res.json({
           proposal,
-          agreements: proposal ? await repo.listRequestAgreements(request.id, proposal.revision) : [],
+          agreements: agreements.map(({ acceptedBy: _acceptedBy, ...agreement }) => agreement),
           revisions: [reviewed],
         })
         return
@@ -1020,7 +1035,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
       const queue = await reviewCases.listQueue(
         { id: actor.id, role: actor.operationalRole },
-        { view, page: parsePositiveInt(req.query.page, 1), limit: Math.min(parsePositiveInt(req.query.limit, 25), 100) },
+        { view, page: Math.min(parsePositiveInt(req.query.page, 1), 1_000_000), limit: Math.min(parsePositiveInt(req.query.limit, 25), 100) },
       )
       res.set('Cache-Control', 'private, no-store, max-age=0').json(queue)
     } catch (error) { next(error) }

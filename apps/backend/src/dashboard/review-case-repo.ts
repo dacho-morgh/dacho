@@ -146,7 +146,7 @@ interface QueueRow {
   event_title: string | null
   subtopic_id: string | null
   subtopic_title: string | null
-  snapshot: unknown
+  company_name: string | null
   role: ReviewerRole
   slot: 'employer' | 'ordinary' | null
   assigned_at: Date
@@ -171,7 +171,7 @@ const ASSIGNMENT_ROWS_SQL = `
   SELECT r.id AS request_id, r.tracking_code, r.title, r.revision, r.status, r.review_stage,
          r.submission_date,
          e.id AS event_id, e.title AS event_title, s.id AS subtopic_id, s.title AS subtopic_title,
-         v.snapshot,
+         v.snapshot -> 'company' ->> 'name' AS company_name,
          a.role, a.slot, a.assigned_at, a.round_id,
          rr.request_revision AS round_request_revision,
          rr.proposal_revision AS round_proposal_revision,
@@ -196,7 +196,6 @@ const ASSIGNMENT_ROWS_SQL = `
   WHERE a.user_id = $1 AND a.role = $2 AND a.active`
 
 function mapQueueRow(row: QueueRow): ReviewQueueItem {
-  const company = asRecord(asRecord(row.snapshot).company)
   return {
     requestId: row.request_id,
     trackingCode: row.tracking_code,
@@ -207,7 +206,7 @@ function mapQueueRow(row: QueueRow): ReviewQueueItem {
     submissionDate: row.submission_date ? row.submission_date.toISOString() : null,
     event: row.event_id && row.event_title ? { id: row.event_id, title: row.event_title } : null,
     subtopic: row.subtopic_id && row.subtopic_title ? { id: row.subtopic_id, title: row.subtopic_title } : null,
-    companyName: typeof company.name === 'string' ? company.name : null,
+    companyName: row.company_name ?? null,
     assignment: { role: row.role, slot: row.slot, assignedAt: row.assigned_at.toISOString() },
     round: row.round_id && row.round_request_revision !== null && row.round_proposal_revision !== null
       ? {
@@ -297,6 +296,11 @@ export class ReviewCaseRepository {
           [requestId, row.proposal_revision],
         )).rows[0] ?? null
 
+    const verification = await this.pool.query<{ snapshot: unknown }>(
+      'SELECT snapshot FROM dashboard.request_verifications WHERE request_id = $1',
+      [requestId],
+    )
+
     const rfp = await this.pool.query<{
       version_id: string
       id: string | null
@@ -337,7 +341,7 @@ export class ReviewCaseRepository {
               })),
           }
         : null,
-      company: row.snapshot ? necessaryCompanyProfile(row.snapshot) : null,
+      company: verification.rows[0] ? necessaryCompanyProfile(verification.rows[0].snapshot) : null,
     }
   }
 

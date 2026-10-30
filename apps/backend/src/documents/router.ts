@@ -188,9 +188,13 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       }
       const pinnedCache = new Map<string, Set<string> | 'unrestricted' | null>()
       const records = await documents.listForRequest(requestId)
+      const assignedToRequest = isReviewerRole(actor.operationalRole)
+        ? undefined
+        : await isAssignedTo(requestId, actor.id, actor.operationalRole)
       const items = []
       for (const record of records) {
-        const assigned = await isAssignedToRecord(record, actor.id, actor.operationalRole, pinnedCache)
+        const assigned = assignedToRequest ??
+          await isAssignedToRecord(record, actor.id, actor.operationalRole, pinnedCache)
         items.push(present(record, actor.id, actor.operationalRole, companyId, assigned))
       }
       res.json({ items: items.filter((record) => record.allowedActions.length > 0) })

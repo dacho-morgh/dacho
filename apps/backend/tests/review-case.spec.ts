@@ -46,7 +46,7 @@ function queueRow(overrides: Record<string, unknown> = {}) {
     request_id: REQUEST_ID, tracking_code: 'DCH-2026-0001', title: 'طرح', revision: 3, status: 'in_review',
     review_stage: 'triaged', submission_date: new Date('2026-10-01T00:00:00Z'),
     event_id: 'event-1', event_title: 'رویداد', subtopic_id: 'sub-1', subtopic_title: 'زیرعنوان',
-    snapshot: FULL_SNAPSHOT, role: 'reviewer', slot: 'ordinary', assigned_at: new Date('2026-10-02T00:00:00Z'),
+    company_name: 'شرکت فناور', role: 'reviewer', slot: 'ordinary', assigned_at: new Date('2026-10-02T00:00:00Z'),
     round_id: ROUND_ID, round_request_revision: 3, round_proposal_revision: 2, proposal_revision: 2,
     actionable: true, evaluation_state: null, evaluation_revision: null, evaluation_updated_at: null,
     evaluation_finalized_at: null,
@@ -54,7 +54,7 @@ function queueRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
-async function setup(options: { row?: Record<string, unknown> | null } = {}) {
+async function setup(options: { row?: Record<string, unknown> | null; snapshot?: unknown } = {}) {
   const calls: { sql: string; params: unknown[] }[] = []
   const row = options.row === undefined ? queueRow() : options.row
   const query = async (sql: string, params: unknown[] = []) => {
@@ -64,6 +64,10 @@ async function setup(options: { row?: Record<string, unknown> | null } = {}) {
       const forRequest = sql.includes('WHERE request_id = $3')
       if (forRequest && params[2] !== REQUEST_ID) return { rows: [] }
       return { rows: row ? [row] : [] }
+    }
+    if (sql.includes('FROM dashboard.request_verifications WHERE request_id = $1')) {
+      const snapshot = options.snapshot === undefined ? FULL_SNAPSHOT : options.snapshot
+      return { rows: snapshot ? [{ snapshot }] : [] }
     }
     if (sql.includes('FROM dashboard.request_proposals WHERE request_id = $1 AND revision = $2')) {
       return {
@@ -230,7 +234,7 @@ describe('[T23] GET /review/cases/:id', () => {
   })
 
   it('has no proposal or profile for a case that never reached a pinned submission', async () => {
-    const { app } = await setup({ row: queueRow({ proposal_revision: null, snapshot: null, round_id: null, round_request_revision: null, round_proposal_revision: null }) })
+    const { app } = await setup({ snapshot: null, row: queueRow({ proposal_revision: null, company_name: null, round_id: null, round_request_revision: null, round_proposal_revision: null }) })
     const res = await request(app).get(`/review/cases/${REQUEST_ID}`).set(header('reviewer-1'))
     expect(res.status).toBe(200)
     expect(res.body.proposal).toBeNull()
