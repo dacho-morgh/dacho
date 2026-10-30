@@ -12,7 +12,7 @@ A triaged event application (`status = in_review`, `review_stage = triaged`) is 
 | `POST /requests/:id/review-round` | Responsible chief | Body `{ reviewerIds: [3 ids], expectedRevision? }`. Creates the round and four assignments in one transaction (`201`). |
 | `GET /requests/:id/review-round` | Owner, Secretariat, the case's chief: all slots. Assigned reviewer/employer: only their own slot. Company and investment: `403`. | `{ round: null }` before a round exists. |
 
-Case responses advertise the chief action `startReview` only to the event's current responsible chief on a triaged case with no round for its current revision. The owner and Secretariat can never start a round; owner-only employer replacement is T26.
+Case responses advertise the chief action `startReview` only to the event's current responsible chief on a triaged case with no round for its current revision. The owner and Secretariat can never start a round; owner-only employer replacement is [T26](review-replacement.md).
 
 ## Rules enforced
 
@@ -28,4 +28,4 @@ The assigned people's queue and case file are in [reviewer-queue.md](reviewer-qu
 
 ## Not in this slice
 
-Replacing an unfinished reviewer or the employer (T26), 4/4 completion and the chief's advance/reject/correct decision (T27–T29), and notifications to the assigned people.
+Replacing an unfinished reviewer or the employer (done in [T26](review-replacement.md)), 4/4 completion and the chief's advance/reject/correct decision (T27–T29), and notifications to the assigned people.

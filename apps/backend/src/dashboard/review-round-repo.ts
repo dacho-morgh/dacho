@@ -16,6 +16,16 @@ export interface ReviewRoundSlotDto {
   revokeReason: string | null
 }
 
+export interface ReviewReplacementDto {
+  id: string
+  slot: ReviewSlot
+  oldUserId: string
+  newUserId: string
+  replacedBy: string
+  reason: string | null
+  replacedAt: string
+}
+
 export interface ReviewRoundDto {
   id: string
   requestId: string
@@ -26,6 +36,8 @@ export interface ReviewRoundDto {
   startedAt: string
   supersededAt: string | null
   slots: ReviewRoundSlotDto[]
+  /** Slot replacements in the order they happened; oversight only. */
+  replacements: ReviewReplacementDto[]
 }
 
 interface RoundRow {
@@ -51,8 +63,26 @@ interface SlotRow {
   revoke_reason: string | null
 }
 
+interface ReplacementRow {
+  id: string
+  round_id: string
+  slot: ReviewSlot
+  old_user_id: string
+  new_user_id: string
+  replaced_by: string
+  reason: string | null
+  replaced_at: Date
+}
+
 const ROUND_COLUMNS =
   'id, request_id, request_revision, proposal_revision, employer_id, started_by, started_at, superseded_at'
+
+/** The last employer the owner substituted for this request, if any. */
+const REPLACEMENT_EMPLOYER_SQL = `(
+  SELECT rp.new_user_id FROM dashboard.review_replacements rp
+  WHERE rp.request_id = r.id AND rp.slot = 'employer'
+  ORDER BY rp.replaced_at DESC, rp.id DESC LIMIT 1
+)`
 
 function mapSlot(row: SlotRow): ReviewRoundSlotDto {
   return {
@@ -67,7 +97,19 @@ function mapSlot(row: SlotRow): ReviewRoundSlotDto {
   }
 }
 
-function mapRound(row: RoundRow, slots: SlotRow[]): ReviewRoundDto {
+function mapReplacement(row: ReplacementRow): ReviewReplacementDto {
+  return {
+    id: row.id,
+    slot: row.slot,
+    oldUserId: row.old_user_id,
+    newUserId: row.new_user_id,
+    replacedBy: row.replaced_by,
+    reason: row.reason,
+    replacedAt: row.replaced_at.toISOString(),
+  }
+}
+
+function mapRound(row: RoundRow, slots: SlotRow[], replacements: ReplacementRow[] = []): ReviewRoundDto {
   return {
     id: row.id,
     requestId: row.request_id,
@@ -78,6 +120,7 @@ function mapRound(row: RoundRow, slots: SlotRow[]): ReviewRoundDto {
     startedAt: row.started_at.toISOString(),
     supersededAt: row.superseded_at ? row.superseded_at.toISOString() : null,
     slots: slots.filter((slot) => slot.round_id === row.id).map(mapSlot),
+    replacements: replacements.filter((item) => item.round_id === row.id).map(mapReplacement),
   }
 }
 
@@ -88,7 +131,10 @@ export interface RoundStartContext {
   reviewStage: string | null
   revision: number
   responsibleChiefId: string
+  /** The employer fixed on the subtopic. */
   employerId: string
+  /** The employer the owner last put in this case's place (T26), when one was. */
+  replacementEmployerId: string | null
 }
 
 export type StartRoundResult =
@@ -102,6 +148,31 @@ export type StartRoundResult =
   | 'existing_assignments'
   | 'already_assigned'
 
+export type ReplaceSlotResult =
+  | { round: ReviewRoundDto }
+  | 'not_found'
+  | 'forbidden'
+  | 'invalid_state'
+  | 'stale_revision'
+  | 'no_round'
+  | 'not_assigned'
+  | 'evaluation_final'
+  | 'already_assigned'
+  | 'previously_assigned'
+
+export interface ReplaceSlotInput {
+  requestId: string
+  actorId: string
+  slot: ReviewSlot
+  /** Ordinary slot: the reviewer being replaced. The employer slot has exactly one holder. */
+  outgoingUserId?: string
+  incomingUserId: string
+  reason: string | null
+  expectedRevision?: number
+  /** `chief`: the event's responsible chief. `owner`: the system owner (the router checked the role). */
+  authority: 'chief' | 'owner'
+}
+
 export class ReviewRoundRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -113,8 +184,10 @@ export class ReviewRoundRepository {
       revision: number
       chief_id: string
       employer_id: string
+      replacement_employer_id: string | null
     }>(
-      `SELECT r.status, r.review_stage, r.revision, e.responsible_chief_id AS chief_id, s.employer_id
+      `SELECT r.status, r.review_stage, r.revision, e.responsible_chief_id AS chief_id, s.employer_id,
+              ${REPLACEMENT_EMPLOYER_SQL} AS replacement_employer_id
        FROM dashboard.requests r
        JOIN dashboard.request_rfps rfp ON rfp.request_id = r.id
        JOIN dashboard.events e ON e.id = rfp.event_id
@@ -131,6 +204,7 @@ export class ReviewRoundRepository {
       revision: row.revision,
       responsibleChiefId: row.chief_id,
       employerId: row.employer_id,
+      replacementEmployerId: row.replacement_employer_id,
     }
   }
 
@@ -163,7 +237,12 @@ export class ReviewRoundRepository {
        FROM dashboard.case_assignments WHERE round_id = $1 ORDER BY slot DESC, assigned_at ASC, user_id ASC`,
       [round.id],
     )
-    return mapRound(round, slots.rows)
+    const replacements = await this.pool.query<ReplacementRow>(
+      `SELECT id, round_id, slot, old_user_id, new_user_id, replaced_by, reason, replaced_at
+       FROM dashboard.review_replacements WHERE round_id = $1 ORDER BY replaced_at ASC, id ASC`,
+      [round.id],
+    )
+    return mapRound(round, slots.rows, replacements.rows)
   }
 
   /**
@@ -191,9 +270,11 @@ export class ReviewRoundRepository {
         revision: number
         chief_id: string
         employer_id: string
+        replacement_employer_id: string | null
       }>(
         `SELECT r.id, r.owner_id, r.status, r.review_stage, r.revision,
-                e.responsible_chief_id AS chief_id, s.employer_id
+                e.responsible_chief_id AS chief_id, s.employer_id,
+                ${REPLACEMENT_EMPLOYER_SQL} AS replacement_employer_id
          FROM dashboard.requests r
          JOIN dashboard.request_rfps rfp ON rfp.request_id = r.id
          JOIN dashboard.events e ON e.id = rfp.event_id
@@ -213,7 +294,8 @@ export class ReviewRoundRepository {
       }
       // The router validated this person; a changed subtopic employer must not
       // be silently replaced by the one it checked.
-      if (current.employer_id !== input.employerId) return await this.abort(client, 'employer_changed')
+      const allowedEmployers = [current.replacement_employer_id, current.employer_id]
+      if (!allowedEmployers.includes(input.employerId)) return await this.abort(client, 'employer_changed')
 
       const existing = await client.query(
         'SELECT 1 FROM dashboard.review_rounds WHERE request_id = $1 AND request_revision = $2',
@@ -253,14 +335,14 @@ export class ReviewRoundRepository {
            (request_id, request_revision, proposal_revision, employer_id, started_by)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING ${ROUND_COLUMNS}`,
-        [current.id, current.revision, proposalRevision, current.employer_id, input.actorId],
+        [current.id, current.revision, proposalRevision, input.employerId, input.actorId],
       )
       const round = inserted.rows[0]
       if (!round) throw new Error('INSERT review_rounds returned no row')
 
       const slots: SlotRow[] = []
       const people: { userId: string; role: 'employer-reviewer' | 'reviewer'; slot: ReviewSlot }[] = [
-        { userId: current.employer_id, role: 'employer-reviewer', slot: 'employer' },
+        { userId: input.employerId, role: 'employer-reviewer', slot: 'employer' },
         ...input.reviewerIds.map((userId) => ({ userId, role: 'reviewer' as const, slot: 'ordinary' as const })),
       ]
       for (const person of people) {
@@ -292,7 +374,135 @@ export class ReviewRoundRepository {
     }
   }
 
-  private async abort<T extends StartRoundResult>(client: PoolClient, result: T): Promise<T> {
+  /**
+   * Replace one person in the current round: the outgoing assignment ends (its
+   * access stops at the next request, the row and any evaluation stay as
+   * history), the incoming person takes the same slot, and the replacement is
+   * recorded with actor, reason and time. Authority, state, revision, the round
+   * and the outgoing person's unfinished status are re-read under the request
+   * lock the evaluation write guard also takes, so a finalization racing the
+   * replacement either commits first (and blocks it) or finds the access gone.
+   */
+  async replaceSlot(input: ReplaceSlotInput): Promise<ReplaceSlotResult> {
+    if (!isUuid(input.requestId)) return 'not_found'
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const locked = await client.query<{
+        id: string
+        owner_id: string
+        status: string
+        review_stage: string | null
+        revision: number
+        chief_id: string
+      }>(
+        `SELECT r.id, r.owner_id, r.status, r.review_stage, r.revision, e.responsible_chief_id AS chief_id
+         FROM dashboard.requests r
+         JOIN dashboard.request_rfps rfp ON rfp.request_id = r.id
+         JOIN dashboard.events e ON e.id = rfp.event_id
+         WHERE r.id = $1
+         FOR NO KEY UPDATE OF r FOR SHARE OF e`,
+        [input.requestId],
+      )
+      const current = locked.rows[0]
+      if (!current) return await this.abort(client, 'not_found')
+      if (input.authority === 'chief' && current.chief_id !== input.actorId) return await this.abort(client, 'forbidden')
+      if (current.status !== 'in_review' || current.review_stage !== 'triaged') {
+        return await this.abort(client, 'invalid_state')
+      }
+      if (input.expectedRevision !== undefined && input.expectedRevision !== current.revision) {
+        return await this.abort(client, 'stale_revision')
+      }
+
+      const roundRows = await client.query<RoundRow>(
+        `SELECT ${ROUND_COLUMNS} FROM dashboard.review_rounds
+         WHERE request_id = $1 AND request_revision = $2 FOR UPDATE`,
+        [current.id, current.revision],
+      )
+      const round = roundRows.rows[0]
+      if (!round) return await this.abort(client, 'no_round')
+
+      const outgoing = await client.query<SlotRow>(
+        `SELECT id, round_id, user_id, role, slot, active, assigned_at, revoked_at, revoke_reason
+         FROM dashboard.case_assignments
+         WHERE round_id = $1 AND slot = $2 AND active
+           AND ($3::text IS NULL OR user_id = $3)
+         FOR UPDATE`,
+        [round.id, input.slot, input.outgoingUserId ?? null],
+      )
+      const leaving = outgoing.rows[0]
+      if (!leaving) return await this.abort(client, 'not_assigned')
+
+      if (input.slot === 'ordinary') {
+        // Only unfinished work is handed over; a locked evaluation stays its author's.
+        const final = await client.query(
+          `SELECT 1 FROM dashboard.evaluations
+           WHERE request_id = $1 AND user_id = $2 AND revision = $3 AND state = 'final'`,
+          [current.id, leaving.user_id, current.revision],
+        )
+        if ((final.rowCount ?? 0) > 0) return await this.abort(client, 'evaluation_final')
+      }
+
+      // A person already (or earlier) in this round cannot be put back: their
+      // old draft or evaluation would silently come back with them.
+      const seen = await client.query<{ active: boolean }>(
+        'SELECT active FROM dashboard.case_assignments WHERE round_id = $1 AND user_id = $2',
+        [round.id, input.incomingUserId],
+      )
+      if (seen.rows.some((row) => row.active)) return await this.abort(client, 'already_assigned')
+      if ((seen.rowCount ?? 0) > 0) return await this.abort(client, 'previously_assigned')
+
+      const revokeReason = input.slot === 'employer' ? 'replaced_employer' : 'replaced_reviewer'
+      await client.query(
+        `UPDATE dashboard.case_assignments
+         SET active = false, revoked_by = $2, revoked_at = now(), revoke_reason = $3
+         WHERE id = $1`,
+        [leaving.id, input.actorId, revokeReason],
+      )
+      const incoming = await client.query<{ id: string }>(
+        `INSERT INTO dashboard.case_assignments (request_id, user_id, role, assigned_by, round_id, slot)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [current.id, input.incomingUserId, leaving.role, input.actorId, round.id, input.slot],
+      )
+      await client.query(
+        `INSERT INTO dashboard.review_replacements
+           (request_id, round_id, slot, old_assignment_id, new_assignment_id, old_user_id, new_user_id, replaced_by, reason)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          current.id, round.id, input.slot, leaving.id, incoming.rows[0]!.id,
+          leaving.user_id, input.incomingUserId, input.actorId, input.reason,
+        ],
+      )
+      if (input.slot === 'employer') {
+        await client.query('UPDATE dashboard.review_rounds SET employer_id = $2 WHERE id = $1', [
+          round.id,
+          input.incomingUserId,
+        ])
+      }
+      await appendTransition(client, {
+        requestId: current.id,
+        ownerId: current.owner_id,
+        actorId: input.actorId,
+        action: input.slot === 'employer' ? 'owner_replace_employer' : 'chief_replace_reviewer',
+        fromState: current.status,
+        toState: current.status,
+        revision: current.revision,
+        reason: input.reason,
+      })
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      if ((error as { code?: string }).code === '23505') return 'already_assigned'
+      throw error
+    } finally {
+      client.release()
+    }
+    const updated = await this.findLatest(input.requestId)
+    return updated ? { round: updated } : 'no_round'
+  }
+
+  private async abort<T extends string>(client: PoolClient, result: T): Promise<T> {
     await client.query('ROLLBACK')
     return result
   }

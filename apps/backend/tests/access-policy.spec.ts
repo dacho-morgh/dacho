@@ -100,7 +100,7 @@ describe('server-derived allowedActions', () => {
     // T22: a triaged case offers the review round until one exists for its revision.
     const triaged = { ...triage, reviewStage: 'triaged' }
     expect(allowedRequestActions('chief-reviewer', { ...triaged, actorIsResponsibleChief: true }, 'c1')).toEqual(['read', 'startReview'])
-    expect(allowedRequestActions('chief-reviewer', { ...triaged, actorIsResponsibleChief: true, reviewRoundStarted: true }, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('chief-reviewer', { ...triaged, actorIsResponsibleChief: true, reviewRoundStarted: true }, 'c1')).toEqual(['read', 'replaceReviewer'])
     expect(allowedRequestActions('chief-reviewer', triaged, 'c1')).toEqual(['read'])
     expect(allowedRequestActions('chief-reviewer', { ...triaged, status: 'rejected', actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
     for (const role of ['system-owner', 'central-secretariat', 'reviewer', 'employer-reviewer', 'investment-reviewer'] as const) {
@@ -120,6 +120,29 @@ describe('server-derived allowedActions', () => {
     expect(allowedRequestActions('system-owner', { ownerId: 'p1', status: 'rejected' }, 'o1')).not.toContain('reopen')
     expect(allowedRequestActions('system-owner', triage, 'o1')).not.toContain('reopen')
     expect(allowedRequestActions('central-secretariat', rejected, 's1')).toEqual(['read', 'uploadDocument'])
+  })
+
+  it('advertises T26 replacement only to the actor who may perform it, inside a started round', () => {
+    const triaged = { ownerId: 'p1', status: 'in_review', reviewStage: 'triaged' }
+    const started = { ...triaged, reviewRoundStarted: true }
+
+    // The responsible chief replaces ordinary reviewers; the owner alone replaces the employer.
+    expect(allowedRequestActions('chief-reviewer', { ...started, actorIsResponsibleChief: true }, 'c1')).toEqual(['read', 'replaceReviewer'])
+    expect(allowedRequestActions('chief-reviewer', started, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('system-owner', started, 'o1')).toEqual([
+      'read', 'assign', 'replaceEmployer', 'uploadDocument', 'deleteDocument',
+    ])
+    expect(allowedRequestActions('system-owner', started, 'o1')).not.toContain('replaceReviewer')
+    expect(allowedRequestActions('system-owner', triaged, 'o1')).not.toContain('replaceEmployer')
+    expect(allowedRequestActions('system-owner', { ...started, status: 'rejected' }, 'o1')).not.toContain('replaceEmployer')
+    expect(allowedRequestActions('system-owner', { ...started, reviewStage: 'chief_triage' }, 'o1')).not.toContain('replaceEmployer')
+
+    for (const role of ['central-secretariat', 'reviewer', 'employer-reviewer', 'investment-reviewer'] as const) {
+      const actions = allowedRequestActions(role, { ...started, actorIsResponsibleChief: true }, 'x1')
+      expect(actions, role).not.toContain('replaceReviewer')
+      expect(actions, role).not.toContain('replaceEmployer')
+    }
+    expect(allowedRequestActions('representative', started, 'p1')).toEqual(['read'])
   })
 })
 

@@ -2,8 +2,9 @@
 
 The evaluation API supports reviewer-owned drafts and immutable final evaluations
 using the fixed T24 rubric. Review-round creation and the four distinct review
-slots are covered by [review rounds (T22)](review-rounds.md). It does not
-implement replacements or the chief's advancement decision. Those
+slots are covered by [review rounds (T22)](review-rounds.md) and reviewer/employer
+replacement by [review replacement (T26)](review-replacement.md). It does not
+implement the chief's advancement decision. Those
 workflow dependencies remain separate; a numeric completion count never advances
 a request automatically. Human acceptance has not been run.
 

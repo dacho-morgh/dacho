@@ -329,4 +329,15 @@ describe('dashboard migrations', () => {
     )
     expect(rows).toHaveLength(2)
   })
+
+  it('adds the T26 replacement history with a mandatory employer reason', async () => {
+    expect(await tableColumns('review_replacements')).toEqual(
+      expect.arrayContaining(['round_id', 'slot', 'old_user_id', 'new_user_id', 'replaced_by', 'reason', 'replaced_at']),
+    )
+    const { rows } = await pool.query(
+      `SELECT conname FROM pg_constraint
+       WHERE conname IN ('review_replacements_employer_reason', 'review_replacements_different_people')`,
+    )
+    expect(rows).toHaveLength(2)
+  })
 })
