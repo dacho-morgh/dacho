@@ -16,6 +16,7 @@ import type { CompanyStore } from '../auth/company-store.js'
 import type { UserStore } from '../auth/user-store.js'
 import { AssignmentRepository } from '../dashboard/assignment-repo.js'
 import { actorOf } from '../dashboard/proxy-auth.js'
+import { isReviewerRole, ReviewCaseRepository } from '../dashboard/review-case-repo.js'
 import { RequestRepository } from '../dashboard/request-repo.js'
 import { isUuid } from '../exhibitions/catalogue.js'
 import type { VerificationStore } from '../dashboard/verification-repo.js'
@@ -59,6 +60,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
   const documents = new DocumentRepository(deps.pool)
   const requests = new RequestRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
+  const reviewCases = new ReviewCaseRepository(deps.pool)
   const storage = deps.privateDocumentStorage
 
   const upload = multer({
@@ -77,6 +79,28 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       return assignments.activeFor(requestId, actorId, role)
     }
     return false
+  }
+
+  /**
+   * Case access for one stored file. Reviewers and employers (T23) read only the
+   * proposal files pinned to the revision they review, so a correction the
+   * company is still preparing, or another revision, stays out of reach.
+   */
+  async function isAssignedToRecord(
+    record: PrivateDocumentRecord,
+    actorId: string,
+    role: string,
+    pinnedCache?: Map<string, Set<string> | 'unrestricted' | null>,
+  ): Promise<boolean> {
+    if (!record.requestId) return false
+    if (!isReviewerRole(role)) return isAssignedTo(record.requestId, actorId, role)
+    let pinned = pinnedCache?.get(record.requestId)
+    if (pinned === undefined) {
+      pinned = await reviewCases.reviewableProposalDocumentIds(record.requestId, { id: actorId, role })
+      pinnedCache?.set(record.requestId, pinned)
+    }
+    if (pinned === 'unrestricted') return true
+    return pinned?.has(record.id) === true
   }
 
   function present(
@@ -127,9 +151,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     role: Parameters<typeof canReadDocument>[0],
     companyId: string | null,
   ): Promise<boolean> {
-    const assigned = record.requestId
-      ? await isAssignedTo(record.requestId, actorId, role)
-      : false
+    const assigned = await isAssignedToRecord(record, actorId, role)
     return canReadDocument(
       role,
       {
@@ -164,12 +186,18 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const assigned = await isAssignedTo(requestId, actor.id, actor.operationalRole)
+      const pinnedCache = new Map<string, Set<string> | 'unrestricted' | null>()
       const records = await documents.listForRequest(requestId)
-      const items = records
-        .map((record) => present(record, actor.id, actor.operationalRole, companyId, assigned))
-        .filter((record) => record.allowedActions.length > 0)
-      res.json({ items })
+      const assignedToRequest = isReviewerRole(actor.operationalRole)
+        ? undefined
+        : await isAssignedTo(requestId, actor.id, actor.operationalRole)
+      const items = []
+      for (const record of records) {
+        const assigned = assignedToRequest ??
+          await isAssignedToRecord(record, actor.id, actor.operationalRole, pinnedCache)
+        items.push(present(record, actor.id, actor.operationalRole, companyId, assigned))
+      }
+      res.json({ items: items.filter((record) => record.allowedActions.length > 0) })
       return
     }
 
@@ -409,9 +437,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       res.status(404).json({ error: 'not_found' })
       return
     }
-    const assigned = record.requestId
-      ? await isAssignedTo(record.requestId, actor.id, actor.operationalRole)
-      : false
+    const assigned = await isAssignedToRecord(record, actor.id, actor.operationalRole)
     res.json({
       document: present(record, actor.id, actor.operationalRole, companyId, assigned),
     })

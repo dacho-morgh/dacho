@@ -24,6 +24,8 @@ Case responses advertise the chief action `startReview` only to the event's curr
 - Hand-made reviewer/employer grants made through the generic owner assignment commands block a start (`existing_assignments`); round-owned slots cannot be added or revoked through those commands (`managed_by_review_round`).
 - Starting a round writes a `review_round_start` history row naming the chief and revision; reviewers' identities are not exposed to other reviewers or to the company.
 
+The assigned people's queue and case file are in [reviewer-queue.md](reviewer-queue.md) (T23).
+
 ## Not in this slice
 
-Replacing an unfinished reviewer or the employer (done in [T26](review-replacement.md)), the assigned reviewer queue/dossier (T23), 4/4 completion and the chief's advance/reject/correct decision (T27–T29), and notifications to the assigned people.
+Replacing an unfinished reviewer or the employer (done in [T26](review-replacement.md)), 4/4 completion and the chief's advance/reject/correct decision (T27–T29), and notifications to the assigned people.
