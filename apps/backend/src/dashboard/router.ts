@@ -51,7 +51,13 @@ import { DocumentRepository, type PrivateDocumentRecord } from '../documents/rep
 import { canSendLetter } from './letter-policy.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
-import { RequestRepository } from './request-repo.js'
+import {
+  AGREEMENT_TEXTS_APPROVED,
+  CURRENT_EVENT_RULES_VERSION,
+  CURRENT_NON_COMPETE_VERSION,
+  RequestRepository,
+  parseApplicationTeam,
+} from './request-repo.js'
 import { StatsRepository } from './stats-repo.js'
 import type { CompanyStore } from '../auth/company-store.js'
 import type { User, UserStore } from '../auth/user-store.js'
@@ -153,6 +159,19 @@ function parsePositiveInt(value: unknown, fallback: number): number {
   const n = Number.parseInt(value, 10)
   if (!Number.isFinite(n) || n < 1) return fallback
   return n
+}
+
+/** Nine digits at most, so the value always fits the integer revision column. */
+function parseRevisionQuery(value: unknown): number | null {
+  if (typeof value !== 'string' || !/^[1-9]\d{0,8}$/.test(value)) return null
+  return Number(value)
+}
+
+/** Consent counts only when the submit itself accepts the exact current text. */
+function acceptsAgreementVersion(value: unknown, currentVersion: string): boolean {
+  if (!value || typeof value !== 'object') return false
+  const { accepted, textVersionId } = value as { accepted?: unknown; textVersionId?: unknown }
+  return accepted === true && textVersionId === currentVersion
 }
 
 function parseBoolean(value: unknown): boolean | undefined {
@@ -565,6 +584,62 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
   })
 
+  router.get('/agreements', (_req, res) => {
+    res.json({
+      agreements: [
+        {
+          type: 'non_compete',
+          version: CURRENT_NON_COMPETE_VERSION,
+          title: 'قرارداد عدم رقابت',
+          approved: AGREEMENT_TEXTS_APPROVED,
+        },
+        {
+          type: 'event_rules',
+          version: CURRENT_EVENT_RULES_VERSION,
+          title: 'قوانین رویداد',
+          approved: AGREEMENT_TEXTS_APPROVED,
+        },
+      ],
+    })
+  })
+
+  router.patch('/requests/:id', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isRepresentative(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { title, answers } = req.body ?? {}
+      if (title !== undefined) {
+        if (typeof title !== 'string' || title.trim() === '') {
+          res.status(400).json({ error: 'invalid_title' })
+          return
+        }
+      }
+      if (answers !== undefined) {
+        if (typeof answers !== 'object' || answers === null || Array.isArray(answers)) {
+          res.status(400).json({ error: 'invalid_answers' })
+          return
+        }
+      }
+      const companyId = await actorCompanyId(actor.id, actor.operationalRole)
+      const result = await repo.updateDraft(req.params.id, actor.id, companyId, {
+        title,
+        answers,
+      })
+      if (result === 'not_found') {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (result === 'not_draft') {
+        res.status(409).json({ error: 'request_not_draft' })
+        return
+      }
+      res.json({ request: requestWithActions(actor.operationalRole, actor.id, result, companyId) })
+    } catch (error) { next(error) }
+  })
+
   router.get('/requests', async (req, res, next) => {
     try {
     const actor = actorOf(res)
@@ -692,14 +767,53 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
 
+    const rfpEntry = await deps.pool.query<{ version_id: string; current_rfp_version_id: string | null }>(
+      `SELECT c.version_id, s.current_rfp_version_id
+       FROM dashboard.request_rfps c
+       JOIN dashboard.event_subtopics s ON s.id = c.subtopic_id
+       WHERE c.request_id = $1`,
+      [request.id],
+    )
+    if (rfpEntry.rows[0] && rfpEntry.rows[0].version_id !== rfpEntry.rows[0].current_rfp_version_id) {
+      res.status(409).json({ error: 'stale_rfp' })
+      return
+    }
+    const isEventRequest = rfpEntry.rows.length > 0
+
     // Validate answers against the service's form schema (required fields present).
     const service = await deps.serviceCatalog.findById(request.serviceId)
+    const missing: string[] = []
     if (service) {
-      const missing = missingRequiredFields(service, request.answers)
-      if (missing) {
-        res.status(400).json({ error: 'invalid_answers', missingFields: missing })
-        return
+      const serviceMissing = missingRequiredFields(service, request.answers)
+      if (serviceMissing) {
+        missing.push(...serviceMissing)
       }
+    }
+
+    if (isEventRequest) {
+      if (!parseApplicationTeam(request.answers?.applicationTeam)) {
+        missing.push('applicationTeam')
+      }
+
+      const proposalDocs = await deps.pool.query(
+        `SELECT 1 FROM dashboard.private_documents WHERE request_id = $1 AND category = 'proposal'`,
+        [request.id],
+      )
+      if ((proposalDocs.rowCount ?? 0) === 0) {
+        missing.push('proposalDocuments')
+      }
+
+      if (!acceptsAgreementVersion(req.body?.nonCompeteAcceptance, CURRENT_NON_COMPETE_VERSION)) {
+        missing.push('nonCompeteAcceptance')
+      }
+      if (!acceptsAgreementVersion(req.body?.eventRulesAcceptance, CURRENT_EVENT_RULES_VERSION)) {
+        missing.push('eventRulesAcceptance')
+      }
+    }
+
+    if (missing.length > 0) {
+      res.status(400).json({ error: 'invalid_answers', missingFields: missing })
+      return
     }
 
     const firstStep = service?.workflow[0]
@@ -709,7 +823,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       firstStep ? { assignedRole: firstStep.roleName, currentStep: firstStep.title } : undefined,
       companyId,
       true,
+      isEventRequest
+        ? { nonCompeteVersion: CURRENT_NON_COMPETE_VERSION, eventRulesVersion: CURRENT_EVENT_RULES_VERSION }
+        : undefined,
     )
+    if (typeof result === 'object' && 'missingFields' in result) {
+      res.status(400).json({ error: 'invalid_answers', missingFields: result.missingFields })
+      return
+    }
     if (result === 'company_not_verified') {
       res.status(403).json({ error: 'company_not_verified' })
       return
@@ -757,6 +878,26 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         }
       }
       res.json({ verification: pinned })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/requests/:id/proposal', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const { scope } = await resolveScope(actor.id, actor.operationalRole)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const revision = req.query.revision === undefined ? undefined : parseRevisionQuery(req.query.revision)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      const proposal = await repo.findRequestProposal(request.id, revision)
+      const agreements = proposal ? await repo.listRequestAgreements(request.id, proposal.revision) : []
+      res.json({ proposal, agreements })
     } catch (error) { next(error) }
   })
 

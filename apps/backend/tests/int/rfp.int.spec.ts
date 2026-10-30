@@ -8,7 +8,11 @@ import { InMemoryCompanyStore } from '../../src/auth/company-store.js'
 import { InMemoryUserStore, type User } from '../../src/auth/user-store.js'
 import { InMemoryServiceCatalog } from '../../src/catalog/service-catalog.js'
 import { runMigrations } from '../../src/db/migrate.js'
-import { RequestRepository } from '../../src/dashboard/request-repo.js'
+import {
+  CURRENT_EVENT_RULES_VERSION,
+  CURRENT_NON_COMPETE_VERSION,
+  RequestRepository,
+} from '../../src/dashboard/request-repo.js'
 import { JwtSigner } from '../../src/jwt.js'
 import { InMemoryCodeStore } from '../../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../../src/otp/console-delivery.js'
@@ -171,12 +175,33 @@ describe('subtopic RFP versioning and download workflow (T18)', () => {
       request(app)
         .post('/requests')
         .set(auth(actor))
-        .send({ serviceId: 'event-service', title: 'Application', eventId, subtopicId, rfpVersionId: v1.id })
+        .send({
+          serviceId: 'event-service',
+          title: 'Application',
+          eventId,
+          subtopicId,
+          rfpVersionId: v1.id,
+          answers: { applicationTeam: [{ name: 'تیم فنی', role: 'توسعه‌دهنده' }] },
+        })
 
     const first = await create()
     expect(first.status).toBe(201)
 
-    const submitted = await request(app).post(`/requests/${first.body.request.id}/submit`).set(auth('company'))
+    await request(app)
+      .post('/documents')
+      .set(auth('company'))
+      .field('category', 'proposal')
+      .field('requestId', first.body.request.id)
+      .attach('file', Buffer.from('%PDF-Proposal-Fixture'), { filename: 'prop.pdf', contentType: 'application/pdf' })
+      .expect(201)
+
+    const submitted = await request(app)
+      .post(`/requests/${first.body.request.id}/submit`)
+      .set(auth('company'))
+      .send({
+        nonCompeteAcceptance: { accepted: true, textVersionId: CURRENT_NON_COMPETE_VERSION },
+        eventRulesAcceptance: { accepted: true, textVersionId: CURRENT_EVENT_RULES_VERSION },
+      })
     expect(submitted.status).toBe(200)
 
     const context = await request(app).get(`/requests/${first.body.request.id}/rfp`).set(auth('company'))

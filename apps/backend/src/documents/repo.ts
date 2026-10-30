@@ -193,6 +193,17 @@ export class DocumentRepository {
     return Number(rows[0]?.version ?? 1)
   }
 
+  /** A submitted proposal snapshot keeps its files for the life of the case. */
+  async isPinnedToProposal(id: string, requestId: string, client: PoolClient | Pool = this.pool): Promise<boolean> {
+    const { rows } = await client.query(
+      `SELECT 1 FROM dashboard.request_proposals
+       WHERE request_id = $1 AND proposal_documents @> $2::jsonb
+       LIMIT 1`,
+      [requestId, JSON.stringify([{ id }])],
+    )
+    return rows.length > 0
+  }
+
   async delete(id: string, client: PoolClient | Pool = this.pool): Promise<PrivateDocumentRecord | undefined> {
     const { rows } = await client.query<DocumentRow>(
       `WITH removed AS (

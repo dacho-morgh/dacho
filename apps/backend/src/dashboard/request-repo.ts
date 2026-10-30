@@ -39,6 +39,67 @@ export interface RequestVerificationDto {
   createdAt: string
 }
 
+/*
+ * Product has not approved the agreement texts yet. These IDs name no published
+ * text, so an acceptance recorded against them is not final consent and must be
+ * collected again once real versions replace them.
+ */
+export const CURRENT_NON_COMPETE_VERSION = 'non-compete-unapproved-placeholder'
+export const CURRENT_EVENT_RULES_VERSION = 'event-rules-unapproved-placeholder'
+export const AGREEMENT_TEXTS_APPROVED = false
+export const APPLICATION_FORM_VERSION = 'event-application-2026-v1'
+
+export type AgreementType = 'non_compete' | 'event_rules'
+
+export interface ApplicationTeamMember {
+  name: string
+  role: string
+  relation?: string
+}
+
+/** The trimmed team, or null unless it is a nonempty list of named members. */
+export function parseApplicationTeam(value: unknown): ApplicationTeamMember[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+  const team: ApplicationTeamMember[] = []
+  for (const member of value) {
+    if (!member || typeof member !== 'object') return null
+    const { name, role, relation } = member as Record<string, unknown>
+    if (typeof name !== 'string' || !name.trim() || typeof role !== 'string' || !role.trim()) return null
+    if (relation !== undefined && typeof relation !== 'string') return null
+    const trimmedRelation = typeof relation === 'string' ? relation.trim() : ''
+    team.push({ name: name.trim(), role: role.trim(), ...(trimmedRelation ? { relation: trimmedRelation } : {}) })
+  }
+  return team
+}
+
+export interface RequestAgreementDto {
+  id: string
+  requestId: string
+  revision: number
+  agreementType: AgreementType
+  textVersionId: string
+  acceptedBy: string
+  acceptedAt: string
+}
+
+export interface PinnedProposalDocument {
+  id: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  logicalVersion: number
+  createdAt: string
+}
+
+export interface RequestProposalDto {
+  requestId: string
+  revision: number
+  formVersion: string
+  applicationTeam: ApplicationTeamMember[]
+  proposalDocuments: PinnedProposalDocument[]
+  createdAt: string
+}
+
 export interface RequestRow {
   id: string
   revision: number
@@ -346,6 +407,47 @@ export class RequestRepository {
     return rows[0] ? mapRequestRow(rows[0]) : undefined
   }
 
+  async updateDraft(
+    id: string,
+    ownerId: string,
+    companyId: string | null,
+    input: { title?: string; answers?: Record<string, unknown> },
+  ): Promise<RequestDto | 'not_found' | 'not_draft'> {
+    if (!isUuid(id)) return 'not_found'
+    const ownership = companyId
+      ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
+      : '(company_id IS NULL AND owner_id = $2)'
+    const client = await this.pool.connect()
+    try {
+      const { rows } = await client.query<RequestRow>(
+        `UPDATE dashboard.requests
+         SET title = COALESCE($3, title),
+             answers = CASE WHEN $4::text IS NOT NULL THEN $4::jsonb ELSE answers END,
+             updated_at = now()
+         WHERE id = $1 AND ${ownership} AND status = 'draft'
+         RETURNING ${REQUEST_COLUMNS}`,
+        [
+          id,
+          ownerId,
+          input.title !== undefined ? input.title.trim() : null,
+          input.answers !== undefined ? JSON.stringify(input.answers) : null,
+          ...(companyId ? [companyId] : []),
+        ],
+      )
+      const updated = rows[0]
+      if (updated) return mapRequestRow(updated)
+
+      const existing = await client.query<RequestRow>(
+        `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests
+         WHERE id = $1 AND ${companyId ? '(company_id = $3 OR (company_id IS NULL AND owner_id = $2))' : '(company_id IS NULL AND owner_id = $2)'}`,
+        [id, ownerId, ...(companyId ? [companyId] : [])],
+      )
+      return existing.rows[0] ? 'not_draft' : 'not_found'
+    } finally {
+      client.release()
+    }
+  }
+
   /** Draft → in_review, stamping submissionDate + the first workflow step. */
   async submit(
     id: string,
@@ -353,7 +455,8 @@ export class RequestRepository {
     step?: { assignedRole: string; currentStep: string },
     companyId?: string | null,
     requireVerification = false,
-  ): Promise<RequestDto | 'not_found' | 'already_submitted' | 'stale_rfp' | 'company_not_verified'> {
+    eventSubmission?: { nonCompeteVersion: string; eventRulesVersion: string },
+  ): Promise<RequestDto | 'not_found' | 'already_submitted' | 'stale_rfp' | 'company_not_verified' | { missingFields: string[] }> {
     if (!isUuid(id)) return 'not_found'
     const ownership = companyId
       ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
@@ -412,6 +515,63 @@ export class RequestRepository {
            VALUES ($1, $2, $3, $4, $5)`,
           [updated.id, verificationCompanyId, verification.id, verification.revision,
             JSON.stringify(verification.snapshot)],
+        )
+      }
+      if (context) {
+        // The UPDATE above holds the row lock that draft edits and document
+        // uploads/deletes take, so these checks see exactly what gets pinned.
+        const { rows: docRows } = await client.query<{
+          id: string
+          original_filename: string
+          mime_type: string
+          size_bytes: number
+          logical_version: number
+          created_at: Date
+        }>(
+          `SELECT id, original_filename, mime_type, size_bytes, logical_version, created_at
+           FROM dashboard.private_documents
+           WHERE request_id = $1 AND category = 'proposal'
+           ORDER BY created_at ASC`,
+          [updated.id],
+        )
+        const team = parseApplicationTeam(updated.answers?.applicationTeam)
+        if (!team || docRows.length === 0 || !eventSubmission) {
+          await client.query('ROLLBACK')
+          return {
+            missingFields: [
+              ...(team ? [] : ['applicationTeam']),
+              ...(docRows.length > 0 ? [] : ['proposalDocuments']),
+              ...(eventSubmission ? [] : ['nonCompeteAcceptance', 'eventRulesAcceptance']),
+            ],
+          }
+        }
+        const proposalDocs: PinnedProposalDocument[] = docRows.map((doc) => ({
+          id: doc.id,
+          filename: doc.original_filename,
+          mimeType: doc.mime_type,
+          sizeBytes: doc.size_bytes,
+          logicalVersion: doc.logical_version,
+          createdAt: doc.created_at.toISOString(),
+        }))
+        await client.query(
+          `INSERT INTO dashboard.request_proposals
+             (request_id, revision, form_version, application_team, proposal_documents)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            updated.id,
+            updated.revision,
+            APPLICATION_FORM_VERSION,
+            JSON.stringify(team),
+            JSON.stringify(proposalDocs),
+          ],
+        )
+        await client.query(
+          `INSERT INTO dashboard.request_agreements
+             (request_id, revision, agreement_type, text_version_id, accepted_by)
+           VALUES
+             ($1, $2, 'non_compete', $3, $4),
+             ($1, $2, 'event_rules', $5, $4)`,
+          [updated.id, updated.revision, eventSubmission.nonCompeteVersion, ownerId, eventSubmission.eventRulesVersion],
         )
       }
       await appendTransition(client, {
@@ -478,5 +638,66 @@ export class RequestRepository {
       snapshot: row.snapshot,
       createdAt: row.created_at.toISOString(),
     }
+  }
+
+  async findRequestProposal(requestId: string, revision?: number): Promise<RequestProposalDto | null> {
+    if (!isUuid(requestId)) return null
+    const params: unknown[] = [requestId]
+    let sql = `SELECT request_id, revision, form_version, application_team, proposal_documents, created_at
+               FROM dashboard.request_proposals WHERE request_id = $1`
+    if (revision !== undefined) {
+      params.push(revision)
+      sql += ` AND revision = $${params.length}`
+    } else {
+      sql += ` ORDER BY revision DESC LIMIT 1`
+    }
+    const { rows } = await this.pool.query<{
+      request_id: string
+      revision: number
+      form_version: string
+      application_team: ApplicationTeamMember[]
+      proposal_documents: PinnedProposalDocument[]
+      created_at: Date
+    }>(sql, params)
+    const row = rows[0]
+    if (!row) return null
+    return {
+      requestId: row.request_id,
+      revision: row.revision,
+      formVersion: row.form_version,
+      applicationTeam: row.application_team,
+      proposalDocuments: row.proposal_documents,
+      createdAt: row.created_at.toISOString(),
+    }
+  }
+
+  async listRequestAgreements(requestId: string, revision?: number): Promise<RequestAgreementDto[]> {
+    if (!isUuid(requestId)) return []
+    const params: unknown[] = [requestId]
+    let sql = `SELECT id, request_id, revision, agreement_type, text_version_id, accepted_by, accepted_at
+               FROM dashboard.request_agreements WHERE request_id = $1`
+    if (revision !== undefined) {
+      params.push(revision)
+      sql += ` AND revision = $${params.length}`
+    }
+    sql += ` ORDER BY revision ASC, agreement_type ASC`
+    const { rows } = await this.pool.query<{
+      id: string
+      request_id: string
+      revision: number
+      agreement_type: AgreementType
+      text_version_id: string
+      accepted_by: string
+      accepted_at: Date
+    }>(sql, params)
+    return rows.map((r) => ({
+      id: r.id,
+      requestId: r.request_id,
+      revision: r.revision,
+      agreementType: r.agreement_type,
+      textVersionId: r.text_version_id,
+      acceptedBy: r.accepted_by,
+      acceptedAt: r.accepted_at.toISOString(),
+    }))
   }
 }
