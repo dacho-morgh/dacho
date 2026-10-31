@@ -328,12 +328,15 @@ export interface DocumentForPolicy {
   requestOwnerId: string | null
   requestCompanyId: string | null
   assigned: boolean
+  /** True once the case's latest invitation holds a package, which is what hands the case off (T31). */
+  requestFinancialSubmitted?: boolean
 }
 
 /**
  * Download/list authority, re-evaluated on every request. A document id or URL
  * is never authority. Financial categories are excluded for chief, ordinary and
- * employer reviewers even when those people are assigned to the case.
+ * employer reviewers even when those people are assigned to the case. The
+ * investment person reads them only with an active assignment after the handoff.
  */
 export function canReadDocument(
   role: OperationalRole,
@@ -368,9 +371,10 @@ export function canReadDocument(
       if (document.category === 'correspondenceAttachment') return false
       return document.assigned && audience === 'case'
     case 'investment-reviewer':
-      // Supplementary financial replies need the same persisted handoff as the
-      // financial package. Generic assignment must not bypass that boundary.
+      // Supplementary financial replies stay closed until T33 delivers them.
       if (document.category === 'correspondenceAttachment') return false
+      // A generic assignment alone must not open the financial files.
+      if (audience === 'financial') return document.assigned && document.requestFinancialSubmitted === true
       return document.assigned && audience === 'case'
   }
 }

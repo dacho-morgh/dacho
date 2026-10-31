@@ -25,6 +25,8 @@ T29 creates `dashboard.financial_invitations` in `1780511400030_financial_invita
 
 T30 adds the nullable `dashboard.private_documents.statement_year` and creates `dashboard.financial_packages` in `1780511400031_financial_packages`. It rewrites no existing rows. Its rollback drops the table and the column, so any submitted package and its statement years are lost. See [financial package](financial-package.md).
 
+T31 adds no schema in `1780511400032_investment_handoff`. Its only data change hands off packages already submitted: it revokes other active investment grants on those cases and adds a system assignment for the event's responsible person, with no history row. Its rollback revokes those system assignments and keeps hand-made grants. See [investment handoff](investment-handoff.md).
+
 T08 preserves legacy assignments, quarantines ambiguous accounts and requires explicit owner mapping; see [personnel foundation](personnel-foundation.md). Existing editorial privilege is independent of operational authority. No real accounts have been mapped by this implementation.
 
 T09/T10 add only additive backend tables: `dashboard.case_assignments` (with an

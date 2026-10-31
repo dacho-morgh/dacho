@@ -37,7 +37,7 @@ the persisted-responsibility predicate below.
 | Chief Reviewer | assigned requests only | assigned case's necessary profile only, not the CMS dossier | assigned event only |
 | Reviewer | assigned requests only | assigned case's necessary profile only | none |
 | Employer Reviewer | assigned requests only | assigned subtopic/case profile only | none |
-| Investment Reviewer | assigned requests only | assigned case profile; financial package only after an authorized persisted handoff (currently unavailable, so denied) | assigned event only |
+| Investment Reviewer | assigned requests only | assigned case profile; financial package only after the [T31 handoff](investment-handoff.md) | assigned event only |
 | Company Representative | `owner_id = current user` | own company only | none |
 
 `dashboard.case_assignments.role` must exactly match the person's current
@@ -143,9 +143,9 @@ absent or denied rather than stubbed permissively:
   backend, as documented in [exhibition booth catalogue](exhibition-booth-catalogue.md).
 - Application revisions, triage, review rounds, four evaluations, replacement
   and chief decisions (T19–T28).
-- Financial package completeness/handoff, investment memo and publication
-  (T29–T33). T10 stores financial files and enforces confidentiality, but no
-  financial submission or handoff state machine exists, so investment financial-document access fails closed even with case assignment.
+- Investment memo and publication (T32–T33). Financial files open to the
+  investment person only with an active assignment after the
+  [T31 handoff](investment-handoff.md); a generic assignment alone stays denied.
 - Correspondence attachment workflow and booth receipts (T35, T50).
 - Any dashboard action that has no backend command is not advertised in
   `allowedActions`.
@@ -174,4 +174,4 @@ acceptance test, deploy staging or migrate real data.
 
 `POST /letters` accepts current operational recipients and applies the role policy before writing. Company representatives can contact Secretariat; ordinary/employer reviewers can contact the uniquely active chief on a case for which both hold current access. Owner/chief general letters do not assign a case or broaden dossier/file access. Case-linked sends authorize both parties in the INSERT statement and hold shared locks on active assignment rows so committed/concurrent revocations cannot be bypassed by earlier route reads. Reading a sent/oversight letter leaves its unread flag unchanged; only its recipient marks it read.
 
-Investment-origin letters and case-linked letters to the investment role remain denied until T31 supplies a persisted authorized handoff. Generic assignment is not a financial handoff. T22 still owes authoritative event/round/slot assignment semantics; current generic case assignments and a unique-chief check are only a conservative foundation. Permitted-recipient discovery, frontend sending and classified attachments (T35) remain separate work. This is a partial draft, not completion of T34, T22, T31 or human acceptance. Docker/CI validation limitations must be reported separately from implemented behavior.
+Investment-origin letters and case-linked letters to the investment role remain denied until T34 opens them. The T31 handoff opens the case and its files, not letters. Generic assignment is not a financial handoff. T22 still owes authoritative event/round/slot assignment semantics; current generic case assignments and a unique-chief check are only a conservative foundation. Permitted-recipient discovery, frontend sending and classified attachments (T35) remain separate work. This is a partial draft, not completion of T34, T22, T31 or human acceptance. Docker/CI validation limitations must be reported separately from implemented behavior.

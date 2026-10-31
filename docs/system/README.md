@@ -34,6 +34,7 @@ Updated: 2026-10-26. This is the English specification for the event, review, in
 | [Chief decision](chief-decision.md) | T28 explicit advance, return or reject after 4/4, correction rounds and readable past rounds |
 | [Financial invitation](financial-invitation.md) | T29 invitation and fixed checklist on chief advancement, and the gate on the company's financial files |
 | [Financial package](financial-package.md) | T30 versioned submission of the financial files, statement-year coverage and the freeze that follows |
+| [Investment handoff](investment-handoff.md) | T31 automatic handoff to the event's investment person, the scoped queue and dossier, and financial confidentiality |
 | [Shared authorization](authorization.md) | T09 seven-role/assignment scope, server-derived actions, CMS/proxy projections and current denials |
 | [Private documents](private-documents.md) | T10 private storage, document policy, access audiences, API contract, migrations and FE07 scope |
 | [Reviewer queue and case file](reviewer-queue.md) | T23 assignment-derived queue, reviewer case file, pinned proposal/RFP files and necessary company profile |

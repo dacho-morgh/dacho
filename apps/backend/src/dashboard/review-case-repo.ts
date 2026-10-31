@@ -307,8 +307,12 @@ export class ReviewCaseRepository {
     )
     const row = rows[0]
     if (!row) return null
+    return { case: mapQueueRow(row), ...(await this.caseMaterials(requestId, row.proposal_revision)) }
+  }
 
-    const proposal = row.proposal_revision === null
+  /** The pinned proposal revision and RFP with the necessary company profile; also the investment dossier's (T31). */
+  async caseMaterials(requestId: string, proposalRevision: number | null): Promise<Omit<ReviewCaseFile, 'case'>> {
+    const proposal = proposalRevision === null
       ? null
       : (await this.pool.query<{
           revision: number
@@ -320,7 +324,7 @@ export class ReviewCaseRepository {
         }>(
           `SELECT revision, form_version, application_team, proposal_documents, answers, created_at
            FROM dashboard.request_proposals WHERE request_id = $1 AND revision = $2`,
-          [requestId, row.proposal_revision],
+          [requestId, proposalRevision],
         )).rows[0] ?? null
 
     const verification = await this.pool.query<{ snapshot: unknown }>(
@@ -344,7 +348,6 @@ export class ReviewCaseRepository {
     )
 
     return {
-      case: mapQueueRow(row),
       proposal: proposal
         ? {
             revision: proposal.revision,

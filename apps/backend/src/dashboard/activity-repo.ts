@@ -80,9 +80,26 @@ export const OVERSIGHT_ONLY_ACTIONS = [
   'review_round_complete',
 ] as const
 
+/** Package status belongs to the financial audience: chiefs, reviewers and employers do not see it (T31). */
+export const FINANCIAL_ONLY_ACTIONS = ['financial_package_submit', 'investment_handoff'] as const
+
+/** The handoff is internal: the company sees its own submission, not who holds the case next. */
+const INTERNAL_FINANCIAL_ACTIONS = ['investment_handoff'] as const
+
+function hiddenActions(scope: RequestScope): readonly string[] {
+  if (scope.kind === 'all') return []
+  if (scope.kind === 'assigned') {
+    if (scope.role === 'chief-reviewer') return FINANCIAL_ONLY_ACTIONS
+    if (scope.role === 'investment-reviewer') return OVERSIGHT_ONLY_ACTIONS
+    return [...OVERSIGHT_ONLY_ACTIONS, ...FINANCIAL_ONLY_ACTIONS]
+  }
+  return [...OVERSIGHT_ONLY_ACTIONS, ...INTERNAL_FINANCIAL_ACTIONS]
+}
+
 function oversightOnlyClause(scope: RequestScope): string {
-  if (scope.kind === 'all' || (scope.kind === 'assigned' && scope.role === 'chief-reviewer')) return 'TRUE'
-  const actions = OVERSIGHT_ONLY_ACTIONS.map((action) => `'${action}'`).join(', ')
+  const hidden = hiddenActions(scope)
+  if (hidden.length === 0) return 'TRUE'
+  const actions = hidden.map((action) => `'${action}'`).join(', ')
   return `(a.action IS NULL OR a.action NOT IN (${actions}))`
 }
 

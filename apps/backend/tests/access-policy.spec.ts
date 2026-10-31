@@ -251,6 +251,18 @@ describe('document read authority', () => {
     expect(canReadDocument('representative', financial, 'rep-1', 'company-1')).toBe(true)
   })
 
+  it('opens financial files to the investment person only with an assignment after the handoff (T31)', () => {
+    const handedOff = { ...financial, requestFinancialSubmitted: true }
+    expect(canReadDocument('investment-reviewer', handedOff, 'i1', null)).toBe(true)
+    expect(canReadDocument('investment-reviewer', { ...handedOff, assigned: false }, 'i2', null)).toBe(false)
+    for (const role of ['chief-reviewer', 'reviewer', 'employer-reviewer'] as const) {
+      expect(canReadDocument(role, handedOff, 'x1', null)).toBe(false)
+    }
+    // Company dossier files and correspondence do not follow the handoff.
+    expect(canReadDocument('investment-reviewer', { ...handedOff, category: 'articlesOfAssociation' }, 'i1', null)).toBe(false)
+    expect(canReadDocument('investment-reviewer', { ...handedOff, category: 'correspondenceAttachment' }, 'i1', null)).toBe(false)
+  })
+
   it('explicitly excludes chief, reviewer and employer reviewer from financial files', () => {
     for (const role of ['chief-reviewer', 'reviewer', 'employer-reviewer'] as const) {
       expect(canReadDocument(role, financial, 'x1', null)).toBe(false)

@@ -122,6 +122,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         requestOwnerId: record.requestOwnerId,
         requestCompanyId: record.requestCompanyId,
         assigned,
+        requestFinancialSubmitted: record.requestFinancialSubmitted,
       },
       actorId,
       companyId,
@@ -165,13 +166,14 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         requestOwnerId: record.requestOwnerId,
         requestCompanyId: record.requestCompanyId,
         assigned,
+        requestFinancialSubmitted: record.requestFinancialSubmitted,
       },
       actorId,
       companyId,
     )
   }
 
-  router.get('/documents', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/documents',asyncHandler(async (req: Request, res: Response) => {
     const actor = actorOf(res)
     const companyId = await actorCompanyId(actor.id, actor.operationalRole)
     const requestId = stringField(req.query.requestId)

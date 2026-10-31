@@ -36,6 +36,7 @@ import {
   ReviewCaseRepository,
   reviewerActivityView,
   reviewerRequestView,
+  type ReviewCaseFile,
 } from './review-case-repo.js'
 import {
   DossierValidationError,
@@ -61,6 +62,7 @@ import { LetterRepository, type CreateLetterInput, type LetterAttachmentDto, typ
 import { DocumentRepository, type PrivateDocumentRecord } from '../documents/repo.js'
 import { canSendLetter } from './letter-policy.js'
 import { FinancialPackageRepository } from './financial-package-repo.js'
+import { InvestmentCaseRepository } from './investment-case-repo.js'
 import { statementYearPlan } from './financial-package.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
@@ -227,6 +229,26 @@ function requesterDisplayName(user: Awaited<ReturnType<UserStore['findById']>>):
 
 function safeOwner(user: User | undefined | null) {
   return user ? { id: user.id, name: user.name ?? null } : null
+}
+
+/** Adds the download routes to a case file's proposal and RFP; each route still authorizes its reader. */
+function withDownloadUrls(requestId: string, found: Pick<ReviewCaseFile, 'proposal' | 'rfp'>) {
+  return {
+    proposal: found.proposal && {
+      ...found.proposal,
+      documents: found.proposal.documents.map((document) => ({
+        ...document,
+        downloadUrl: `/api/dashboard/documents/${document.id}/download`,
+      })),
+    },
+    rfp: found.rfp && {
+      ...found.rfp,
+      files: found.rfp.files.map((file) => ({
+        ...file,
+        downloadUrl: `/api/dashboard/requests/${requestId}/rfp/files/${file.id}`,
+      })),
+    },
+  }
 }
 
 function requestWithActions(
@@ -413,6 +435,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const assignments = new AssignmentRepository(deps.pool)
   const rounds = new ReviewRoundRepository(deps.pool)
   const financialPackages = new FinancialPackageRepository(deps.pool)
+  const investmentCases = new InvestmentCaseRepository(deps.pool)
   const reviewCases = new ReviewCaseRepository(deps.pool)
   const evaluations =
     deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool)
@@ -1107,7 +1130,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   /**
    * The financial package invitation (T29) for the owning company, Secretariat and
    * the owner. Chiefs and reviewers are outside the financial audience, and the
-   * investment person waits for the persisted handoff like the files themselves.
+   * investment person reads the package through the case dossier (T31).
    */
   router.get('/requests/:id/financial-invitation', async (req, res, next) => {
     try {
@@ -1136,8 +1159,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
    * The company submits its financial package (T30). Every checklist category and
    * every statement year the founding date requires must have a file; otherwise
    * nothing is stored and the response names the gaps. A complete package freezes
-   * the financial files. It does not advance the case. A repeated submit returns
-   * the stored package.
+   * the financial files and hands the case to the event's investment person (T31).
+   * It does not advance the case. A repeated submit returns the stored package.
    */
   router.post('/requests/:id/financial-package', async (req, res, next) => {
     try {
@@ -1253,23 +1276,69 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const requestId = found.case.requestId
       res.set('Cache-Control', 'private, no-store, max-age=0').json({
         ...found,
-        proposal: found.proposal && {
-          ...found.proposal,
-          documents: found.proposal.documents.map((document) => ({
+        ...withDownloadUrls(found.case.requestId, found),
+      })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Investment queue and dossier (T31) ────────────────────────────── */
+
+  /** The investment person's inbox: only cases whose package reached them. */
+  router.get('/investment/queue', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const queue = await investmentCases.listQueue(actor.id, {
+        page: Math.min(parsePositiveInt(req.query.page, 1), 1_000_000),
+        limit: Math.min(parsePositiveInt(req.query.limit, 25), 100),
+      })
+      res.set('Cache-Control', 'private, no-store, max-age=0').json(queue)
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * The dossier of a handed-off case: the advanced proposal and RFP, the necessary
+   * company profile, the frozen package and the round's final evaluations. Drafts and
+   * evaluations of people who left their slot stay out, as they do from the count, and
+   * authors stay unnamed. The private verification dossier is not part of it.
+   */
+  router.get('/investment/cases/:id', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const found = await investmentCases.findCase(actor.id, req.params.id)
+      if (!found) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const { packageDetail, ...summary } = found
+      const materials = await reviewCases.caseMaterials(found.requestId, found.proposalRevision)
+      const round = await rounds.findByRevision(found.requestId, found.reviewedRevision)
+      const counted = (round?.slots ?? []).filter((slot) => slot.active)
+      const reviews = (await evaluations.listForRequest(found.requestId, found.reviewedRevision))
+        .filter((item) => item.state === 'final' && counted.some((slot) => slot.userId === item.userId && slot.role === item.role))
+        .map(({ userId: _userId, ...item }) => item)
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({
+        case: summary,
+        ...materials,
+        ...withDownloadUrls(found.requestId, materials),
+        package: {
+          ...found.package,
+          ...packageDetail,
+          documents: packageDetail.documents.map((document) => ({
             ...document,
             downloadUrl: `/api/dashboard/documents/${document.id}/download`,
           })),
         },
-        rfp: found.rfp && {
-          ...found.rfp,
-          files: found.rfp.files.map((file) => ({
-            ...file,
-            downloadUrl: `/api/dashboard/requests/${requestId}/rfp/files/${file.id}`,
-          })),
-        },
+        evaluations: reviews,
       })
     } catch (error) { next(error) }
   })

@@ -56,8 +56,8 @@ role, ownership and active assignment. A document id or URL is never authority.
 | --- | --- |
 | Company dossier (`articlesOfAssociation`, notices, catalogues, certificates) | owning representative, System Owner, Central Secretariat. Chief/reviewer/employer/investment are denied even when assigned to a case |
 | Case (`proposal`) | owning representative, System Owner, Central Secretariat, and an actively assigned chief/reviewer/employer/investment reviewer |
-| Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner and Central Secretariat. Investment reviewer access requires an authorized persisted handoff; T30 has not delivered that state, so investment access currently fails closed. Chief, ordinary reviewer and employer reviewer are explicitly denied. The company can upload only after the chief advances the case ([T29](financial-invitation.md)) |
-| Correspondence (`correspondenceAttachment`) | owning representative, System Owner and Central Secretariat. Supplementary financial replies retain the financial audience restrictions, including denying investment access until a persisted handoff exists |
+| Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner and Central Secretariat. The investment person reads them only with an active assignment after the [T31 handoff](investment-handoff.md). Chief, ordinary reviewer and employer reviewer are explicitly denied. The company can upload only after the chief advances the case ([T29](financial-invitation.md)) |
+| Correspondence (`correspondenceAttachment`) | owning representative, System Owner and Central Secretariat. Supplementary financial replies retain the financial audience restrictions, including denying investment access until T33 delivers them |
 | Future workflow (`rfp`, `supplementaryCaseFiles`, `boothPaymentReceipt`) | denied with `422 unsupported_category` until T18/T33/T50 provide the parent workflow |
 
 Uploads: an active representative may add files to its own draft request or own
@@ -120,10 +120,9 @@ rehearsal applied all seven backend migrations on the disposable database.
 ## Deliberately not delivered
 
 - RFP version/download workflow (T18), proposal/revision workflow (T20),
-  financial package completeness/handoff (T30/T31), supplementary result
-  publication (T33) and booth receipt workflow (T50). T35 supports company and
-  Secretariat supplementary replies; investment inspection remains dependent
-  on the persisted handoff.
+  supplementary result publication (T33) and booth receipt workflow (T50). T35
+  supports company and Secretariat supplementary replies; investment inspection
+  of those replies remains closed until T33.
 - Image uploads, OCR, virus scanning, signed URLs, resumable uploads, retention
   automation or a numerical file-count cap.
 - A deployed staging runtime or real-data migration.
