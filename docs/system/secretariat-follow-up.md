@@ -82,4 +82,4 @@ No Figma design exists for these screens. They use the existing dashboard compon
 
 ## Not in this slice
 
-The investment person's screen (FE20), a notification to the Secretariat when a memo or company file arrives, counts on the dashboard overview (T38), and letters between the investment person and the Secretariat (T34).
+The investment person's screen (FE20), a notification to the Secretariat when a memo or company file arrives, counts on the dashboard overview (T38), and [letters between the investment person and the Secretariat (T34)](authorization.md#role-scoped-correspondence--t34).

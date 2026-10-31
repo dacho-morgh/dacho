@@ -14,13 +14,23 @@ describe('letter recipient roles', () => {
     expect(canSendLetter('system-owner', 'reviewer', false)).toBe(true)
     expect(canSendLetter('chief-reviewer', 'representative', false)).toBe(true)
   })
-  it('keeps investment correspondence closed until T34 opens it', () => {
-    for (const recipient of ['system-owner', 'central-secretariat', 'chief-reviewer', 'reviewer', 'employer-reviewer', 'investment-reviewer', 'representative'] as const) {
-      expect(canSendLetter('investment-reviewer', recipient, true)).toBe(false)
-      expect(canSendLetter(recipient, 'investment-reviewer', true)).toBe(false)
+  it('keeps case letters of the investment person within the staff of the financial audience', () => {
+    for (const role of ['system-owner', 'central-secretariat'] as const) {
+      expect(canSendLetter('investment-reviewer', role, true)).toBe(true)
+      expect(canSendLetter(role, 'investment-reviewer', true)).toBe(true)
+    }
+    for (const role of ['chief-reviewer', 'reviewer', 'employer-reviewer', 'investment-reviewer', 'representative'] as const) {
+      expect(canSendLetter('investment-reviewer', role, true)).toBe(false)
+      expect(canSendLetter(role, 'investment-reviewer', true)).toBe(false)
+    }
+  })
+  it('gives the investment person no general letters to send', () => {
+    for (const role of ['system-owner', 'central-secretariat', 'chief-reviewer', 'reviewer', 'employer-reviewer', 'investment-reviewer', 'representative'] as const) {
+      expect(canSendLetter('investment-reviewer', role, false)).toBe(false)
     }
     expect(canSendLetter('system-owner', 'investment-reviewer', false)).toBe(true)
     expect(canSendLetter('chief-reviewer', 'investment-reviewer', false)).toBe(true)
+    expect(canSendLetter('central-secretariat', 'investment-reviewer', false)).toBe(false)
   })
 
 })

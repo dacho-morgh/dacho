@@ -18,6 +18,7 @@ import {
   type RequestScope,
 } from '../access/policy.js'
 import {
+  OPERATIONAL_ROLES,
   isCaseAssignmentRole,
   isInternalOperationalRole,
   isOperationalRole,
@@ -2574,6 +2575,55 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
+  // Who the actor may write to now. Sending re-checks every rule when the letter is written.
+  router.get('/letters/recipients', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const { requestId } = req.query
+      const caseLinked = requestId !== undefined
+      const allowedRoles = OPERATIONAL_ROLES.filter((role) => canSendLetter(actor.operationalRole, role, caseLinked))
+      const listRoles = (roles: OperationalRole[], search?: string) =>
+        Promise.all(roles.map((operationalRole) => deps.userStore.list({ operationalRole, search })))
+      const present = (users: (User | undefined)[], eligible: (user: User, role: OperationalRole) => boolean) => {
+        const items = new Map<string, { id: string; name: string | null; operationalRole: OperationalRole }>()
+        for (const user of users) {
+          const role = operationalRoleOf(user)
+          if (!user || !role || user.id === actor.id || !allowedRoles.includes(role) || !eligible(user, role)) continue
+          items.set(user.id, { id: user.id, name: user.name ?? null, operationalRole: role })
+        }
+        return [...items.values()]
+      }
+
+      if (!caseLinked) {
+        const search = typeof req.query.search === 'string' ? req.query.search.trim() || undefined : undefined
+        res.json({ items: present((await listRoles(allowedRoles, search)).flat(), () => true) })
+        return
+      }
+      if (typeof requestId !== 'string' || !isUuid(requestId)) { res.status(400).json({ error: 'invalid_request_id' }); return }
+      const { scope } = await resolveScope(actor.id, actor.operationalRole)
+      const item = await repo.findByIdScoped(requestId, scope)
+      if (!item) { res.status(404).json({ error: 'not_found' }); return }
+
+      const handedOff = await financialPackages.isSubmitted(requestId)
+      if (actor.operationalRole === 'investment-reviewer' && !handedOff) { res.json({ items: [] }); return }
+      const active = (await assignments.listForRequest(requestId)).filter((assignment) => assignment.active)
+      const chiefs = active.filter((assignment) => assignment.role === 'chief-reviewer')
+      const staffRoles = allowedRoles.filter((role) => role === 'system-owner' || role === 'central-secretariat')
+      const candidates = [
+        ...(await listRoles(staffRoles)).flat(),
+        ...(await Promise.all([...active.map((assignment) => assignment.userId), item.ownerId].map((id) => deps.userStore.findById(id)))),
+      ]
+      res.json({
+        items: present(candidates, (user, role) => {
+          if (!isCaseAssignmentRole(role)) return true
+          if (!active.some((assignment) => assignment.userId === user.id && assignment.role === role)) return false
+          if (role === 'investment-reviewer') return handedOff
+          return !isReviewerRole(actor.operationalRole) || chiefs.length === 1
+        }),
+      })
+    } catch (error) { next(error) }
+  })
+
   router.get('/letters/:id', async (req, res, next) => {
     try {
     const actor = actorOf(res)
@@ -3279,7 +3329,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       const senderScope = await resolveScope(actor.id, actor.operationalRole)
       const recipientScope = await resolveScope(trimmedRecipientId, recipientRole)
       letter = await letters.createScoped(input, senderScope.scope, recipientScope.scope,
-        actor.operationalRole === 'reviewer' || actor.operationalRole === 'employer-reviewer')
+        actor.operationalRole === 'reviewer' || actor.operationalRole === 'employer-reviewer',
+        actor.operationalRole === 'investment-reviewer' || recipientRole === 'investment-reviewer')
       if (!letter) { res.status(403).json({ error: 'forbidden' }); return }
     } else {
       letter = await letters.create(input)

@@ -52,5 +52,19 @@ describe('atomic case-letter creation', () => {
     expect(sql).toContain('INSERT INTO dashboard.letters')
     expect(sql).toContain("COUNT(*) FROM locked_letter_assignments WHERE role = 'chief-reviewer'")
     expect(params.slice(-4)).toEqual(['sender', 'reviewer', 'recipient', 'chief-reviewer'])
+    expect(sql).not.toContain('dashboard.financial_packages')
+  })
+
+  it('requires the handoff in the same statement when the investment person takes part', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] })
+    const repo = new LetterRepository({ query } as unknown as Pool)
+    const result = await repo.createScoped({ type: 'official', title: 'Letter', body: 'Body', senderId: 'sender', recipientId: 'recipient', requestId: id },
+      { kind: 'assigned', userId: 'sender', role: 'investment-reviewer' },
+      { kind: 'all' }, false, true)
+    expect(result).toBeUndefined()
+    const [sql] = query.mock.calls[0]!
+    expect(sql).toContain('INSERT INTO dashboard.letters')
+    expect(sql).toContain('dashboard.financial_packages')
+    expect(sql).toContain('fi.request_id = r.id')
   })
 })
