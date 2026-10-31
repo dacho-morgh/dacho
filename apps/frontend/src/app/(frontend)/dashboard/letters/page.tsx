@@ -109,17 +109,38 @@ export default async function LettersPage(props: PageProps) {
   const fetchedLetters = lettersRes?.items ?? []
   const fetchedTickets = ticketsRes?.items ?? []
 
-  const letters: ApplicantLetterItem[] = fetchedLetters.map((dto) => ({
-    id: dto.id,
-    title: dto.title,
-    type: dto.type,
-    typeLabel: LETTER_TYPE_LABELS[dto.type] ?? 'نامه رسمی',
-    senderName: dto.senderName ?? 'کارخانه نوآوری',
-    senderRole: dto.senderRole ?? 'دبیرخانه',
-    sentDate: formatDate(dto.sentAt),
-    senderAvatar: (dto as unknown as { senderAvatar?: string }).senderAvatar,
-    source: 'letter',
-  }))
+  const isSentLetter = (dto: LetterDto) => !!user && String(dto.senderId) === String(user.id)
+  // Letter DTOs carry only the recipient id; show the recipient's name in the sent tab.
+  const sentRecipientIds = [...new Set(fetchedLetters.filter(isSentLetter).map((dto) => dto.recipientId))]
+  const recipientNames = new Map<string, string>()
+  if (sentRecipientIds.length) {
+    const recipients = await payload.find({
+      collection: 'users',
+      where: { id: { in: sentRecipientIds } },
+      depth: 0,
+      limit: sentRecipientIds.length,
+    })
+    for (const recipient of recipients.docs) {
+      if (recipient.name) recipientNames.set(String(recipient.id), recipient.name)
+    }
+  }
+
+  const letters: ApplicantLetterItem[] = fetchedLetters.map((dto) => {
+    const isSent = isSentLetter(dto)
+    return {
+      id: dto.id,
+      title: dto.title,
+      type: dto.type,
+      typeLabel: LETTER_TYPE_LABELS[dto.type] ?? 'نامه رسمی',
+      senderName: isSent ? (recipientNames.get(dto.recipientId) ?? 'دبیرخانه') : (dto.senderName ?? 'کارخانه نوآوری'),
+      senderRole: isSent ? 'گیرنده' : (dto.senderRole ?? 'دبیرخانه'),
+      sentDate: formatDate(dto.sentAt),
+      senderAvatar: (dto as unknown as { senderAvatar?: string }).senderAvatar,
+      source: 'letter',
+      direction: isSent ? 'sent' : 'received',
+      read: dto.read,
+    }
+  })
 
   const tickets: ApplicantLetterItem[] = fetchedTickets.map((t) => ({
     id: `support:${t.id}`,

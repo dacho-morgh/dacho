@@ -536,17 +536,40 @@ export function mapLetterItem(dto: LetterDto): LetterItem {
 }
 
 export function mapMailData(dto: LetterDto): MailData {
+  // The API presents only attachments the reader may open, as objects.
+  const rawAttachments = Array.isArray(dto.attachments)
+    ? dto.attachments.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    : []
+  const attachments = rawAttachments.map((att) => {
+    const id = typeof att.id === 'string' ? att.id : undefined
+    const name = String(att.name ?? att.filename ?? 'پیوست')
+    const size = typeof att.size === 'string'
+      ? att.size
+      : typeof att.sizeBytes === 'number'
+        ? `${Math.max(1, Math.round(att.sizeBytes / 1024))} KB`
+        : '—'
+    const ext = name.split('.').pop() ?? ''
+    const downloadUrl = typeof att.downloadUrl === 'string'
+      ? att.downloadUrl
+      : id
+        ? `/api/dashboard/letters/${encodeURIComponent(dto.id)}/attachments/${encodeURIComponent(id)}/download`
+        : undefined
+    return { id, name, size, ext, downloadUrl }
+  })
+
   return {
     id: dto.id,
     title: dto.title,
-    category: LETTER_TYPE_LABELS[dto.type],
+    category: LETTER_TYPE_LABELS[dto.type] ?? 'نامه رسمی',
+    senderId: dto.senderId,
     senderName: dto.senderName ?? 'کارخانه نوآوری',
     senderRole: dto.senderRole ?? '',
+    requestId: dto.requestId,
     datePersian: formatDate(dto.sentAt),
     dayOfWeek: formatWeekday(dto.sentAt),
     timeStr: formatTime(dto.sentAt),
     body: dto.body,
-    attachments: [],
+    attachments,
   }
 }
 
