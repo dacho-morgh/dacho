@@ -936,3 +936,129 @@ export function updateBooth(
     },
   )
 }
+
+/* ── Event Categories, Subtopics, and RFP (FE10 / FE11 / T17 / T18) ──────── */
+
+export interface EventCategoryDto {
+  id: string
+  eventId: string
+  title: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface EventSubtopicDto {
+  id: string
+  eventId: string
+  categoryId: string
+  categoryTitle?: string
+  title: string
+  employerId: string
+  currentRfpVersionId: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface RfpFileDto {
+  id: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  policyVersion?: string
+}
+
+export interface RfpVersionDto {
+  id: string
+  subtopicId: string
+  createdBy: string
+  createdAt: string
+  reason: string
+  files: RfpFileDto[]
+}
+
+export function getAdminEventCategories(eventId: string): Promise<{ items: EventCategoryDto[] }> {
+  return dashboardFetch<{ items: EventCategoryDto[] }>(`/admin/events/${encodeURIComponent(eventId)}/categories`)
+}
+
+export function createEventCategory(
+  eventId: string,
+  input: { title: string },
+): Promise<{ category: EventCategoryDto }> {
+  return dashboardFetch<{ category: EventCategoryDto }>(
+    `/admin/events/${encodeURIComponent(eventId)}/categories`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+export function getAdminEventSubtopics(eventId: string): Promise<{ items: EventSubtopicDto[] }> {
+  return dashboardFetch<{ items: EventSubtopicDto[] }>(`/admin/events/${encodeURIComponent(eventId)}/subtopics`)
+}
+
+export function createEventSubtopic(
+  eventId: string,
+  input: { title: string; categoryId: string; employerId: string },
+): Promise<{ subtopic: EventSubtopicDto }> {
+  return dashboardFetch<{ subtopic: EventSubtopicDto }>(
+    `/admin/events/${encodeURIComponent(eventId)}/subtopics`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+export function getEventCategories(eventId: string): Promise<{ items: EventCategoryDto[] }> {
+  return dashboardFetch<{ items: EventCategoryDto[] }>(`/events/${encodeURIComponent(eventId)}/categories`)
+}
+
+export function getEventSubtopics(eventId: string): Promise<{ items: EventSubtopicDto[] }> {
+  return dashboardFetch<{ items: EventSubtopicDto[] }>(`/events/${encodeURIComponent(eventId)}/subtopics`)
+}
+
+export function getSubtopicRfp(
+  eventId: string,
+  subtopicId: string,
+  versionId?: string,
+): Promise<{ version: RfpVersionDto }> {
+  const path = versionId
+    ? `/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopicId)}/rfp/${encodeURIComponent(versionId)}`
+    : `/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopicId)}/rfp`
+  return dashboardFetch<{ version: RfpVersionDto }>(path)
+}
+
+export function uploadSubtopicRfp(
+  eventId: string,
+  subtopicId: string,
+  formData: FormData,
+): Promise<{ version: RfpVersionDto }> {
+  return dashboardFetch<{ version: RfpVersionDto }>(
+    `/admin/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopicId)}/rfp`,
+    {
+      method: 'POST',
+      body: formData,
+    },
+  )
+}
+
+export function getRfpDownloadUrl(
+  eventId: string,
+  subtopicId: string,
+  versionId: string,
+  fileId: string,
+): string {
+  return `/api/dashboard/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopicId)}/rfp/${encodeURIComponent(versionId)}/files/${encodeURIComponent(fileId)}`
+}
+
+export function formatFileSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return '۰ بایت'
+  const units = ['بایت', 'کیلوبایت', 'مگابایت', 'گیگابایت']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const val = (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)
+  const persianVal = val.replace(/\./g, '٫').replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)] ?? d)
+  return `${persianVal} ${units[i]}`
+}
