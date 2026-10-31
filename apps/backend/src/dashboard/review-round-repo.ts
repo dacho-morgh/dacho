@@ -268,13 +268,12 @@ export class ReviewRoundRepository {
 
   /** The round for the request's current revision, or the latest earlier one. */
   async findLatest(requestId: string): Promise<ReviewRoundDto | null> {
-    return (await this.loadRounds(requestId, 'LIMIT 1'))[0] ?? null
+    return (await this.loadRounds(requestId, { limit: 1 }))[0] ?? null
   }
 
   /** The round that reviewed exactly this revision, if one did. */
   async findByRevision(requestId: string, revision: number): Promise<ReviewRoundDto | null> {
-    const rounds = await this.loadRounds(requestId)
-    return rounds.find((round) => round.requestRevision === revision) ?? null
+    return (await this.loadRounds(requestId, { revision }))[0] ?? null
   }
 
   /** Every round of the request, newest first, including superseded and decided ones. */
@@ -282,14 +281,18 @@ export class ReviewRoundRepository {
     return this.loadRounds(requestId)
   }
 
-  private async loadRounds(requestId: string, limit = ''): Promise<ReviewRoundDto[]> {
+  private async loadRounds(
+    requestId: string,
+    filter: { revision?: number; limit?: number } = {},
+  ): Promise<ReviewRoundDto[]> {
     if (!isUuid(requestId)) return []
     const { rows } = await this.pool.query<RoundRow & { current: boolean }>(
       `SELECT rr.*, (r.revision = rr.request_revision AND r.status = 'in_review') AS current
        FROM dashboard.review_rounds rr
        JOIN dashboard.requests r ON r.id = rr.request_id
-       WHERE rr.request_id = $1 ORDER BY rr.request_revision DESC ${limit}`,
-      [requestId],
+       WHERE rr.request_id = $1 AND ($2::integer IS NULL OR rr.request_revision = $2)
+       ORDER BY rr.request_revision DESC LIMIT $3::integer`,
+      [requestId, filter.revision ?? null, filter.limit ?? null],
     )
     const roundIds = rows.map((round) => round.id)
     const slots = await this.pool.query<SlotRow>(
