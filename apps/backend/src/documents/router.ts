@@ -378,13 +378,6 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const storageKey = await storage.save(validated.file.body, validated.file.extension)
       let record: PrivateDocumentRecord
       try {
-        if (audience === 'company' && parentCompanyId &&
-            ['articlesOfAssociation', 'establishmentNotices', 'amendmentNotices'].includes(category)) {
-          await deps.verificationStore?.invalidateApproval(
-            parentCompanyId,
-            'تغییر مدارک ثبتی؛ نیازمند احراز مجدد',
-          )
-        }
         const input = {
           storageKey,
           category: validated.file.category,
@@ -427,6 +420,25 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
               return
             }
             record = await documents.create({ ...input, companyId: current.company_id }, client)
+            await client.query('COMMIT')
+          } catch (error) {
+            await client.query('ROLLBACK')
+            throw error
+          } finally {
+            client.release()
+          }
+        } else if (audience === 'company' && parentCompanyId && deps.verificationStore &&
+            ['articlesOfAssociation', 'establishmentNotices', 'amendmentNotices'].includes(category)) {
+          // The approval is lost only together with the saved document that changes it.
+          const client = await deps.pool.connect()
+          try {
+            await client.query('BEGIN')
+            await deps.verificationStore.invalidateApproval(
+              parentCompanyId,
+              'تغییر مدارک ثبتی؛ نیازمند احراز مجدد',
+              client,
+            )
+            record = await documents.create(input, client)
             await client.query('COMMIT')
           } catch (error) {
             await client.query('ROLLBACK')
