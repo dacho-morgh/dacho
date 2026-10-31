@@ -42,10 +42,15 @@ export function isCompanyEditableStatus(status: string | null | undefined, revie
   return status === 'draft' || isChiefCorrectionStatus(status, reviewStage)
 }
 
+/** Only the chief's advancement opens the company's financial package (T29). */
+export function isFinancialStageOpen(status: string | null | undefined, reviewStage?: string | null): boolean {
+  return status === 'in_review' && reviewStage === 'advanced'
+}
+
 /**
  * Request-linked company files. A draft is fully editable; a chief correction
  * reopens the proposal only (UAT12), so files of other categories submitted with
- * the case stay as they were.
+ * the case stay as they were. Financial files change once that stage is open.
  */
 function isCompanyChangeableRequestDocument(
   category: DocumentCategory | undefined,
@@ -53,6 +58,7 @@ function isCompanyChangeableRequestDocument(
   reviewStage?: string | null,
 ): boolean {
   if (status === 'draft') return true
+  if (category && FINANCIAL_CATEGORIES.includes(category)) return isFinancialStageOpen(status, reviewStage)
   return category === 'proposal' && isChiefCorrectionStatus(status, reviewStage)
 }
 
@@ -147,6 +153,8 @@ export function allowedRequestActions(
       if (request.status === 'draft') actions.push('submit', 'uploadDocument', 'deleteDocument')
       else if (isCompanyEditableStatus(request.status, request.reviewStage)) {
         actions.push('correct', 'uploadDocument', 'deleteDocument')
+      } else if (isFinancialStageOpen(request.status, request.reviewStage)) {
+        actions.push('uploadDocument', 'deleteDocument')
       }
       return actions
     }
@@ -231,7 +239,7 @@ const COMPANY_CATEGORIES: readonly DocumentCategory[] = [
   'certificatesLicenses',
 ]
 
-const FINANCIAL_CATEGORIES: readonly DocumentCategory[] = [
+export const FINANCIAL_CATEGORIES: readonly DocumentCategory[] = [
   'financialStatements',
   'debtFacilityEvidence',
   'taxInsuranceRecords',
@@ -294,6 +302,7 @@ export function canUploadOwnedDocument(
   if (category === 'correspondenceAttachment') {
     return true
   }
+  if (audience === 'financial') return isFinancialStageOpen(parent.requestStatus, parent.requestReviewStage)
   return (
     parent.requestStatus === undefined ||
     parent.requestStatus === null ||

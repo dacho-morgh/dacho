@@ -1096,6 +1096,34 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
+  /**
+   * The financial package invitation (T29) for the owning company, Secretariat and
+   * the owner. Chiefs and reviewers are outside the financial audience, and the
+   * investment person waits for the persisted handoff like the files themselves.
+   */
+  router.get('/requests/:id/financial-invitation', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role !== 'representative' && role !== 'central-secretariat' && role !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const invitation = request.reviewStage === 'advanced' ? await repo.findFinancialInvitation(request.id) : null
+      if (!invitation) {
+        res.status(409).json({ error: 'financial_stage_not_open' })
+        return
+      }
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ invitation })
+    } catch (error) { next(error) }
+  })
+
   /* ── Assigned reviewer queue and case file (T23) ───────────────────── */
 
   /** Reviewer and employer inbox, fed only by the actor's active server-side assignments. */

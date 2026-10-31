@@ -21,6 +21,8 @@ T27 adds the nullable `dashboard.review_rounds.completed_at` in `1780511400028_r
 
 T28 adds the `advanced` review stage, the nullable `decision`, `decided_by`, `decided_at` and `decision_reason` columns on `dashboard.review_rounds` with a consistency check, and extends the reason-required activity check with `chief_review_return` and `chief_review_reject`, in `1780511400029_chief_review_decision`. It creates and rewrites no rows. Its rollback puts any `advanced` request back to `triaged` and drops the recorded decisions; the history rows stay. See [chief decision](chief-decision.md).
 
+T29 creates `dashboard.financial_invitations` in `1780511400030_financial_invitations`. Its only data change adds one row for each case already advanced, using the decision's actor and time; those cases get no new notification. Its rollback drops the table and leaves the cases `advanced`. See [financial invitation](financial-invitation.md).
+
 T08 preserves legacy assignments, quarantines ambiguous accounts and requires explicit owner mapping; see [personnel foundation](personnel-foundation.md). Existing editorial privilege is independent of operational authority. No real accounts have been mapped by this implementation.
 
 T09/T10 add only additive backend tables: `dashboard.case_assignments` (with an

@@ -54,6 +54,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const data = result.data
   const canUpload = canUploadDocuments(data.request)
   const canDelete = canDeleteDocuments(data.request)
+  // The chief's advancement opens the financial files and closes the proposal.
+  const financialStageOpen = data.request.reviewStage === 'advanced'
 
   const allowedActions = data.request.allowedActions ?? []
   const nextAction =
@@ -109,8 +111,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
             category="proposal"
             label="پروپوزال"
             requestId={data.request.id}
-            canUpload={canUpload}
-            canDelete={canDelete}
+            canUpload={canUpload && !financialStageOpen}
+            canDelete={canDelete && !financialStageOpen}
           />
           {(
             [
@@ -127,7 +129,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               category={category}
               label={label}
               requestId={data.request.id}
-              canUpload={canUpload}
+              canUpload={canUpload && financialStageOpen}
               canDelete={canDelete}
             />
           ))}

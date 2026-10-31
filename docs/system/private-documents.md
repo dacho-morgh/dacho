@@ -56,7 +56,7 @@ role, ownership and active assignment. A document id or URL is never authority.
 | --- | --- |
 | Company dossier (`articlesOfAssociation`, notices, catalogues, certificates) | owning representative, System Owner, Central Secretariat. Chief/reviewer/employer/investment are denied even when assigned to a case |
 | Case (`proposal`) | owning representative, System Owner, Central Secretariat, and an actively assigned chief/reviewer/employer/investment reviewer |
-| Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner and Central Secretariat. Investment reviewer access requires an authorized persisted handoff; T29/T30 have not delivered that state, so investment access currently fails closed. Chief, ordinary reviewer and employer reviewer are explicitly denied |
+| Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner and Central Secretariat. Investment reviewer access requires an authorized persisted handoff; T30 has not delivered that state, so investment access currently fails closed. Chief, ordinary reviewer and employer reviewer are explicitly denied. The company can upload only after the chief advances the case ([T29](financial-invitation.md)) |
 | Correspondence (`correspondenceAttachment`) | owning representative, System Owner and Central Secretariat. Supplementary financial replies retain the financial audience restrictions, including denying investment access until a persisted handoff exists |
 | Future workflow (`rfp`, `supplementaryCaseFiles`, `boothPaymentReceipt`) | denied with `422 unsupported_category` until T18/T33/T50 provide the parent workflow |
 

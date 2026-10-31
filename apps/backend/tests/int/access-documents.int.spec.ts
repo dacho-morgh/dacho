@@ -523,7 +523,7 @@ describe('shared access policy and private documents (T09/T10)', () => {
       requestId: id,
     }).expect(201)
     const financial = await upload({
-      userId: people.repA.id,
+      userId: people.owner.id,
       category: 'financialStatements',
       filename: 'financial.pdf',
       contentType: 'application/pdf',

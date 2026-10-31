@@ -20,6 +20,11 @@ const companyCategories: readonly DocumentCategory[] = [
 const unsupportedCategories: readonly DocumentCategory[] = [
   'rfp', 'supplementaryCaseFiles', 'boothPaymentReceipt',
 ]
+// Closed to the company in both statuses below: only the chief's advancement opens them (T29).
+const financialCategories: readonly DocumentCategory[] = [
+  'financialStatements', 'debtFacilityEvidence', 'taxInsuranceRecords',
+  'contractsOrdersMousCommitments', 'projectEstimateUseOfFunds', 'guaranteeCollateral',
+]
 
 const contexts = [
   { name: 'own company and request', companyId: 'company', requestOwnerId: 'actor' },
@@ -58,7 +63,7 @@ describe('T42 current backend document authority matrix', () => {
             const expected = supported && validParent && (
               privileged || (role === 'representative' && (companyDocument
                 ? context.companyId === 'company'
-                : context.requestOwnerId === 'actor' && (requestStatus === 'draft' || category === 'correspondenceAttachment')))
+                : context.requestOwnerId === 'actor' && !financialCategories.includes(category) && (requestStatus === 'draft' || category === 'correspondenceAttachment')))
             )
             expect(canUploadOwnedDocument(role, category, {
               companyId: companyDocument ? context.companyId : null,

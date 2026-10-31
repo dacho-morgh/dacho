@@ -604,7 +604,7 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
     await uploadProposal(app, 'company-user-1', requestId, 'proposal.pdf')
     const financial = await request(app)
       .post('/documents')
-      .set(auth('company-user-1'))
+      .set(auth('owner'))
       .field('category', 'financialStatements')
       .field('requestId', requestId)
       .attach('file', Buffer.from('%PDF-1.4 statements'), { filename: 'statements.pdf', contentType: 'application/pdf' })

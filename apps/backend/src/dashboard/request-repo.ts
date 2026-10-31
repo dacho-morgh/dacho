@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import type { RequestScope } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
 import { countRoundFinals, ROUND_REQUIRED_EVALUATIONS } from '../reviews/round-completion.js'
+import { FINANCIAL_CHECKLIST, FINANCIAL_CHECKLIST_VERSION, type FinancialChecklistItem, type FinancialInvitationDto } from './financial-invitation.js'
 import { appendTransition } from './transition-history.js'
 import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 import { lockApprovedVerification } from './verification-repo.js'
@@ -392,8 +393,9 @@ const REVIEW_DECISION_TRANSITIONS: Record<ReviewDecisionAction, ChiefTransition>
     history: 'chief_review_advance',
     toStatus: 'in_review',
     toStage: 'advanced',
-    title: 'تأیید عبور از مرحله داوری',
-    body: (r) => `درخواست ${r.title} با کد رهگیری ${r.tracking_code} مرحله داوری را با تأیید سردبیر پشت سر گذاشت.`,
+    title: 'دعوت به ارسال بسته مالی',
+    body: (r) =>
+      `درخواست ${r.title} با کد رهگیری ${r.tracking_code} مرحله داوری را با تأیید سردبیر پشت سر گذاشت. لطفاً مدارک مالی زیر را برای این پرونده ارسال کنید: ${FINANCIAL_CHECKLIST.map((item) => item.title).join('، ')}.`,
   },
   return: {
     history: 'chief_review_return',
@@ -780,7 +782,9 @@ export class RequestRepository {
    * is the one finalizations and the owner's employer replacement also take, so
    * readiness read under it cannot change before this commits, and a racing second
    * decision finds the case already moved. The revision moves on with the case:
-   * the round stops being current and its slots can write nothing more.
+   * the round stops being current and its slots can write nothing more. An
+   * advance opens the financial stage (T29) in the same transaction, so a case
+   * never advances without its invitation.
    */
   async decideReview(input: {
     requestId: string
@@ -794,8 +798,8 @@ export class RequestRepository {
       REVIEW_DECISION_TRANSITIONS[input.action],
       'triaged',
       async (client, current): Promise<'round_not_ready' | undefined> => {
-        const { rows } = await client.query<{ id: string; completed_at: Date | null }>(
-          `SELECT id, completed_at FROM dashboard.review_rounds
+        const { rows } = await client.query<{ id: string; proposal_revision: number; completed_at: Date | null }>(
+          `SELECT id, proposal_revision, completed_at FROM dashboard.review_rounds
            WHERE request_id = $1 AND request_revision = $2
            FOR NO KEY UPDATE`,
           [current.id, current.revision],
@@ -810,9 +814,61 @@ export class RequestRepository {
            WHERE id = $1`,
           [round.id, input.action, input.actorId, input.reason],
         )
+        if (input.action === 'advance') {
+          await client.query(
+            `INSERT INTO dashboard.financial_invitations
+               (request_id, review_round_id, request_revision, proposal_revision, checklist_version, checklist, invited_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              current.id,
+              round.id,
+              current.revision + 1,
+              round.proposal_revision,
+              FINANCIAL_CHECKLIST_VERSION,
+              JSON.stringify(FINANCIAL_CHECKLIST),
+              input.actorId,
+            ],
+          )
+        }
         return undefined
       },
     )
+  }
+
+  /** The invitation of the case's latest advancement, with the checklist as it was sent. */
+  async findFinancialInvitation(requestId: string): Promise<FinancialInvitationDto | null> {
+    if (!isUuid(requestId)) return null
+    const { rows } = await this.pool.query<{
+      id: string
+      request_id: string
+      tracking_code: string
+      request_revision: number
+      proposal_revision: number
+      checklist_version: string
+      checklist: FinancialChecklistItem[]
+      invited_at: Date
+    }>(
+      `SELECT i.id, i.request_id, r.tracking_code, i.request_revision, i.proposal_revision,
+              i.checklist_version, i.checklist, i.invited_at
+       FROM dashboard.financial_invitations i
+       JOIN dashboard.requests r ON r.id = i.request_id
+       WHERE i.request_id = $1
+       ORDER BY i.request_revision DESC
+       LIMIT 1`,
+      [requestId],
+    )
+    const row = rows[0]
+    if (!row) return null
+    return {
+      id: row.id,
+      requestId: row.request_id,
+      trackingCode: row.tracking_code,
+      requestRevision: row.request_revision,
+      proposalRevision: row.proposal_revision,
+      checklistVersion: row.checklist_version,
+      checklist: row.checklist,
+      invitedAt: row.invited_at.toISOString(),
+    }
   }
 
   private async applyChiefDecision<Refusal extends string = never>(
