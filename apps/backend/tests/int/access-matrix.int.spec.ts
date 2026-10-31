@@ -648,7 +648,7 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
       ...[TEAM_A, TEAM_B, IDLE].flatMap((team) => flatten(team).map(([id]) => id)),
     ]
 
-    type Attempt = (user: string) => request.Test
+    type Attempt = (user: string, caseId: string) => request.Test
 
     const snapshot = async (id: string) => ({
       request: (await pool.query(
@@ -667,8 +667,13 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
     async function expectOnly(id: string, label: string, allowed: readonly string[], attempt: Attempt) {
       const before = await snapshot(id)
       for (const user of SEATS.filter((seatId) => !allowed.includes(seatId))) {
-        const res = await attempt(user)
+        const res = await attempt(user, id)
         expect([403, 404], `${label} by ${user}: ${res.status} ${JSON.stringify(res.body)}`).toContain(res.status)
+        // Someone who cannot read the case must not learn from a refusal that it exists.
+        if ((await get(user, `/requests/${id}`)).status === 404) {
+          const unknown = await attempt(user, UNKNOWN_ID)
+          expect.soft({ status: res.status, body: res.body }, `${label} by ${user}`).toEqual({ status: unknown.status, body: unknown.body })
+        }
       }
       expect(await snapshot(id), label).toEqual(before)
     }
@@ -680,76 +685,77 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
     it('refuses every command to everyone else, at the stage where it would otherwise succeed', async () => {
       const { id, eventId, proposalId } = await draftCase(TEAM_A)
       const uploadTo = (category: string, statementYear?: number): Attempt =>
-        (user) => uploadAs(user, { requestId: id }, category, 'bypass.pdf', statementYear)
+        (user, target) => uploadAs(user, { requestId: target }, category, 'bypass.pdf', statementYear)
+      const real = (target: string, value: string) => (target === id ? value : UNKNOWN_ID)
 
       // Draft.
-      await expectOnly(id, 'edit draft', [company], (user) => request(app).patch(`/requests/${id}`).set(auth(user)).send({ title: 'تلاش' }))
-      await expectOnly(id, 'submit', [company], (user) => post(user, `/requests/${id}/submit`, consent))
+      await expectOnly(id, 'edit draft', [company], (user, target) => request(app).patch(`/requests/${target}`).set(auth(user)).send({ title: 'تلاش' }))
+      await expectOnly(id, 'submit', [company], (user, target) => post(user, `/requests/${target}/submit`, consent))
       await expectOnly(id, 'upload proposal', [company, 'owner', 'secretariat'], uploadTo('proposal'))
-      await expectOnly(id, 'delete proposal', [company, 'owner'], (user) => request(app).delete(`/documents/${proposalId}`).set(auth(user)))
+      await expectOnly(id, 'delete proposal', [company, 'owner'], (user, target) => request(app).delete(`/documents/${real(target, proposalId)}`).set(auth(user)))
       const submitted = await post(company, `/requests/${id}/submit`, consent)
       expectOk(submitted, 200, 'submit')
 
       // Triage.
-      await expectOnly(id, 'triage', [chief], (user) =>
-        post(user, `/requests/${id}/triage`, { action: 'accept', expectedRevision: submitted.body.request.revision }))
+      await expectOnly(id, 'triage', [chief], (user, target) =>
+        post(user, `/requests/${target}/triage`, { action: 'accept', expectedRevision: submitted.body.request.revision }))
       const accepted = await post(chief, `/requests/${id}/triage`, { action: 'accept', expectedRevision: submitted.body.request.revision })
       expectOk(accepted, 200, 'triage')
       const revision = accepted.body.request.revision as number
 
       // Round.
-      await expectOnly(id, 'start round', [chief], (user) =>
-        post(user, `/requests/${id}/review-round`, { reviewerIds: TEAM_A.reviewers, expectedRevision: revision }))
+      await expectOnly(id, 'start round', [chief], (user, target) =>
+        post(user, `/requests/${target}/review-round`, { reviewerIds: TEAM_A.reviewers, expectedRevision: revision }))
       expectOk(await post(chief, `/requests/${id}/review-round`, { reviewerIds: TEAM_A.reviewers, expectedRevision: revision }), 201, 'round')
 
       const slots = [TEAM_A.employer, ...TEAM_A.reviewers]
-      await expectOnly(id, 'save evaluation', slots, (user) =>
-        request(app).put(`/requests/${id}/evaluation`).set(auth(user)).send({ revision, scores, answers: ordinaryAnswers(user) }))
-      await expectOnly(id, 'finalize evaluation', slots, (user) =>
-        post(user, `/requests/${id}/evaluation/finalize`, { revision, scores, answers: ordinaryAnswers(user) }))
-      await expectOnly(id, 'replace reviewer', [chief], (user) =>
-        post(user, `/requests/${id}/review-round/reviewers/${TEAM_A.reviewers[0]}/replace`, { expectedRevision: revision, replacementId: IDLE.reviewers[0], reason: 'تلاش' }))
-      await expectOnly(id, 'replace employer', ['owner'], (user) =>
-        post(user, `/requests/${id}/review-round/employer/replace`, { expectedRevision: revision, employerId: IDLE.employer, reason: 'تلاش' }))
-      await expectOnly(id, 'assign', ['owner'], (user) =>
-        post(user, `/admin/requests/${id}/assignments`, { userId: IDLE.reviewers[0], role: 'reviewer' }))
-      await expectOnly(id, 'revoke assignment', ['owner'], (user) =>
-        request(app).delete(`/admin/requests/${id}/assignments/${TEAM_A.reviewers[0]}`).set(auth(user)).send({ reason: 'تلاش' }))
+      await expectOnly(id, 'save evaluation', slots, (user, target) =>
+        request(app).put(`/requests/${target}/evaluation`).set(auth(user)).send({ revision, scores, answers: ordinaryAnswers(user) }))
+      await expectOnly(id, 'finalize evaluation', slots, (user, target) =>
+        post(user, `/requests/${target}/evaluation/finalize`, { revision, scores, answers: ordinaryAnswers(user) }))
+      await expectOnly(id, 'replace reviewer', [chief], (user, target) =>
+        post(user, `/requests/${target}/review-round/reviewers/${TEAM_A.reviewers[0]}/replace`, { expectedRevision: revision, replacementId: IDLE.reviewers[0], reason: 'تلاش' }))
+      await expectOnly(id, 'replace employer', ['owner'], (user, target) =>
+        post(user, `/requests/${target}/review-round/employer/replace`, { expectedRevision: revision, employerId: IDLE.employer, reason: 'تلاش' }))
+      await expectOnly(id, 'assign', ['owner'], (user, target) =>
+        post(user, `/admin/requests/${target}/assignments`, { userId: IDLE.reviewers[0], role: 'reviewer' }))
+      await expectOnly(id, 'revoke assignment', ['owner'], (user, target) =>
+        request(app).delete(`/admin/requests/${target}/assignments/${TEAM_A.reviewers[0]}`).set(auth(user)).send({ reason: 'تلاش' }))
 
       await finalizeAll(TEAM_A, id, revision)
 
       // Chief decision.
-      await expectOnly(id, 'chief decision', [chief], (user) =>
-        post(user, `/requests/${id}/review-decision`, { action: 'advance', expectedRevision: revision }))
+      await expectOnly(id, 'chief decision', [chief], (user, target) =>
+        post(user, `/requests/${target}/review-decision`, { action: 'advance', expectedRevision: revision }))
       expectOk(await post(chief, `/requests/${id}/review-decision`, { action: 'advance', expectedRevision: revision }), 200, 'advance')
 
       // Financial package. The people assigned to review get nowhere near it.
       await expectOnly(id, 'upload financial', [company, 'owner', 'secretariat'], uploadTo('financialStatements', YEARS[0]))
       for (const category of OTHER_CATEGORIES) expectOk(await uploadAs(company, { requestId: id }, category, `${category}.pdf`), 201, category)
       for (const year of YEARS) expectOk(await uploadAs(company, { requestId: id }, 'financialStatements', `s-${year}.pdf`, year), 201, `year ${year}`)
-      await expectOnly(id, 'submit package', [company], (user) => post(user, `/requests/${id}/financial-package`))
+      await expectOnly(id, 'submit package', [company], (user, target) => post(user, `/requests/${target}/financial-package`))
       expectOk(await post(company, `/requests/${id}/financial-package`), 201, 'package')
 
       // Memo.
-      await expectOnly(id, 'save memo', [holder], (user) => post(user, `/investment/cases/${id}/memo`, { body: 'تلاش' }))
+      await expectOnly(id, 'save memo', [holder], (user, target) => post(user, `/investment/cases/${target}/memo`, { body: 'تلاش' }))
       const memo = await post(holder, `/investment/cases/${id}/memo`, { body: 'یادداشت' })
       expectOk(memo, 201, 'memo')
-      await expectOnly(id, 'send memo', [holder], (user) => post(user, `/investment/cases/${id}/memo/send`, { version: memo.body.memo.version }))
+      await expectOnly(id, 'send memo', [holder], (user, target) => post(user, `/investment/cases/${target}/memo/send`, { version: memo.body.memo.version }))
       expectOk(await post(holder, `/investment/cases/${id}/memo/send`, { version: memo.body.memo.version }), 200, 'send')
 
       // Follow-up and publication belong to the Secretariat alone.
       const reply = await uploadAs(company, { requestId: id }, 'correspondenceAttachment', 'reply.pdf')
       expectOk(reply, 201, 'reply')
-      await expectOnly(id, 'supplementary request', ['secretariat'], (user) => post(user, `/requests/${id}/supplementary-requests`, { body: 'تلاش' }))
-      await expectOnly(id, 'deliver file', ['secretariat'], (user) => post(user, `/requests/${id}/supplementary-files`, { documentId: reply.body.document.id }))
-      await expectOnly(id, 'draft result', ['secretariat'], (user) => post(user, `/requests/${id}/result`, { body: 'تلاش' }))
+      await expectOnly(id, 'supplementary request', ['secretariat'], (user, target) => post(user, `/requests/${target}/supplementary-requests`, { body: 'تلاش' }))
+      await expectOnly(id, 'deliver file', ['secretariat'], (user, target) => post(user, `/requests/${target}/supplementary-files`, { documentId: reply.body.document.id }))
+      await expectOnly(id, 'draft result', ['secretariat'], (user, target) => post(user, `/requests/${target}/result`, { body: 'تلاش' }))
       const result = await post('secretariat', `/requests/${id}/result`, { body: 'متن' })
       expectOk(result, 201, 'result')
-      await expectOnly(id, 'publish', ['secretariat'], (user) => post(user, `/requests/${id}/result/publish`, { version: result.body.result.version }))
+      await expectOnly(id, 'publish', ['secretariat'], (user, target) => post(user, `/requests/${target}/result/publish`, { version: result.body.result.version }))
       expect((await get(company, `/requests/${id}/result`)).body.result).toBeNull()
 
       // Event definitions.
-      await expectOnly(id, 'create event', ['owner'], (user) => post(user, '/admin/events', {
+      await expectOnly(id, 'create event', ['owner'], (user, target) => post(user, '/admin/events', {
         title: 'تلاش',
         description: 'تلاش',
         registrationOpenAt: '2020-01-01T00:00:00Z',
@@ -757,16 +763,16 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
         responsibleChiefId: chief,
         responsibleInvestmentId: holder,
       }))
-      await expectOnly(id, 'edit event', ['owner'], (user) =>
-        request(app).patch(`/admin/events/${eventId}`).set(auth(user)).send({ title: 'تلاش', revision: 1, reason: 'تلاش' }))
-      await expectOnly(id, 'add category', ['owner'], (user) => post(user, `/admin/events/${eventId}/categories`, { title: 'تلاش' }))
+      await expectOnly(id, 'edit event', ['owner'], (user, target) =>
+        request(app).patch(`/admin/events/${real(target, eventId)}`).set(auth(user)).send({ title: 'تلاش', revision: 1, reason: 'تلاش' }))
+      await expectOnly(id, 'add category', ['owner'], (user, target) => post(user, `/admin/events/${real(target, eventId)}/categories`, { title: 'تلاش' }))
     }, 120_000)
 
     it('leaves reopening a rejected case to the owner', async () => {
       const { id } = await draftCase(TEAM_A)
       const submitted = await post(company, `/requests/${id}/submit`, consent)
       expectOk(await post(chief, `/requests/${id}/triage`, { action: 'reject', reason: 'رد', expectedRevision: submitted.body.request.revision }), 200, 'reject')
-      await expectOnly(id, 'reopen', ['owner'], (user) => post(user, `/admin/requests/${id}/reopen`, { reason: 'تلاش' }))
+      await expectOnly(id, 'reopen', ['owner'], (user, target) => post(user, `/admin/requests/${target}/reopen`, { reason: 'تلاش' }))
     })
 
     it('leaves the company decision to the people who verify', async () => {
@@ -774,8 +780,9 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
         'SELECT id FROM dashboard.company_verifications WHERE company_id = $1 ORDER BY revision DESC LIMIT 1',
         [caseA.companyId],
       )).rows[0]!.id
-      await expectOnly(caseA.id, 'verification decision', ['owner', 'secretariat'], (user) =>
-        post(user, `/admin/verifications/${verification}/decision`, { action: 'approve' }))
+      const real = (target: string, value: string) => (target === caseA.id ? value : UNKNOWN_ID)
+      await expectOnly(caseA.id, 'verification decision', ['owner', 'secretariat'], (user, target) =>
+        post(user, `/admin/verifications/${real(target, verification)}/decision`, { action: 'approve' }))
     })
 
     it('takes the owner from the session, whatever the body claims', async () => {
