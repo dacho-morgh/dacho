@@ -10,6 +10,8 @@ export interface PrivateDocumentDto {
   mimeType: string
   sizeBytes: number
   logicalVersion: number
+  /** The year a financial statement covers (T30); null for every other file. */
+  statementYear: number | null
   requestId: string | null
   companyId: string | null
   uploaderId: string
@@ -23,6 +25,8 @@ export interface PrivateDocumentRecord extends PrivateDocumentDto {
   requestStatus: string | null
   requestReviewStage: string | null
   requestCompanyId: string | null
+  /** True once the company submitted its financial package; its financial files are frozen (T30). */
+  requestFinancialSubmitted: boolean
 }
 
 interface DocumentRow {
@@ -33,6 +37,7 @@ interface DocumentRow {
   mime_type: string
   size_bytes: number
   logical_version: number
+  statement_year: number | null
   request_id: string | null
   company_id: string | null
   uploader_id: string
@@ -42,12 +47,14 @@ interface DocumentRow {
   request_status: string | null
   request_review_stage: string | null
   request_company_id: string | null
+  request_financial_submitted: boolean
 }
 
 const DOCUMENT_COLUMNS = `
   d.id, d.storage_key, d.category, d.original_filename, d.mime_type, d.size_bytes,
-  d.logical_version, d.request_id, d.company_id, d.uploader_id, d.created_at, d.updated_at,
-  r.owner_id AS request_owner_id, r.status::text AS request_status, r.review_stage AS request_review_stage, r.company_id AS request_company_id
+  d.logical_version, d.statement_year, d.request_id, d.company_id, d.uploader_id, d.created_at, d.updated_at,
+  r.owner_id AS request_owner_id, r.status::text AS request_status, r.review_stage AS request_review_stage, r.company_id AS request_company_id,
+  EXISTS (SELECT 1 FROM dashboard.financial_packages fp WHERE fp.request_id = r.id) AS request_financial_submitted
 `
 
 const DOCUMENT_FROM = `
@@ -64,6 +71,7 @@ function mapRow(row: DocumentRow): PrivateDocumentRecord {
     mimeType: row.mime_type,
     sizeBytes: row.size_bytes,
     logicalVersion: row.logical_version,
+    statementYear: row.statement_year,
     requestId: row.request_id,
     companyId: row.company_id,
     uploaderId: row.uploader_id,
@@ -73,6 +81,7 @@ function mapRow(row: DocumentRow): PrivateDocumentRecord {
     requestStatus: row.request_status,
     requestReviewStage: row.request_review_stage,
     requestCompanyId: row.request_company_id,
+    requestFinancialSubmitted: row.request_financial_submitted,
   }
 }
 
@@ -84,6 +93,7 @@ export function toDocumentDto(record: PrivateDocumentRecord): PrivateDocumentDto
     mimeType: record.mimeType,
     sizeBytes: record.sizeBytes,
     logicalVersion: record.logicalVersion,
+    statementYear: record.statementYear,
     requestId: record.requestId,
     companyId: record.companyId,
     uploaderId: record.uploaderId,
@@ -99,6 +109,7 @@ export interface CreateDocumentInput {
   mimeType: string
   sizeBytes: number
   logicalVersion: number
+  statementYear?: number | null
   requestId: string | null
   companyId: string | null
   uploaderId: string
@@ -112,8 +123,8 @@ export class DocumentRepository {
       `WITH inserted AS (
          INSERT INTO dashboard.private_documents
            (storage_key, category, original_filename, mime_type, size_bytes, logical_version,
-            request_id, company_id, uploader_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            request_id, company_id, uploader_id, statement_year)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *
        )
        SELECT ${DOCUMENT_COLUMNS}
@@ -129,6 +140,7 @@ export class DocumentRepository {
         input.requestId,
         input.companyId,
         input.uploaderId,
+        input.statementYear ?? null,
       ],
     )
     const row = rows[0]

@@ -17,6 +17,8 @@ import type { UserStore } from '../auth/user-store.js'
 import { AssignmentRepository } from '../dashboard/assignment-repo.js'
 import { actorOf } from '../dashboard/proxy-auth.js'
 import { isReviewerRole, ReviewCaseRepository } from '../dashboard/review-case-repo.js'
+import { FinancialPackageRepository } from '../dashboard/financial-package-repo.js'
+import { parseStatementYear } from '../dashboard/financial-package.js'
 import { RequestRepository } from '../dashboard/request-repo.js'
 import { isUuid } from '../exhibitions/catalogue.js'
 import type { VerificationStore } from '../dashboard/verification-repo.js'
@@ -59,6 +61,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
   const router = Router()
   const documents = new DocumentRepository(deps.pool)
   const requests = new RequestRepository(deps.pool)
+  const financialPackages = new FinancialPackageRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
   const reviewCases = new ReviewCaseRepository(deps.pool)
   const storage = deps.privateDocumentStorage
@@ -135,6 +138,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           requestStatus: record.requestStatus,
           requestReviewStage: record.requestReviewStage,
           category: record.category,
+          requestFinancialSubmitted: record.requestFinancialSubmitted,
         },
         actorId,
         companyId,
@@ -286,6 +290,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       let requestStatus: string | null = null
       let requestReviewStage: string | null = null
       let requestCompanyId: string | null = null
+      let requestFinancialSubmitted = false
       let parentCompanyId: string | null = requestedCompanyId
       if (requestId) {
         if (!isUuid(requestId)) {
@@ -304,6 +309,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         requestStatus = request.status
         requestReviewStage = request.reviewStage
         requestCompanyId = request.companyId
+        requestFinancialSubmitted = await financialPackages.isSubmitted(requestId)
         parentCompanyId = request.companyId ?? parentCompanyId
         if (!parentCompanyId) {
           const ownerCompany = await deps.companyStore.findByRepresentative(request.ownerId)
@@ -320,6 +326,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           requestStatus,
           requestReviewStage,
           requestCompanyId,
+          requestFinancialSubmitted,
         },
         actor.id,
         companyId,
@@ -333,6 +340,13 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const file = req.file
       if (!file) {
         res.status(400).json({ error: 'invalid_file' })
+        return
+      }
+      // A statement names the year it covers. A file without a year is kept but does not count toward the package (T30).
+      const yearField = category === 'financialStatements' ? stringField(req.body?.statementYear) : null
+      const statementYear = yearField === null ? null : parseStatementYear(yearField)
+      if (yearField !== null && statementYear === null) {
+        res.status(422).json({ error: 'invalid_statement_year' })
         return
       }
       const validated = validateDocumentFile({
@@ -374,6 +388,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           mimeType: validated.file.mimeType,
           sizeBytes: validated.file.sizeBytes,
           logicalVersion,
+          statementYear,
           requestId: requestId ?? null,
           companyId: parentCompanyId,
           uploaderId: actor.id,
@@ -390,7 +405,14 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
             const currentPermission = current && canUploadOwnedDocument(
               actor.operationalRole,
               category,
-              { requestOwnerId: current.owner_id, requestStatus: current.status, requestReviewStage: current.review_stage, requestCompanyId: current.company_id },
+              {
+                requestOwnerId: current.owner_id,
+                requestStatus: current.status,
+                requestReviewStage: current.review_stage,
+                requestCompanyId: current.company_id,
+                // Read after the lock: a package that committed while this upload waited blocks it.
+                requestFinancialSubmitted: await financialPackages.isSubmitted(requestId, client),
+              },
               actor.id,
               companyId,
             )
@@ -501,7 +523,14 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       if (
         !canDeleteDocument(
           actor.operationalRole,
-          { requestOwnerId: current.owner_id, requestCompanyId: current.company_id, requestStatus: current.status, requestReviewStage: current.review_stage, category: record.category },
+          {
+            requestOwnerId: current.owner_id,
+            requestCompanyId: current.company_id,
+            requestStatus: current.status,
+            requestReviewStage: current.review_stage,
+            category: record.category,
+            requestFinancialSubmitted: await financialPackages.isSubmitted(record.requestId as string, client),
+          },
           actor.id,
           companyId,
         )

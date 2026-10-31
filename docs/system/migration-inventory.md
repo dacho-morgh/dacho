@@ -23,6 +23,8 @@ T28 adds the `advanced` review stage, the nullable `decision`, `decided_by`, `de
 
 T29 creates `dashboard.financial_invitations` in `1780511400030_financial_invitations`. Its only data change adds one row for each case already advanced, using the decision's actor and time; those cases get no new notification. Its rollback drops the table and leaves the cases `advanced`. See [financial invitation](financial-invitation.md).
 
+T30 adds the nullable `dashboard.private_documents.statement_year` and creates `dashboard.financial_packages` in `1780511400031_financial_packages`. It rewrites no existing rows. Its rollback drops the table and the column, so any submitted package and its statement years are lost. See [financial package](financial-package.md).
+
 T08 preserves legacy assignments, quarantines ambiguous accounts and requires explicit owner mapping; see [personnel foundation](personnel-foundation.md). Existing editorial privilege is independent of operational authority. No real accounts have been mapped by this implementation.
 
 T09/T10 add only additive backend tables: `dashboard.case_assignments` (with an

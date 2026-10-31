@@ -360,4 +360,11 @@ describe('dashboard migrations', () => {
       expect.arrayContaining(['request_id', 'review_round_id', 'request_revision', 'proposal_revision', 'checklist_version', 'checklist']),
     )
   })
+
+  it('adds the T30 financial packages and statement years', async () => {
+    expect(await tableColumns('financial_packages')).toEqual(
+      expect.arrayContaining(['request_id', 'invitation_id', 'package_version', 'statement_years', 'documents', 'submitted_by']),
+    )
+    expect(await tableColumns('private_documents')).toEqual(expect.arrayContaining(['statement_year']))
+  })
 })

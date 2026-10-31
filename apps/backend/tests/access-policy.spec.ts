@@ -297,8 +297,17 @@ describe('document read authority', () => {
       }
     }
     expect(canUploadOwnedDocument('representative', 'financialStatements', { ...advanced, requestOwnerId: 'rep-2' }, 'rep-1', null)).toBe(false)
-    expect(allowedRequestActions('representative', { ownerId: 'rep-1', status: 'in_review', reviewStage: 'advanced' }, 'rep-1')).toEqual(['read', 'uploadDocument', 'deleteDocument'])
+    expect(allowedRequestActions('representative', { ownerId: 'rep-1', status: 'in_review', reviewStage: 'advanced' }, 'rep-1')).toEqual(['read', 'uploadDocument', 'deleteDocument', 'submitFinancialPackage'])
     expect(allowedRequestActions('representative', { ownerId: 'rep-1', status: 'in_review', reviewStage: 'triaged' }, 'rep-1')).toEqual(['read'])
+  })
+
+  it('freezes financial files and the package action once the company submits (T30)', () => {
+    const submitted = { requestOwnerId: 'rep-1', requestStatus: 'in_review', requestReviewStage: 'advanced', requestFinancialSubmitted: true }
+    for (const category of FINANCIAL_CATEGORIES) {
+      expect(canUploadOwnedDocument('representative', category, submitted, 'rep-1', null)).toBe(false)
+      expect(canDeleteDocument('representative', { ...submitted, category }, 'rep-1')).toBe(false)
+    }
+    expect(allowedRequestActions('representative', { ownerId: 'rep-1', status: 'in_review', reviewStage: 'advanced', financialPackageSubmitted: true }, 'rep-1')).toEqual(['read'])
   })
 
   it('asks for every financial category exactly once (T29)', () => {

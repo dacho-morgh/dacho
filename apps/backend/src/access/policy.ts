@@ -14,6 +14,7 @@ export const REQUEST_ACTIONS = [
   'reopen',
   'uploadDocument',
   'deleteDocument',
+  'submitFinancialPackage',
 ] as const
 
 export type RequestAction = (typeof REQUEST_ACTIONS)[number]
@@ -30,6 +31,8 @@ export interface RequestForPolicy {
   reviewRoundStarted?: boolean
   /** True when that round holds its four final evaluations and awaits the chief's decision. */
   reviewRoundComplete?: boolean
+  /** True once the company submitted its financial package for the open stage (T30). */
+  financialPackageSubmitted?: boolean
 }
 
 /** An event case the responsible chief returned at triage; it is resubmitted as a new revision. */
@@ -50,15 +53,19 @@ export function isFinancialStageOpen(status: string | null | undefined, reviewSt
 /**
  * Request-linked company files. A draft is fully editable; a chief correction
  * reopens the proposal only (UAT12), so files of other categories submitted with
- * the case stay as they were. Financial files change once that stage is open.
+ * the case stay as they were. Financial files change once that stage is open and
+ * until the company submits its package, which freezes them (T30).
  */
 function isCompanyChangeableRequestDocument(
   category: DocumentCategory | undefined,
   status: string | null | undefined,
   reviewStage?: string | null,
+  financialPackageSubmitted = false,
 ): boolean {
   if (status === 'draft') return true
-  if (category && FINANCIAL_CATEGORIES.includes(category)) return isFinancialStageOpen(status, reviewStage)
+  if (category && FINANCIAL_CATEGORIES.includes(category)) {
+    return isFinancialStageOpen(status, reviewStage) && !financialPackageSubmitted
+  }
   return category === 'proposal' && isChiefCorrectionStatus(status, reviewStage)
 }
 
@@ -153,8 +160,8 @@ export function allowedRequestActions(
       if (request.status === 'draft') actions.push('submit', 'uploadDocument', 'deleteDocument')
       else if (isCompanyEditableStatus(request.status, request.reviewStage)) {
         actions.push('correct', 'uploadDocument', 'deleteDocument')
-      } else if (isFinancialStageOpen(request.status, request.reviewStage)) {
-        actions.push('uploadDocument', 'deleteDocument')
+      } else if (isFinancialStageOpen(request.status, request.reviewStage) && !request.financialPackageSubmitted) {
+        actions.push('uploadDocument', 'deleteDocument', 'submitFinancialPackage')
       }
       return actions
     }
@@ -264,6 +271,8 @@ export interface DocumentParent {
   requestCompanyId?: string | null
   requestStatus?: string | null
   requestReviewStage?: string | null
+  /** True once the company submitted its financial package; freezes the financial files (T30). */
+  requestFinancialSubmitted?: boolean
   /** True when the current actor holds an active assignment on the request. */
   assigned?: boolean
 }
@@ -296,13 +305,15 @@ export function canUploadOwnedDocument(
     (!parent.requestCompanyId && parent.requestOwnerId === actorId)
   )
   if (!ownsRequest) return false
-  // Draft-only company editing keeps submitted/financial snapshots immutable
-  // until T30 introduces versioned package submissions.
+  // Draft-only company editing keeps submitted snapshots immutable. Financial
+  // files freeze when the company submits its package (T30).
   // Supplementary correspondence is additive and does not edit submitted files.
   if (category === 'correspondenceAttachment') {
     return true
   }
-  if (audience === 'financial') return isFinancialStageOpen(parent.requestStatus, parent.requestReviewStage)
+  if (audience === 'financial') {
+    return isFinancialStageOpen(parent.requestStatus, parent.requestReviewStage) && !parent.requestFinancialSubmitted
+  }
   return (
     parent.requestStatus === undefined ||
     parent.requestStatus === null ||
@@ -373,13 +384,19 @@ export function canDeleteDocument(
     requestReviewStage?: string | null
     /** Needed outside drafts: a chief correction only reopens proposal files. */
     category?: DocumentCategory
+    requestFinancialSubmitted?: boolean
   },
   actorId: string,
   actorCompanyId?: string | null,
 ): boolean {
   if (role === 'system-owner') return true
   if (role !== 'representative') return false
-  if (!isCompanyChangeableRequestDocument(document.category, document.requestStatus, document.requestReviewStage)) {
+  if (!isCompanyChangeableRequestDocument(
+    document.category,
+    document.requestStatus,
+    document.requestReviewStage,
+    document.requestFinancialSubmitted,
+  )) {
     return false
   }
   if (document.requestCompanyId) {
