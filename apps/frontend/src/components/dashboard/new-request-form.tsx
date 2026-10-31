@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
-import { createRequest, submitRequest } from '@/utilities/dashboard-api'
+import { createRequest, describeMutationFailure, submitRequest } from '@/utilities/dashboard-api'
 
 export interface RequestFormOption { label: string; value: string }
 export interface RequestFormField { name: string; label?: string; blockType: string; required?: boolean; options?: RequestFormOption[] }
@@ -43,8 +43,8 @@ export function NewRequestForm({
     try {
       const created = await createRequest({ serviceId, title, answers })
       setDraftId(created.request.id)
-    } catch {
-      setError('ایجاد پیش‌نویس انجام نشد. لطفاً دوباره تلاش کنید.')
+    } catch (cause) {
+      setError(describeMutationFailure(cause, 'ایجاد پیش‌نویس انجام نشد. لطفاً دوباره تلاش کنید.'))
     } finally {
       setSaving(false)
     }
@@ -62,8 +62,8 @@ export function NewRequestForm({
     try {
       await submitRequest(draftId)
       router.push(`/dashboard/requests/${encodeURIComponent(draftId)}`)
-    } catch {
-      setError('ارسال درخواست انجام نشد. پیش‌نویس شما حفظ شده است؛ دوباره تلاش کنید.')
+    } catch (cause) {
+      setError(describeMutationFailure(cause, 'ارسال درخواست انجام نشد. پیش‌نویس شما حفظ شده است؛ دوباره تلاش کنید.'))
     } finally {
       setSaving(false)
     }

@@ -163,7 +163,7 @@ function DeniedNotice() {
       role="status"
       variant="14/regular"
       color="warning"
-      className="rounded-lg border border-warning-500 bg-warning-50 p-3"
+      className="rounded-lg border border-warning-500 bg-warning-50 p-3 pl-14 md:pl-3"
     >
       به نشانی درخواستی دسترسی ندارید؛ پیشخوان نقش فعلی شما نمایش داده شده است.
     </Typography>

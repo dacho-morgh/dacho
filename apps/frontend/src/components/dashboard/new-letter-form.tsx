@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography, typographyVariants } from '@/components/ui/typography'
-import { LETTER_TYPE_LABELS, type LetterType } from '@/utilities/dashboard-api'
+import { DashboardApiError, describeMutationFailure, LETTER_TYPE_LABELS, type LetterType } from '@/utilities/dashboard-api'
 import { cn } from '@/utilities/ui'
 
 export interface LetterRecipient {
@@ -69,12 +69,13 @@ export function NewLetterForm({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ subject, message: body }),
         })
+        if (!response.ok) throw new DashboardApiError(response.status, 'ticket_not_created')
         const result = await response.json()
-        if (!response.ok || !result?.ticket?.id) throw new Error('ticket_not_created')
+        if (!result?.ticket?.id) throw new Error('ticket_not_created')
         router.push('/dashboard/letters')
         router.refresh()
-      } catch {
-        setError('ارسال پیام پشتیبانی انجام نشد. لطفاً دوباره تلاش کنید.')
+      } catch (cause) {
+        setError(describeMutationFailure(cause, 'ارسال پیام پشتیبانی انجام نشد. لطفاً دوباره تلاش کنید.'))
       } finally {
         submitting.current = false
         setSaving(false)
@@ -97,12 +98,13 @@ export function NewLetterForm({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ recipientId, title, type, body }),
       })
+      if (!response.ok) throw new DashboardApiError(response.status, 'letter_not_created')
       const result = await response.json()
-      if (!response.ok || !result?.letter?.id) throw new Error('letter_not_created')
+      if (!result?.letter?.id) throw new Error('letter_not_created')
       router.push('/dashboard/letters')
       router.refresh()
-    } catch {
-      setError('ارسال نامه انجام نشد. لطفاً دوباره تلاش کنید.')
+    } catch (cause) {
+      setError(describeMutationFailure(cause, 'ارسال نامه انجام نشد. لطفاً دوباره تلاش کنید.'))
     } finally {
       submitting.current = false
       setSaving(false)
