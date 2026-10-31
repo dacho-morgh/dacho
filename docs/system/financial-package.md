@@ -62,4 +62,4 @@ These are open product inputs. The code takes the reading below and keeps each o
 
 ## Not in this slice
 
-Supplementary financial documents (T33), the investment memo (T32), and the financial screens (FE19). A second package version is not created by any route yet.
+Supplementary financial documents (T33), the [investment memo (T32)](investment-memo.md), and the financial screens (FE19). A second package version is not created by any route yet.

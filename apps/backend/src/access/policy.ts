@@ -148,8 +148,8 @@ export function allowedRequestActions(
     case 'reviewer':
     case 'employer-reviewer':
     case 'investment-reviewer':
-      // Future evaluation/memo actions are not implemented; do not
-      // advertise routes that do not exist yet.
+      // Evaluation and memo commands live on their own routes, which check
+      // the assignment themselves. The memo is not a decision on the request.
       return ['read']
     case 'representative': {
       const belongsToCompany = Boolean(
