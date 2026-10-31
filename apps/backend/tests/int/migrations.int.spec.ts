@@ -354,4 +354,10 @@ describe('dashboard migrations', () => {
     )
     expect(rows[0]?.definition).toContain('advanced')
   })
+
+  it('adds the T29 financial invitations', async () => {
+    expect(await tableColumns('financial_invitations')).toEqual(
+      expect.arrayContaining(['request_id', 'review_round_id', 'request_revision', 'proposal_revision', 'checklist_version', 'checklist']),
+    )
+  })
 })

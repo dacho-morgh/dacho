@@ -10,8 +10,10 @@ import {
   documentAudience,
   requestScopeFor,
   type DocumentCategory,
+  FINANCIAL_CATEGORIES,
 } from '../src/access/policy.js'
 import { operationalRoleOf } from '../src/access/roles.js'
+import { FINANCIAL_CHECKLIST } from '../src/dashboard/financial-invitation.js'
 import { safeOriginalFilename, validateDocumentFile } from '../src/documents/policy.js'
 import { PrivateDocumentStorage } from '../src/documents/storage.js'
 
@@ -275,6 +277,32 @@ describe('document read authority', () => {
     expect(canUploadOwnedDocument('representative', 'financialStatements', { requestOwnerId: 'rep-1', requestStatus: 'in_review' }, 'rep-1', 'company-1')).toBe(false)
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'draft' }, 'rep-1')).toBe(true)
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'in_review' }, 'rep-1')).toBe(false)
+  })
+
+  it('opens company financial files only after the chief advances the case (T29)', () => {
+    const advanced = { requestOwnerId: 'rep-1', requestStatus: 'in_review', requestReviewStage: 'advanced' }
+    expect(canUploadOwnedDocument('representative', 'financialStatements', advanced, 'rep-1', null)).toBe(true)
+    expect(canUploadOwnedDocument('representative', 'proposal', advanced, 'rep-1', null)).toBe(false)
+    expect(canDeleteDocument('representative', { ...advanced, category: 'financialStatements' }, 'rep-1')).toBe(true)
+    expect(canDeleteDocument('representative', { ...advanced, category: 'proposal' }, 'rep-1')).toBe(false)
+    for (const before of [
+      { requestStatus: 'draft', requestReviewStage: null },
+      { requestStatus: 'in_review', requestReviewStage: 'chief_triage' },
+      { requestStatus: 'in_review', requestReviewStage: 'triaged' },
+      { requestStatus: 'action_needed', requestReviewStage: 'chief_triage' },
+      { requestStatus: 'rejected', requestReviewStage: 'chief_triage' },
+    ]) {
+      for (const category of FINANCIAL_CATEGORIES) {
+        expect(canUploadOwnedDocument('representative', category, { requestOwnerId: 'rep-1', ...before }, 'rep-1', null)).toBe(false)
+      }
+    }
+    expect(canUploadOwnedDocument('representative', 'financialStatements', { ...advanced, requestOwnerId: 'rep-2' }, 'rep-1', null)).toBe(false)
+    expect(allowedRequestActions('representative', { ownerId: 'rep-1', status: 'in_review', reviewStage: 'advanced' }, 'rep-1')).toEqual(['read', 'uploadDocument', 'deleteDocument'])
+    expect(allowedRequestActions('representative', { ownerId: 'rep-1', status: 'in_review', reviewStage: 'triaged' }, 'rep-1')).toEqual(['read'])
+  })
+
+  it('asks for every financial category exactly once (T29)', () => {
+    expect(FINANCIAL_CHECKLIST.map((item) => item.category).sort()).toEqual([...FINANCIAL_CATEGORIES].sort())
   })
 
   it('reopens only proposal files when the chief returns an event case for correction (T21)', () => {

@@ -21,7 +21,7 @@ Every decision raises the revision and commits the state, the round's decision, 
 
 | Action | Request | History | What follows |
 | --- | --- | --- | --- |
-| `advance` | `in_review`, stage `advanced` | `chief_review_advance` | The financial stage (T29) opens from here. This slice opens nothing else; the chief has no further action. |
+| `advance` | `in_review`, stage `advanced` | `chief_review_advance` | The [financial stage (T29)](financial-invitation.md) opens in the same transaction; the chief has no further action. |
 | `return` | `action_needed`, stage `chief_triage` | `chief_review_return` with reason | The company corrects the proposal and resubmits on the same application and tracking code, with a new proposal revision. It goes through triage again ([workflows](workflows.md), `J --> D`), then the chief starts a new round. |
 | `reject` | `rejected`, stage `chief_triage` | `chief_review_reject` with reason | Terminal for this company, event and subtopic. The owner's reopen goes back through triage to a new round. |
 
@@ -48,4 +48,4 @@ The company sees the decision and the reason for a return or rejection in its hi
 
 ## Not in this slice
 
-The financial package invitation and its required categories (T29), any gate on financial uploads by stage (T30), the screens (FE13, FE14, FE18), and a notification to the chief when a round completes or to the people of a closed round.
+The screens (FE13, FE14, FE18) and a notification to the chief when a round completes or to the people of a closed round.

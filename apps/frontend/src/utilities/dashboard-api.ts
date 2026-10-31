@@ -19,6 +19,7 @@ export interface RequestDto {
   serviceName: string
   ownerId: string
   status: RequestStatus
+  reviewStage?: string | null
   currentStepIndex: number
   assignedRole: string | null
   currentStep: string | null
