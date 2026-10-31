@@ -344,7 +344,7 @@ describe('T29: Financial package invitation (int)', () => {
     expect((await decide(app, id, { action: 'advance', expectedRevision: revision })).status).toBe(200)
 
     const detail = await request(app).get(`/requests/${id}`).set(auth('company-user-1'))
-    expect(detail.body.request.allowedActions).toEqual(['read', 'uploadDocument', 'deleteDocument'])
+    expect(detail.body.request.allowedActions).toEqual(['read', 'uploadDocument', 'deleteDocument', 'submitFinancialPackage'])
 
     for (const item of FINANCIAL_CHECKLIST) {
       expect((await uploadAs(app, 'company-user-1', id, item.category, `${item.category}.pdf`)).status, item.category).toBe(201)

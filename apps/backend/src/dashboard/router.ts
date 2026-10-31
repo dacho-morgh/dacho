@@ -13,6 +13,7 @@ import {
   canReadDocument,
   canRequestAction,
   isChiefCorrectionStatus,
+  isFinancialStageOpen,
   requestScopeFor,
   type RequestScope,
 } from '../access/policy.js'
@@ -59,6 +60,8 @@ import {
 import { LetterRepository, type CreateLetterInput, type LetterAttachmentDto, type LetterDto } from './letter-repo.js'
 import { DocumentRepository, type PrivateDocumentRecord } from '../documents/repo.js'
 import { canSendLetter } from './letter-policy.js'
+import { FinancialPackageRepository } from './financial-package-repo.js'
+import { statementYearPlan } from './financial-package.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
 import {
@@ -234,13 +237,14 @@ function requestWithActions(
   actorIsResponsibleChief = false,
   reviewRoundStarted = false,
   reviewRoundComplete = false,
+  financialPackageSubmitted = false,
 ) {
   if (!request) return request
   return {
     ...request,
     allowedActions: allowedRequestActions(
       role,
-      { ...request, actorIsResponsibleChief, reviewRoundStarted, reviewRoundComplete },
+      { ...request, actorIsResponsibleChief, reviewRoundStarted, reviewRoundComplete, financialPackageSubmitted },
       actorId,
       companyId,
     ),
@@ -408,6 +412,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
   const rounds = new ReviewRoundRepository(deps.pool)
+  const financialPackages = new FinancialPackageRepository(deps.pool)
   const reviewCases = new ReviewCaseRepository(deps.pool)
   const evaluations =
     deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool)
@@ -457,10 +462,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         (actor.operationalRole === 'system-owner' ? item.status === 'in_review' : chiefCases.has(item.id)),
     )
     const currentRounds = await rounds.currentRoundsOf(roundCases.map((item) => item.id))
+    const packaged = await financialPackages.submittedRequestIds(
+      items.filter((item) => isFinancialStageOpen(item.status, item.reviewStage)).map((item) => item.id),
+    )
     return items.map((item) =>
       requestWithActions(
         actor.operationalRole, actor.id, item, companyId, chiefCases.has(item.id),
-        currentRounds.has(item.id), currentRounds.get(item.id) === true,
+        currentRounds.has(item.id), currentRounds.get(item.id) === true, packaged.has(item.id),
       )!,
     )
   }
@@ -1121,6 +1129,87 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       res.set('Cache-Control', 'private, no-store, max-age=0').json({ invitation })
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * The company submits its financial package (T30). Every checklist category and
+   * every statement year the founding date requires must have a file; otherwise
+   * nothing is stored and the response names the gaps. A complete package freezes
+   * the financial files. It does not advance the case. A repeated submit returns
+   * the stored package.
+   */
+  router.post('/requests/:id/financial-package', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'representative') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request || !allowedRequestActions(actor.operationalRole, request, actor.id, companyId).includes('read')) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!isFinancialStageOpen(request.status, request.reviewStage)) {
+        res.status(409).json({ error: 'financial_stage_not_open' })
+        return
+      }
+      const company = request.companyId
+        ? await deps.companyStore.findById(request.companyId).catch(() => undefined)
+        : await deps.companyStore.findByRepresentative(request.ownerId)
+      const plan = statementYearPlan(company?.establishmentDate)
+      if (!plan.ok) {
+        res.status(422).json({ error: plan.error })
+        return
+      }
+      const result = await financialPackages.submit({
+        requestId: request.id,
+        actorId: actor.id,
+        expectedYears: plan.years,
+      })
+      switch (result.status) {
+        case 'submitted':
+          res.status(201).json({ package: result.package })
+          return
+        case 'already_submitted':
+          res.json({ package: result.package })
+          return
+        case 'incomplete':
+          res.status(422).json({
+            error: 'financial_package_incomplete',
+            missingCategories: result.gaps.missingCategories,
+            missingStatementYears: result.gaps.missingStatementYears,
+          })
+          return
+        case 'stage_closed':
+          res.status(409).json({ error: 'financial_stage_not_open' })
+          return
+        case 'not_found':
+          res.status(404).json({ error: 'not_found' })
+          return
+      }
+    } catch (error) { next(error) }
+  })
+
+  /** The company's latest submitted financial package, for the owning company, Secretariat and the owner. */
+  router.get('/requests/:id/financial-package', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role !== 'representative' && role !== 'central-secretariat' && role !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      const pkg = request ? await financialPackages.findLatest(request.id) : null
+      if (!pkg) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ package: pkg })
     } catch (error) { next(error) }
   })
 

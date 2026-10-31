@@ -48,7 +48,7 @@ Two inputs are still open, so the checklist decides neither of them:
 | Upload or delete a proposal file | As before | Denied |
 
 - A representative's case now advertises `uploadDocument` and `deleteDocument` in this stage. The company's request page applies them per category, because these actions do not name one.
-- Nothing freezes the files yet. T30 must close uploads and deletes when it adds submission.
+- Files freeze only when the company submits a complete package. Submission is [T30](financial-package.md) and closes uploads and deletes from then on.
 - The owner and Secretariat keep their existing upload rights at every stage. The gate covers the company only.
 - Read access does not change. The investment person still has no access until a persisted handoff exists.
 
@@ -62,4 +62,4 @@ Two inputs are still open, so the checklist decides neither of them:
 
 ## Not in this slice
 
-Versioned package submission, completeness and the since-establishment rule (T30), the investment handoff, and the invitation screens (FE18, FE19).
+Package submission and completeness are in [T30](financial-package.md). Still open: the investment handoff (T31) and the invitation screens (FE18, FE19).

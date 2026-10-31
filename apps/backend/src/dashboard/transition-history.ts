@@ -11,6 +11,7 @@ export const TRANSITION_TITLES: Record<string, string> = {
   chief_review_advance: 'تأیید عبور از مرحله داوری',
   chief_review_return: 'برگشت پروپوزال جهت اصلاح پس از داوری',
   chief_review_reject: 'رد درخواست پس از داوری',
+  financial_package_submit: 'ارسال بسته مالی',
   chief_replace_reviewer: 'جایگزینی داور',
   owner_replace_employer: 'جایگزینی کارفرما توسط صاحب سیستم',
   owner_reopen: 'بازگشایی درخواست توسط صاحب سیستم',
