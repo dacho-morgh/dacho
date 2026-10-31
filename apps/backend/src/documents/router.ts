@@ -552,7 +552,9 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         )
       ) {
         await client.query('ROLLBACK')
-        res.status(403).json({ error: 'forbidden' })
+        // Someone who cannot read the file gets what an unknown id gets.
+        if (await authorizeRecord(record, actor.id, actor.operationalRole, companyId)) res.status(403).json({ error: 'forbidden' })
+        else res.status(404).json({ error: 'not_found' })
         return
       }
       if (await documents.isPinnedToProposal(record.id, record.requestId, client)) {

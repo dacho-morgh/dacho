@@ -325,7 +325,7 @@ describe('T22: Review rounds and four distinct assignments (int)', () => {
 
     for (const user of ['chief-2', 'owner', 'secretariat', 'reviewer-1', 'employer-1', 'investment', 'company-user-1']) {
       const res = await startRound(app, user, triaged.id, body)
-      expect(res.status, user).toBe(403)
+      expect(res.status, user).toBe(user === 'chief-2' ? 404 : 403)
     }
     expect((await request(app).get(`/requests/${triaged.id}/review-round/candidates`).set(auth('chief-2'))).status).toBe(404)
     expect((await request(app).get(`/requests/${triaged.id}/review-round/candidates`).set(auth('owner'))).status).toBe(403)

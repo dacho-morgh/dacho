@@ -21,6 +21,7 @@ import {
   DashboardSearchIcon,
   DashboardTrashIcon,
 } from '@/components/icons'
+import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
 
 export type AdminLetterStatus = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -138,7 +139,7 @@ function LettersSkeleton() {
 }
 
 /* Empty state — Figma node 30851:15880 */
-function LettersEmptyState() {
+function LettersEmptyState({ noMatch = false }: { noMatch?: boolean }) {
   return (
     <div className="absolute left-1/2 top-1/2 flex w-[265px] -translate-x-1/2 -translate-y-1/2 flex-col items-center">
       <div className="flex flex-col items-center gap-[4px]">
@@ -146,10 +147,10 @@ function LettersEmptyState() {
           <DashboardEmptyInboxIcon className="size-[80px]" />
         </div>
         <Typography variant="14/semibold" className="mt-1 text-center text-neutral-600">
-          صندوق نامه‌های شما خالیست
+          {noMatch ? 'نتیجه‌ای پیدا نشد' : 'صندوق نامه‌های شما خالیست'}
         </Typography>
         <Typography variant="12/regular" className="text-center text-neutral-500">
-          تا کنون نامه یا پیامی برای شما ارسال نشده است
+          {noMatch ? 'عبارت جستجو، فیلتر یا زبانه را تغییر دهید' : 'تا کنون نامه یا پیامی برای شما ارسال نشده است'}
         </Typography>
       </div>
     </div>
@@ -182,11 +183,11 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
     }
     try {
       const response = await fetch(`/api/dashboard/letters/${encodeURIComponent(item.id)}`, { method: 'DELETE' })
-      if (!response.ok) throw new Error('delete_failed')
+      if (!response.ok) throw new DashboardApiError(response.status, 'delete_failed')
       setLetters((current) => current.filter((letter) => letter.id !== item.id))
       showNotice(`نامه «${item.title}» با موفقیت حذف گردید.`)
-    } catch {
-      showNotice('حذف نامه انجام نشد.')
+    } catch (cause) {
+      showNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
     }
   }
 
@@ -236,6 +237,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
             <button
               type="button"
               onClick={() => setTab('sent')}
+              aria-pressed={tab === 'sent'}
               className={`flex h-[36px] items-center gap-[8px] rounded-[10px] p-[8px] transition-colors ${
                 tab === 'sent' ? 'bg-white' : 'bg-transparent'
               }`}
@@ -250,6 +252,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
             <button
               type="button"
               onClick={() => setTab('received')}
+              aria-pressed={tab === 'received'}
               className={`flex h-[36px] items-center gap-[8px] rounded-[10px] p-[8px] transition-colors ${
                 tab === 'received' ? 'bg-white' : 'bg-transparent'
               }`}
@@ -264,6 +267,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
             <button
               type="button"
               onClick={() => setTab('support')}
+              aria-pressed={tab === 'support'}
               className={`flex h-[36px] items-center gap-[8px] rounded-[10px] p-[8px] transition-colors ${
                 tab === 'support' ? 'bg-white' : 'bg-transparent'
               }`}
@@ -363,7 +367,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
         {isLoading ? (
           <LettersSkeleton />
         ) : isEmpty ? (
-          <LettersEmptyState />
+          <LettersEmptyState noMatch={state !== 'empty' && (searchQuery.trim() !== '' || typeFilter !== 'all')} />
         ) : (
           <>
             <div className="hidden flex-row-reverse items-start justify-end lg:flex">

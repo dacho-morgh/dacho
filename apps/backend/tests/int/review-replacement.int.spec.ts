@@ -418,7 +418,7 @@ describe('T26: Reviewer replacement and assignment history (int)', () => {
 
     for (const user of ['chief-2', 'owner', 'secretariat', 'reviewer-1', 'employer-1', 'investment', 'company-user-1']) {
       const res = await replaceReviewer(app, user, started.id, 'reviewer-1', body)
-      expect(res.status, user).toBe(403)
+      expect(res.status, user).toBe(user === 'chief-2' ? 404 : 403)
     }
     const early = await replaceReviewer(app, 'chief', noRound.id, 'reviewer-1', body)
     expect(early.status).toBe(409)

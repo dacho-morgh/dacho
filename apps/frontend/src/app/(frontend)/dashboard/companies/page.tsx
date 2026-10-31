@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export default async function CompaniesPage() {
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: await headers() })
-  if (!canReadCompanyDossiers(user)) redirect('/dashboard')
+  if (!canReadCompanyDossiers(user)) redirect('/dashboard?access=denied')
 
   return <CompanyList />
 }

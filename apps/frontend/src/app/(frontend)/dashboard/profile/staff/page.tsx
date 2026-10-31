@@ -4,7 +4,8 @@ import { StaffProfileView } from '@/components/dashboard/profile/staff-profile-v
 import type { DashboardOwnProfileDto } from '@/utilities/dashboard-api'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
 import { getProfileSessionUser, isInternalUser } from '@/utilities/profile-session'
-import { Typography } from '@/components/ui/typography'
+import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
+import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import type { DashboardNavigation } from '@/components/dashboard/sidebar-shell'
 
 export const dynamic = 'force-dynamic'
@@ -23,13 +24,7 @@ export default async function StaffProfilePage() {
   ])
   if (result.kind === 'unauthenticated') redirect('/login?expired=1')
   if (result.kind !== 'ok') {
-    return (
-      <div className="p-6" dir="rtl">
-        <Typography role="alert" variant="16/regular" color="error">
-          دریافت اطلاعات پروفایل انجام نشد. دوباره تلاش کنید.
-        </Typography>
-      </div>
-    )
+    return <DashboardReadNotice reason={unavailableReasonFor(result) ?? 'unavailable'} retryHref="/dashboard/profile/staff" />
   }
 
   return (

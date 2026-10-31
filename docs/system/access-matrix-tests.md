@@ -12,7 +12,7 @@ Seven roles against three relations: their own case or company, another team's, 
 | Files | Same | Metadata and bytes for proposal, financial, company dossier, delivered and undelivered correspondence. The list holds exactly the permitted files, and no response holds a storage key |
 | Counts | Same | `/requests`, `/admin/requests`, `/stats`, `/stats/overview`, `/activities` and both queues stay in the detail's scope. Query parameters do not widen it |
 | Confidentiality | Same | Marked financial, dossier, memo and evaluation text never appears in a response outside its audience. A letter cannot carry a file to someone outside its audience |
-| Skipping the screens | Same | One case walks every stage, and at the stage where each command would succeed, everyone else is refused and the case does not move. Also forged owners, forged role headers, missing proxy proof, and revocation, role change and deactivation |
+| Skipping the screens | Same | One case walks every stage, and at the stage where each command would succeed, everyone else is refused and the case does not move. A person who cannot read the case gets the same answer as for an unknown id. Also forged owners, forged role headers, missing proxy proof, and revocation, role change and deactivation |
 | CMS | `apps/frontend/tests/int/access-matrix.int.spec.ts` | Company records through REST and the Local API, company writes, identity fields, self-promotion, credentials in populated relations. The real GraphQL route answers `404` with no body to every seat, to an anonymous caller and to a deactivated account, for reads and mutations |
 | Proxy | Same | The real route with real Payload authentication and a stubbed backend: only the session's identity is forwarded, forged headers are dropped, anonymous, deactivated and service accounts stop at the proxy, refusals and download headers pass through unchanged |
 
@@ -20,7 +20,7 @@ The earlier `apps/backend/tests/document-access-matrix.spec.ts` still covers the
 
 ## Corrected
 
-`GET /requests/:id/evaluation` and `GET /requests/:id/review-round/candidates` answered `403` for a real case the person holds nothing on and `404` for an unknown id, which confirmed the case exists. Both now answer `404`, as [shared authorization](authorization.md) requires.
+A refusal could confirm that a case exists, because a real case answered `403` and an unknown id `404`. This affected `GET /requests/:id/evaluation`, `GET /requests/:id/review-round/candidates`, triage, the chief decision, starting a round, replacing a reviewer, saving and finalizing an evaluation, and deleting a file. Someone who cannot read the case or file now gets the same `404` as an unknown id, as [shared authorization](authorization.md) requires. Someone who can read it but may not act still gets `403`.
 
 ## CMS GraphQL is disabled
 
@@ -34,7 +34,6 @@ Re-enabling GraphQL needs enum-safe select values with a data migration, and the
 
 ## Known gaps
 
-- **Commands still confirm existence.** A refused command such as `POST /requests/:id/triage` may answer `403` on a real case and `404` on an unknown id. Nothing is read or changed; the spec accepts either status for commands.
 - **The proxy and backend are tested apart.** The frontend spec stubs the backend, and the backend spec sends the proxy's headers itself. A browser journey across both belongs to T45.
 - Exhibition booths and receipts are not in this matrix. T54 covers that path.
 

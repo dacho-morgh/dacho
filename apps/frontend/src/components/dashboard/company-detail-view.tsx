@@ -2,11 +2,15 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
+import { notFound } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { DashboardAddIcon, DashboardEditIcon, DashboardTrashIcon } from '@/components/icons'
+import type { UnavailableReason } from '@/utilities/dashboard-fetch-result'
 
 interface CompanyDetailResponse {
   representative?: { id: string; name: string | null; phone?: string | null; email?: string | null; position?: string | null }
@@ -25,13 +29,50 @@ interface CompanyDetailResponse {
 
 export function CompanyDetailView({ id }: { id: string }) {
   const [data, setData] = useState<CompanyDetailResponse | null>(null)
-  useEffect(() => { fetch(`/api/dashboard/admin/companies/${encodeURIComponent(id)}`).then((response) => response.ok ? response.json() : null).then(setData).catch(() => setData(null)) }, [id])
-  const user = data?.company
+  const [failure, setFailure] = useState<UnavailableReason | 'missing' | null>(null)
+  useEffect(() => {
+    let current = true
+    fetch(`/api/dashboard/admin/companies/${encodeURIComponent(id)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        if (!current) return
+        if (response.ok) setData((await response.json()) as CompanyDetailResponse)
+        else if (response.status === 401) setFailure('expired')
+        else if (response.status === 403) setFailure('denied')
+        else if (response.status === 404) setFailure('missing')
+        else setFailure('unavailable')
+      })
+      .catch(() => {
+        if (current) setFailure('unavailable')
+      })
+    return () => {
+      current = false
+    }
+  }, [id])
+  if (failure === 'missing') notFound()
+  if (failure) {
+    return (
+      <div className="mx-auto w-full max-w-4xl p-6 pt-20 md:p-10" dir="rtl">
+        <OfflineNotice reason={failure} retryHref={`/dashboard/companies/${encodeURIComponent(id)}`} />
+      </div>
+    )
+  }
+  if (!data) {
+    return (
+      <div className="flex w-full flex-col gap-5 p-6 pt-20 md:p-10" dir="rtl">
+        <Typography as="span" role="status" variant="14/regular" className="sr-only">
+          در حال دریافت اطلاعات شرکت
+        </Typography>
+        <Skeleton aria-hidden="true" className="h-6 w-48 rounded-lg bg-neutral-200 motion-reduce:animate-none" />
+        <Skeleton aria-hidden="true" className="h-96 w-full rounded-2xl bg-neutral-100 motion-reduce:animate-none" />
+      </div>
+    )
+  }
+  const user = data.company
   const companyName = user?.name
   const fields: Array<[string, string | undefined]> = [['نام شرکت', user?.name], ['تاریخ تاسیس', user?.establishmentDate], ['وضعیت شرکت', user?.status], ['نوع شرکت', user?.type], ['شماره ثبت', user?.registrationNumber], ['کد اقتصادی', user?.economicCode], ['شناسه ملی', user?.nationalId]]
-  const addresses = data?.addresses ?? []
+  const addresses = data.addresses ?? []
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:p-10" dir="rtl">
+    <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 pt-20 md:p-10" dir="rtl">
       <div className="flex items-center gap-2">
         <Link href="/dashboard/companies">
           <Typography variant="14/regular" color="brand-600">
@@ -43,7 +84,7 @@ export function CompanyDetailView({ id }: { id: string }) {
         </Typography>
       </div>
       <div className="flex min-h-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:min-h-[912px] lg:flex-row">
-        <nav className="order-first flex w-full shrink-0 flex-row gap-2 border-b border-neutral-200 pb-4 lg:order-none lg:w-[200px] lg:flex-col lg:border-b-0 lg:border-l lg:pl-5">
+        <nav className="order-first flex w-full shrink-0 flex-row flex-wrap gap-2 border-b border-neutral-200 pb-4 lg:order-none lg:w-[200px] lg:flex-col lg:border-b-0 lg:border-l lg:pl-5">
           <Typography
             variant="16/semibold"
             color="brand-600"
@@ -67,7 +108,7 @@ export function CompanyDetailView({ id }: { id: string }) {
         </nav>
         <div className="flex w-full max-w-[892px] flex-col gap-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 items-center gap-4">
               <Image
                 src="/figma/dashboard/profile-avatar.png"
                 alt={companyName || 'شرکت'}
@@ -75,7 +116,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                 height={80}
                 className="rounded-xl object-cover"
               />
-              <div>
+              <div className="min-w-0 break-words">
                 <Typography variant="20/bold" color="neutral-900">
                   {companyName || '—'}
                 </Typography>
@@ -132,7 +173,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                   key={category}
                   category={category}
                   label={label}
-                  companyId={data?.companyId ?? undefined}
+                  companyId={data.companyId ?? undefined}
                   canUpload
                 />
               ))}
