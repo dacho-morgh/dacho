@@ -327,7 +327,7 @@ describe('T22: Review rounds and four distinct assignments (int)', () => {
       const res = await startRound(app, user, triaged.id, body)
       expect(res.status, user).toBe(403)
     }
-    expect((await request(app).get(`/requests/${triaged.id}/review-round/candidates`).set(auth('chief-2'))).status).toBe(403)
+    expect((await request(app).get(`/requests/${triaged.id}/review-round/candidates`).set(auth('chief-2'))).status).toBe(404)
     expect((await request(app).get(`/requests/${triaged.id}/review-round/candidates`).set(auth('owner'))).status).toBe(403)
 
     const early = await startRound(app, 'chief', pending.id, body)
@@ -417,7 +417,7 @@ describe('T22: Review rounds and four distinct assignments (int)', () => {
       expect(res.status, user).toBe(200)
       expect(res.body.revision, user).toBe(triaged.revision)
     }
-    expect((await request(app).get(`/requests/${triaged.id}/evaluation`).set(auth('reviewer-4'))).status).toBe(403)
+    expect((await request(app).get(`/requests/${triaged.id}/evaluation`).set(auth('reviewer-4'))).status).toBe(404)
   })
 
   it('keeps round slots out of the generic owner assignment commands', async () => {

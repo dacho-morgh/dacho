@@ -1731,7 +1731,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
       const context = await rounds.findStartContext(req.params.id)
       if (!context) { res.status(404).json({ error: 'not_found' }); return }
-      if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
+      if (context.responsibleChiefId !== actor.id) { res.status(404).json({ error: 'not_found' }); return }
       const users = await deps.userStore.list({ operationalRole: 'reviewer' })
       // Once a round exists for the current revision the list serves replacement:
       // nobody who already held a slot of it returns. An earlier revision's round
@@ -2138,7 +2138,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
-        res.status(403).json({ error: 'forbidden' })
+        res.status(404).json({ error: 'not_found' })
         return
       }
       // The revision this person's round reviews: a decided case has moved past it.
