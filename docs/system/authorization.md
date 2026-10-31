@@ -172,8 +172,32 @@ UAT gates remain **Not run**. This implementation does not pass a human
 acceptance test, deploy staging or migrate real data.
 
 
-## Role-scoped correspondence foundation — T34 draft
+## Role-scoped correspondence — T34
 
 `POST /letters` accepts current operational recipients and applies the role policy before writing. Company representatives can contact Secretariat; ordinary/employer reviewers can contact the uniquely active chief on a case for which both hold current access. Owner/chief general letters do not assign a case or broaden dossier/file access. Case-linked sends authorize both parties in the INSERT statement and hold shared locks on active assignment rows so committed/concurrent revocations cannot be bypassed by earlier route reads. Reading a sent/oversight letter leaves its unread flag unchanged; only its recipient marks it read.
 
-Investment-origin letters and case-linked letters to the investment role remain denied until T34 opens them. The T31 handoff opens the case and its files, not letters. Generic assignment is not a financial handoff. T22 still owes authoritative event/round/slot assignment semantics; current generic case assignments and a unique-chief check are only a conservative foundation. Permitted-recipient discovery, frontend sending and classified attachments (T35) remain separate work. This is a partial draft, not completion of T34, T22, T31 or human acceptance. Docker/CI validation limitations must be reported separately from implemented behavior.
+The investment person writes only case-linked letters, only on a case they hold, and only with the Secretariat and the System Owner; those two can write back on that case. Holding means the [T31 handoff](investment-handoff.md): an active assignment and a package on the latest invitation, checked in the INSERT statement. A generic assignment opens no letters, and revoking the assignment ends sending and reading on the next request. Owner and chief general letters to the investment person stay open and carry no case.
+
+A case letter from the investment person shows that a package was handed off, and package status is confined to the financial audience. So the chief, reviewers and employer are not recipients, even though they are assigned to the case. The company stays with Secretariat support, as the permission matrix requires. The product owner confirmed this reading of "assigned-case participants" on 2026-10-31.
+
+A letter opens no file: an attachment needs both parties in its audience, so a correspondence file reaches the investment person only after the [Secretariat delivers it](secretariat-follow-up.md).
+
+### Permitted recipients
+
+`GET /letters/recipients` answers `{ items: [{ id, name, operationalRole }] }` with no contact details, and leaves out the actor. Sending re-checks every rule, so the list is a convenience and not permission.
+
+| Query | Behaviour |
+| --- | --- |
+| none | People the actor may write to without a case. Optional `search` matches the name, and each role returns at most the user store's 100-row page, so a composer should search rather than treat the list as complete. |
+| `requestId` | The owner and Secretariat, then the case's active assignees and its company, each filtered by the role policy. `400 invalid_request_id`; `404` for a case outside the actor's scope. The investment person gets an empty list before the handoff, and a reviewer or employer gets an empty list without one active chief. |
+
+| Actor | Without a case | On a case in their scope |
+| --- | --- | --- |
+| Owner | Everyone | Secretariat, company, assignees, and the investment person after the handoff |
+| Secretariat | Companies | Owner, company, assignees, and the investment person after the handoff |
+| Chief | Everyone | Owner, Secretariat, company, and reviewers on the case; not the investment person |
+| Reviewer, employer | Nobody | The case's one active chief |
+| Investment person | Nobody | Owner and Secretariat, after the handoff |
+| Company | Secretariat | Secretariat |
+
+T22 assignments and the unique-chief check decide the reviewer's chief. Screens are [FE22](frontend-plan.md), and human acceptance (UAT27) has not been run.
