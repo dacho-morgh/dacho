@@ -344,4 +344,14 @@ describe('dashboard migrations', () => {
   it('adds the T27 completion time to review rounds', async () => {
     expect(await tableColumns('review_rounds')).toEqual(expect.arrayContaining(['completed_at']))
   })
+
+  it('adds the T28 chief decision to review rounds and the advanced review stage', async () => {
+    expect(await tableColumns('review_rounds')).toEqual(
+      expect.arrayContaining(['decision', 'decided_by', 'decided_at', 'decision_reason']),
+    )
+    const { rows } = await pool.query<{ definition: string }>(
+      `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'requests_review_stage_check'`,
+    )
+    expect(rows[0]?.definition).toContain('advanced')
+  })
 })

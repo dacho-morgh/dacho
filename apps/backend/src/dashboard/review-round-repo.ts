@@ -35,6 +35,14 @@ export interface ReviewRoundCompletionDto {
   completedAt: string | null
 }
 
+/** The chief's decision on a complete round; oversight only. */
+export interface ReviewRoundDecisionDto {
+  action: 'advance' | 'return' | 'reject'
+  decidedBy: string
+  decidedAt: string
+  reason: string | null
+}
+
 export interface ReviewRoundDto {
   id: string
   requestId: string
@@ -45,6 +53,7 @@ export interface ReviewRoundDto {
   startedAt: string
   supersededAt: string | null
   completion: ReviewRoundCompletionDto
+  decision: ReviewRoundDecisionDto | null
   slots: ReviewRoundSlotDto[]
   /** Slot replacements in the order they happened; oversight only. */
   replacements: ReviewReplacementDto[]
@@ -60,6 +69,10 @@ interface RoundRow {
   started_at: Date
   superseded_at: Date | null
   completed_at: Date | null
+  decision: ReviewRoundDecisionDto['action'] | null
+  decided_by: string | null
+  decided_at: Date | null
+  decision_reason: string | null
 }
 
 interface SlotRow {
@@ -86,7 +99,8 @@ interface ReplacementRow {
 }
 
 const ROUND_COLUMNS =
-  'id, request_id, request_revision, proposal_revision, employer_id, started_by, started_at, superseded_at, completed_at'
+  `id, request_id, request_revision, proposal_revision, employer_id, started_by, started_at, superseded_at, completed_at,
+   decision, decided_by, decided_at, decision_reason`
 
 /** The last employer the owner substituted for this request, if any. */
 const REPLACEMENT_EMPLOYER_SQL = `(
@@ -141,6 +155,14 @@ function mapRound(
       ready: progress.current && row.completed_at !== null,
       completedAt: row.completed_at ? row.completed_at.toISOString() : null,
     },
+    decision: row.decision && row.decided_by && row.decided_at
+      ? {
+          action: row.decision,
+          decidedBy: row.decided_by,
+          decidedAt: row.decided_at.toISOString(),
+          reason: row.decision_reason,
+        }
+      : null,
     slots: slots.filter((slot) => slot.round_id === row.id).map(mapSlot),
     replacements: replacements.filter((item) => item.round_id === row.id).map(mapReplacement),
   }
@@ -230,44 +252,64 @@ export class ReviewRoundRepository {
     }
   }
 
-  /** Request ids (out of the given cases) that already have a round for their current revision. */
-  async requestsWithCurrentRound(requestIds: string[]): Promise<Set<string>> {
+  /** Rounds covering the current revision of the given cases, by request id; true once complete. */
+  async currentRoundsOf(requestIds: string[]): Promise<Map<string, boolean>> {
     const valid = requestIds.filter(isUuid)
-    if (valid.length === 0) return new Set()
-    const { rows } = await this.pool.query<{ request_id: string }>(
-      `SELECT rr.request_id
+    if (valid.length === 0) return new Map()
+    const { rows } = await this.pool.query<{ request_id: string; complete: boolean }>(
+      `SELECT rr.request_id, rr.completed_at IS NOT NULL AS complete
        FROM dashboard.review_rounds rr
        JOIN dashboard.requests r ON r.id = rr.request_id AND r.revision = rr.request_revision
        WHERE rr.request_id = ANY($1::uuid[])`,
       [valid],
     )
-    return new Set(rows.map((row) => row.request_id))
+    return new Map(rows.map((row) => [row.request_id, row.complete]))
   }
 
   /** The round for the request's current revision, or the latest earlier one. */
   async findLatest(requestId: string): Promise<ReviewRoundDto | null> {
-    if (!isUuid(requestId)) return null
+    return (await this.loadRounds(requestId, { limit: 1 }))[0] ?? null
+  }
+
+  /** The round that reviewed exactly this revision, if one did. */
+  async findByRevision(requestId: string, revision: number): Promise<ReviewRoundDto | null> {
+    return (await this.loadRounds(requestId, { revision }))[0] ?? null
+  }
+
+  /** Every round of the request, newest first, including superseded and decided ones. */
+  async listForRequest(requestId: string): Promise<ReviewRoundDto[]> {
+    return this.loadRounds(requestId)
+  }
+
+  private async loadRounds(
+    requestId: string,
+    filter: { revision?: number; limit?: number } = {},
+  ): Promise<ReviewRoundDto[]> {
+    if (!isUuid(requestId)) return []
     const { rows } = await this.pool.query<RoundRow & { current: boolean }>(
       `SELECT rr.*, (r.revision = rr.request_revision AND r.status = 'in_review') AS current
        FROM dashboard.review_rounds rr
        JOIN dashboard.requests r ON r.id = rr.request_id
-       WHERE rr.request_id = $1 ORDER BY rr.request_revision DESC LIMIT 1`,
-      [requestId],
+       WHERE rr.request_id = $1 AND ($2::integer IS NULL OR rr.request_revision = $2)
+       ORDER BY rr.request_revision DESC LIMIT $3::integer`,
+      [requestId, filter.revision ?? null, filter.limit ?? null],
     )
-    const round = rows[0]
-    if (!round) return null
-    const finalized = await countRoundFinals(this.pool, { id: round.id, requestRevision: round.request_revision })
+    const roundIds = rows.map((round) => round.id)
     const slots = await this.pool.query<SlotRow>(
       `SELECT id, round_id, user_id, role, slot, active, assigned_at, revoked_at, revoke_reason
-       FROM dashboard.case_assignments WHERE round_id = $1 ORDER BY slot DESC, assigned_at ASC, user_id ASC`,
-      [round.id],
+       FROM dashboard.case_assignments WHERE round_id = ANY($1::uuid[])
+       ORDER BY slot DESC, assigned_at ASC, user_id ASC`,
+      [roundIds],
     )
     const replacements = await this.pool.query<ReplacementRow>(
       `SELECT id, round_id, slot, old_user_id, new_user_id, replaced_by, reason, replaced_at
-       FROM dashboard.review_replacements WHERE round_id = $1 ORDER BY replaced_at ASC, id ASC`,
-      [round.id],
+       FROM dashboard.review_replacements WHERE round_id = ANY($1::uuid[]) ORDER BY replaced_at ASC, id ASC`,
+      [roundIds],
     )
-    return mapRound(round, slots.rows, replacements.rows, { finalized, current: round.current })
+    return Promise.all(rows.map(async (round) => {
+      const finalized = await countRoundFinals(this.pool, { id: round.id, requestRevision: round.request_revision })
+      return mapRound(round, slots.rows, replacements.rows, { finalized, current: round.current })
+    }))
   }
 
   /**

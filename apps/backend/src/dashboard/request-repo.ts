@@ -2,14 +2,15 @@ import type { Pool, PoolClient } from 'pg'
 
 import type { RequestScope } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
+import { countRoundFinals, ROUND_REQUIRED_EVALUATIONS } from '../reviews/round-completion.js'
 import { appendTransition } from './transition-history.js'
 import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 import { lockApprovedVerification } from './verification-repo.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
-/** Event applications only: chief triage precedes the review round (T22). */
-export type ReviewStage = 'chief_triage' | 'triaged'
+/** Event applications only: chief triage precedes the review round (T22); `advanced` follows the chief's decision (T28). */
+export type ReviewStage = 'chief_triage' | 'triaged' | 'advanced'
 
 export interface RequestDto {
   id: string
@@ -340,13 +341,15 @@ async function ensureChiefAssignment(client: PoolClient, requestId: string): Pro
 
 export type TriageAction = 'accept' | 'return' | 'reject'
 
-const TRIAGE_TRANSITIONS: Record<TriageAction, {
+interface ChiefTransition {
   history: string
   toStatus: RequestStatus
   toStage: ReviewStage
   title: string
   body: (request: RequestRow, reason: string | null) => string
-}> = {
+}
+
+const TRIAGE_TRANSITIONS: Record<TriageAction, ChiefTransition> = {
   accept: {
     history: 'chief_accept',
     toStatus: 'in_review',
@@ -376,6 +379,39 @@ export type TriageResult =
   | 'forbidden'
   | 'invalid_state'
   | 'stale_revision'
+
+export type ReviewDecisionAction = 'advance' | 'return' | 'reject'
+
+/**
+ * A returned or rejected case goes back to the same states as at triage, so
+ * correction, resubmission and the owner's reopen work as they do there, and the
+ * corrected revision passes through the chief again before its new round.
+ */
+const REVIEW_DECISION_TRANSITIONS: Record<ReviewDecisionAction, ChiefTransition> = {
+  advance: {
+    history: 'chief_review_advance',
+    toStatus: 'in_review',
+    toStage: 'advanced',
+    title: 'تأیید عبور از مرحله داوری',
+    body: (r) => `درخواست ${r.title} با کد رهگیری ${r.tracking_code} مرحله داوری را با تأیید سردبیر پشت سر گذاشت.`,
+  },
+  return: {
+    history: 'chief_review_return',
+    toStatus: 'action_needed',
+    toStage: 'chief_triage',
+    title: 'برگشت پروپوزال جهت اصلاح پس از داوری',
+    body: (r, reason) => `پروپوزال درخواست ${r.title} با کد رهگیری ${r.tracking_code} پس از داوری برای اصلاح برگردانده شد: ${reason}`,
+  },
+  reject: {
+    history: 'chief_review_reject',
+    toStatus: 'rejected',
+    toStage: 'chief_triage',
+    title: 'رد درخواست پس از داوری',
+    body: (r, reason) => `درخواست ${r.title} با کد رهگیری ${r.tracking_code} پس از داوری رد شد: ${reason}`,
+  },
+}
+
+export type ReviewDecisionResult = TriageResult | 'round_not_ready'
 
 export type ResubmitResult =
   | RequestDto
@@ -736,8 +772,56 @@ export class RequestRepository {
     reason: string | null
     expectedRevision?: number
   }): Promise<TriageResult> {
+    return this.applyChiefDecision<never>(input, TRIAGE_TRANSITIONS[input.action], 'chief_triage')
+  }
+
+  /**
+   * The responsible chief's decision on a complete review round. The request lock
+   * is the one finalizations and the owner's employer replacement also take, so
+   * readiness read under it cannot change before this commits, and a racing second
+   * decision finds the case already moved. The revision moves on with the case:
+   * the round stops being current and its slots can write nothing more.
+   */
+  async decideReview(input: {
+    requestId: string
+    actorId: string
+    action: ReviewDecisionAction
+    reason: string | null
+    expectedRevision?: number
+  }): Promise<ReviewDecisionResult> {
+    return this.applyChiefDecision(
+      input,
+      REVIEW_DECISION_TRANSITIONS[input.action],
+      'triaged',
+      async (client, current): Promise<'round_not_ready' | undefined> => {
+        const { rows } = await client.query<{ id: string; completed_at: Date | null }>(
+          `SELECT id, completed_at FROM dashboard.review_rounds
+           WHERE request_id = $1 AND request_revision = $2
+           FOR NO KEY UPDATE`,
+          [current.id, current.revision],
+        )
+        const round = rows[0]
+        if (!round?.completed_at) return 'round_not_ready'
+        const finalized = await countRoundFinals(client, { id: round.id, requestRevision: current.revision })
+        if (finalized < ROUND_REQUIRED_EVALUATIONS) return 'round_not_ready'
+        await client.query(
+          `UPDATE dashboard.review_rounds
+           SET decision = $2, decided_by = $3, decided_at = now(), decision_reason = $4
+           WHERE id = $1`,
+          [round.id, input.action, input.actorId, input.reason],
+        )
+        return undefined
+      },
+    )
+  }
+
+  private async applyChiefDecision<Refusal extends string = never>(
+    input: { requestId: string; actorId: string; reason: string | null; expectedRevision?: number },
+    transition: ChiefTransition,
+    fromStage: ReviewStage,
+    guard?: (client: PoolClient, current: RequestRow) => Promise<Refusal | undefined>,
+  ): Promise<TriageResult | Refusal> {
     if (!isUuid(input.requestId)) return 'not_found'
-    const transition = TRIAGE_TRANSITIONS[input.action]
     const client = await this.pool.connect()
     let decided: RequestRow
     let notificationJobId: string
@@ -761,13 +845,18 @@ export class RequestRepository {
         await client.query('ROLLBACK')
         return 'forbidden'
       }
-      if (current.status !== 'in_review' || current.review_stage !== 'chief_triage') {
+      if (current.status !== 'in_review' || current.review_stage !== fromStage) {
         await client.query('ROLLBACK')
         return 'invalid_state'
       }
       if (input.expectedRevision !== undefined && input.expectedRevision !== current.revision) {
         await client.query('ROLLBACK')
         return 'stale_revision'
+      }
+      const refusal = await guard?.(client, current)
+      if (refusal) {
+        await client.query('ROLLBACK')
+        return refusal
       }
       const { rows } = await client.query<RequestRow>(
         `UPDATE dashboard.requests

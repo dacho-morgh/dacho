@@ -233,13 +233,14 @@ function requestWithActions(
   companyId?: string | null,
   actorIsResponsibleChief = false,
   reviewRoundStarted = false,
+  reviewRoundComplete = false,
 ) {
   if (!request) return request
   return {
     ...request,
     allowedActions: allowedRequestActions(
       role,
-      { ...request, actorIsResponsibleChief, reviewRoundStarted },
+      { ...request, actorIsResponsibleChief, reviewRoundStarted, reviewRoundComplete },
       actorId,
       companyId,
     ),
@@ -455,10 +456,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         item.reviewStage === 'triaged' &&
         (actor.operationalRole === 'system-owner' ? item.status === 'in_review' : chiefCases.has(item.id)),
     )
-    const startedRounds = await rounds.requestsWithCurrentRound(roundCases.map((item) => item.id))
+    const currentRounds = await rounds.currentRoundsOf(roundCases.map((item) => item.id))
     return items.map((item) =>
       requestWithActions(
-        actor.operationalRole, actor.id, item, companyId, chiefCases.has(item.id), startedRounds.has(item.id),
+        actor.operationalRole, actor.id, item, companyId, chiefCases.has(item.id),
+        currentRounds.has(item.id), currentRounds.get(item.id) === true,
       )!,
     )
   }
@@ -1055,6 +1057,45 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
+  /** The responsible chief's explicit decision once a round holds its four final evaluations (T28). */
+  router.post('/requests/:id/review-decision', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { action, reason, expectedRevision } = req.body ?? {}
+      if (action !== 'advance' && action !== 'return' && action !== 'reject') {
+        res.status(400).json({ error: 'invalid_action' })
+        return
+      }
+      const trimmedReason = parseDecisionReason(reason)
+      if (action !== 'advance' && !trimmedReason) {
+        res.status(400).json({ error: 'reason_required' })
+        return
+      }
+      const revision = parseExpectedRevision(expectedRevision)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      const result = await repo.decideReview({
+        requestId: req.params.id,
+        actorId: actor.id,
+        action,
+        reason: action === 'advance' ? null : trimmedReason,
+        expectedRevision: revision,
+      })
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'forbidden') { res.status(403).json({ error: 'forbidden' }); return }
+      if (result === 'invalid_state') { res.status(409).json({ error: 'invalid_decision_state' }); return }
+      if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
+      if (result === 'round_not_ready') { res.status(409).json({ error: 'round_not_ready' }); return }
+      res.json({ request: (await presentRequests(actor, [result.request]))[0] })
+    } catch (error) { next(error) }
+  })
+
   /* ── Assigned reviewer queue and case file (T23) ───────────────────── */
 
   /** Reviewer and employer inbox, fed only by the actor's active server-side assignments. */
@@ -1257,6 +1298,22 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       res.json({ round })
+    } catch (error) { next(error) }
+  })
+
+  /** Every round of the case with its decision, for the people who oversee it. */
+  router.get('/requests/:id/review-rounds', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role !== 'system-owner' && role !== 'central-secretariat' && role !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) { res.status(404).json({ error: 'not_found' }); return }
+      res.json({ items: await rounds.listForRequest(request.id) })
     } catch (error) { next(error) }
   })
 
@@ -1552,7 +1609,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(403).json({ error: 'forbidden' })
         return
       }
-      const revision = request.revision
+      // The revision this person's round reviews: a decided case has moved past it.
+      const revision = await reviewCases.reviewedRequestRevision(
+        request.id, { id: actor.id, role: actor.operationalRole },
+      ) ?? request.revision
       // Own evaluation only: how far the other three are is not a reviewer's to see.
       const evaluation = await evaluations.findByRequestAndUser(request.id, actor.id, revision)
       res.json({ evaluation, revision })
@@ -1701,13 +1761,20 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const revision = request.revision
-      const items = await evaluations.listForRequest(request.id, revision)
-      const completedCount = await currentCompletion(request.id, items)
-      const round = await rounds.findLatest(request.id)
+      // The current revision by default; `revision` reads the evaluations of a past round.
+      const requested = req.query.revision === undefined ? request.revision : parseRevisionQuery(req.query.revision)
+      if (requested === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      const items = await evaluations.listForRequest(request.id, requested)
+      const round = await rounds.findByRevision(request.id, requested)
+      const completedCount = requested === request.revision
+        ? await currentCompletion(request.id, items)
+        : round?.completion.finalized ?? 0
       res.json({
         items: items.map(oversightEvaluation),
-        revision,
+        revision: requested,
         completedCount,
         requiredCount: ROUND_REQUIRED_EVALUATIONS,
         readyForChiefDecision: round?.completion.ready ?? false,

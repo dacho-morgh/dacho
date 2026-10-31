@@ -5,7 +5,11 @@ import { appendTransition } from '../dashboard/transition-history.js'
 /** One employer and three ordinary reviewers. */
 export const ROUND_REQUIRED_EVALUATIONS = 4
 
-/** Final evaluations for the round's revision held by its currently active slots. */
+/**
+ * Final evaluations for the round's revision held by its slots: the active ones,
+ * or the ones a later round ended, so a past round keeps the count it was decided
+ * on. Replaced people never count.
+ */
 export async function countRoundFinals(
   db: Pool | PoolClient,
   round: { id: string; requestRevision: number },
@@ -16,7 +20,7 @@ export async function countRoundFinals(
      JOIN dashboard.evaluations ev
        ON ev.request_id = a.request_id AND ev.user_id = a.user_id AND ev.role = a.role::text
       AND ev.revision = $2 AND ev.state = 'final'
-     WHERE a.round_id = $1 AND a.active`,
+     WHERE a.round_id = $1 AND (a.active OR a.revoke_reason = 'superseded_by_new_round')`,
     [round.id, round.requestRevision],
   )
   return Number(rows[0]?.finalized ?? 0)

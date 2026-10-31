@@ -99,11 +99,13 @@ export class PostgresEvaluationRepository implements EvaluationStore {
   private async writeGuard(client: PoolClient, input: SaveEvaluationInput): Promise<'stale' | 'forbidden' | undefined> {
     // Share locks allow independent reviewers while preventing a revision change
     // or assignment revocation from committing between authorization and this write.
-    const request = await client.query<{ revision: number; status: string }>(
-      'SELECT revision, status FROM dashboard.requests WHERE id = $1 FOR SHARE',
+    const request = await client.query<{ revision: number; status: string; review_stage: string | null }>(
+      'SELECT revision, status, review_stage FROM dashboard.requests WHERE id = $1 FOR SHARE',
       [input.requestId],
     )
     if (request.rows[0]?.revision !== input.revision || request.rows[0]?.status !== 'in_review') return 'stale'
+    // Review is over once the chief advanced the case, even for a hand-made grant.
+    if (request.rows[0]?.review_stage === 'advanced') return 'stale'
     const assignment = await client.query<{ round_revision: number | null }>(
       `SELECT rr.request_revision AS round_revision
        FROM dashboard.case_assignments a
