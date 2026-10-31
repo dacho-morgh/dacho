@@ -130,6 +130,8 @@ jobs:
         run: echo "n" | pnpm --filter @dacho/frontend payload migrate
 
       - name: Backend integration tests
+        env:
+          PHASE0_PG_CONTAINER: ${{ job.services.postgres.id }}
         run: pnpm --filter @dacho/backend test:int
 
       - name: Frontend integration tests

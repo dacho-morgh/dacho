@@ -23,6 +23,7 @@ Updated: 2026-10-26. This is the English specification for the event, review, in
 | [Supplied review rubric](review-rubric.md) | Ordinary/employer forms, shared scoring up to 55.05 and remaining interpretation questions |
 | [Isolated test environment](test-environment.md) | T04 guarded disposable database/files and recorded recovery checks |
 | [Migration inventory](migration-inventory.md) | Current migration streams, schema discrepancy and rollout limits |
+| [Migration rehearsal](migration-rehearsal.md) | T41 upgrade from the `main` level on separate populated data, disposition of old accounts and cases, and recovery |
 | [Phase 0 Figma evidence](phase-0-figma-evidence.md) | Fresh read-only design evidence and conflicts with approved product rules |
 | [Phase 0 execution record](phase-0-execution.md) | Work allocation, branch, evidence, limitations and handoff for T01–T04 |
 | [Personnel foundation](personnel-foundation.md) | T08 scalar operational role, editorial/service separation, deactivation and explicit legacy mapping |
