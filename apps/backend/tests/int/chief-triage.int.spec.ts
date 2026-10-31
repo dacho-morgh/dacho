@@ -205,7 +205,7 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
     const otherQueue = await request(app).get('/admin/requests').set(auth('chief-2'))
     expect(otherQueue.body.items.map((entry: { id: string }) => entry.id)).not.toContain(submitted.id)
     const otherDecision = await triage(app, 'chief-2', submitted.id, { action: 'accept' })
-    expect(otherDecision.status).toBe(403)
+    expect(otherDecision.status).toBe(404)
 
     const company = await request(app).get(`/requests/${submitted.id}`).set(auth('company-user-1'))
     expect(company.body.request.allowedActions).toEqual(['read'])
@@ -531,7 +531,7 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
     expect(swap.status).toBe(200)
 
     // The former chief neither decides nor keeps reading the dossier.
-    expect((await triage(app, 'chief', submitted.id, { action: 'accept' })).status).toBe(403)
+    expect((await triage(app, 'chief', submitted.id, { action: 'accept' })).status).toBe(404)
     expect((await request(app).get(`/admin/requests/${submitted.id}`).set(auth('chief'))).status).toBe(404)
     expect((await request(app).get(`/requests/${submitted.id}/proposal`).set(auth('chief'))).status).toBe(404)
     const oldQueue = await request(app).get('/admin/requests').set(auth('chief'))
@@ -576,7 +576,7 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
       ...cases.map((id) => triage(app, 'chief', id, { action: 'return', reason: 'اصلاح' })),
     ])
     expect(swap!.status).toBe(200)
-    for (const decision of decisions) expect([200, 403]).toContain(decision.status)
+    for (const decision of decisions) expect([200, 403, 404]).toContain(decision.status)
 
     const { rows } = await pool.query<{ user_id: string }>(
       `SELECT user_id FROM dashboard.case_assignments

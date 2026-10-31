@@ -561,6 +561,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     return { scope, companyId }
   }
 
+  /** Refuses a command: someone who cannot read the case gets what an unknown id gets, so a guess confirms nothing. */
+  const refuseCommand = async (res: Response, actor: { id: string; operationalRole: OperationalRole }, requestId: string) => {
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
+    if (await repo.findByIdScoped(requestId, scope)) res.status(403).json({ error: 'forbidden' })
+    else res.status(404).json({ error: 'not_found' })
+  }
+
   // Mailbox visibility never expands the underlying document audience.
   const canReadAttachment = async (doc: PrivateDocumentRecord, actorId: string, role: OperationalRole): Promise<boolean> => {
     const companyId = await actorCompanyId(actorId, role)
@@ -1123,7 +1130,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         expectedRevision: revision,
       })
       if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
-      if (result === 'forbidden') { res.status(403).json({ error: 'forbidden' }); return }
+      if (result === 'forbidden') { await refuseCommand(res, actor, req.params.id); return }
       if (result === 'invalid_state') { res.status(409).json({ error: 'invalid_triage_state' }); return }
       if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
       res.json({ request: (await presentRequests(actor, [result.request]))[0] })
@@ -1161,7 +1168,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         expectedRevision: revision,
       })
       if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
-      if (result === 'forbidden') { res.status(403).json({ error: 'forbidden' }); return }
+      if (result === 'forbidden') { await refuseCommand(res, actor, req.params.id); return }
       if (result === 'invalid_state') { res.status(409).json({ error: 'invalid_decision_state' }); return }
       if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
       if (result === 'round_not_ready') { res.status(409).json({ error: 'round_not_ready' }); return }
@@ -1731,7 +1738,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       }
       const context = await rounds.findStartContext(req.params.id)
       if (!context) { res.status(404).json({ error: 'not_found' }); return }
-      if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
+      if (context.responsibleChiefId !== actor.id) { await refuseCommand(res, actor, req.params.id); return }
       const users = await deps.userStore.list({ operationalRole: 'reviewer' })
       // Once a round exists for the current revision the list serves replacement:
       // nobody who already held a slot of it returns. An earlier revision's round
@@ -1767,7 +1774,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
       const context = await rounds.findStartContext(req.params.id)
       if (!context) { res.status(404).json({ error: 'not_found' }); return }
-      if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
+      if (context.responsibleChiefId !== actor.id) { await refuseCommand(res, actor, req.params.id); return }
 
       // Four distinct active people: the case's employer plus three other reviewers.
       const employerId = await roundEmployerOf(context)
@@ -1868,7 +1875,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
 
       const context = await rounds.findStartContext(req.params.id)
       if (!context) { res.status(404).json({ error: 'not_found' }); return }
-      if (context.responsibleChiefId !== actor.id) { res.status(403).json({ error: 'forbidden' }); return }
+      if (context.responsibleChiefId !== actor.id) { await refuseCommand(res, actor, req.params.id); return }
       if (replacementId === req.params.userId) { res.status(400).json({ error: 'duplicate_people' }); return }
       const incoming = await deps.userStore.findById(replacementId).catch(() => undefined)
       if (!incoming || operationalRoleOf(incoming) !== 'reviewer') {
@@ -2138,7 +2145,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
-        res.status(403).json({ error: 'forbidden' })
+        res.status(404).json({ error: 'not_found' })
         return
       }
       // The revision this person's round reviews: a decided case has moved past it.
@@ -2164,7 +2171,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
-        res.status(403).json({ error: 'forbidden' })
+        await refuseCommand(res, actor, request.id)
         return
       }
       if (!Number.isSafeInteger(req.body?.revision) || req.body.revision < 1) {
@@ -2226,7 +2233,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
-        res.status(403).json({ error: 'forbidden' })
+        await refuseCommand(res, actor, request.id)
         return
       }
       if (!Number.isSafeInteger(req.body?.revision) || req.body.revision < 1) {

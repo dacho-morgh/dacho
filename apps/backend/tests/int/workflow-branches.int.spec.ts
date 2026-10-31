@@ -436,7 +436,7 @@ describe('T43: Workflow branches across stages (int)', () => {
       replacementId: 'reviewer-4', reason: 'عدم دسترسی', expectedRevision: firstRevision,
     })
     expect(replaced.status).toBe(200)
-    expect((await finalize(app, 'reviewer-1', id, firstRevision)).status).toBe(403)
+    expect((await finalize(app, 'reviewer-1', id, firstRevision)).status).toBe(404)
     expect((await decide(app, id, { action: 'advance', expectedRevision: firstRevision })).body.error).toBe('round_not_ready')
     await finalizeAll(app, id, firstRevision, ['reviewer-4'])
 
@@ -456,7 +456,7 @@ describe('T43: Workflow branches across stages (int)', () => {
       employerId: 'employer-2', reason: 'تعارض منافع', expectedRevision: secondRevision,
     })
     expect(employerSwap.status).toBe(200)
-    expect((await finalize(app, 'employer-1', id, secondRevision)).status).toBe(403)
+    expect((await finalize(app, 'employer-1', id, secondRevision)).status).toBe(404)
     await finalizeAll(app, id, secondRevision, ['employer-2'])
     expect((await decide(app, id, { action: 'return', reason: 'اصلاح دوم', expectedRevision: secondRevision })).status).toBe(200)
 
@@ -465,7 +465,7 @@ describe('T43: Workflow branches across stages (int)', () => {
     const third = await startRound(app, id, thirdRevision, SECOND_THREE)
     expect(third.body.round.slots.filter((slot: { active: boolean }) => slot.active).map((slot: { userId: string }) => slot.userId).sort())
       .toEqual(['employer-2', ...SECOND_THREE].sort())
-    expect((await finalize(app, 'employer-1', id, thirdRevision)).status).toBe(403)
+    expect((await finalize(app, 'employer-1', id, thirdRevision)).status).toBe(404)
     await finalizeAll(app, id, thirdRevision, ['employer-2', ...SECOND_THREE])
     const advanced = await decide(app, id, { action: 'advance', expectedRevision: thirdRevision })
     expect(advanced.status).toBe(200)

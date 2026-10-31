@@ -43,6 +43,7 @@ Updated: 2026-10-26. This is the English specification for the event, review, in
 | [Reviewer queue and case file](reviewer-queue.md) | T23 assignment-derived queue, reviewer case file, pinned proposal/RFP files and necessary company profile |
 | [Scoped queues and overview](work-queues.md) | T38 each role's state-derived work queues, counts equal to their lists, and search and filters inside the row scope |
 | [Shared dossier and role actions](request-dossier.md) | T39 one case page for seven roles, sections and controls per role, financial slots absent for the chief and reviewers, and the removed transition route |
+| [Access and file matrix tests](access-matrix-tests.md) | T42 seven roles against own, other and unassigned records across API, files, counts, CMS and proxy, what was corrected and the known gaps |
 
 ## Reading and execution order
 

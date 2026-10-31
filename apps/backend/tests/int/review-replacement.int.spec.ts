@@ -256,7 +256,7 @@ describe('T26: Reviewer replacement and assignment history (int)', () => {
 
     // The replaced reviewer loses the case everywhere at the next request.
     expect((await request(app).get(`/requests/${triaged.id}/review-round`).set(auth('reviewer-1'))).status).toBe(404)
-    expect((await request(app).get(`/requests/${triaged.id}/evaluation`).set(auth('reviewer-1'))).status).toBe(403)
+    expect((await request(app).get(`/requests/${triaged.id}/evaluation`).set(auth('reviewer-1'))).status).toBe(404)
     expect(idsOf(await request(app).get('/admin/requests').set(auth('reviewer-1')))).not.toContain(triaged.id)
     // The newcomer takes over the slot.
     expect((await request(app).get(`/requests/${triaged.id}/evaluation`).set(auth('reviewer-4'))).status).toBe(200)
@@ -418,7 +418,7 @@ describe('T26: Reviewer replacement and assignment history (int)', () => {
 
     for (const user of ['chief-2', 'owner', 'secretariat', 'reviewer-1', 'employer-1', 'investment', 'company-user-1']) {
       const res = await replaceReviewer(app, user, started.id, 'reviewer-1', body)
-      expect(res.status, user).toBe(403)
+      expect(res.status, user).toBe(user === 'chief-2' ? 404 : 403)
     }
     const early = await replaceReviewer(app, 'chief', noRound.id, 'reviewer-1', body)
     expect(early.status).toBe(409)
@@ -511,7 +511,7 @@ describe('T26: Reviewer replacement and assignment history (int)', () => {
     expect(await activeUsers(triaged.id)).toEqual(['employer-2', 'reviewer-1', 'reviewer-2', 'reviewer-3'])
 
     expect((await request(app).get(`/requests/${triaged.id}/review-round`).set(auth('employer-1'))).status).toBe(404)
-    expect((await request(app).get(`/requests/${triaged.id}/evaluation`).set(auth('employer-1'))).status).toBe(403)
+    expect((await request(app).get(`/requests/${triaged.id}/evaluation`).set(auth('employer-1'))).status).toBe(404)
     expect(idsOf(await request(app).get('/admin/requests').set(auth('employer-1')))).not.toContain(triaged.id)
     expect((await request(app).get(`/requests/${triaged.id}/evaluation`).set(auth('employer-2'))).status).toBe(200)
     expect(idsOf(await request(app).get('/admin/requests').set(auth('employer-2')))).toContain(triaged.id)

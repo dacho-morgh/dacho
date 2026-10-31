@@ -231,11 +231,11 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
       .set(authHeader('rep-1'))
     expect(repRes.status).toBe(403)
 
-    // Unassigned reviewer cannot evaluate this request
+    // Unassigned reviewer cannot evaluate this request, or learn that it exists
     const unassignedRes = await request(app)
       .get(`/requests/${REQUEST_ID}/evaluation`)
       .set(authHeader('reviewer-2'))
-    expect(unassignedRes.status).toBe(403)
+    expect(unassignedRes.status).toBe(404)
 
     // Missing request returns 404
     const notFoundRes = await request(app)

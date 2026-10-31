@@ -454,8 +454,8 @@ describe('T28: Chief decision and correction rounds (int)', () => {
     expect(started.body.round.completion).toEqual({ required: 4, finalized: 0, ready: false, completedAt: null })
 
     // Old evaluations and old slots cannot touch the new count.
-    expect((await finalize(app, 'reviewer-1', id, revision)).status).toBe(403)
-    expect((await finalize(app, 'reviewer-1', id, firstRevision)).status).toBe(403)
+    expect((await finalize(app, 'reviewer-1', id, revision)).status).toBe(404)
+    expect((await finalize(app, 'reviewer-1', id, firstRevision)).status).toBe(404)
     expect((await request(app).get(`/review/cases/${id}`).set(auth('reviewer-1'))).status).toBe(404)
     expect((await finalize(app, 'reviewer-2', id, firstRevision)).body.error).toBe('stale_evaluation')
     const fresh = await request(app).get(`/requests/${id}/evaluation`).set(auth('reviewer-2'))
@@ -588,7 +588,7 @@ describe('T28: Chief decision and correction rounds (int)', () => {
       const res = await decide(app, user, id, body)
       expect(res.status, user).toBe(403)
     }
-    expect((await decide(app, 'chief-2', id, body)).status).toBe(403)
+    expect((await decide(app, 'chief-2', id, body)).status).toBe(404)
 
     expect((await decide(app, 'chief', id, { action: 'approve' })).body.error).toBe('invalid_action')
     expect((await decide(app, 'chief', id, {})).body.error).toBe('invalid_action')
