@@ -6,30 +6,13 @@
  * Persian feedback and never replace the response.
  */
 
+import { DOCUMENT_CATEGORIES, documentCategoryLabel, type DocumentCategory } from './document-categories'
+
 export const MAX_DOCUMENT_BYTES = 10_000_000
 export const DOCUMENT_SIZE_MESSAGE = 'حداکثر ۱۰ مگابایت برای هر فایل'
 export const DOCUMENT_FORMATS_MESSAGE = 'فقط PDF یا Word (doc / docx)'
 
-export const DOCUMENT_CATEGORIES = [
-  'rfp',
-  'proposal',
-  'articlesOfAssociation',
-  'establishmentNotices',
-  'amendmentNotices',
-  'catalogues',
-  'certificatesLicenses',
-  'financialStatements',
-  'debtFacilityEvidence',
-  'taxInsuranceRecords',
-  'contractsOrdersMousCommitments',
-  'projectEstimateUseOfFunds',
-  'guaranteeCollateral',
-  'supplementaryCaseFiles',
-  'boothPaymentReceipt',
-  'correspondenceAttachment',
-] as const
-
-export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number]
+export { DOCUMENT_CATEGORIES, documentCategoryLabel, type DocumentCategory }
 
 export const DOCUMENT_ACCEPT =
   '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -38,29 +21,6 @@ const EXTENSION_MIME: Record<string, string> = {
   pdf: 'application/pdf',
   doc: 'application/msword',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-}
-
-export function documentCategoryLabel(category: DocumentCategory): string {
-  return (
-    {
-      rfp: 'RFP',
-      proposal: 'پروپوزال',
-      articlesOfAssociation: 'اساس‌نامه',
-      establishmentNotices: 'آگهی تأسیس',
-      amendmentNotices: 'آگهی تغییرات',
-      catalogues: 'کاتالوگ محصولات',
-      certificatesLicenses: 'گواهی‌ها و مجوزها',
-      financialStatements: 'صورت‌های مالی',
-      debtFacilityEvidence: 'بدهی‌ها و تسهیلات',
-      taxInsuranceRecords: 'اظهارنامه مالیاتی و بیمه',
-      contractsOrdersMousCommitments: 'قراردادها و تعهدات',
-      projectEstimateUseOfFunds: 'برآورد و مصرف منابع',
-      guaranteeCollateral: 'تضامین و وثایق',
-      supplementaryCaseFiles: 'مدارک تکمیلی پرونده',
-      boothPaymentReceipt: 'رسید پرداخت غرفه',
-      correspondenceAttachment: 'پیوست مکاتبه',
-    } satisfies Record<DocumentCategory, string>
-  )[category]
 }
 
 export function formatDocumentSize(bytes: number): string {

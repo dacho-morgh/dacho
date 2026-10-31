@@ -16,7 +16,7 @@ import {
   type RequestProposalDetail,
   type ReviewRoundDto,
 } from '@/utilities/dashboard-api'
-import { documentCategoryLabel, type DocumentCategory } from '@/utilities/document-api'
+import { documentCategoryLabel, type DocumentCategory } from '@/utilities/document-categories'
 
 const FINANCIAL_CATEGORIES: DocumentCategory[] = [
   'financialStatements',
