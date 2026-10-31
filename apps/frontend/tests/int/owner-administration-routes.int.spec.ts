@@ -41,7 +41,7 @@ it('routes active owner to personnel management', async () => {
 })
 it('routes active owner to operational events and exhibition catalogue management', async () => {
   backend.auth.mockResolvedValue({ user: { operationalRole: 'system-owner', isActive: true } })
-  render(await EventsPage({}))
+  render(await EventsPage())
   expect(screen.getByText('Manage operational events')).toBeTruthy()
   expect(screen.getByText('Discover exhibitions-17')).toBeTruthy()
   expect(backend.find).toHaveBeenCalledExactlyOnceWith({
@@ -69,7 +69,7 @@ it.each(['employees', 'events'])(
           ? { operationalRole: 'system-owner', isActive: true }
           : null,
     }))
-    render(route === 'employees' ? await EmployeesPage() : await EventsPage({}))
+    render(route === 'employees' ? await EmployeesPage() : await EventsPage())
     expect(
       screen.getByText(route === 'employees' ? 'Manage personnel' : 'Manage operational events'),
     ).toBeTruthy()
@@ -92,7 +92,7 @@ it.each([
 ])('denies %s personnel route and preserves public-event discovery', async (role) => {
   backend.auth.mockResolvedValue({ user: { operationalRole: role, isActive: true } })
   await expect(EmployeesPage()).rejects.toThrow('REDIRECT')
-  render(await EventsPage({}))
+  render(await EventsPage())
   expect(screen.getByText('Discover events-17,exhibitions-17')).toBeTruthy()
   expect(screen.queryByText('Manage operational events')).toBeNull()
 })
@@ -103,6 +103,6 @@ it.each([
 ])('never grants management to absent, inactive or service sessions: %j', async (user) => {
   backend.auth.mockResolvedValue({ user })
   await expect(EmployeesPage()).rejects.toThrow('REDIRECT')
-  render(await EventsPage({}))
+  render(await EventsPage())
   expect(screen.queryByText('Manage operational events')).toBeNull()
 })

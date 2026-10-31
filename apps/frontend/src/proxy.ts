@@ -6,6 +6,24 @@ import { getPayload } from 'payload'
 import { DASHBOARD_RETURN_URL_HEADER, getLoginUrl } from '@/utilities/auth-return-url'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
+/**
+ * Served before any layout exists, so it carries its own direction and viewport. No private
+ * data and nothing from the request goes in it; the empty href reloads the address asked for.
+ */
+const ACCESS_UNAVAILABLE_PAGE = `<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>سرویس در دسترس نیست</title>
+</head>
+<body style="font-family:system-ui,sans-serif;text-align:center;padding:4rem 1rem;line-height:2">
+<h1 style="font-size:1.25rem">سرویس بررسی دسترسی در دسترس نیست</h1>
+<p>این خطا به معنای نبود داده یا لغو دسترسی شما نیست. کمی بعد دوباره تلاش کنید.</p>
+<p><a href="">تلاش دوباره</a></p>
+</body>
+</html>`
+
 export async function proxy(request: NextRequest) {
   const returnUrl = `${request.nextUrl.pathname}${request.nextUrl.search}`
   const hasSessionCookie = Boolean(request.cookies.get('payload-token')?.value)
@@ -20,9 +38,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL(getLoginUrl(returnUrl), request.url))
   }
 
-  const unavailable = () => new NextResponse('سرویس بررسی دسترسی در دسترس نیست. کمی بعد دوباره تلاش کنید.', {
+  const unavailable = () => new NextResponse(ACCESS_UNAVAILABLE_PAGE, {
     status: 503,
-    headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'private, no-store, max-age=0' },
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, no-store, max-age=0' },
   })
 
   let user = null

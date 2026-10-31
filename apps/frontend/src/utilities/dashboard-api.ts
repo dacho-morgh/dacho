@@ -225,6 +225,20 @@ export class DashboardApiError extends Error {
   }
 }
 
+/**
+ * What a failed write means to the person, with the input they typed still on screen.
+ * Session, permission and stale-version failures each ask for a different next step,
+ * and a dropped connection is not the server's refusal.
+ */
+export function describeMutationFailure(cause: unknown, fallback: string): string {
+  if (cause instanceof TypeError) return 'ارتباط با سرور برقرار نشد. اطلاعات این صفحه حفظ شده است؛ اتصال را بررسی کنید و دوباره تلاش کنید.'
+  if (!(cause instanceof DashboardApiError)) return fallback
+  if (cause.status === 401) return 'نشست شما پایان یافته است. در برگه‌ای دیگر دوباره وارد شوید و سپس همین‌جا ادامه دهید؛ اطلاعات این صفحه حفظ شده است.'
+  if (cause.status === 403) return 'اجازه انجام این کار را ندارید یا دسترسی شما تغییر کرده است.'
+  if (cause.status === 409) return 'این مورد پس از باز شدن صفحه تغییر کرده است. صفحه را تازه کنید و وضعیت را دوباره بررسی کنید.'
+  return fallback
+}
+
 async function dashboardFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api/dashboard${path}`, { cache: 'no-store', ...init })
   if (!res.ok) {

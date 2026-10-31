@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
 
 interface Assignment {
   id: string
@@ -29,16 +30,21 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployee, setSelectedEmployee] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [employeesFailed, setEmployeesFailed] = useState(false)
   const base = `/api/dashboard/admin/requests/${encodeURIComponent(id)}/assignments`
 
   const loadAssignments = useCallback(async () => {
-    const response = await fetch(base)
-    if (!response.ok) {
-      setError('دریافت انتساب‌ها انجام نشد.')
-      return
+    try {
+      const response = await fetch(base)
+      if (!response.ok) throw new DashboardApiError(response.status, 'assignments_failed')
+      const body = (await response.json()) as { items: Assignment[] }
+      setAssignments(body.items.filter((assignment) => assignment.active))
+      setLoaded(true)
+    } catch (cause) {
+      setError(describeMutationFailure(cause, 'دریافت انتساب‌ها انجام نشد.'))
     }
-    const body = (await response.json()) as { items: Assignment[] }
-    setAssignments(body.items.filter((assignment) => assignment.active))
   }, [base])
 
   useEffect(() => {
@@ -47,9 +53,13 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
     fetch('/api/dashboard/admin/employees')
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
-        if (active) setEmployees(payload?.items ?? [])
+        if (!active) return
+        setEmployees(payload?.items ?? [])
+        setEmployeesFailed(!payload)
       })
-      .catch(() => setEmployees([]))
+      .catch(() => {
+        if (active) setEmployeesFailed(true)
+      })
     return () => {
       active = false
     }
@@ -57,38 +67,56 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
 
   const failure = async (response: Response, fallback: string) => {
     const body = (await response.json().catch(() => null)) as { error?: string } | null
-    setError(ERROR_MESSAGES[body?.error ?? ''] ?? fallback)
+    setError(
+      ERROR_MESSAGES[body?.error ?? ''] ??
+        describeMutationFailure(new DashboardApiError(response.status, body?.error ?? 'request_failed'), fallback),
+    )
   }
 
   const assign = async () => {
     const employee = employees.find((item) => item.id === selectedEmployee)
-    if (!employee) return
+    if (!employee || busy) return
     setError(null)
-    const response = await fetch(base, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId: employee.id, role: employee.operationalRole }),
-    })
-    if (!response.ok) {
-      await failure(response, 'انتساب انجام نشد.')
-      return
+    setBusy(true)
+    try {
+      const response = await fetch(base, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: employee.id, role: employee.operationalRole }),
+      })
+      if (!response.ok) {
+        await failure(response, 'انتساب انجام نشد.')
+        return
+      }
+      setSelectedEmployee('')
+      await loadAssignments()
+    } catch (cause) {
+      setError(describeMutationFailure(cause, 'انتساب انجام نشد.'))
+    } finally {
+      setBusy(false)
     }
-    setSelectedEmployee('')
-    await loadAssignments()
   }
 
   const revoke = async (assignment: Assignment) => {
+    if (busy) return
     setError(null)
-    const response = await fetch(`${base}/${encodeURIComponent(assignment.userId)}`, {
-      method: 'DELETE',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ reason: 'revoked by owner' }),
-    })
-    if (!response.ok) {
-      await failure(response, 'لغو انتساب انجام نشد.')
-      return
+    setBusy(true)
+    try {
+      const response = await fetch(`${base}/${encodeURIComponent(assignment.userId)}`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reason: 'revoked by owner' }),
+      })
+      if (!response.ok) {
+        await failure(response, 'لغو انتساب انجام نشد.')
+        return
+      }
+      await loadAssignments()
+    } catch (cause) {
+      setError(describeMutationFailure(cause, 'لغو انتساب انجام نشد.'))
+    } finally {
+      setBusy(false)
     }
-    await loadAssignments()
   }
 
   return (
@@ -106,17 +134,17 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
               <Typography variant="14/regular" color="neutral-700">
                 {employees.find((item) => item.id === assignment.userId)?.name ?? assignment.userId} — {assignmentRoleLabel(assignment.role)}
               </Typography>
-              <Button type="button" variant="text-gray" size="32" onClick={() => revoke(assignment)}>
+              <Button type="button" variant="text-gray" size="32" disabled={busy} onClick={() => revoke(assignment)}>
                 <Typography variant="12/semibold" className="text-inherit">لغو انتساب</Typography>
               </Button>
             </li>
           ))}
         </ul>
-      ) : (
+      ) : loaded ? (
         <Typography variant="14/regular" color="neutral-400">هنوز انتسابی ثبت نشده است.</Typography>
-      )}
+      ) : null}
       <div className="flex flex-wrap items-end gap-2">
-        <label className="flex min-w-60 flex-col gap-1">
+        <label className="flex w-full flex-col gap-1 sm:w-auto sm:min-w-60">
           <Typography variant="12/regular" color="neutral-500">شخص</Typography>
           <select
             value={selectedEmployee}
@@ -131,10 +159,13 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
             ))}
           </select>
         </label>
-        <Button type="button" size="40" disabled={!selectedEmployee} onClick={assign}>
+        <Button type="button" size="40" disabled={!selectedEmployee || busy} onClick={assign}>
           <Typography variant="14/regular" className="text-inherit">ثبت انتساب</Typography>
         </Button>
       </div>
+      {employeesFailed ? (
+        <Typography role="alert" variant="14/regular" color="error">دریافت فهرست کارکنان انجام نشد. صفحه را دوباره بارگذاری کنید.</Typography>
+      ) : null}
       {error ? (
         <Typography role="alert" variant="14/regular" color="error">{error}</Typography>
       ) : null}

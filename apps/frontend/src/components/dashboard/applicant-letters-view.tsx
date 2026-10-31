@@ -22,7 +22,7 @@ import {
   DashboardTrashIcon,
   DashboardUserTagIcon,
 } from '@/components/icons'
-import { deleteLetter } from '@/utilities/dashboard-api'
+import { deleteLetter, describeMutationFailure } from '@/utilities/dashboard-api'
 
 export type ApplicantLetterStatus = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -111,7 +111,7 @@ function LettersSkeleton() {
 }
 
 /* Empty state — Figma node 53:11877 */
-function LettersEmptyState() {
+function LettersEmptyState({ noMatch = false }: { noMatch?: boolean }) {
   return (
     <div className="absolute left-1/2 top-1/2 flex w-[265px] -translate-x-1/2 -translate-y-1/2 flex-col items-center">
       <div className="flex flex-col items-center gap-[4px]">
@@ -119,10 +119,10 @@ function LettersEmptyState() {
           <DashboardEmptyInboxIcon className="size-[80px]" />
         </div>
         <Typography variant="14/semibold" className="mt-1 text-center text-neutral-600">
-          صندوق نامه‌های شما خالیست
+          {noMatch ? 'نتیجه‌ای پیدا نشد' : 'صندوق نامه‌های شما خالیست'}
         </Typography>
         <Typography variant="12/regular" className="text-center text-neutral-500">
-          تا کنون نامه یا پیامی برای شما ارسال نشده است
+          {noMatch ? 'عبارت جستجو یا زبانه را تغییر دهید' : 'تا کنون نامه یا پیامی برای شما ارسال نشده است'}
         </Typography>
       </div>
     </div>
@@ -158,8 +158,8 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
       await deleteLetter(item.id)
       setActionNotice(null)
       window.location.reload()
-    } catch {
-      setActionNotice('حذف نامه انجام نشد.')
+    } catch (cause) {
+      setActionNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
       window.setTimeout(() => setActionNotice(null), 3500)
     }
   }
@@ -187,6 +187,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
             <button
               type="button"
               onClick={() => setTab('sent')}
+              aria-pressed={tab === 'sent'}
               className={`flex h-[36px] items-center rounded-[10px] p-[8px] transition-colors ${tab === 'sent' ? 'bg-white' : 'bg-transparent'}`}
             >
               <Typography variant="16/regular" className={tab === 'sent' ? 'whitespace-nowrap text-neutral-700' : 'whitespace-nowrap text-neutral-600'}>
@@ -196,6 +197,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
             <button
               type="button"
               onClick={() => setTab('received')}
+              aria-pressed={tab === 'received'}
               className={`flex h-[36px] items-center rounded-[10px] p-[8px] transition-colors ${tab === 'received' ? 'bg-white' : 'bg-transparent'}`}
             >
               <Typography variant="16/regular" className={tab === 'received' ? 'whitespace-nowrap text-neutral-700' : 'whitespace-nowrap text-neutral-600'}>
@@ -205,6 +207,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
             <button
               type="button"
               onClick={() => setTab('support')}
+              aria-pressed={tab === 'support'}
               className={`flex h-[36px] items-center rounded-[10px] p-[8px] transition-colors ${tab === 'support' ? 'bg-white' : 'bg-transparent'}`}
             >
               <Typography variant="16/regular" className={tab === 'support' ? 'whitespace-nowrap text-neutral-700' : 'whitespace-nowrap text-neutral-600'}>
@@ -243,11 +246,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
         {state === 'loading' ? (
           <LettersSkeleton />
         ) : !showTable ? (
-          state === 'empty' || initialLetters.length === 0 ? (
-            <LettersEmptyState />
-          ) : (
-            <LettersEmptyState />
-          )
+          <LettersEmptyState noMatch={state !== 'empty' && searchQuery.trim() !== ''} />
         ) : (
           <>
           <div className="hidden flex-row-reverse justify-end overflow-hidden lg:flex">
