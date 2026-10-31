@@ -13,7 +13,7 @@ Seven roles against three relations: their own case or company, another team's, 
 | Counts | Same | `/requests`, `/admin/requests`, `/stats`, `/stats/overview`, `/activities` and both queues stay in the detail's scope. Query parameters do not widen it |
 | Confidentiality | Same | Marked financial, dossier, memo and evaluation text never appears in a response outside its audience. A letter cannot carry a file to someone outside its audience |
 | Skipping the screens | Same | One case walks every stage, and at the stage where each command would succeed, everyone else is refused and the case does not move. Also forged owners, forged role headers, missing proxy proof, and revocation, role change and deactivation |
-| CMS | `apps/frontend/tests/int/access-matrix.int.spec.ts` | Company records through REST, GraphQL and the Local API, company writes, identity fields, self-promotion, credentials in populated relations |
+| CMS | `apps/frontend/tests/int/access-matrix.int.spec.ts` | Company records through REST and the Local API, company writes, identity fields, self-promotion, credentials in populated relations. The real GraphQL route answers `404` with no body to every seat, to an anonymous caller and to a deactivated account, for reads and mutations |
 | Proxy | Same | The real route with real Payload authentication and a stubbed backend: only the session's identity is forwarded, forged headers are dropped, anonymous, deactivated and service accounts stop at the proxy, refusals and download headers pass through unchanged |
 
 The earlier `apps/backend/tests/document-access-matrix.spec.ts` still covers the policy function across every category and context.
@@ -22,10 +22,19 @@ The earlier `apps/backend/tests/document-access-matrix.spec.ts` still covers the
 
 `GET /requests/:id/evaluation` and `GET /requests/:id/review-round/candidates` answered `403` for a real case the person holds nothing on and `404` for an unknown id, which confirmed the case exists. Both now answer `404`, as [shared authorization](authorization.md) requires.
 
+## CMS GraphQL is disabled
+
+Payload could not build the schema, because the Persian options of the company `type` field are not valid enum names. On a running development server `POST /api/graphql` answered `500` with an empty body and logged the same `Names must only contain` error as the test process.
+
+Nothing in the repository reads GraphQL, so `graphQL.disable` is set in `packages/cms-core/src/payload.config.ts`, and the route now answers `404`. Repairing the schema would have kept an unused endpoint open and meant changing stored values, because Payload builds the enum names from them.
+
+`/api/graphql-playground` still renders its static page outside production, because Payload ignores the setting there. It holds no data and its queries get the same `404`. In production it answers `404`.
+
+Re-enabling GraphQL needs enum-safe select values with a data migration, and the role checks this spec used to hold for it.
+
 ## Known gaps
 
 - **Commands still confirm existence.** A refused command such as `POST /requests/:id/triage` may answer `403` on a real case and `404` on an unknown id. Nothing is read or changed; the spec accepts either status for commands.
-- **CMS GraphQL does not work.** Payload cannot build the schema, because the Persian options of the company `type` field are not valid enum names. The endpoint serves nobody, so it leaks nothing, and the spec's checks still hold if it is repaired. Only the failure in the test process was observed, not on a running server.
 - **The proxy and backend are tested apart.** The frontend spec stubs the backend, and the backend spec sends the proxy's headers itself. A browser journey across both belongs to T45.
 - Exhibition booths and receipts are not in this matrix. T54 covers that path.
 
@@ -41,3 +50,4 @@ Each of these temporary changes made the specs fail, and each was reverted:
 | Proxy forwards the browser's `x-user-id` | 7 |
 | Proxy admits deactivated and service accounts | 3 |
 | CMS company read open to everyone | 25 |
+| CMS GraphQL no longer disabled | 18 |

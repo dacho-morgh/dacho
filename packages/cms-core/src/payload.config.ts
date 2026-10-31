@@ -205,6 +205,12 @@ export default buildConfig({
   csrf: Array.from(new Set([getServerSideURL(), ...getLocalNetworkOrigins()])).filter(Boolean),
   globals: [Header, Footer, AboutUs, ContactUs, SiteSettings, Mag, LogoStrip],
   endpoints: [openApiEndpoint],
+  // Nothing here reads GraphQL: the admin panel, site and backend all use REST or the
+  // Local API. An unused endpoint is one more door for the permission matrix to guard, and
+  // the schema cannot build anyway, because Persian select values are not valid enum names.
+  graphQL: {
+    disable: true,
+  },
   plugins,
   secret: payloadSecret,
   sharp,
