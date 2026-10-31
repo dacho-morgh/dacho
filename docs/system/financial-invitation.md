@@ -50,7 +50,7 @@ Two inputs are still open, so the checklist decides neither of them:
 - A representative's case now advertises `uploadDocument` and `deleteDocument` in this stage. The company's request page applies them per category, because these actions do not name one.
 - Files freeze only when the company submits a complete package. Submission is [T30](financial-package.md) and closes uploads and deletes from then on.
 - The owner and Secretariat keep their existing upload rights at every stage. The gate covers the company only.
-- Read access does not change. The investment person still has no access until a persisted handoff exists.
+- Read access does not change. The investment person gets access only at the [T31 handoff](investment-handoff.md).
 
 ## Migration
 
@@ -62,4 +62,4 @@ Two inputs are still open, so the checklist decides neither of them:
 
 ## Not in this slice
 
-Package submission and completeness are in [T30](financial-package.md). Still open: the investment handoff (T31) and the invitation screens (FE18, FE19).
+Package submission and completeness are in [T30](financial-package.md), the handoff in [T31](investment-handoff.md). Still open: the invitation screens (FE18, FE19).

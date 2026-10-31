@@ -2,8 +2,8 @@ import type { OperationalRole } from '../access/roles.js'
 
 /** Case access must already have been checked separately for both parties. */
 export function canSendLetter(sender: OperationalRole, recipient: OperationalRole, caseLinked: boolean): boolean {
-  // T31 has no persisted financial handoff yet. Generic assignment must not
-  // substitute for investment participation, for either side of a case letter.
+  // Investment correspondence is T34. The T31 handoff opens the case and its files,
+  // not letters, and a generic assignment must not stand in for either side.
   if (sender === 'investment-reviewer' || (caseLinked && recipient === 'investment-reviewer')) return false
   switch (sender) {
     case 'system-owner':

@@ -57,7 +57,7 @@ function mapRow(row: AssignmentRow): CaseAssignmentDto {
 
 export type CreateAssignmentResult =
   | { ok: true; assignment: CaseAssignmentDto }
-  | { ok: false; reason: 'already_assigned' | 'managed_by_review_round' }
+  | { ok: false; reason: 'already_assigned' | 'managed_by_review_round' | 'investment_person_assigned' }
 
 export class AssignmentRepository {
   constructor(private readonly pool: Pool) {}
@@ -87,6 +87,20 @@ export class AssignmentRepository {
         if ((round.rowCount ?? 0) > 0) {
           await client.query('ROLLBACK')
           return { ok: false, reason: 'managed_by_review_round' }
+        }
+      }
+      if (input.role === 'investment-reviewer') {
+        // One investment person per case. The exclusive lock orders this with another
+        // grant and with the handoff, which takes the same row lock (T31).
+        await client.query('SELECT 1 FROM dashboard.requests WHERE id = $1 FOR UPDATE', [input.requestId])
+        const held = await client.query<{ user_id: string }>(
+          `SELECT user_id FROM dashboard.case_assignments
+           WHERE request_id = $1 AND role = 'investment-reviewer' AND active AND user_id <> $2`,
+          [input.requestId, input.userId],
+        )
+        if ((held.rowCount ?? 0) > 0) {
+          await client.query('ROLLBACK')
+          return { ok: false, reason: 'investment_person_assigned' }
         }
       }
       const { rows } = await client.query<AssignmentRow>(

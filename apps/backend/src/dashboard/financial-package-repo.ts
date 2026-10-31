@@ -128,6 +128,16 @@ export class FinancialPackageRepository {
       if (!isFinancialStageOpen(request.status, request.review_stage)) {
         return await rollback(client, { status: 'stage_closed' })
       }
+      const responsible = await client.query<{ investment_id: string }>(
+        `SELECT e.responsible_investment_id AS investment_id
+         FROM dashboard.request_rfps rfp
+         JOIN dashboard.events e ON e.id = rfp.event_id
+         WHERE rfp.request_id = $1`,
+        [input.requestId],
+      )
+      const investmentId = responsible.rows[0]?.investment_id
+      // Only an event application advances; a package must never commit without someone to receive it.
+      if (!investmentId) return await rollback(client, { status: 'stage_closed' })
 
       const invitationResult = await client.query<{ id: string; checklist_version: string }>(
         `SELECT id, checklist_version FROM dashboard.financial_invitations
@@ -191,6 +201,16 @@ export class FinancialPackageRepository {
         toState: request.status,
         revision: request.revision,
       })
+      await handOffToInvestment(client, input.requestId, investmentId)
+      await appendTransition(client, {
+        requestId: input.requestId,
+        ownerId: request.owner_id,
+        actorId: 'system',
+        action: 'investment_handoff',
+        fromState: request.status,
+        toState: request.status,
+        revision: request.revision,
+      })
       await client.query('COMMIT')
       return { status: 'submitted', package: mapPackage(inserted.rows[0]!) }
     } catch (error) {
@@ -200,6 +220,26 @@ export class FinancialPackageRepository {
       client.release()
     }
   }
+}
+
+/**
+ * The event's responsible person receives the case (T31). A hand-made grant to anyone
+ * else ends here: the role is one person per case, and the package now opens the files
+ * to whoever holds it. The caller holds the request lock.
+ */
+async function handOffToInvestment(client: PoolClient, requestId: string, investmentId: string): Promise<void> {
+  await client.query(
+    `UPDATE dashboard.case_assignments
+     SET active = false, revoked_by = 'system', revoked_at = now(), revoke_reason = 'investment_handoff'
+     WHERE request_id = $1 AND role = 'investment-reviewer' AND active AND user_id <> $2`,
+    [requestId, investmentId],
+  )
+  await client.query(
+    `INSERT INTO dashboard.case_assignments (request_id, user_id, role, assigned_by)
+     VALUES ($1, $2, 'investment-reviewer', 'system')
+     ON CONFLICT (request_id, user_id, role) WHERE active DO NOTHING`,
+    [requestId, investmentId],
+  )
 }
 
 async function rollback(client: PoolClient, result: SubmitFinancialPackageResult): Promise<SubmitFinancialPackageResult> {

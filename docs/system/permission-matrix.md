@@ -8,6 +8,8 @@ Implementation update (T09/T10): [shared authorization](authorization.md) applie
 
 Implementation update (T16): [event configuration](authorization.md) adds an owner-managed `dashboard.events` record with the registration window and one responsible chief/investment reviewer per event. Writes are System Owner only; Central Secretariat reads all events; an assigned chief or investment reviewer reads only their own event. Updates are revision-checked with a required reason, return `409` for a stale revision and commit a before/after audit row atomically. Subtopic, RFP, triage, review, financial and booth authority remain unimplemented.
 
+Implementation update (T31): the [investment handoff](investment-handoff.md) supplies the persisted handoff this matrix requires. Financial files and package status are confined to the owner, Secretariat, the owning company and the investment person holding the case.
+
 ## Decision rules
 
 One person has exactly one **operational** role: System Owner (O), Central Secretariat (S), Chief Reviewer (C), Reviewer (R), Employer Reviewer (E), Investment Reviewer (I), or Company Representative (P). `editor` is a separate CMS content privilege, not an operational workflow role; preserve existing editorial access during migration without making an editor a reviewer or owner. **Proposed technical mapping:** an account may retain editorial privilege alongside its one operational role, but operational authority must never be inferred from editorial privilege. Each existing `admin` account requires explicit review and mapping to the appropriate new role; do not automatically grant O to every legacy admin.

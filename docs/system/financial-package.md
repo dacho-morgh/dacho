@@ -1,13 +1,13 @@
 # Financial package submission (T30 / #46)
 
-Backend slice that completes the company's financial package after the [invitation (T29)](financial-invitation.md). The company submits the files once; a complete package freezes them. Human acceptance (UAT22) has not been run, and the financial screens (FE19) are not built. Submitting the package does not advance the case: investment handoff belongs to T31.
+Backend slice that completes the company's financial package after the [invitation (T29)](financial-invitation.md). The company submits the files once; a complete package freezes them. Human acceptance (UAT22) has not been run, and the financial screens (FE19) are not built. Submitting the package does not advance the case; it [hands the case to the investment person (T31)](investment-handoff.md).
 
 ## API
 
 | Route | Who | Behaviour |
 | --- | --- | --- |
 | `POST /requests/:id/financial-package` | Owning company | `201 { package }` on the first complete submit. `200 { package }` with the stored package on a repeat. `422 financial_package_incomplete` with `missingCategories` and `missingStatementYears`, storing nothing. `409 financial_stage_not_open` before advancement. `422 establishment_date_unavailable` when the founding date has no readable year. Another company gets `404`; chief, reviewer, employer, investment and Secretariat get `403`. |
-| `GET /requests/:id/financial-package` | Owning company, Secretariat, owner | `{ package }`, the latest stored package. `404` when none exists. Chief, reviewer, employer and investment person get `403`. |
+| `GET /requests/:id/financial-package` | Owning company, Secretariat, owner | `{ package }`, the latest stored package. `404` when none exists. Chief, reviewer, employer and investment person get `403`; the investment person reads the package through the [T31 dossier](investment-handoff.md). |
 | `POST /documents` with `category=financialStatements` | Owning company | Accepts an optional `statementYear` (four-digit Gregorian year). A malformed year gets `422 invalid_statement_year`. A statement without a year is stored but counts toward nothing. |
 
 `package` holds `id`, `requestId`, `invitationId`, `packageVersion` (1 for now), `checklistVersion`, `statementYears`, `documents` (the frozen file ids, names, sizes, logical versions and statement years), `submittedBy` and `submittedAt`.
@@ -62,4 +62,4 @@ These are open product inputs. The code takes the reading below and keeps each o
 
 ## Not in this slice
 
-Supplementary financial documents (T33), the investment handoff and memo (T31, T32), and the financial screens (FE19). A second package version is not created by any route yet.
+Supplementary financial documents (T33), the investment memo (T32), and the financial screens (FE19). A second package version is not created by any route yet.
