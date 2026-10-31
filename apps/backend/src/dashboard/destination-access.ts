@@ -34,6 +34,9 @@ export function canOpenDashboardDestination(role: OperationalRole, value: string
   if (path === '/dashboard/companies' || path.startsWith('/dashboard/companies/')) {
     return managementRoles.includes(role)
   }
+  if (path === '/dashboard/follow-ups' || path.startsWith('/dashboard/follow-ups/')) {
+    return managementRoles.includes(role)
+  }
   if (path === '/dashboard/employees' || path.startsWith('/dashboard/employees/')) {
     return managementRoles.includes(role)
   }

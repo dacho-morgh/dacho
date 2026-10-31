@@ -33,6 +33,10 @@ describe('current-role dashboard destinations', () => {
   it('keeps case pages scoped by role and rejects path-normalization tricks', () => {
     expect(canOpenDashboardDestination('investment-reviewer', '/dashboard/requests/abc/evaluation')).toBe(true)
     expect(canOpenDashboardDestination('reviewer', '/dashboard/requests/../companies')).toBe(false)
+    expect(canOpenDashboardDestination('central-secretariat', '/dashboard/follow-ups')).toBe(true)
+    expect(canOpenDashboardDestination('system-owner', '/dashboard/follow-ups')).toBe(true)
+    expect(canOpenDashboardDestination('investment-reviewer', '/dashboard/follow-ups')).toBe(false)
+    expect(canOpenDashboardDestination('representative', '/dashboard/follow-ups')).toBe(false)
     expect(canOpenDashboardDestination('reviewer', '/dashboard%2fcompanies')).toBe(false)
     expect(canOpenDashboardDestination('reviewer', '/dashboard\\companies')).toBe(false)
     expect(canOpenDashboardDestination('reviewer', '//outside.example/dashboard')).toBe(false)

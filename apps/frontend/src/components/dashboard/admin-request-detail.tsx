@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
+import { SecretariatFollowUpPanel } from '@/components/dashboard/secretariat-follow-up-panel'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { ArrowUpIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
@@ -234,6 +235,8 @@ export function AdminRequestDetail({ id }: { id: string }) {
           ))}
         </div>
       </section>
+
+      <SecretariatFollowUpPanel id={id} />
 
       {canAssign ? (
         <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">

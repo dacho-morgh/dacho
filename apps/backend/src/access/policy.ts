@@ -229,8 +229,9 @@ export type DocumentAudience = 'company' | 'case' | 'financial' | 'unsupported'
 
 /**
  * Categories whose prerequisite workflow does not exist yet stay denied rather
- * than becoming permissive stubs: RFP/versioning is T18, supplementary files T33,
- * and booth receipts T50. T35 supports request-linked correspondence.
+ * than becoming permissive stubs: RFP/versioning is T18 and booth receipts T50.
+ * T35 supports request-linked correspondence. Supplementary files arrive as
+ * correspondence attachments (T33), so `supplementaryCaseFiles` has no workflow.
  */
 export const UNSUPPORTED_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = [
   'rfp',
@@ -330,6 +331,8 @@ export interface DocumentForPolicy {
   assigned: boolean
   /** True once the case's latest invitation holds a package, which is what hands the case off (T31). */
   requestFinancialSubmitted?: boolean
+  /** True once the Secretariat opened this correspondence file to the investment person (T33). */
+  supplementaryDelivered?: boolean
 }
 
 /**
@@ -371,8 +374,10 @@ export function canReadDocument(
       if (document.category === 'correspondenceAttachment') return false
       return document.assigned && audience === 'case'
     case 'investment-reviewer':
-      // Supplementary financial replies stay closed until T33 delivers them.
-      if (document.category === 'correspondenceAttachment') return false
+      // A correspondence file stays closed until the Secretariat delivers it (T33).
+      if (document.category === 'correspondenceAttachment') {
+        return document.assigned && document.requestFinancialSubmitted === true && document.supplementaryDelivered === true
+      }
       // A generic assignment alone must not open the financial files.
       if (audience === 'financial') return document.assigned && document.requestFinancialSubmitted === true
       return document.assigned && audience === 'case'

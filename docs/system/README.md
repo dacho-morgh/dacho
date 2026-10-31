@@ -36,6 +36,7 @@ Updated: 2026-10-26. This is the English specification for the event, review, in
 | [Financial package](financial-package.md) | T30 versioned submission of the financial files, statement-year coverage and the freeze that follows |
 | [Investment handoff](investment-handoff.md) | T31 automatic handoff to the event's investment person, the scoped queue and dossier, and financial confidentiality |
 | [Investment memo](investment-memo.md) | T32 versioned memo written by the person holding the case and sent to the Secretariat, with no decision controls |
+| [Secretariat follow-up](secretariat-follow-up.md) | T33 queue, supplementary documents delivered to the investment person and the separately published result |
 | [Shared authorization](authorization.md) | T09 seven-role/assignment scope, server-derived actions, CMS/proxy projections and current denials |
 | [Private documents](private-documents.md) | T10 private storage, document policy, access audiences, API contract, migrations and FE07 scope |
 | [Reviewer queue and case file](reviewer-queue.md) | T23 assignment-derived queue, reviewer case file, pinned proposal/RFP files and necessary company profile |

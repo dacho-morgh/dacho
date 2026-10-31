@@ -26,6 +26,8 @@ export interface PrivateDocumentRecord extends PrivateDocumentDto {
   requestStatus: string | null
   requestReviewStage: string | null
   requestCompanyId: string | null
+  /** True once the Secretariat opened this correspondence file to the investment person (T33). */
+  supplementaryDelivered: boolean
   /** True once the company submitted its financial package; its financial files are frozen (T30). */
   requestFinancialSubmitted: boolean
 }
@@ -49,13 +51,15 @@ interface DocumentRow {
   request_review_stage: string | null
   request_company_id: string | null
   request_financial_submitted: boolean
+  supplementary_delivered: boolean
 }
 
 const DOCUMENT_COLUMNS = `
   d.id, d.storage_key, d.category, d.original_filename, d.mime_type, d.size_bytes,
   d.logical_version, d.statement_year, d.request_id, d.company_id, d.uploader_id, d.created_at, d.updated_at,
   r.owner_id AS request_owner_id, r.status::text AS request_status, r.review_stage AS request_review_stage, r.company_id AS request_company_id,
-  ${latestInvitationPackageExists('r.id')} AS request_financial_submitted
+  ${latestInvitationPackageExists('r.id')} AS request_financial_submitted,
+  EXISTS (SELECT 1 FROM dashboard.supplementary_deliveries sd WHERE sd.document_id = d.id) AS supplementary_delivered
 `
 
 const DOCUMENT_FROM = `
@@ -83,6 +87,7 @@ function mapRow(row: DocumentRow): PrivateDocumentRecord {
     requestReviewStage: row.request_review_stage,
     requestCompanyId: row.request_company_id,
     requestFinancialSubmitted: row.request_financial_submitted,
+    supplementaryDelivered: row.supplementary_delivered,
   }
 }
 

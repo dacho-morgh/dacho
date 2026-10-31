@@ -10,6 +10,8 @@ import {
   canDeleteDocuments,
   canUploadDocuments,
   formatDate,
+  type CompanySupplementaryRequestDto,
+  type PublishedResultDto,
   type RequestDetail,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
@@ -52,6 +54,14 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
     )
   }
   const data = result.data
+  const [publishedResult, supplementary] = await Promise.all([
+    serverDashboardFetchResult<{ result: PublishedResultDto | null }>(
+      `/requests/${encodeURIComponent(id)}/result`,
+    ),
+    serverDashboardFetchResult<{ items: CompanySupplementaryRequestDto[] }>(
+      `/requests/${encodeURIComponent(id)}/supplementary-requests`,
+    ),
+  ])
   const canUpload = canUploadDocuments(data.request)
   const canDelete = canDeleteDocuments(data.request)
   // The chief's advancement opens the financial files and closes the proposal.
@@ -82,6 +92,52 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
         <Field label="تاریخ ثبت" value={formatDate(data.request.submissionDate) || 'ثبت نشده'} />
         <Field label="آخرین به‌روزرسانی" value={formatDate(data.request.updatedAt)} />
       </div>
+      {publishedResult.kind !== 'ok' ? (
+        <Typography role="alert" variant="14/regular" color="error">
+          دریافت نتیجه پرونده انجام نشد. صفحه را دوباره بارگذاری کنید.
+        </Typography>
+      ) : publishedResult.data.result ? (
+        <section className="flex flex-col gap-2 rounded-2xl border border-brand-600 bg-white p-6">
+          <Typography as="h2" variant="20/bold" className="text-neutral-900">
+            نتیجه پرونده
+          </Typography>
+          <Typography variant="12/regular" className="text-neutral-500">
+            تاریخ انتشار: {formatDate(publishedResult.data.result.publishedAt)}
+          </Typography>
+          <Typography variant="16/regular" className="whitespace-pre-wrap text-neutral-800">
+            {publishedResult.data.result.body}
+          </Typography>
+        </section>
+      ) : null}
+      {supplementary.kind !== 'ok' ? (
+        <Typography role="alert" variant="14/regular" color="error">
+          دریافت درخواست‌های دبیرخانه انجام نشد. صفحه را دوباره بارگذاری کنید.
+        </Typography>
+      ) : supplementary.data.items.length ? (
+        <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+          <Typography as="h2" variant="20/bold" className="text-neutral-900">
+            مدارک تکمیلی درخواست‌شده
+          </Typography>
+          <ul className="flex flex-col gap-2">
+            {supplementary.data.items.map((item) => (
+              <li key={item.id} className="rounded-lg bg-neutral-50 p-3">
+                <Typography variant="12/regular" className="text-neutral-500">
+                  {formatDate(item.createdAt)}
+                </Typography>
+                <Typography variant="14/regular" className="mt-1 whitespace-pre-wrap text-neutral-800">
+                  {item.body}
+                </Typography>
+              </li>
+            ))}
+          </ul>
+          <PrivateDocumentField
+            category="correspondenceAttachment"
+            label="ارسال مدارک تکمیلی به دبیرخانه"
+            requestId={data.request.id}
+            canUpload
+          />
+        </section>
+      ) : null}
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">
         <Typography as="h2" variant="20/bold" className="text-neutral-900">
           اطلاعات درخواست

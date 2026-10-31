@@ -207,6 +207,89 @@ async function dashboardFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/* ── Secretariat follow-up and published result (T33) ─────────────────── */
+
+export interface PublishedResultDto {
+  body: string
+  publishedAt: string
+}
+
+export interface CompanySupplementaryRequestDto {
+  id: string
+  body: string
+  createdAt: string
+}
+
+export interface FollowUpQueueItemDto {
+  requestId: string
+  trackingCode: string
+  title: string
+  companyName: string | null
+  latestMemoVersion: number
+  latestMemoSentAt: string
+  publishedAt: string | null
+}
+
+export type FollowUpQueueDto = Paginated<FollowUpQueueItemDto>
+
+export interface ResultVersionDto {
+  id: string
+  version: number
+  body: string
+  authorName: string | null
+  createdAt: string
+  publishedByName: string | null
+  publishedAt: string | null
+}
+
+export interface CaseFollowUpDto {
+  stageOpen: boolean
+  canAct: boolean
+  memos: {
+    id: string
+    version: number
+    body: string
+    authorName: string | null
+    sentAt: string | null
+  }[]
+  supplementaryRequests: CompanySupplementaryRequestDto[]
+  files: {
+    id: string
+    filename: string
+    createdAt: string
+    deliveredAt: string | null
+    downloadUrl: string
+  }[]
+  results: ResultVersionDto[]
+  published: PublishedResultDto | null
+}
+
+const postJson = (body: unknown): RequestInit => ({
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+})
+
+export function getCaseFollowUp(id: string): Promise<CaseFollowUpDto> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/follow-up`)
+}
+
+export function requestSupplementaryDocuments(id: string, body: string): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/supplementary-requests`, postJson({ body }))
+}
+
+export function deliverSupplementaryFile(id: string, documentId: string): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/supplementary-files`, postJson({ documentId }))
+}
+
+export function saveResult(id: string, body: string): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/result`, postJson({ body }))
+}
+
+export function publishResult(id: string, version: number): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/result/publish`, postJson({ version }))
+}
+
 export function getStats(): Promise<RequestStats> {
   return dashboardFetch<RequestStats>('/stats')
 }

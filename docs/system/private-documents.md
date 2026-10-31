@@ -57,8 +57,8 @@ role, ownership and active assignment. A document id or URL is never authority.
 | Company dossier (`articlesOfAssociation`, notices, catalogues, certificates) | owning representative, System Owner, Central Secretariat. Chief/reviewer/employer/investment are denied even when assigned to a case |
 | Case (`proposal`) | owning representative, System Owner, Central Secretariat, and an actively assigned chief/reviewer/employer/investment reviewer |
 | Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner and Central Secretariat. The investment person reads them only with an active assignment after the [T31 handoff](investment-handoff.md). Chief, ordinary reviewer and employer reviewer are explicitly denied. The company can upload only after the chief advances the case ([T29](financial-invitation.md)) |
-| Correspondence (`correspondenceAttachment`) | owning representative, System Owner and Central Secretariat. Supplementary financial replies retain the financial audience restrictions, including denying investment access until T33 delivers them |
-| Future workflow (`rfp`, `supplementaryCaseFiles`, `boothPaymentReceipt`) | denied with `422 unsupported_category` until T18/T33/T50 provide the parent workflow |
+| Correspondence (`correspondenceAttachment`) | owning representative, System Owner and Central Secretariat. Supplementary financial replies retain the financial audience restrictions, and the investment person holding the case reads only files the Secretariat delivered ([T33](secretariat-follow-up.md)) |
+| Future workflow (`rfp`, `supplementaryCaseFiles`, `boothPaymentReceipt`) | denied with `422 unsupported_category` until T18/T50 provide the parent workflow. T33 carries supplementary files as correspondence attachments, so `supplementaryCaseFiles` has no workflow |
 
 Uploads: an active representative may add files to its own draft request or own
 company dossier; System Owner and Central Secretariat may add to an authorized
