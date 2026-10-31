@@ -4,7 +4,7 @@ import { Typography } from '@/components/ui/typography'
 import { RequestsListTable } from './requests-list-table'
 import { RequestsStatusFilter } from './requests-status-filter'
 import { RequestsToolbar } from './requests-toolbar'
-import type { RequestItem, RequestStatus } from './types'
+import type { RequestItem, RequestQueueFilters, RequestStatus } from './types'
 
 export interface RequestsListViewProps {
   state?: 'default' | 'loading' | 'empty'
@@ -14,6 +14,10 @@ export interface RequestsListViewProps {
   activeStatus?: RequestStatus | 'all'
   basePath?: string
   retryHref?: string
+  /** Live counts and filters of the status tabs, and the filter form rendered under them. */
+  counts?: Partial<Record<RequestStatus | 'all', number>>
+  filters?: RequestQueueFilters
+  filterForm?: React.ReactNode
   onFilterClick?: () => void
   searchValue?: string
   onSearchChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
@@ -29,6 +33,9 @@ export function RequestsListView({
   activeStatus = 'all',
   basePath = '/dashboard/requests',
   retryHref = basePath,
+  counts,
+  filters,
+  filterForm,
   onFilterClick,
   searchValue,
   onSearchChange,
@@ -46,7 +53,8 @@ export function RequestsListView({
         لیست درخواست ها
       </Typography>
 
-      <RequestsStatusFilter basePath={basePath} active={activeStatus} className="mt-5" />
+      <RequestsStatusFilter basePath={basePath} active={activeStatus} counts={counts} filters={filters} className="mt-5" />
+      {filterForm && <div className="mt-3">{filterForm}</div>}
 
       {(onSearchChange || onFilterClick) && (
         <RequestsToolbar

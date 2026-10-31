@@ -7,6 +7,7 @@ import { FINANCIAL_CHECKLIST, FINANCIAL_CHECKLIST_VERSION, type FinancialCheckli
 import { appendTransition } from './transition-history.js'
 import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 import { lockApprovedVerification } from './verification-repo.js'
+import { requestWorkQueueClause, type RequestWorkQueueFilter } from './work-queues.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
@@ -243,6 +244,33 @@ export function requestScopeClause(scope: RequestScope, params: unknown[], alias
   }
 }
 
+/** Narrowing filters of a scoped list and its counts. None of them can reach outside the row scope. */
+export interface RequestFilters {
+  /** Matches the title and tracking code only, which every reader of the row already sees. */
+  search?: string
+  eventId?: string
+  reviewStage?: ReviewStage
+  queue?: RequestWorkQueueFilter
+}
+
+export function requestFilterClauses(filters: RequestFilters, params: unknown[]): string[] {
+  const clauses: string[] = []
+  if (filters.search) {
+    params.push(`%${filters.search.replace(/[\\%_]/g, '\\$&')}%`)
+    clauses.push(`(r.title ILIKE $${params.length} OR r.tracking_code ILIKE $${params.length})`)
+  }
+  if (filters.eventId) {
+    params.push(filters.eventId)
+    clauses.push(`EXISTS (SELECT 1 FROM dashboard.request_rfps f WHERE f.request_id = r.id AND f.event_id = $${params.length})`)
+  }
+  if (filters.reviewStage) {
+    params.push(filters.reviewStage)
+    clauses.push(`r.review_stage = $${params.length}`)
+  }
+  if (filters.queue) clauses.push(requestWorkQueueClause(filters.queue, params))
+  return clauses
+}
+
 /**
  * Pins the current team, proposal files, answers and agreement acceptance as the
  * immutable snapshot for `request.revision`. Returns the missing fields instead
@@ -436,7 +464,7 @@ export class RequestRepository {
 
   async listScoped(
     scope: RequestScope,
-    options: { status?: string; page: number; limit: number },
+    options: RequestFilters & { status?: string; page: number; limit: number },
   ): Promise<RequestList> {
     const where: string[] = []
     const params: unknown[] = []
@@ -446,6 +474,7 @@ export class RequestRepository {
       params.push(options.status)
       where.push(`r.status = $${params.length}`)
     }
+    where.push(...requestFilterClauses(options, params))
     const whereSql = where.join(' AND ')
     const count = await this.pool.query<{ total: string }>(
       `SELECT COUNT(*) AS total FROM dashboard.requests r WHERE ${whereSql}`,

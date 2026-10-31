@@ -95,7 +95,7 @@ access check.
 | `GET /admin/events`, `GET /admin/events/:id` | internal roles only; System Owner / Central Secretariat all, assigned chief/investment reviewer own event, other internal roles empty/404 |
 | `POST /admin/events`, `PATCH /admin/events/:id` | System Owner only; responsible people must be active and currently hold chief-reviewer / investment-reviewer respectively; registration close must be after open; PATCH requires the current revision and a reason, records an atomic audit entry and returns `409` for a stale revision |
 | `GET /letters`, `GET /letters/:id`, `DELETE /letters/:id` | case letters require current case ownership/assignment and sender-or-recipient participation; deletion additionally requires recipient scope. Non-case personal letters retain sender/recipient scope; all-scope oversight remains explicit |
-| `GET /stats`, `GET /activities` | identical scope as the request list |
+| `GET /stats`, `GET /stats/overview`, `GET /activities` | identical scope as the request list; [queues and filters](work-queues.md) only narrow it |
 | `GET /admin/companies`, `GET /admin/companies/:id` | System Owner / Central Secretariat; explicit projection with no raw user, credential, API key, session or personnel history |
 | `GET /admin/employees` | System Owner / Central Secretariat; id/name/role/active only |
 | `GET /support`, `POST /support`, responses and close | representative's own ticket or System Owner / Central Secretariat |
