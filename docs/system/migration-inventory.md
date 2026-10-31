@@ -27,6 +27,8 @@ T30 adds the nullable `dashboard.private_documents.statement_year` and creates `
 
 T31 adds no schema in `1780511400032_investment_handoff`. Its only data change hands off packages already submitted: it revokes other active investment grants on those cases and adds a system assignment for the event's responsible person, with no history row. Its rollback revokes those system assignments and keeps hand-made grants. See [investment handoff](investment-handoff.md).
 
+T32 creates `dashboard.investment_memos` in `1780511400033_investment_memos`. It rewrites no existing rows. Its rollback drops the table, so any memo is lost. See [investment memo](investment-memo.md).
+
 T08 preserves legacy assignments, quarantines ambiguous accounts and requires explicit owner mapping; see [personnel foundation](personnel-foundation.md). Existing editorial privilege is independent of operational authority. No real accounts have been mapped by this implementation.
 
 T09/T10 add only additive backend tables: `dashboard.case_assignments` (with an

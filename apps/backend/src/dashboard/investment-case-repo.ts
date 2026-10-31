@@ -61,7 +61,7 @@ interface CaseRow {
  * One row per case the actor holds. The inner join to the latest invitation's package
  * is the handoff gate: an assignment without a package yields nothing here.
  */
-const CASE_ROWS_SQL = `
+export const CASE_ROWS_SQL = `
   SELECT r.id AS request_id, r.tracking_code, r.title, r.status, r.review_stage,
          e.id AS event_id, e.title AS event_title, s.id AS subtopic_id, s.title AS subtopic_title,
          v.snapshot -> 'company' ->> 'name' AS company_name,

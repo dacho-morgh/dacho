@@ -13,6 +13,8 @@ export const TRANSITION_TITLES: Record<string, string> = {
   chief_review_reject: 'رد درخواست پس از داوری',
   financial_package_submit: 'ارسال بسته مالی',
   investment_handoff: 'ارجاع پرونده به مسئول سرمایه‌گذاری',
+  investment_memo_save: 'ثبت یادداشت سرمایه‌گذاری',
+  investment_memo_send: 'ارسال یادداشت سرمایه‌گذاری به دبیرخانه',
   chief_replace_reviewer: 'جایگزینی داور',
   owner_replace_employer: 'جایگزینی کارفرما توسط صاحب سیستم',
   owner_reopen: 'بازگشایی درخواست توسط صاحب سیستم',

@@ -80,11 +80,11 @@ export const OVERSIGHT_ONLY_ACTIONS = [
   'review_round_complete',
 ] as const
 
-/** Package status belongs to the financial audience: chiefs, reviewers and employers do not see it (T31). */
-export const FINANCIAL_ONLY_ACTIONS = ['financial_package_submit', 'investment_handoff'] as const
+/** The handoff and the memo are internal: the company sees its own submission, not what follows it (T31, T32). */
+const INTERNAL_FINANCIAL_ACTIONS = ['investment_handoff', 'investment_memo_save', 'investment_memo_send'] as const
 
-/** The handoff is internal: the company sees its own submission, not who holds the case next. */
-const INTERNAL_FINANCIAL_ACTIONS = ['investment_handoff'] as const
+/** Package status belongs to the financial audience: chiefs, reviewers and employers do not see it (T31). */
+export const FINANCIAL_ONLY_ACTIONS = ['financial_package_submit', ...INTERNAL_FINANCIAL_ACTIONS] as const
 
 function hiddenActions(scope: RequestScope): readonly string[] {
   if (scope.kind === 'all') return []

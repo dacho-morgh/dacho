@@ -143,7 +143,8 @@ absent or denied rather than stubbed permissively:
   backend, as documented in [exhibition booth catalogue](exhibition-booth-catalogue.md).
 - Application revisions, triage, review rounds, four evaluations, replacement
   and chief decisions (T19–T28).
-- Investment memo and publication (T32–T33). Financial files open to the
+- Publication (T33). The [investment memo (T32)](investment-memo.md) is
+  implemented on its own routes. Financial files open to the
   investment person only with an active assignment after the
   [T31 handoff](investment-handoff.md); a generic assignment alone stays denied.
 - Correspondence attachment workflow and booth receipts (T35, T50).

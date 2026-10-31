@@ -63,6 +63,7 @@ import { DocumentRepository, type PrivateDocumentRecord } from '../documents/rep
 import { canSendLetter } from './letter-policy.js'
 import { FinancialPackageRepository } from './financial-package-repo.js'
 import { InvestmentCaseRepository } from './investment-case-repo.js'
+import { InvestmentMemoRepository, MAX_MEMO_LENGTH, type InvestmentMemoDto } from './investment-memo-repo.js'
 import { statementYearPlan } from './financial-package.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
@@ -436,6 +437,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const rounds = new ReviewRoundRepository(deps.pool)
   const financialPackages = new FinancialPackageRepository(deps.pool)
   const investmentCases = new InvestmentCaseRepository(deps.pool)
+  const investmentMemos = new InvestmentMemoRepository(deps.pool)
   const reviewCases = new ReviewCaseRepository(deps.pool)
   const evaluations =
     deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool)
@@ -1339,7 +1341,114 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
           })),
         },
         evaluations: reviews,
+        memos: await investmentMemos.listForHolder(actor.id, found.requestId),
       })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Investment memo (T32) ─────────────────────────────────────────── */
+
+  const withAuthorNames = async <T extends InvestmentMemoDto>(memos: T[]) => {
+    const names = await resolveRequesterNames(deps.userStore, memos.map((memo) => memo.authorId))
+    return memos.map((memo) => ({ ...memo, authorName: names.get(memo.authorId) ?? null }))
+  }
+
+  /** The person holding the case saves a new version of the memo. Nothing here decides the case. */
+  router.post('/investment/cases/:id/memo', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
+      if (!body || body.length > MAX_MEMO_LENGTH) {
+        res.status(400).json({ error: 'invalid_memo', maxLength: MAX_MEMO_LENGTH })
+        return
+      }
+      const result = await investmentMemos.save({ requestId: req.params.id, actorId: actor.id, body })
+      switch (result.status) {
+        case 'saved':
+          res.status(201).json({ memo: result.memo })
+          return
+        case 'unchanged':
+          res.json({ memo: result.memo })
+          return
+        case 'stage_closed':
+          res.status(409).json({ error: 'investment_stage_closed' })
+          return
+        case 'not_found':
+          res.status(404).json({ error: 'not_found' })
+          return
+      }
+    } catch (error) { next(error) }
+  })
+
+  /** Sends the holder's latest version to the Secretariat. A repeated send returns the version already sent. */
+  router.post('/investment/cases/:id/memo/send', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const version = req.body?.version
+      if (!Number.isSafeInteger(version) || version < 1) {
+        res.status(400).json({ error: 'invalid_memo_version' })
+        return
+      }
+      const result = await investmentMemos.send({ requestId: req.params.id, actorId: actor.id, version })
+      switch (result.status) {
+        case 'sent':
+        case 'already_sent':
+          res.json({ memo: result.memo })
+          return
+        case 'stale_version':
+          res.status(409).json({ error: 'memo_version_stale' })
+          return
+        case 'stage_closed':
+          res.status(409).json({ error: 'investment_stage_closed' })
+          return
+        case 'not_found':
+          res.status(404).json({ error: 'not_found' })
+          return
+      }
+    } catch (error) { next(error) }
+  })
+
+  /** The Secretariat's inbox of sent memos, also open to the owner. */
+  router.get('/investment/memos', async (req, res, next) => {
+    try {
+      const role = actorOf(res).operationalRole
+      if (role !== 'central-secretariat' && role !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const list = await investmentMemos.listSent({
+        page: Math.min(parsePositiveInt(req.query.page, 1), 1_000_000),
+        limit: Math.min(parsePositiveInt(req.query.limit, 25), 100),
+      })
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ ...list, items: await withAuthorNames(list.items) })
+    } catch (error) { next(error) }
+  })
+
+  /** One case's memos: sent versions for the Secretariat, every version for the owner. */
+  router.get('/requests/:id/investment-memos', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role !== 'central-secretariat' && role !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const memos = await investmentMemos.listForRequest(request.id, { includeDrafts: role === 'system-owner' })
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ items: await withAuthorNames(memos) })
     } catch (error) { next(error) }
   })
 
