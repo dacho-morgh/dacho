@@ -80,20 +80,28 @@ export const OVERSIGHT_ONLY_ACTIONS = [
   'review_round_complete',
 ] as const
 
-/** The handoff and the memo are internal: the company sees its own submission, not what follows it (T31, T32). */
-const INTERNAL_FINANCIAL_ACTIONS = ['investment_handoff', 'investment_memo_save', 'investment_memo_send'] as const
+/** A draft of the result text stays with the Secretariat and the owner until it is published (T33). */
+const RESULT_DRAFT_ACTIONS = ['result_save'] as const
 
-/** Package status belongs to the financial audience: chiefs, reviewers and employers do not see it (T31). */
-export const FINANCIAL_ONLY_ACTIONS = ['financial_package_submit', ...INTERNAL_FINANCIAL_ACTIONS] as const
+/** The handoff, the memo and the delivery are internal: the company sees its own submission, not what follows it (T31-T33). */
+const INTERNAL_FINANCIAL_ACTIONS = [
+  'investment_handoff',
+  'investment_memo_save',
+  'investment_memo_send',
+  'supplementary_delivery',
+] as const
+
+/** Package status and follow-up belong to the financial audience: chiefs, reviewers and employers do not see them (T31, T33). */
+export const FINANCIAL_ONLY_ACTIONS = ['financial_package_submit', 'supplementary_request', ...INTERNAL_FINANCIAL_ACTIONS] as const
 
 function hiddenActions(scope: RequestScope): readonly string[] {
   if (scope.kind === 'all') return []
   if (scope.kind === 'assigned') {
-    if (scope.role === 'chief-reviewer') return FINANCIAL_ONLY_ACTIONS
-    if (scope.role === 'investment-reviewer') return OVERSIGHT_ONLY_ACTIONS
-    return [...OVERSIGHT_ONLY_ACTIONS, ...FINANCIAL_ONLY_ACTIONS]
+    if (scope.role === 'chief-reviewer') return [...RESULT_DRAFT_ACTIONS, ...FINANCIAL_ONLY_ACTIONS]
+    if (scope.role === 'investment-reviewer') return [...RESULT_DRAFT_ACTIONS, ...OVERSIGHT_ONLY_ACTIONS]
+    return [...RESULT_DRAFT_ACTIONS, ...OVERSIGHT_ONLY_ACTIONS, ...FINANCIAL_ONLY_ACTIONS]
   }
-  return [...OVERSIGHT_ONLY_ACTIONS, ...INTERNAL_FINANCIAL_ACTIONS]
+  return [...RESULT_DRAFT_ACTIONS, ...OVERSIGHT_ONLY_ACTIONS, ...INTERNAL_FINANCIAL_ACTIONS]
 }
 
 function oversightOnlyClause(scope: RequestScope): string {

@@ -1,6 +1,6 @@
 # Investment handoff and dossier (T31 / #47)
 
-Backend slice that hands a submitted [financial package (T30)](financial-package.md) to the event's investment person. Human acceptance (UAT23) has not been run, and the screens (FE19, FE20, FE30) are not built. The memo is [T32](investment-memo.md); correspondence is T34; supplementary files are T33.
+Backend slice that hands a submitted [financial package (T30)](financial-package.md) to the event's investment person. Human acceptance (UAT23) has not been run, and the screens (FE19, FE20, FE30) are not built. The memo is [T32](investment-memo.md); correspondence is T34; supplementary files are in [follow-up and publication (T33)](secretariat-follow-up.md).
 
 ## The handoff
 
@@ -58,4 +58,4 @@ Revoking the assignment, deactivating the account or changing its role ends acce
 
 ## Not in this slice
 
-The [memo (T32)](investment-memo.md), correspondence with the investment person (T34), supplementary files (T33), the screens (FE19, FE20, FE30), a notification to the investment person when a case arrives, and a dedicated reassign command.
+The [memo (T32)](investment-memo.md), correspondence with the investment person (T34), supplementary files, covered by [follow-up and publication (T33)](secretariat-follow-up.md), the screens (FE19, FE20, FE30), a notification to the investment person when a case arrives, and a dedicated reassign command.

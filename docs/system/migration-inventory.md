@@ -29,6 +29,8 @@ T31 adds no schema in `1780511400032_investment_handoff`. Its only data change h
 
 T32 creates `dashboard.investment_memos` in `1780511400033_investment_memos`. It rewrites no existing rows. Its rollback drops the table, so any memo is lost. See [investment memo](investment-memo.md).
 
+T33 creates `dashboard.supplementary_requests`, `dashboard.supplementary_deliveries` and `dashboard.published_results` in `1780511400034_secretariat_follow_up`. It rewrites no existing rows. Its rollback drops the three tables, so requests, deliveries and published texts are lost. See [Secretariat follow-up](secretariat-follow-up.md).
+
 T08 preserves legacy assignments, quarantines ambiguous accounts and requires explicit owner mapping; see [personnel foundation](personnel-foundation.md). Existing editorial privilege is independent of operational authority. No real accounts have been mapped by this implementation.
 
 T09/T10 add only additive backend tables: `dashboard.case_assignments` (with an

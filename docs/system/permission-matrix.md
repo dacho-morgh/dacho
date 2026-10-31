@@ -12,6 +12,8 @@ Implementation update (T31): the [investment handoff](investment-handoff.md) sup
 
 Implementation update (T32): the [investment memo](investment-memo.md) implements the memo row below. The Secretariat reads sent versions only; drafts stay with their author and the owner.
 
+Implementation update (T33): [follow-up and publication](secretariat-follow-up.md) implements the published-outcome row. The Secretariat alone publishes; the company and assigned staff read only the published text. The owner's administrative override is not implemented, so the owner reads and does not publish.
+
 ## Decision rules
 
 One person has exactly one **operational** role: System Owner (O), Central Secretariat (S), Chief Reviewer (C), Reviewer (R), Employer Reviewer (E), Investment Reviewer (I), or Company Representative (P). `editor` is a separate CMS content privilege, not an operational workflow role; preserve existing editorial access during migration without making an editor a reviewer or owner. **Proposed technical mapping:** an account may retain editorial privilege alongside its one operational role, but operational authority must never be inferred from editorial privilege. Each existing `admin` account requires explicit review and mapping to the appropriate new role; do not automatically grant O to every legacy admin.

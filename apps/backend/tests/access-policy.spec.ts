@@ -260,6 +260,8 @@ describe('document read authority', () => {
     }
     // Company dossier files and correspondence do not follow the handoff.
     expect(canReadDocument('investment-reviewer', { ...handedOff, category: 'articlesOfAssociation' }, 'i1', null)).toBe(false)
+    expect(canReadDocument('investment-reviewer', { ...handedOff, category: 'correspondenceAttachment', supplementaryDelivered: true }, 'i1', null)).toBe(true)
+    expect(canReadDocument('investment-reviewer', { ...handedOff, assigned: false, category: 'correspondenceAttachment', supplementaryDelivered: true }, 'i1', null)).toBe(false)
     expect(canReadDocument('investment-reviewer', { ...handedOff, category: 'correspondenceAttachment' }, 'i1', null)).toBe(false)
   })
 

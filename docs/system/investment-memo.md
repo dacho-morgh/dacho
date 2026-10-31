@@ -1,6 +1,6 @@
 # Investment memo (T32 / #48)
 
-Backend slice that lets the person holding a [handed-off case (T31)](investment-handoff.md) write a memo and send it to the Secretariat. Human acceptance (UAT24) has not been run, and the screen (FE20) is not built. What the Secretariat does with a memo, including publication, is [T33](../event-review-system-plan.md).
+Backend slice that lets the person holding a [handed-off case (T31)](investment-handoff.md) write a memo and send it to the Secretariat. Human acceptance (UAT24) has not been run, and the screen (FE20) is not built. What the Secretariat does with a memo is [follow-up and publication (T33)](secretariat-follow-up.md).
 
 ## The memo
 
@@ -51,4 +51,4 @@ The history rows hold no memo text. A new holder does not read the previous hold
 
 ## Not in this slice
 
-The screen (FE20), a notification to the Secretariat when a memo arrives, and everything after receipt: supplementary documents and publication (T33).
+The screen (FE20), a notification to the Secretariat when a memo arrives, and everything after receipt, which is [follow-up and publication (T33)](secretariat-follow-up.md).
