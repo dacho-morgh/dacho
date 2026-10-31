@@ -10,6 +10,22 @@ import type { RequestItem } from '@/components/dashboard/requests/types'
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 export type LetterType = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
+/** Server-derived per role and stage; a control appears only for an action listed here. */
+export type RequestAction =
+  | 'read'
+  | 'submit'
+  | 'correct'
+  | 'assign'
+  | 'reopen'
+  | 'triage'
+  | 'startReview'
+  | 'replaceReviewer'
+  | 'replaceEmployer'
+  | 'decideReview'
+  | 'submitFinancialPackage'
+  | 'uploadDocument'
+  | 'deleteDocument'
+
 export interface RequestDto {
   id: string
   trackingCode: string
@@ -20,6 +36,7 @@ export interface RequestDto {
   ownerId: string
   status: RequestStatus
   reviewStage?: string | null
+  revision?: number
   currentStepIndex: number
   assignedRole: string | null
   currentStep: string | null
@@ -29,7 +46,7 @@ export interface RequestDto {
   submittedBy?: string | null
   createdAt: string
   updatedAt: string
-  allowedActions?: ('read' | 'submit' | 'assign' | 'uploadDocument' | 'deleteDocument')[]
+  allowedActions?: RequestAction[]
 }
 
 export interface LetterDto {
@@ -303,6 +320,96 @@ export function publishResult(id: string, version: number): Promise<unknown> {
   return dashboardFetch(`/requests/${encodeURIComponent(id)}/result/publish`, postJson({ version }))
 }
 
+/* ── Role actions on the shared dossier (T21, T22, T28, T32) ──────────── */
+
+export type TriageAction = 'accept' | 'return' | 'reject'
+export type ReviewDecisionAction = 'advance' | 'return' | 'reject'
+
+const decisionBody = (action: string, reason: string, expectedRevision?: number) => ({
+  action,
+  ...(reason ? { reason } : {}),
+  ...(expectedRevision ? { expectedRevision } : {}),
+})
+
+export function decideTriage(id: string, action: TriageAction, reason: string, expectedRevision?: number): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/triage`, postJson(decisionBody(action, reason, expectedRevision)))
+}
+
+export function decideReview(id: string, action: ReviewDecisionAction, reason: string, expectedRevision?: number): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/review-decision`, postJson(decisionBody(action, reason, expectedRevision)))
+}
+
+export function reopenRequest(id: string, reason: string, expectedRevision?: number): Promise<unknown> {
+  return dashboardFetch(
+    `/admin/requests/${encodeURIComponent(id)}/reopen`,
+    postJson({ reason, ...(expectedRevision ? { expectedRevision } : {}) }),
+  )
+}
+
+export interface ReviewCandidatesDto {
+  items: { id: string; name: string | null }[]
+  employerId: string | null
+}
+
+export function getReviewCandidates(id: string): Promise<ReviewCandidatesDto> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/review-round/candidates`)
+}
+
+export function startReviewRound(id: string, reviewerIds: string[], expectedRevision?: number): Promise<unknown> {
+  return dashboardFetch(
+    `/requests/${encodeURIComponent(id)}/review-round`,
+    postJson({ reviewerIds, ...(expectedRevision ? { expectedRevision } : {}) }),
+  )
+}
+
+/** Oversight's view of the latest round; progress only, without who holds a slot. */
+export interface ReviewRoundDto {
+  id: string
+  requestRevision: number
+  proposalRevision: number
+  startedAt: string
+  completion: { required: number; finalized: number; ready: boolean; completedAt: string | null }
+  decision: { action: ReviewDecisionAction; decidedAt: string; reason: string | null } | null
+}
+
+/** Unfinished evaluations reach oversight without scores or answers. */
+export interface EvaluationSummaryDto {
+  id: string
+  variant: 'ordinary' | 'employer'
+  state: 'draft' | 'final'
+  scoreA?: number
+  scoreB?: number
+  scoreC?: number
+  weightedHundredths?: number
+  finalizedAt: string | null
+}
+
+export interface EvaluationListDto {
+  items: EvaluationSummaryDto[]
+  completedCount: number
+  requiredCount: number
+}
+
+export interface InvestmentMemoDto {
+  id: string
+  version: number
+  body: string
+  createdAt: string
+  sentAt: string | null
+}
+
+export function listInvestmentMemos(id: string): Promise<{ memos: InvestmentMemoDto[] }> {
+  return dashboardFetch(`/investment/cases/${encodeURIComponent(id)}`)
+}
+
+export function saveInvestmentMemo(id: string, body: string): Promise<unknown> {
+  return dashboardFetch(`/investment/cases/${encodeURIComponent(id)}/memo`, postJson({ body }))
+}
+
+export function sendInvestmentMemo(id: string, version: number): Promise<unknown> {
+  return dashboardFetch(`/investment/cases/${encodeURIComponent(id)}/memo/send`, postJson({ version }))
+}
+
 export function getStats(): Promise<RequestStats> {
   return dashboardFetch<RequestStats>('/stats')
 }
@@ -324,6 +431,8 @@ export interface RequestDetail {
   request: RequestDto
   timeline: ActivityDto[]
   workflow: { title: string; role: string; roleName: string; order: number }[]
+  /** Absent for reviewers and employers, who are not told whose case it is. */
+  owner?: { id: string; name: string | null } | null
 }
 
 export function getRequest(id: string): Promise<RequestDetail> {

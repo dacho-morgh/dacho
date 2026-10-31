@@ -1,11 +1,8 @@
 import { redirect } from 'next/navigation'
 
 /**
- * The review-evaluation workflow (rounds, four assignments and the fixed
- * rubric) is not implemented yet. The shared authorization response does not
- * advertise an evaluation action, so this stale route must not present a form
- * whose backend command does not exist. It returns to the authorized dossier;
- * T24/T25 will replace it when the review workflow is delivered.
+ * The fixed evaluation form belongs to FE17 and does not exist yet. This old address
+ * must not present a form without a command behind it, so it returns to the dossier.
  */
 export default async function EvaluationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

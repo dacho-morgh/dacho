@@ -42,6 +42,8 @@ export interface PrivateDocumentFieldProps {
   disabled?: boolean
   canUpload?: boolean
   canDelete?: boolean
+  /** For a role that only reads: no upload control or upload guidance at all. */
+  readOnly?: boolean
   onPendingChange?: (pending: boolean) => void
   onReadyChange?: (ready: boolean) => void
   onDocumentsChange?: (documents: PrivateDocumentDto[]) => void
@@ -64,6 +66,7 @@ export function PrivateDocumentField({
   disabled = false,
   canUpload = true,
   canDelete = false,
+  readOnly = false,
   onPendingChange,
   onReadyChange,
   onDocumentsChange,
@@ -250,9 +253,11 @@ export function PrivateDocumentField({
           {label ?? documentCategoryLabel(category)}
           {required ? <span className="text-error-500"> *</span> : null}
         </Typography>
-        <Typography variant="12/regular" color="neutral-500">
-          {DOCUMENT_FORMATS_MESSAGE} · {DOCUMENT_SIZE_MESSAGE}
-        </Typography>
+        {readOnly ? null : (
+          <Typography variant="12/regular" color="neutral-500">
+            {DOCUMENT_FORMATS_MESSAGE} · {DOCUMENT_SIZE_MESSAGE}
+          </Typography>
+        )}
       </div>
 
       {description ? (
@@ -260,9 +265,11 @@ export function PrivateDocumentField({
           {description}
         </Typography>
       ) : null}
-      <Typography variant="12/light" color="neutral-400">
-        امکان بارگذاری چند فایل در همین فیلد وجود دارد؛ هر فایل جداگانه اعتبارسنجی می‌شود.
-      </Typography>
+      {readOnly ? null : (
+        <Typography variant="12/light" color="neutral-400">
+          امکان بارگذاری چند فایل در همین فیلد وجود دارد؛ هر فایل جداگانه اعتبارسنجی می‌شود.
+        </Typography>
+      )}
 
       {sessionExpired ? (
         <Typography role="alert" variant="14/regular" color="error" className="rounded-lg bg-error-50 p-3">
@@ -375,7 +382,7 @@ export function PrivateDocumentField({
         </ul>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
+      {readOnly ? null : <div className="flex flex-wrap items-center gap-2">
         <input
           ref={inputRef}
           id={inputId}
@@ -407,7 +414,7 @@ export function PrivateDocumentField({
               : 'در وضعیت فعلی امکان افزودن مدرک نیست.'}
           </Typography>
         ) : null}
-      </div>
+      </div>}
 
       {pending ? (
         <Typography role="status" variant="12/regular" color="neutral-500">

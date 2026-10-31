@@ -1,3 +1,5 @@
+import type { RequestAction } from '@/utilities/dashboard-api'
+
 export const REQUEST_STATUS_VALUES: RequestStatus[] = [
   'draft',
   'in_review',
@@ -83,12 +85,7 @@ export function requestQueueHref(
 
 export type RequestStatus = 'in_review' | 'action_needed' | 'rejected' | 'draft' | 'approved'
 
-export type RequestAllowedAction =
-  | 'read'
-  | 'submit'
-  | 'assign'
-  | 'uploadDocument'
-  | 'deleteDocument'
+export type RequestAllowedAction = RequestAction
 
 export interface RequestItem {
   id: string
