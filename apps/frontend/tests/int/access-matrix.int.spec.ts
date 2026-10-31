@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { GRAPHQL_POST } from '@payloadcms/next/routes'
 import { NextRequest } from 'next/server'
 import { getPayload, handleEndpoints, type Payload } from 'payload'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { GET as proxyGet, POST as proxyPost } from '@/app/(frontend)/api/dashboard/[...path]/route'
+import { POST as graphqlPost } from '@/app/(payload)/api/graphql/route'
 import config from '@/payload.config'
 
 // T42: seven roles against their own company, another company and a company they hold
@@ -56,28 +56,21 @@ const rest = (path: string, seat?: Seat, method = 'GET', body?: unknown) =>
     }),
   })
 
-type GraphqlAnswer = { data?: Record<string, { id?: number; docs?: { id: number }[] } | null>; errors?: unknown[] }
-
-// Payload cannot build the GraphQL schema today: a Persian select option is not a valid
-// enum name, so the endpoint serves nobody. That closes it for now, and these checks still
-// hold if the schema is ever repaired.
-const graphql = async (query: string, seat?: Seat): Promise<GraphqlAnswer> => {
-  try {
-    const res = await GRAPHQL_POST(config)(
-      new Request('http://localhost/api/graphql', {
-        method: 'POST',
-        headers: {
-          ...(seat ? { Authorization: `users API-Key ${keys[seat]}` } : {}),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query }),
-      }),
-    )
-    return (await res.json()) as GraphqlAnswer
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Names must only contain')) return { errors: [error.message] }
-    throw error
-  }
+// GraphQL is disabled in the Payload config, so the real route answers 404 with no body
+// for everyone, before it reads the query or builds a schema.
+const expectGraphqlClosed = async (query: string, seat?: Seat) => {
+  const res = await graphqlPost(
+    new Request('http://localhost/api/graphql', {
+      method: 'POST',
+      headers: {
+        ...(seat ? { Authorization: `users API-Key ${keys[seat]}` } : {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    }),
+  )
+  expect(res.status, String(seat)).toBe(404)
+  expect(await res.text(), String(seat)).toBe('')
 }
 
 const docIds = async (res: Response) => ((await res.json()) as { docs: { id: number }[] }).docs.map((doc) => doc.id)
@@ -148,13 +141,9 @@ describe('T42: seven-role CMS and proxy access (int)', () => {
         expect(listed.includes(company.other)).toBe(readOther(seat))
       })
 
-      it(`${seat}: GraphQL holds no record outside the same scope`, async () => {
-        const detail = await graphql(`{ Company(id: ${company.own}) { id economicCode } }`, seat)
-        if (!readOwn(seat)) expect(detail.data?.Company ?? null).toBeNull()
-        const list = await graphql('{ Companies(limit: 1000) { docs { id } } }', seat)
-        const listed = list.data?.Companies?.docs?.map((doc) => doc.id) ?? []
-        if (!readOwn(seat)) expect(listed).not.toContain(company.own)
-        if (!readOther(seat)) expect(listed).not.toContain(company.other)
+      it(`${seat}: GraphQL is closed`, async () => {
+        await expectGraphqlClosed(`{ Company(id: ${company.own}) { id economicCode } }`, seat)
+        await expectGraphqlClosed('{ Companies(limit: 1000) { docs { id } } }', seat)
       })
 
       it(`${seat}: Local API acting for the user holds the same records`, async () => {
@@ -172,7 +161,7 @@ describe('T42: seven-role CMS and proxy access (int)', () => {
       for (const seat of [undefined, 'inactive'] as const) {
         expect((await rest(`companies/${company.own}`, seat)).status, String(seat)).not.toBe(200)
         expect(await listedIds(await rest('companies?depth=0&limit=1000', seat))).toEqual([])
-        expect((await graphql(`{ Company(id: ${company.own}) { id } }`, seat)).data?.Company ?? null).toBeNull()
+        await expectGraphqlClosed(`{ Company(id: ${company.own}) { id } }`, seat)
       }
     })
 
@@ -227,7 +216,7 @@ describe('T42: seven-role CMS and proxy access (int)', () => {
       it(`${role}: cannot promote itself or another person`, async () => {
         await rest(`users/${ids[role]}`, role, 'PATCH', { operationalRole: role === 'owner' ? undefined : 'system-owner', backendService: true })
         await rest(`users/${ids.reviewer}`, role === 'owner' ? 'secretariat' : role, 'PATCH', { operationalRole: 'system-owner', isActive: false })
-        await graphql(`mutation { updateUser(id: ${ids.reviewer}, data: { isActive: false }) { id } }`, role === 'owner' ? 'secretariat' : role)
+        await expectGraphqlClosed(`mutation { updateUser(id: ${ids.reviewer}, data: { isActive: false }) { id } }`, role)
         const self = await payload.findByID({ collection: 'users', id: ids[role], depth: 0 })
         expect(self.operationalRole).toBe(OPERATIONAL[role])
         expect(Boolean(self.backendService)).toBe(false)
