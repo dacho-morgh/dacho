@@ -1,7 +1,7 @@
 import { Client } from 'pg'
 import { collectMigrationInventory } from './migration-inventory.js'
 
-// ponytail: aggregate counts only; sanitized role/mapping audits need separately reviewed queries.
+// Aggregate table counts only; `pnpm reconciliation` reports role and case dispositions.
 if (!process.env.DATABASE_URL || process.env.INVENTORY_ACK !== 'read-only-inventory') {
   console.error('DATABASE_URL and INVENTORY_ACK=read-only-inventory are required; use a sanitized disposable copy and a least-privilege read-only account.')
   process.exitCode = 1

@@ -66,6 +66,8 @@ switch ($Action) {
   'Backend' {
     Set-IsolatedEnvironment
     Assert-Ready
+    # The migration rehearsal runs pg_dump/pg_restore inside this container only.
+    $env:PHASE0_PG_CONTAINER = (& docker compose -f $compose -p dacho-phase0-test ps -q postgres).Trim()
     & pnpm --filter @dacho/backend test:int
     if ($LASTEXITCODE -ne 0) { throw 'Backend integration suite failed.' }
   }
