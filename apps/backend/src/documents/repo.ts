@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
 
+import { latestInvitationPackageExists } from '../dashboard/financial-package-repo.js'
 import { isUuid } from '../db/uuid.js'
 import type { DocumentCategory } from './policy.js'
 
@@ -54,7 +55,7 @@ const DOCUMENT_COLUMNS = `
   d.id, d.storage_key, d.category, d.original_filename, d.mime_type, d.size_bytes,
   d.logical_version, d.statement_year, d.request_id, d.company_id, d.uploader_id, d.created_at, d.updated_at,
   r.owner_id AS request_owner_id, r.status::text AS request_status, r.review_stage AS request_review_stage, r.company_id AS request_company_id,
-  EXISTS (SELECT 1 FROM dashboard.financial_packages fp WHERE fp.request_id = r.id) AS request_financial_submitted
+  ${latestInvitationPackageExists('r.id')} AS request_financial_submitted
 `
 
 const DOCUMENT_FROM = `

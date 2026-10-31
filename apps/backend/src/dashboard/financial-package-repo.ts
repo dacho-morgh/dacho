@@ -48,17 +48,34 @@ function mapPackage(row: PackageRow): FinancialPackageDto {
   }
 }
 
+/**
+ * True when the case's latest invitation holds a package. The invitation is one per
+ * advancement, so a package of an earlier one does not freeze a later stage (T30).
+ * `requestRef` is a trusted SQL expression, never user input.
+ */
+export function latestInvitationPackageExists(requestRef: string): string {
+  return `EXISTS (
+    SELECT 1 FROM dashboard.financial_packages fp
+    WHERE fp.invitation_id = (
+      SELECT fi.id FROM dashboard.financial_invitations fi
+      WHERE fi.request_id = ${requestRef}
+      ORDER BY fi.request_revision DESC LIMIT 1
+    )
+  )`
+}
+
 export class FinancialPackageRepository {
   constructor(private readonly pool: Pool) {}
 
   /**
    * Read in its own statement, so a wait for the request lock sees a package that
-   * committed meanwhile. Upload and delete call it after taking that lock.
+   * committed meanwhile. Upload and delete call it after taking that lock. Only a
+   * package of the case's latest invitation freezes the files, matching submit.
    */
   async isSubmitted(requestId: string, client: Pool | PoolClient = this.pool): Promise<boolean> {
     if (!isUuid(requestId)) return false
     const { rows } = await client.query<{ submitted: boolean }>(
-      'SELECT EXISTS (SELECT 1 FROM dashboard.financial_packages WHERE request_id = $1) AS submitted',
+      `SELECT ${latestInvitationPackageExists('$1::uuid')} AS submitted`,
       [requestId],
     )
     return rows[0]?.submitted === true
@@ -68,7 +85,8 @@ export class FinancialPackageRepository {
     const valid = requestIds.filter(isUuid)
     if (valid.length === 0) return new Set()
     const { rows } = await this.pool.query<{ request_id: string }>(
-      'SELECT DISTINCT request_id FROM dashboard.financial_packages WHERE request_id = ANY($1::uuid[])',
+      `SELECT ids.request_id FROM unnest($1::uuid[]) AS ids(request_id)
+       WHERE ${latestInvitationPackageExists('ids.request_id')}`,
       [valid],
     )
     return new Set(rows.map((row) => row.request_id))

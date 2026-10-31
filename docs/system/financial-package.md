@@ -28,7 +28,7 @@ Absence of a category or a year is not a waiver. The product has not approved an
 
 ## Freeze
 
-Submission runs under the lock on the request row, the same lock an upload or delete takes. A file therefore cannot land between the check and the snapshot. After a package exists:
+Submission runs under the lock on the request row, the same lock an upload or delete takes. A file therefore cannot land between the check and the snapshot. After a package exists for the case's latest invitation (a package of an earlier invitation does not freeze a later stage):
 
 - Financial uploads return `404`, as for any denied upload.
 - Financial deletes return `403`.
