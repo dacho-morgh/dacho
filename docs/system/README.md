@@ -40,6 +40,7 @@ Updated: 2026-10-26. This is the English specification for the event, review, in
 | [Shared authorization](authorization.md) | T09 seven-role/assignment scope, server-derived actions, CMS/proxy projections and current denials |
 | [Private documents](private-documents.md) | T10 private storage, document policy, access audiences, API contract, migrations and FE07 scope |
 | [Reviewer queue and case file](reviewer-queue.md) | T23 assignment-derived queue, reviewer case file, pinned proposal/RFP files and necessary company profile |
+| [Scoped queues and overview](work-queues.md) | T38 each role's state-derived work queues, counts equal to their lists, and search and filters inside the row scope |
 
 ## Reading and execution order
 

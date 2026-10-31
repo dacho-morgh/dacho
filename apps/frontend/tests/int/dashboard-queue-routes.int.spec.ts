@@ -101,6 +101,7 @@ it.each(['list', 'detail'])(
         ? { id: 'reviewer-1', operationalRole: 'reviewer', isActive: true }
         : null,
     }))
+    backend.fetch.mockResolvedValue({ kind: 'unavailable' })
     const view =
       route === 'list'
         ? await RequestsPage({ searchParams: Promise.resolve({}) })
@@ -109,6 +110,7 @@ it.each(['list', 'detail'])(
     expect(
       screen.getByText(route === 'list' ? 'Internal request queue' : 'Internal request detail'),
     ).toBeTruthy()
-    expect(backend.fetch).not.toHaveBeenCalled()
+    // The applicant queue stays unread; the internal list loads its own rows in the browser.
+    expect(backend.fetch.mock.calls.filter(([path]) => String(path).startsWith('/requests'))).toEqual([])
   },
 )

@@ -2,7 +2,7 @@ import React from 'react'
 import Link from 'next/link'
 
 import { Typography } from '@/components/ui/typography'
-import type { RequestStatus } from './types'
+import { requestQueueHref, type RequestQueueFilters, type RequestStatus } from './types'
 
 type StatusFilterValue = RequestStatus | 'all'
 
@@ -20,6 +20,8 @@ export interface RequestsStatusFilterProps {
   active?: StatusFilterValue
   /** Counts come from `GET /stats`; omit when the caller has no aggregate. */
   counts?: Partial<Record<StatusFilterValue, number>>
+  /** Kept on every tab, so its count stays the size of the list it opens. */
+  filters?: RequestQueueFilters
   className?: string
 }
 
@@ -32,6 +34,7 @@ export function RequestsStatusFilter({
   basePath,
   active = 'all',
   counts,
+  filters,
   className = '',
 }: RequestsStatusFilterProps) {
   return (
@@ -42,7 +45,7 @@ export function RequestsStatusFilter({
         return (
           <Link
             key={option.value}
-            href={option.value === 'all' ? basePath : `${basePath}?status=${option.value}`}
+            href={requestQueueHref(basePath, option.value === 'all' ? undefined : option.value, 1, filters)}
             aria-current={isActive ? 'page' : undefined}
             className={`inline-flex h-10 items-center rounded-[10px] px-3 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
               isActive

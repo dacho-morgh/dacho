@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   AdminListView,
@@ -7,6 +7,12 @@ import {
   type AdminColumn,
   type AdminListLoadState,
 } from '@/components/dashboard/admin-list-view'
+import { RequestsPagination } from '@/components/dashboard/requests/requests-pagination'
+import {
+  requestFiltersQuery,
+  type RequestQueueFilters,
+  type RequestStatus,
+} from '@/components/dashboard/requests/types'
 import { Typography } from '@/components/ui/typography'
 type Request = {
   id: string
@@ -59,18 +65,35 @@ const columns: AdminColumn<Request>[] = [
     ),
   },
 ]
-export function AdminRequestList() {
+export function AdminRequestList({
+  status,
+  page = 1,
+  filters = {},
+}: {
+  status?: RequestStatus
+  page?: number
+  filters?: RequestQueueFilters
+} = {}) {
   const [requests, setRequests] = useState<Request[]>([])
+  const [totalPages, setTotalPages] = useState(1)
   const [loadState, setLoadState] = useState<AdminListLoadState>('loading')
+  // The API narrows and pages the list, so what shows matches the count of the same filters.
+  const query = `limit=50&page=${page}${status ? `&status=${status}` : ''}${requestFiltersQuery(filters)}`
+  const latestLoad = useRef(0)
   const loadRequests = useCallback(async () => {
+    const load = ++latestLoad.current
     setLoadState('loading')
     try {
-      const response = await fetch('/api/dashboard/admin/requests?limit=100', { cache: 'no-store' })
+      const response = await fetch(`/api/dashboard/admin/requests?${query}`, { cache: 'no-store' })
+      // A slower answer to an earlier filter must not replace the current list.
+      if (load !== latestLoad.current) return
       if (response.status === 401) { setLoadState('unauthenticated'); return }
       if (response.status === 403) { setLoadState('denied'); return }
       if (!response.ok) { setLoadState('error'); return }
-      const data = (await response.json()) as { items?: { id: string; title: string; status: string; createdAt: string; owner?: { companyName?: string; name?: string } }[] }
+      const data = (await response.json()) as { totalPages?: number; items?: { id: string; title: string; status: string; createdAt: string; owner?: { companyName?: string; name?: string } }[] }
+      if (load !== latestLoad.current) return
       if (!Array.isArray(data.items)) { setLoadState('error'); return }
+      setTotalPages(data.totalPages ?? 1)
       setRequests(data.items.map((item) => ({
         id: item.id,
         company: item.owner?.companyName || item.owner?.name || '—',
@@ -80,21 +103,28 @@ export function AdminRequestList() {
       })))
       setLoadState('ready')
     } catch {
-      setLoadState('error')
+      if (load === latestLoad.current) setLoadState('error')
     }
-  }, [])
+  }, [query])
   useEffect(() => { void loadRequests() }, [loadRequests])
   return (
-    <AdminListView
-      title="درخواست ها"
-      addLabel="درخواست جدید"
-      searchPlaceholder="درخواست خود را جست و جو کنید"
-      items={requests}
-      getSearchText={(item) => Object.values(item).join(' ')}
-      getKey={(item) => item.id}
-      columns={columns}
-      loadState={loadState}
-      onRetry={() => void loadRequests()}
-    />
+    <>
+      <AdminListView
+        title="درخواست ها"
+        addLabel="درخواست جدید"
+        items={requests}
+        getSearchText={(item) => Object.values(item).join(' ')}
+        getKey={(item) => item.id}
+        columns={columns}
+        loadState={loadState}
+        onRetry={() => void loadRequests()}
+        serverFiltered
+      />
+      {loadState === 'ready' && (
+        <div className="pb-4">
+          <RequestsPagination page={page} totalPages={totalPages} status={status} filters={filters} />
+        </div>
+      )}
+    </>
   )
 }

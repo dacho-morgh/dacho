@@ -75,8 +75,11 @@ import {
   CURRENT_NON_COMPETE_VERSION,
   RequestRepository,
   parseApplicationTeam,
+  type RequestFilters,
+  type ReviewStage,
 } from './request-repo.js'
 import { StatsRepository } from './stats-repo.js'
+import { isRequestWorkQueueOf } from './work-queues.js'
 import type { CompanyStore } from '../auth/company-store.js'
 import type { User, UserStore } from '../auth/user-store.js'
 import { SupportRepository } from './support-repo.js'
@@ -172,6 +175,35 @@ const dashboardRoles = {
     destinations: ['/dashboard', '/dashboard/requests', '/dashboard/letters', '/dashboard/events', '/dashboard/profile'],
   },
 } as const
+
+const MAX_REQUEST_SEARCH_LENGTH = 100
+const REVIEW_STAGES: readonly unknown[] = ['chief_triage', 'triaged', 'advanced']
+
+/** The list and count filters, or the error code of the first invalid one. A queue of another role is invalid. */
+function parseRequestFilters(
+  query: Record<string, unknown>,
+  actor: { id: string; operationalRole: OperationalRole },
+): RequestFilters | string {
+  const filters: RequestFilters = {}
+  if (query.search !== undefined) {
+    const search = typeof query.search === 'string' ? query.search.trim() : null
+    if (search === null || search.length > MAX_REQUEST_SEARCH_LENGTH) return 'invalid_search'
+    if (search) filters.search = search
+  }
+  if (query.eventId !== undefined) {
+    if (typeof query.eventId !== 'string' || !isUuid(query.eventId)) return 'invalid_event_id'
+    filters.eventId = query.eventId
+  }
+  if (query.stage !== undefined) {
+    if (!REVIEW_STAGES.includes(query.stage)) return 'invalid_stage'
+    filters.reviewStage = query.stage as ReviewStage
+  }
+  if (query.queue !== undefined) {
+    if (!isRequestWorkQueueOf(actor.operationalRole, query.queue)) return 'invalid_queue'
+    filters.queue = { key: query.queue, actorId: actor.id, role: actor.operationalRole }
+  }
+  return filters
+}
 
 function parsePositiveInt(value: unknown, fallback: number): number {
   if (typeof value !== 'string') return fallback
@@ -780,8 +812,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const status = typeof req.query.status === 'string' ? req.query.status : undefined
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
+    const filters = parseRequestFilters(req.query, actor)
+    if (typeof filters === 'string') { res.status(400).json({ error: filters }); return }
     const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
-    const result = await repo.listScoped(scope, { status, page, limit })
+    const result = await repo.listScoped(scope, { ...filters, status, page, limit })
     res.json({
       ...result,
       items: await Promise.all(
@@ -799,8 +833,11 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     const status = typeof req.query.status === 'string' ? req.query.status : undefined
+    const filters = parseRequestFilters(req.query, actor)
+    if (typeof filters === 'string') { res.status(400).json({ error: filters }); return }
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const result = await repo.listScoped(scope, {
+      ...filters,
       status,
       page: parsePositiveInt(req.query.page, 1),
       limit: parsePositiveInt(req.query.limit, 25),
@@ -2637,19 +2674,38 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
-  router.get('/stats', async (_req, res, next) => {
+  router.get('/stats', async (req, res, next) => {
     try {
     const actor = actorOf(res)
+    const filters = parseRequestFilters(req.query, actor)
+    if (typeof filters === 'string') { res.status(400).json({ error: filters }); return }
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
-    res.json(await stats.forScope(scope))
+    res.json(await stats.forScope(scope, filters))
     } catch (error) { next(error) }
   })
 
+  /** The role's overview: status counts, its work queues and the options of the event filter. */
   router.get('/stats/overview', async (_req, res, next) => {
     try {
     const actor = actorOf(res)
-    const { scope } = await resolveScope(actor.id, actor.operationalRole)
-    res.json(await stats.forScope(scope))
+    const role = actor.operationalRole
+    const { scope, companyId } = await resolveScope(actor.id, role)
+    const overview = await stats.overview(scope, { id: actor.id, role })
+    // Work outside the request table. Each count is read from the list its role already has.
+    const other: { key: string; count: number }[] = []
+    if (role === 'central-secretariat') {
+      other.push({ key: 'verification_pending', count: (await verificationStore.listQueue({ status: 'pending' })).length })
+    }
+    if (isCompanyAdministrator(role)) {
+      other.push({ key: 'support_open', count: (await support.list({ status: 'open', page: 1, limit: 1 })).total })
+    }
+    if (companyId) {
+      const verification = await verificationStore.findCurrentByCompanyId(companyId)
+      if (verification?.status === 'returned' || verification?.status === 'rejected') {
+        other.push({ key: 'company_verification_returned', count: 1 })
+      }
+    }
+    res.set('Cache-Control', 'private, no-store, max-age=0').json({ ...overview, queues: [...overview.queues, ...other] })
     } catch (error) { next(error) }
   })
 

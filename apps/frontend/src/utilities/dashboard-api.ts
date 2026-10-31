@@ -68,6 +68,19 @@ export interface RequestStats {
   rejected: number
 }
 
+/** A queue the backend counts for the current role; an unknown key is never shown. */
+export interface WorkQueueCountDto {
+  key: string
+  count: number
+}
+
+/** GET /stats/overview: every number comes from the actor's own row scope. */
+export interface DashboardOverviewDto {
+  counts: RequestStats
+  queues: WorkQueueCountDto[]
+  events: { id: string; title: string }[]
+}
+
 export interface Paginated<T> {
   items: T[]
   total: number

@@ -18,11 +18,13 @@ import {
 import { requestQueueHref } from '@/components/dashboard/requests/types'
 import { ServicesQuickAccess, type ServiceCard } from '@/components/dashboard/services-quick-access'
 import { StatCards } from '@/components/dashboard/stat-cards'
+import { WorkQueueOverview } from '@/components/dashboard/work-queue-overview'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
   formatDate,
   type ActivityDto,
+  type DashboardOverviewDto,
   type Paginated,
   type RequestDto,
   type RequestStats,
@@ -55,19 +57,19 @@ export default async function DashboardPage({
   const requestHeaders = await headers()
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })
   const workspace = dashboardWorkspace(dashboardOperationalRole(user))
-  if (workspace === 'company-dossiers') {
+  const overviewResult = await serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview')
+  const workQueues = (
+    <WorkQueueOverview
+      queues={overviewResult.kind === 'ok' ? overviewResult.data.queues : undefined}
+      notice={unavailableReasonFor(overviewResult)}
+    />
+  )
+  if (workspace === 'company-dossiers' || workspace === 'internal-queue') {
     return (
       <>
         {showDeniedNotice && <DeniedNotice />}
-        <CompanyList />
-      </>
-    )
-  }
-  if (workspace === 'internal-queue') {
-    return (
-      <>
-        {showDeniedNotice && <DeniedNotice />}
-        <AdminRequestList />
+        <div className="px-4 pt-6 lg:pt-10">{workQueues}</div>
+        {workspace === 'company-dossiers' ? <CompanyList /> : <AdminRequestList />}
       </>
     )
   }
@@ -116,6 +118,8 @@ export default async function DashboardPage({
   return (
     <div className="space-y-8 p-6 pb-12 sm:p-8">
       {showDeniedNotice && <DeniedNotice />}
+      {workQueues}
+
       {/* 1. Quick Stats */}
       <StatCards data={stats} notice={statsNotice} activeStatus={status} />
 

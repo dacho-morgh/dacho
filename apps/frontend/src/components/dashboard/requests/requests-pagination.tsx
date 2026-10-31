@@ -1,19 +1,21 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
-import { requestQueueHref, type RequestStatus } from './types'
+import { requestQueueHref, type RequestQueueFilters, type RequestStatus } from './types'
 
 export function RequestsPagination({
   page,
   totalPages,
   status,
+  filters,
 }: {
   page: number
   totalPages: number
   status?: RequestStatus
+  filters?: RequestQueueFilters
 }) {
   if (totalPages <= 1 && page <= 1) return null
-  const href = (target: number) => requestQueueHref('/dashboard/requests', status, target)
+  const href = (target: number) => requestQueueHref('/dashboard/requests', status, target, filters)
   return (
     <nav
       aria-label="صفحه‌بندی درخواست‌ها"
