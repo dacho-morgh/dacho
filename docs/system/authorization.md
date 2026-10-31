@@ -178,7 +178,7 @@ acceptance test, deploy staging or migrate real data.
 
 The investment person writes only case-linked letters, only on a case they hold, and only with the Secretariat and the System Owner; those two can write back on that case. Holding means the [T31 handoff](investment-handoff.md): an active assignment and a package on the latest invitation, checked in the INSERT statement. A generic assignment opens no letters, and revoking the assignment ends sending and reading on the next request. Owner and chief general letters to the investment person stay open and carry no case.
 
-A case letter from the investment person shows that a package was handed off, and package status is confined to the financial audience. So the chief, reviewers and employer are not recipients, even though they are assigned to the case. The company stays with Secretariat support, as the permission matrix requires. **To confirm:** "assigned-case participants" was not spelled out further, so this is the narrowest reading that keeps those two rules.
+A case letter from the investment person shows that a package was handed off, and package status is confined to the financial audience. So the chief, reviewers and employer are not recipients, even though they are assigned to the case. The company stays with Secretariat support, as the permission matrix requires. The product owner confirmed this reading of "assigned-case participants" on 2026-10-31.
 
 A letter opens no file: an attachment needs both parties in its audience, so a correspondence file reaches the investment person only after the [Secretariat delivers it](secretariat-follow-up.md).
 
