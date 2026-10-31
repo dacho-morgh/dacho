@@ -32,8 +32,8 @@ vi.mock('@/utilities/dashboard-server', async (importOriginal) => ({
 vi.mock('@/components/dashboard/admin-request-list', () => ({
   AdminRequestList: () => createElement('div', null, 'Internal request queue'),
 }))
-vi.mock('@/components/dashboard/admin-request-detail', () => ({
-  AdminRequestDetail: () => createElement('div', null, 'Internal request detail'),
+vi.mock('@/components/dashboard/request-dossier', () => ({
+  RequestDossier: ({ role }: { role: string }) => createElement('div', null, `Dossier for ${role}`),
 }))
 
 beforeEach(() => {
@@ -86,31 +86,46 @@ it('offers safe sign-in for an expired session instead of a missing dossier', as
   expect(login.searchParams.get('returnUrl')).toBe('/dashboard/requests/request-1')
 })
 
-it.each(['list', 'detail'])(
-  'keeps internal authority on an HTTP mobile %s navigation',
-  async (route) => {
-    const payload = {
-      config: {
-        cookiePrefix: 'payload',
-        csrf: [getServerSideURL()],
-        auth: { jwtOrder: ['cookie'] },
-      },
-    } as unknown as Parameters<typeof extractJWT>[0]['payload']
-    backend.auth.mockImplementation(async ({ headers }: { headers: Headers }) => ({
-      user: extractJWT({ headers, payload })
-        ? { id: 'reviewer-1', operationalRole: 'reviewer', isActive: true }
-        : null,
-    }))
-    backend.fetch.mockResolvedValue({ kind: 'unavailable' })
-    const view =
-      route === 'list'
-        ? await RequestsPage({ searchParams: Promise.resolve({}) })
-        : await RequestDetailPage({ params: Promise.resolve({ id: 'request-1' }) })
-    render(view)
-    expect(
-      screen.getByText(route === 'list' ? 'Internal request queue' : 'Internal request detail'),
-    ).toBeTruthy()
-    // The applicant queue stays unread; the internal list loads its own rows in the browser.
-    expect(backend.fetch.mock.calls.filter(([path]) => String(path).startsWith('/requests'))).toEqual([])
-  },
-)
+it('keeps internal authority on an HTTP mobile list navigation', async () => {
+  const payload = {
+    config: {
+      cookiePrefix: 'payload',
+      csrf: [getServerSideURL()],
+      auth: { jwtOrder: ['cookie'] },
+    },
+  } as unknown as Parameters<typeof extractJWT>[0]['payload']
+  backend.auth.mockImplementation(async ({ headers }: { headers: Headers }) => ({
+    user: extractJWT({ headers, payload })
+      ? { id: 'reviewer-1', operationalRole: 'reviewer', isActive: true }
+      : null,
+  }))
+  backend.fetch.mockResolvedValue({ kind: 'unavailable' })
+  render(await RequestsPage({ searchParams: Promise.resolve({}) }))
+  expect(screen.getByText('Internal request queue')).toBeTruthy()
+  // The applicant queue stays unread; the internal list loads its own rows in the browser.
+  expect(backend.fetch.mock.calls.filter(([path]) => String(path).startsWith('/requests'))).toEqual([])
+})
+
+const dossierReads = async (role: string) => {
+  backend.auth.mockResolvedValue({ user: { id: 'user-1', operationalRole: role, isActive: true } })
+  backend.fetch.mockImplementation(async (path: string) =>
+    path === '/requests/request-1'
+      ? { kind: 'ok', data: { request: { id: 'request-1' }, timeline: [], workflow: [] } }
+      : { kind: 'ok', data: {} },
+  )
+  render(await RequestDetailPage({ params: Promise.resolve({ id: 'request-1' }) }))
+  expect(screen.getByText(`Dossier for ${role}`)).toBeTruthy()
+  return backend.fetch.mock.calls.map(([path]) => String(path).replace('/requests/request-1', '')).sort()
+}
+
+it.each([
+  ['representative', ['', '/proposal', '/result', '/supplementary-requests']],
+  ['reviewer', ['', '/proposal']],
+  ['employer-reviewer', ['', '/proposal']],
+  ['investment-reviewer', ['', '/proposal']],
+  ['chief-reviewer', ['', '/evaluations', '/proposal', '/review-round']],
+  ['central-secretariat', ['', '/evaluations', '/proposal', '/review-round']],
+  ['system-owner', ['', '/evaluations', '/proposal', '/review-round']],
+])('reads only what %s may see on the shared dossier', async (role, reads) => {
+  expect(await dossierReads(role)).toEqual(reads)
+})
