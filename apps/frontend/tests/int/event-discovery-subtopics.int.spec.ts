@@ -116,6 +116,20 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
     vi.spyOn(dashboardApi, 'getEventCategories').mockResolvedValue({ items: mockCategories })
     vi.spyOn(dashboardApi, 'getEventSubtopics').mockResolvedValue({ items: mockSubtopics })
     vi.spyOn(dashboardApi, 'getSubtopicRfp').mockResolvedValue({ version: mockRfpVersion })
+    // FE06 gates registration on the server's company verification; these cases cover an approved company.
+    vi.spyOn(dashboardApi, 'fetchCompanyVerification').mockResolvedValue({
+      status: 'approved',
+      revision: 1,
+      submittedAt: null,
+      decidedAt: null,
+      reason: null,
+      canRequestVerification: false,
+    })
+    vi.spyOn(dashboardApi, 'fetchProfileDossier').mockResolvedValue({
+      dossier: {} as dashboardApi.CompanyDossierDto,
+      documents: [],
+      missing: { required: [], optional: [], canRequestVerification: true },
+    })
   })
 
   afterEach(() => {
@@ -256,6 +270,7 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
     // Register button reflects count
     const registerBtn = screen.getByRole('button', { name: /ثبت درخواست \(۲ زیرعنوان\)/i })
     expect(registerBtn).toBeDefined()
+    await waitFor(() => expect((registerBtn as HTMLButtonElement).disabled).toBe(false))
 
     // Clicking register passes real server IDs
     fireEvent.click(registerBtn)

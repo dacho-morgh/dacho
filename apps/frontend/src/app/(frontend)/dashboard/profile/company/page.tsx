@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
+import { ReturnToRegistration } from '@/components/dashboard/profile/return-to-registration'
 import { CompanyProfileView } from '@/components/dashboard/profile/company-profile-view'
 import type { DossierResponseDto, ProfileDto } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
@@ -14,7 +15,12 @@ export const metadata: Metadata = {
   title: 'پروفایل شرکت',
 }
 
-export default async function CompanyProfilePage() {
+export default async function CompanyProfilePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ returnTo?: string }>
+} = {}) {
+  const returnTo = (await searchParams)?.returnTo
   if (isInternalUser(await getProfileSessionUser())) redirect('/dashboard/profile/staff')
 
   const [profile, dossier] = await Promise.all([
@@ -27,9 +33,12 @@ export default async function CompanyProfilePage() {
   }
 
   return (
-    <CompanyProfileView
-      initialProfile={profile.data}
-      initialDossier={dossier.kind === 'ok' ? dossier.data : undefined}
-    />
+    <>
+      <ReturnToRegistration returnTo={returnTo} />
+      <CompanyProfileView
+        initialProfile={profile.data}
+        initialDossier={dossier.kind === 'ok' ? dossier.data : undefined}
+      />
+    </>
   )
 }
