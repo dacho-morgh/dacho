@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -185,15 +186,15 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
           <ul className="flex flex-col gap-2">
             {followUp.files.map((file) => (
               <li key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 p-3">
-                <div className="min-w-0">
-                  <a href={file.downloadUrl} className="break-all">
-                    <Typography as="span" variant="14/regular" color="brand-600">{file.filename}</Typography>
-                  </a>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <Typography as="span" variant="14/regular" color="neutral-700" className="break-all"><bdi dir="auto">{file.filename}</bdi></Typography>
                   <Typography variant="12/regular" color="neutral-500">
                     {formatDate(file.createdAt)}
                     {file.deliveredAt ? ` · در دسترس مسئول سرمایه‌گذاری از ${formatDate(file.deliveredAt)}` : ''}
                   </Typography>
                 </div>
+                <div className="flex flex-wrap items-start gap-2">
+                <PrivateDocumentDownload documentId={file.id} filename={file.filename} />
                 {editable && !file.deliveredAt ? (
                   <Button
                     type="button"
@@ -205,6 +206,7 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
                     <Typography variant="12/semibold" className="text-inherit">ارجاع به مسئول سرمایه‌گذاری</Typography>
                   </Button>
                 ) : null}
+                </div>
               </li>
             ))}
           </ul>

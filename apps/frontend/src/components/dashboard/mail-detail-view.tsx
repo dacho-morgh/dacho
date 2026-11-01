@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
+import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -15,6 +16,13 @@ import {
   DashboardMoreIcon, DashboardTrashIcon,
 } from '@/components/icons'
 import { deleteLetter, describeMutationFailure } from '@/utilities/dashboard-api'
+import { letterAttachmentDownloadPath } from '@/utilities/document-api'
+
+export interface MailAttachment {
+  id: string
+  name: string
+  size: string
+}
 
 export interface MailData {
   id: string
@@ -28,7 +36,8 @@ export interface MailData {
   dayOfWeek: string
   timeStr: string
   body: string
-  attachments?: { name: string; size: string; ext: string }[]
+  /** Authorized attachment metadata; bytes come only from the letter-scoped download route. */
+  attachments?: MailAttachment[]
 }
 
 interface MailDetailViewProps {
@@ -153,9 +162,17 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
           {!!mail.attachments?.length && (
             <section aria-label="پیوست‌های نامه" className="flex flex-col gap-2">
               <Typography variant="14/semibold" className="text-neutral-600">پیوست‌های نامه</Typography>
-              {mail.attachments.map((attachment, index) => (
-                <Typography key={index} variant="14/regular" className="text-neutral-500">{attachment.name} — {attachment.size}</Typography>
-              ))}
+              <ul className="flex flex-col gap-2">
+                {mail.attachments.map((attachment) => (
+                  <li key={attachment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-100 px-3 py-2">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <Typography variant="14/semibold" className="break-all text-neutral-700"><bdi dir="auto">{attachment.name}</bdi></Typography>
+                      <Typography variant="12/light" className="text-neutral-400">{attachment.size}</Typography>
+                    </div>
+                    <PrivateDocumentDownload path={letterAttachmentDownloadPath(mail.id, attachment.id)} filename={attachment.name} />
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
         </>}

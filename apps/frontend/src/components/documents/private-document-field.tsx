@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
+import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -12,7 +13,6 @@ import {
   DocumentApiError,
   documentCategoryLabel,
   documentErrorMessage,
-  downloadDocument,
   deleteDocument,
   formatDocumentSize,
   listDocuments,
@@ -44,6 +44,12 @@ export interface PrivateDocumentFieldProps {
   canDelete?: boolean
   /** For a role that only reads: no upload control or upload guidance at all. */
   readOnly?: boolean
+  /**
+   * Attachment mode (e.g. a letter being composed): existing parent files are
+   * not listed; only files uploaded through this control in this session are
+   * shown, and they can be detached locally without deleting server bytes.
+   */
+  sessionOnly?: boolean
   onPendingChange?: (pending: boolean) => void
   onReadyChange?: (ready: boolean) => void
   onDocumentsChange?: (documents: PrivateDocumentDto[]) => void
@@ -67,6 +73,7 @@ export function PrivateDocumentField({
   canUpload = true,
   canDelete = false,
   readOnly = false,
+  sessionOnly = false,
   onPendingChange,
   onReadyChange,
   onDocumentsChange,
@@ -110,7 +117,8 @@ export function PrivateDocumentField({
     setError(null)
     setSessionExpired(false)
     setListDenied(false)
-    if (!hasParent) return () => { active = false }
+    if (sessionOnly) setDocuments([])
+    if (!hasParent || sessionOnly) return () => { active = false }
 
     setLoading(true)
     listDocuments({ requestId, companyId })
@@ -136,7 +144,7 @@ export function PrivateDocumentField({
       })
 
     return () => { active = false }
-  }, [category, companyId, hasParent, logicalVersion, requestId])
+  }, [category, companyId, hasParent, logicalVersion, requestId, sessionOnly])
 
   useEffect(() => {
     callbacks.current.onPendingChange?.(pending)
@@ -214,27 +222,6 @@ export function PrivateDocumentField({
     }
   }
 
-  const download = async (document: PrivateDocumentDto) => {
-    setError(null)
-    try {
-      const { blob, filename } = await downloadDocument(document.id)
-      if (typeof URL.createObjectURL !== 'function') {
-        throw new DocumentApiError(0, 'document_unavailable')
-      }
-      const href = URL.createObjectURL(blob)
-      const anchor = window.document.createElement('a')
-      anchor.href = href
-      anchor.download = filename
-      anchor.rel = 'noopener'
-      window.document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      window.setTimeout(() => URL.revokeObjectURL(href), 1000)
-    } catch (cause) {
-      report(cause)
-    }
-  }
-
   const remove = async (document: PrivateDocumentDto) => {
     if (!window.confirm('این مدرک حذف شود؟')) return
     setError(null)
@@ -300,7 +287,7 @@ export function PrivateDocumentField({
 
       {scopedDocuments.length === 0 && !loading && !listDenied && hasParent ? (
         <Typography variant="14/regular" color="neutral-400">
-          هنوز مدرکی بارگذاری نشده است.
+          {sessionOnly ? 'هنوز فایلی پیوست نشده است.' : 'هنوز مدرکی بارگذاری نشده است.'}
         </Typography>
       ) : null}
 
@@ -319,11 +306,20 @@ export function PrivateDocumentField({
                   {formatDocumentSize(document.sizeBytes)} · نسخهٔ {document.logicalVersion.toLocaleString('fa-IR')}
                 </Typography>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-start gap-1">
                 {document.allowedActions.includes('download') ? (
-                  <Button type="button" variant="outline-primary" size="32" onClick={() => download(document)}>
+                  <PrivateDocumentDownload documentId={document.id} filename={document.filename} />
+                ) : null}
+                {sessionOnly ? (
+                  <Button
+                    type="button"
+                    variant="text-gray"
+                    size="32"
+                    aria-label={`حذف ${document.filename} از پیوست‌ها`}
+                    onClick={() => setDocuments((current) => current.filter((item) => item.id !== document.id))}
+                  >
                     <Typography variant="12/semibold" className="text-inherit">
-                      دانلود
+                      حذف از پیوست‌ها
                     </Typography>
                   </Button>
                 ) : null}
@@ -418,7 +414,7 @@ export function PrivateDocumentField({
 
       {pending ? (
         <Typography role="status" variant="12/regular" color="neutral-500">
-          تا پایان بارگذاری، ثبت نهایی درخواست غیرفعال است.
+          {sessionOnly ? 'تا پایان بارگذاری، ارسال غیرفعال است.' : 'تا پایان بارگذاری، ثبت نهایی درخواست غیرفعال است.'}
         </Typography>
       ) : null}
 
