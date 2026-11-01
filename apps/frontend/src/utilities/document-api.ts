@@ -112,6 +112,19 @@ export function documentErrorMessage(error: DocumentErrorCode | string | null | 
   }
 }
 
+/** Download-specific copy: denied and revoked access read the same (404/403). */
+export function documentDownloadErrorMessage(error: DocumentErrorCode | string | null | undefined): string {
+  switch (error) {
+    case 'unauthorized':
+    case 'forbidden':
+    case 'not_found':
+    case 'document_unavailable':
+      return documentErrorMessage(error)
+    default:
+      return 'دریافت فایل انجام نشد. دوباره تلاش کنید.'
+  }
+}
+
 function parseError(status: number, body: unknown): DocumentApiError {
   const code =
     body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string'
@@ -191,10 +204,40 @@ export function uploadDocument(
   })
 }
 
+const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+const AUTHORIZED_DOWNLOAD_PATHS = [
+  new RegExp(`^/api/dashboard/documents/${UUID_PATTERN}/download$`, 'i'),
+  new RegExp(`^/api/dashboard/letters/${UUID_PATTERN}/attachments/${UUID_PATTERN}/download$`, 'i'),
+]
+
+/**
+ * Private bytes are only fetched through the authenticated same-origin proxy
+ * routes that re-check access on every request. Any other URL (public media,
+ * absolute/external URLs, storage paths) is refused instead of being followed.
+ */
+export function isAuthorizedDownloadPath(path: string): boolean {
+  return AUTHORIZED_DOWNLOAD_PATHS.some((pattern) => pattern.test(path))
+}
+
+export function documentDownloadPath(id: string): string {
+  return `/api/dashboard/documents/${encodeURIComponent(id)}/download`
+}
+
+export function letterAttachmentDownloadPath(letterId: string, attachmentId: string): string {
+  return `/api/dashboard/letters/${encodeURIComponent(letterId)}/attachments/${encodeURIComponent(attachmentId)}/download`
+}
+
 export async function downloadDocument(id: string): Promise<{ blob: Blob; filename: string }> {
-  const response = await fetch(`/api/dashboard/documents/${encodeURIComponent(id)}/download`, {
-    cache: 'no-store',
-  })
+  return fetchPrivateBytes(documentDownloadPath(id))
+}
+
+export async function downloadFromAuthorizedPath(path: string): Promise<{ blob: Blob; filename: string }> {
+  if (!isAuthorizedDownloadPath(path)) throw new DocumentApiError(0, 'not_found')
+  return fetchPrivateBytes(path)
+}
+
+async function fetchPrivateBytes(path: string): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(path, { cache: 'no-store', credentials: 'same-origin' })
   if (!response.ok) throw parseError(response.status, await response.json().catch(() => null))
   const disposition = response.headers.get('content-disposition') ?? ''
   const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1]
@@ -203,6 +246,22 @@ export async function downloadDocument(id: string): Promise<{ blob: Blob; filena
     blob: await response.blob(),
     filename: encoded ? decodeURIComponent(encoded) : fallback ?? 'document',
   }
+}
+
+/** Hands downloaded bytes to the browser without exposing any server path. */
+export function saveDownloadedFile(blob: Blob, filename: string): void {
+  if (typeof URL.createObjectURL !== 'function') {
+    throw new DocumentApiError(0, 'document_unavailable')
+  }
+  const href = URL.createObjectURL(blob)
+  const anchor = window.document.createElement('a')
+  anchor.href = href
+  anchor.download = filename
+  anchor.rel = 'noopener'
+  window.document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  window.setTimeout(() => URL.revokeObjectURL(href), 1000)
 }
 
 export async function deleteDocument(id: string): Promise<void> {

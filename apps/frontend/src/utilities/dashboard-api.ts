@@ -766,8 +766,34 @@ export function mapMailData(dto: LetterDto): MailData {
     dayOfWeek: formatWeekday(dto.sentAt),
     timeStr: formatTime(dto.sentAt),
     body: dto.body,
-    attachments: [],
+    attachments: mapLetterAttachments(dto.attachments),
   }
+}
+
+/**
+ * Keeps only safe display metadata from authorized letter attachments. The
+ * server omits attachments the viewer can no longer read; any URL or storage
+ * field in the payload is ignored, downloads use the letter-scoped route.
+ */
+function formatAttachmentSize(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes < 0) return '—'
+  if (bytes < 1000) return `${bytes.toLocaleString('fa-IR')} بایت`
+  return `${(bytes / 1_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 2 })} مگابایت`
+}
+
+export function mapLetterAttachments(raw: unknown): MailData['attachments'] {
+  if (!Array.isArray(raw)) return []
+  const items: NonNullable<MailData['attachments']> = []
+  for (const value of raw) {
+    if (!value || typeof value !== 'object') continue
+    const record = value as Record<string, unknown>
+    const id = typeof record.id === 'string' ? record.id : null
+    if (!id) continue
+    const name = typeof record.filename === 'string' ? record.filename : typeof record.name === 'string' ? record.name : 'پیوست'
+    const sizeBytes = typeof record.sizeBytes === 'number' ? record.sizeBytes : null
+    items.push({ id, name, size: formatAttachmentSize(sizeBytes) })
+  }
+  return items
 }
 
 export function deleteLetter(id: string): Promise<{ success: boolean }> {

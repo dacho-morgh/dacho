@@ -145,5 +145,16 @@ rehearsal applied all seven backend migrations on the disposable database.
 - Integration tests cover submit-versus-upload/delete row-lock ordering,
   participant-only case letters, recipient-only deletion and revocation.
 
+- FE07 correspondence slice: Secretariat/System Owner letters can link a
+  recipient case and attach `correspondenceAttachment` files uploaded in that
+  compose session; sending is blocked while an upload is pending and stale
+  attachments from a previous case are never sent. Letter attachments and
+  supplementary replies download only through the shared authorized control
+  (`/api/dashboard/documents/:id/download` or the letter-scoped
+  `/api/dashboard/letters/:letterId/attachments/:id/download`); any other URL
+  is refused client-side.
+
 UAT05/UAT09/UAT11/UAT22/UAT25/UAT35 remain **Not run**. Issue #71 stays open for
-the RFP, finance-package, correspondence and receipt integrations.
+the RFP and booth-receipt integrations (categories still return
+`422 unsupported_category` until T18/T50) and any financial-package UI beyond
+the existing request-form fields.
