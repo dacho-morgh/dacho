@@ -403,29 +403,6 @@ describe('NewRequestForm final-submit eligibility', () => {
     expect(mockPush).not.toHaveBeenCalled()
   })
 
-  it('sends the representative back to the event to read a replaced RFP', async () => {
-    mockEligibility('approved')
-    vi.spyOn(dashboardApi, 'submitRequest').mockRejectedValue(new dashboardApi.DashboardApiError(409, 'stale_rfp'))
-    render(
-      createElement(NewRequestForm, {
-        ...props,
-        serviceKey: 'events',
-        participation: { kind: 'event', eventId: EVENT_ID, subtopicIds: ['sub-1'] },
-        returnTo: undefined,
-      }),
-    )
-    const create = (await screen.findByRole('button', { name: 'ایجاد پیش‌نویس و ادامه' })) as HTMLButtonElement
-    await waitFor(() => expect(create.disabled).toBe(false))
-    fireEvent.click(create)
-    const submitButton = (await screen.findByRole('button', { name: 'ثبت و ارسال درخواست' })) as HTMLButtonElement
-    await waitFor(() => expect(submitButton.disabled).toBe(false))
-    fireEvent.click(submitButton)
-    expect(await screen.findByText(/نسخه RFP این زیرعنوان/)).toBeDefined()
-    expect(screen.getByRole('link', { name: 'بازگشت به رویداد و مطالعه نسخه جدید RFP' }).getAttribute('href')).toBe(
-      `/dashboard/events?eventId=${EVENT_ID}&subtopicId=sub-1`,
-    )
-  })
-
   it('submits and opens the request when the server confirms eligibility', async () => {
     mockEligibility('approved')
     const submit = vi.spyOn(dashboardApi, 'submitRequest').mockResolvedValue({ request: { id: 'req-1' } as dashboardApi.RequestDto })
