@@ -15,12 +15,17 @@ export const metadata: Metadata = {
 }
 
 interface PageProps {
-  searchParams?: Promise<{ eventId?: string }>
+  searchParams?: Promise<{ eventId?: string; subtopicId?: string }>
 }
 
 export default async function EventsPage(props: PageProps = {}) {
   const searchParams = await props.searchParams
   const eventId = searchParams?.eventId
+  const subtopicIds = (searchParams?.subtopicId ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .slice(0, 50)
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isOwner = dashboardOperationalRole(user) === 'system-owner'
@@ -57,6 +62,7 @@ export default async function EventsPage(props: PageProps = {}) {
         initialEventsList={events}
         isOwner={isOwner}
         initialSelectedEventId={eventId}
+        initialSubtopicIds={subtopicIds}
       />
     </div>
   )

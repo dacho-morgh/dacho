@@ -1012,3 +1012,47 @@ export function formatFileSize(bytes: number): string {
   const persianVal = val.replace(/\./g, '٫').replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)] ?? d)
   return `${persianVal} ${units[i]}`
 }
+
+/* ── Participation eligibility (FE06; T15/T19/T55) ─────────────────────── */
+
+export type CompanyVerificationStatus = 'unsubmitted' | 'pending' | 'approved' | 'returned' | 'rejected'
+
+/** The representative's own current verification, as the server derives it. */
+export interface CompanyVerificationDto {
+  status: CompanyVerificationStatus
+  revision: number
+  submittedAt: string | null
+  decidedAt: string | null
+  reason: string | null
+  canRequestVerification: boolean
+}
+
+export function fetchCompanyVerification(): Promise<CompanyVerificationDto> {
+  return dashboardFetch<CompanyVerificationDto>('/profile/verification')
+}
+
+export function submitCompanyVerification(): Promise<unknown> {
+  return dashboardFetch<unknown>('/profile/verification/submit', { method: 'POST' })
+}
+
+export type BoothAttendanceStatus = 'pending' | 'approved' | 'rejected'
+
+/** The company's own booth reservation; attendance and payment are decided per booth. */
+export interface BoothReservationDto {
+  id: string
+  boothId: string
+  boothIdentifier?: string
+  exhibitionId: string
+  active: boolean
+  attendanceStatus: BoothAttendanceStatus
+  attendanceReason: string | null
+  priceAmount?: number
+  createdAt: string
+  allowedActions: string[]
+}
+
+export function listMyBoothReservations(exhibitionId: string): Promise<{ items: BoothReservationDto[] }> {
+  return dashboardFetch<{ items: BoothReservationDto[] }>(
+    `/exhibitions/${encodeURIComponent(exhibitionId)}/my-reservations`,
+  )
+}

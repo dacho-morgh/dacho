@@ -337,7 +337,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       )}
 
       {/* 1. محصولات و خدمات */}
-      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section id="resume-products" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-1">
             <Typography as="h2" variant="20/bold" color="neutral-600">

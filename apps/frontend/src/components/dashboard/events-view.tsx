@@ -29,6 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { ParticipationEligibilityPanel } from '@/components/dashboard/participation-eligibility-panel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -42,6 +43,7 @@ import {
   type EventSubtopicDto,
   type RfpVersionDto,
 } from '@/utilities/dashboard-api'
+import type { Eligibility } from '@/utilities/participation-eligibility'
 
 export interface EventItem {
   id: string
@@ -64,6 +66,8 @@ export interface EventsViewProps {
   state?: 'default' | 'loading' | 'empty'
   isOwner?: boolean
   initialSelectedEventId?: string
+  /** Subtopics the representative chose before leaving to complete the profile. */
+  initialSubtopicIds?: string[]
 }
 
 // Skeleton state matching Figma node 56:13600
@@ -301,6 +305,7 @@ export function EventsView({
   state = 'default',
   isOwner = false,
   initialSelectedEventId,
+  initialSubtopicIds,
 }: EventsViewProps) {
   const router = useRouter()
   const [events] = useState<EventItem[]>(initialEventsList)
@@ -342,6 +347,15 @@ export function EventsView({
   // Quick Select modal
   const [quickModalOpen, setQuickModalOpen] = useState(false)
 
+  // Company verification read from the server; registration stays off until it is approved.
+  const [eligibility, setEligibility] = useState<Eligibility | null>(null)
+  // Subtopics to restore once, for the event the representative returned to.
+  const pendingSubtopicIds = useRef<{ eventId: string; ids: string[] } | null>(
+    initialSelectedEventId && initialSubtopicIds?.length
+      ? { eventId: initialSelectedEventId, ids: initialSubtopicIds }
+      : null,
+  )
+
   // Fetch categories & subtopics whenever selectedEvent changes
   const effectiveEventId = selectedEvent?.rawId || selectedEvent?.id.replace(/^events-/, '') || ''
   // The event whose responses may still be applied; a reply for an event the user left is dropped.
@@ -366,6 +380,13 @@ export function EventsView({
       if (!isCurrent()) return
       setCategories(catsRes.items ?? [])
       setSubtopics(subsRes.items ?? [])
+      const restore = pendingSubtopicIds.current
+      if (restore && restore.eventId === eventId) {
+        pendingSubtopicIds.current = null
+        const known = new Set((subsRes.items ?? []).map((sub) => sub.id))
+        // Only restore subtopics that still exist for this event.
+        setSelectedSubtopicIds(new Set(restore.ids.filter((id) => known.has(id))))
+      }
       // Expand all categories by default so user immediately sees hierarchy
       const initialExpanded: Record<string, boolean> = {}
       for (const cat of catsRes.items ?? []) {
@@ -451,7 +472,7 @@ export function EventsView({
   }
 
   const handleRegisterSelected = () => {
-    if (selectedSubtopicIds.size === 0) return
+    if (selectedSubtopicIds.size === 0 || !eligibility?.canParticipate) return
     const ids = Array.from(selectedSubtopicIds).join(',')
     router.push(
       `/dashboard/new-request?service=events&eventId=${encodeURIComponent(
@@ -512,7 +533,7 @@ export function EventsView({
             <button
               type="button"
               onClick={handleRegisterSelected}
-              disabled={isEnded || selectedCount === 0}
+              disabled={isEnded || selectedCount === 0 || !eligibility?.canParticipate}
               className="flex h-[40px] items-center justify-center gap-2 rounded-[10px] bg-brand-500 px-4 text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500"
             >
               <span className="font-sans text-[15px] font-semibold">
@@ -587,6 +608,20 @@ export function EventsView({
             </p>
           )}
         </section>
+
+        {/* Company verification state, missing profile sections and return destination (FE06) */}
+        {!isOwner && !isEnded ? (
+          <div className="mt-4">
+            <ParticipationEligibilityPanel
+              target={{
+                kind: 'event',
+                eventId: effectiveEventId,
+                subtopicIds: Array.from(selectedSubtopicIds),
+              }}
+              onEligibilityChange={setEligibility}
+            />
+          </div>
+        ) : null}
 
         {/* Slot 2: Categories and Subtopics Tree Card - Figma Slot / Frame 156 */}
         <section className="relative mt-4 flex w-full flex-col gap-5 rounded-[16px] border border-[#e5e5e5] bg-white p-4 sm:p-6">
@@ -979,8 +1014,9 @@ export function EventsView({
                                 const eventIdParam = evt.rawId || evt.id.replace(/^events-/, '')
                                 router.push(`/dashboard/events?eventId=${encodeURIComponent(eventIdParam)}`)
                               } else {
+                                const rawId = evt.rawId || evt.id.replace(/^exhibitions-/, '')
                                 router.push(
-                                  `/dashboard/new-request?service=${evt.serviceKey}&eventId=${encodeURIComponent(evt.id)}&eventTitle=${encodeURIComponent(evt.title)}`,
+                                  `/dashboard/new-request?service=${evt.serviceKey}&eventId=${encodeURIComponent(rawId)}&eventTitle=${encodeURIComponent(evt.title)}`,
                                 )
                               }
                             }}

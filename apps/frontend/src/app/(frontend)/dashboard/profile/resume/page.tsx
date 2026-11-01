@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
+import { ReturnToRegistration } from '@/components/dashboard/profile/return-to-registration'
 import { ResumeProfileView } from '@/components/dashboard/profile/resume-profile-view'
 import type { DossierResponseDto, ProfileDto } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
@@ -13,7 +14,12 @@ export const metadata: Metadata = {
   title: 'رزومه شرکت',
 }
 
-export default async function ResumePage() {
+export default async function ResumePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ returnTo?: string }>
+} = {}) {
+  const returnTo = (await searchParams)?.returnTo
   if (isInternalUser(await getProfileSessionUser())) redirect('/dashboard/profile/staff')
 
   const [profile, dossier] = await Promise.all([
@@ -28,9 +34,12 @@ export default async function ResumePage() {
   if (!profile.data.companyId) throw new Error('profile_load_failed')
 
   return (
-    <ResumeProfileView
-      initialDossier={dossier.kind === 'ok' ? dossier.data : undefined}
-      companyId={profile.data.companyId}
-    />
+    <>
+      <ReturnToRegistration returnTo={returnTo} />
+      <ResumeProfileView
+        initialDossier={dossier.kind === 'ok' ? dossier.data : undefined}
+        companyId={profile.data.companyId}
+      />
+    </>
   )
 }
