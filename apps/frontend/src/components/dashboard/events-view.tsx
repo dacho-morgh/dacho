@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CalendarBulkIcon,
   EmptyInboxIllustration,
@@ -32,6 +32,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import {
+  DashboardApiError,
   formatFileSize,
   getEventCategories,
   getEventSubtopics,
@@ -115,7 +116,7 @@ function TreeSkeleton() {
 }
 
 // Empty state matching Figma node 56:13860 / 56:14004
-function EventsEmptyState() {
+function EventsEmptyState({ noMatch = false }: { noMatch?: boolean }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-28 text-center">
       <div className="flex flex-col items-center gap-[4px]">
@@ -123,10 +124,10 @@ function EventsEmptyState() {
           <EmptyInboxIllustration className="size-[80px]" />
         </div>
         <p className="mt-1 font-sans text-[14px] leading-[24px] font-semibold text-[#525252]">
-          رویداد و نمایشگاهی در سیستم موجود نیست
+          {noMatch ? 'نتیجه‌ای پیدا نشد' : 'رویداد و نمایشگاهی در سیستم موجود نیست'}
         </p>
         <p className="font-sans text-[12px] leading-[20px] font-normal text-[#737373]">
-          در صورت ایجاد رویداد یا نمایشگاه به شما اطلاع رسانی خواهیم کرد
+          {noMatch ? 'عبارت جستجو یا فیلتر را تغییر دهید' : 'در صورت ایجاد رویداد یا نمایشگاه به شما اطلاع رسانی خواهیم کرد'}
         </p>
       </div>
     </div>
@@ -271,6 +272,26 @@ function QuickSelectModal({
   )
 }
 
+/** A 404 here means the event is not open to this account, not that the list is empty. */
+function describeHierarchyFailure(cause: unknown): string {
+  if (cause instanceof TypeError) return 'ارتباط با سرور برقرار نشد. اتصال را بررسی کنید و دوباره تلاش کنید.'
+  if (cause instanceof DashboardApiError) {
+    if (cause.status === 401) return 'نشست شما پایان یافته است. برای مشاهده عناوین دوباره وارد شوید.'
+    if (cause.status === 403) return 'دسترسی به عناوین و زیرعنوان‌های این رویداد مجاز نیست.'
+    if (cause.status === 404) return 'عناوین این رویداد برای حساب شما در دسترس نیست.'
+  }
+  return 'خطا در دریافت عناوین و زیرعنوان‌ها'
+}
+
+function describeRfpFailure(cause: unknown): string {
+  if (cause instanceof TypeError) return 'ارتباط با سرور برقرار نشد. اتصال را بررسی کنید و دوباره تلاش کنید.'
+  if (cause instanceof DashboardApiError) {
+    if (cause.status === 401) return 'نشست شما پایان یافته است. برای دریافت RFP دوباره وارد شوید.'
+    if (cause.status === 403 || cause.status === 404) return 'دسترسی به فایل RFP این زیرعنوان امکان‌پذیر نیست.'
+  }
+  return 'دریافت فایل RFP انجام نشد. دوباره تلاش کنید.'
+}
+
 function toPersianDigits(val: number | string): string {
   return String(val).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)] ?? d)
 }
@@ -323,16 +344,26 @@ export function EventsView({
 
   // Fetch categories & subtopics whenever selectedEvent changes
   const effectiveEventId = selectedEvent?.rawId || selectedEvent?.id.replace(/^events-/, '') || ''
+  // The event whose responses may still be applied; a reply for an event the user left is dropped.
+  const activeEventId = useRef(effectiveEventId)
+  activeEventId.current = effectiveEventId
+  const hierarchyRequest = useRef(0)
 
   const loadEventHierarchy = async () => {
     if (!effectiveEventId) return
+    const eventId = effectiveEventId
+    const request = ++hierarchyRequest.current
+    const isCurrent = () => request === hierarchyRequest.current && activeEventId.current === eventId
     setLoadingDetails(true)
     setDetailsError(null)
+    setCategories([])
+    setSubtopics([])
     try {
       const [catsRes, subsRes] = await Promise.all([
-        getEventCategories(effectiveEventId),
-        getEventSubtopics(effectiveEventId),
+        getEventCategories(eventId),
+        getEventSubtopics(eventId),
       ])
+      if (!isCurrent()) return
       setCategories(catsRes.items ?? [])
       setSubtopics(subsRes.items ?? [])
       // Expand all categories by default so user immediately sees hierarchy
@@ -341,10 +372,10 @@ export function EventsView({
         initialExpanded[cat.id] = true
       }
       setExpandedCategories(initialExpanded)
-    } catch {
-      setDetailsError('خطا در دریافت عناوین و زیرعنوان‌ها')
+    } catch (cause) {
+      if (isCurrent()) setDetailsError(describeHierarchyFailure(cause))
     } finally {
-      setLoadingDetails(false)
+      if (isCurrent()) setLoadingDetails(false)
     }
   }
 
@@ -397,18 +428,21 @@ export function EventsView({
       [subtopic.id]: { loading: true, error: null, version: null, isOpen: true },
     }))
 
+    const eventId = effectiveEventId
     try {
-      const res = await getSubtopicRfp(effectiveEventId, subtopic.id)
+      const res = await getSubtopicRfp(eventId, subtopic.id)
+      if (activeEventId.current !== eventId) return
       setRfpState((prev) => ({
         ...prev,
         [subtopic.id]: { loading: false, error: null, version: res.version, isOpen: true },
       }))
-    } catch {
+    } catch (cause) {
+      if (activeEventId.current !== eventId) return
       setRfpState((prev) => ({
         ...prev,
         [subtopic.id]: {
           loading: false,
-          error: 'دسترسی به فایل RFP امکان‌پذیر نیست یا فایلی وجود ندارد.',
+          error: describeRfpFailure(cause),
           version: null,
           isOpen: true,
         },
@@ -684,11 +718,6 @@ export function EventsView({
                                       <span className="font-sans text-[15px] leading-[26px] font-medium text-neutral-800">
                                         {sub.title}
                                       </span>
-                                      {sub.employerId && (
-                                        <span className="inline-flex items-center text-[12px] text-neutral-500">
-                                          کارفرما: <strong className="mr-1 text-neutral-700">{sub.employerId}</strong>
-                                        </span>
-                                      )}
                                     </div>
                                   </div>
 
@@ -989,7 +1018,7 @@ export function EventsView({
             )}
 
             {/* Empty State */}
-            {isEmpty && <EventsEmptyState />}
+            {isEmpty && <EventsEmptyState noMatch={state !== 'empty' && events.length > 0} />}
           </>
         )}
       </section>

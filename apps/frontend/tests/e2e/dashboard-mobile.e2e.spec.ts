@@ -8,6 +8,7 @@ test.use({ channel: 'chrome' })
 const password = 'mobile-dashboard-test-only'
 const suffix = `${Date.now()}${randomInt(100, 999)}`.slice(-9)
 const mobileRequestId = randomUUID()
+const mobileRequestTitle = 'Mobile dashboard request test'
 const applicant = {
   email: `mobile-applicant-${suffix}@example.invalid`,
   phone: `09${suffix}`,
@@ -24,6 +25,10 @@ let payload: Awaited<ReturnType<typeof getPayload>>
 let applicantId: number | string
 let managerId: number | string
 let companyId: number | string
+
+/** The dashboard schema belongs to the backend, so the case is written directly. */
+const dashboardDb = () =>
+  (payload.db as unknown as { pool: { query(sql: string, params: unknown[]): Promise<unknown> } }).pool
 
 async function signIn(page: Page, username: string) {
   const response = await page.request.post('http://localhost:3000/api/users/login', {
@@ -63,6 +68,8 @@ async function expectDashboardPagesFit(page: Page, paths: string[]) {
         await expect(
           page.getByRole('heading', { name: 'رزومه و سوابق شرکت', exact: true }),
         ).toBeVisible()
+      } else if (path.startsWith(`/dashboard/requests/${mobileRequestId}`)) {
+        await expect(page.getByRole('heading', { name: mobileRequestTitle, exact: true })).toBeVisible()
       }
       await expect
         .poll(
@@ -104,6 +111,12 @@ test.beforeAll(async () => {
     },
   })
   companyId = company.id
+  // The dossier answers 404 for a missing case, so these pages need a real one.
+  await dashboardDb().query(
+    `INSERT INTO dashboard.requests (id, tracking_code, title, service_id, service_key, service_name, owner_id, company_id)
+     VALUES ($1, $2, $3, '999999', 'events', 'Mobile test service', $4, $5)`,
+    [mobileRequestId, `MOBILE-${suffix}`, mobileRequestTitle, String(applicantId), String(companyId)],
+  )
 
   const managerUser = await payload.create({
     collection: 'users',
@@ -121,6 +134,7 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
+  await dashboardDb().query('DELETE FROM dashboard.requests WHERE id = $1', [mobileRequestId])
   // The company references its representative with ON DELETE restrict.
   if (companyId !== undefined) {
     await payload.delete({ collection: 'companies', id: companyId })
@@ -154,6 +168,7 @@ test('applicant dashboard pages fit phone widths', async ({ page }) => {
   await expectDashboardPagesFit(page, [
     '/dashboard',
     '/dashboard/requests',
+    `/dashboard/requests/${mobileRequestId}`,
     '/dashboard/letters',
     '/dashboard/letters/new?mode=support',
     '/dashboard/events',

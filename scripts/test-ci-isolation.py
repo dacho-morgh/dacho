@@ -69,8 +69,13 @@ class CIIsolationContract(unittest.TestCase):
 
         for name in ("Migrate", "Backend integration tests", "Frontend integration tests"):
             self.assertNotIn("DATABASE_URL:", step(integration, name))
+        self.assertIn(
+            "PHASE0_PG_CONTAINER: ${{ job.services.postgres.id }}",
+            step(integration, "Backend integration tests"),
+        )
 
         wrapper = (Path(__file__).resolve().parents[1] / "scripts/phase0-test.ps1").read_text()
+        self.assertIn("$env:PHASE0_PG_CONTAINER", wrapper)
         self.assertIn("$env:PRIVATE_DOCUMENTS_DIR", wrapper)
         self.assertIn("$env:DOTENV_CONFIG_OVERRIDE = ''", wrapper)
         self.assertNotIn("$env:DOTENV_CONFIG_OVERRIDE = 'false'", wrapper)

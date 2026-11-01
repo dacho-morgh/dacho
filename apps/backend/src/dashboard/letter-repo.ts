@@ -2,6 +2,7 @@ import type { Pool } from 'pg'
 
 import type { RequestScope, DocumentCategory } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
+import { latestInvitationPackageExists } from './financial-package-repo.js'
 import { requestScopeClause } from './request-repo.js'
 
 export type LetterType = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
@@ -192,6 +193,7 @@ export class LetterRepository {
     senderScope: RequestScope,
     recipientScope: RequestScope,
     requireResponsibleChief: boolean,
+    requireInvestmentHandoff = false,
   ): Promise<LetterDto | undefined> {
     if (!input.requestId) return this.create(input)
     const attachmentsJson = JSON.stringify(input.attachments ?? [])
@@ -209,6 +211,7 @@ export class LetterRepository {
       AND (SELECT COUNT(*) FROM locked_letter_assignments WHERE role = 'chief-reviewer') = 1
       AND EXISTS (SELECT 1 FROM locked_letter_assignments WHERE role = 'chief-reviewer' AND user_id = $7)
     ` : ''
+    const handoffClause = requireInvestmentHandoff ? `AND ${latestInvitationPackageExists('r.id')}` : ''
     const { rows } = await this.pool.query<LetterRow>(
       `WITH locked_letter_assignments AS MATERIALIZED (
          SELECT user_id, role FROM dashboard.case_assignments
@@ -217,7 +220,7 @@ export class LetterRepository {
        INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, attachments, read)
        SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, false
        FROM dashboard.requests r
-       WHERE r.id = $8 AND (${senderClause}) AND (${recipientClause}) ${chiefClause}
+       WHERE r.id = $8 AND (${senderClause}) AND (${recipientClause}) ${chiefClause} ${handoffClause}
        RETURNING ${LETTER_COLUMNS}`,
       params,
     )

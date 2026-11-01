@@ -15,12 +15,11 @@ export const metadata: Metadata = {
 }
 
 interface PageProps {
-  searchParams?: Promise<{ state?: 'default' | 'loading' | 'empty'; eventId?: string }>
+  searchParams?: Promise<{ eventId?: string }>
 }
 
-export default async function EventsPage(props: PageProps) {
+export default async function EventsPage(props: PageProps = {}) {
   const searchParams = await props.searchParams
-  const state = searchParams?.state ?? 'default'
   const eventId = searchParams?.eventId
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
@@ -36,7 +35,6 @@ export default async function EventsPage(props: PageProps) {
         <div className="flex w-full flex-col items-center bg-[#fafafa] px-4 pb-12 sm:px-6 lg:px-8">
           <EventsView
             initialEventsList={exhibitions.docs.map((item) => mapEvent(item, 'exhibitions'))}
-            state={state}
             isOwner
             initialSelectedEventId={eventId}
           />
@@ -57,7 +55,6 @@ export default async function EventsPage(props: PageProps) {
     <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">
       <EventsView
         initialEventsList={events}
-        state={state}
         isOwner={isOwner}
         initialSelectedEventId={eventId}
       />

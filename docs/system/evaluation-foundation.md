@@ -1,15 +1,17 @@
 # Evaluation persistence (T25 / #41)
 
 The evaluation API supports reviewer-owned drafts and immutable final evaluations
-using the fixed T24 rubric. It does not implement review-round creation, the four
-distinct review slots, replacements, or the chief's advancement decision. Those
+using the fixed T24 rubric. Review-round creation and the four distinct review
+slots are covered by [review rounds (T22)](review-rounds.md) and reviewer/employer
+replacement by [review replacement (T26)](review-replacement.md). It does not
+implement the chief's advancement decision. Those
 workflow dependencies remain separate; a numeric completion count never advances
 a request automatically. Human acceptance has not been run.
 
 `GET /requests/:id/evaluation` requires a current assignment matching the actor's
-reviewer or employer-reviewer role. It returns only that person's evaluation,
-the current request `revision`, and a completion count for final evaluations on
-that revision with active matching assignments.
+reviewer or employer-reviewer role. It returns only that person's evaluation and
+the current request `revision`. Progress across the panel is oversight-only; see
+[four-of-four completion (T27)](review-completion.md).
 
 `PUT /requests/:id/evaluation` and
 `POST /requests/:id/evaluation/finalize` require that returned `revision` in the

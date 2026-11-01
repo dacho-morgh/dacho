@@ -158,7 +158,7 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
     expect(screen.getByText('طراحی و ساخت پمپ مگنتی مقاوم به خوردگی')).toBeDefined()
   })
 
-  it('shows employer identity where available', async () => {
+  it('does not present the raw employer user id as an employer identity', async () => {
     render(
       createElement(EventsView, {
         initialEventsList: [mockEvent],
@@ -167,8 +167,9 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
     )
 
     await waitFor(() => {
-      expect(screen.getAllByText(/employer-user-42/).length).toBeGreaterThan(0)
+      expect(screen.getByText('ساخت دستگاه پلیمرزدایی از تاورها')).toBeDefined()
     })
+    expect(screen.queryByText(/employer-user-42/)).toBeNull()
   })
 
   it('downloads subtopic RFP and displays file information', async () => {
@@ -343,5 +344,50 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
       expect(screen.queryByText('عنوان ها و زیر عنوان های رویداد')).toBeNull()
     })
     expect(screen.getByText('نمایشگاه بین‌المللی انرژی و نوآوری پارس')).toBeDefined()
+  })
+
+  it.each([
+    [403, 'دسترسی به عناوین و زیرعنوان‌های این رویداد مجاز نیست.'],
+    [404, 'عناوین این رویداد برای حساب شما در دسترس نیست.'],
+    [401, 'نشست شما پایان یافته است. برای مشاهده عناوین دوباره وارد شوید.'],
+  ])('explains a %i hierarchy response instead of showing an empty event', async (status, copy) => {
+    vi.spyOn(dashboardApi, 'getEventCategories').mockRejectedValueOnce(
+      new dashboardApi.DashboardApiError(status, 'not_found'),
+    )
+
+    render(
+      createElement(EventsView, {
+        initialEventsList: [mockEvent],
+        initialSelectedEventId: mockEvent.rawId,
+      }),
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(copy)).toBeDefined()
+    })
+    expect(screen.queryByText('هیچ عنوان یا زیرعنوانی برای این رویداد تعریف نشده است.')).toBeNull()
+  })
+
+  it('reports a denied RFP read separately from a missing RFP', async () => {
+    vi.spyOn(dashboardApi, 'getSubtopicRfp').mockRejectedValueOnce(
+      new dashboardApi.DashboardApiError(403, 'forbidden'),
+    )
+
+    render(
+      createElement(EventsView, {
+        initialEventsList: [mockEvent],
+        initialSelectedEventId: mockEvent.rawId,
+      }),
+    )
+
+    const open = await screen.findByRole('button', {
+      name: 'دریافت فایل RFP برای ساخت دستگاه پلیمرزدایی از تاورها',
+    })
+    fireEvent.click(open)
+
+    await waitFor(() => {
+      expect(screen.getByText('دسترسی به فایل RFP این زیرعنوان امکان‌پذیر نیست.')).toBeDefined()
+    })
+    expect(screen.queryByText('فایل RFP بارگذاری نشده است')).toBeNull()
   })
 })

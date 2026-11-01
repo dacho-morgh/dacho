@@ -43,27 +43,14 @@ export default async function EventDetailPage(props: PageProps) {
     eventDoc = null
   }
 
-  // If not found in Payload, create synthetic event representation with the ID
-  const eventItem: EventItem = eventDoc
-    ? mapEvent(eventDoc, 'events')
-    : {
-        id: `events-${id}`,
-        rawId: id,
-        serviceKey: 'events',
-        title: 'رویداد انتخابی',
-        badgeText: 'در حال برگزاری',
-        badgeType: 'active',
-        dates: 'تاریخ رویداد',
-        location: 'محل برگزاری ثبت نشده است',
-        hasActionButton: true,
-        actionButtonText: 'ثبت درخواست',
-      }
+  // Only a real published event may be shown; an unknown ID is not rendered as a placeholder event.
+  if (!eventDoc) notFound()
+  const eventItem: EventItem = mapEvent(eventDoc, 'events')
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">
       <EventsView
         initialEventsList={[eventItem]}
-        state="default"
         isOwner={isOwner}
         initialSelectedEventId={id}
       />
