@@ -220,6 +220,8 @@ export class DashboardApiError extends Error {
   constructor(
     public status: number,
     public code: string,
+    /** Field names a validation refusal reported (e.g. `invalid_answers`); empty otherwise. */
+    public missingFields: string[] = [],
   ) {
     super(code)
   }
@@ -242,10 +244,13 @@ export function describeMutationFailure(cause: unknown, fallback: string): strin
 async function dashboardFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api/dashboard${path}`, { cache: 'no-store', ...init })
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { error?: string } | null
+    const body = (await res.json().catch(() => null)) as { error?: string; missingFields?: unknown } | null
     throw new DashboardApiError(
       res.status,
       typeof body?.error === 'string' ? body.error : 'request_failed',
+      Array.isArray(body?.missingFields)
+        ? body.missingFields.filter((field): field is string => typeof field === 'string')
+        : [],
     )
   }
   return res.json() as Promise<T>
@@ -430,11 +435,14 @@ export function getStats(): Promise<RequestStats> {
 
 export function listRequests(params?: {
   status?: RequestStatus
+  /** Only requests bound to this event's subtopics (server-side filter). */
+  eventId?: string
   page?: number
   limit?: number
 }): Promise<Paginated<RequestDto>> {
   const qs = new URLSearchParams()
   if (params?.status) qs.set('status', params.status)
+  if (params?.eventId) qs.set('eventId', params.eventId)
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
   const suffix = qs.toString() ? `?${qs.toString()}` : ''
@@ -485,6 +493,10 @@ export function createRequest(input: {
   serviceId: string
   title: string
   answers?: Record<string, unknown>
+  /** Event applications: the server binds one draft to this subtopic and the RFP version read. */
+  eventId?: string
+  subtopicId?: string
+  rfpVersionId?: string
 }): Promise<{ request: RequestDto }> {
   return dashboardFetch<{ request: RequestDto }>('/requests', {
     method: 'POST',
@@ -1019,6 +1031,11 @@ export function getSubtopicRfp(
     ? `/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopicId)}/rfp/${encodeURIComponent(versionId)}`
     : `/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopicId)}/rfp`
   return dashboardFetch<{ version: RfpVersionDto }>(path)
+}
+
+/** The event/subtopic/RFP version pinned to an application; 404 when the request has none. */
+export function getRequestRfp(requestId: string): Promise<{ version: RfpVersionDto }> {
+  return dashboardFetch<{ version: RfpVersionDto }>(`/requests/${encodeURIComponent(requestId)}/rfp`)
 }
 
 export function getRfpDownloadUrl(
