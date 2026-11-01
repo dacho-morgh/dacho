@@ -30,11 +30,22 @@ export function RequestsListRow({
         <Typography variant="12/regular" className="mt-1 font-mono text-neutral-400">
           کد پیگیری: {item.trackingCode}
         </Typography>
+        {item.nextAction ? (
+          <Typography variant="12/regular" className="mt-1 truncate text-neutral-500" data-testid="row-next-action">
+            اقدام شما: {item.nextAction}
+          </Typography>
+        ) : null}
       </td>
 
       {/* Column 2: Status Badge */}
       <td className="h-18 px-4">
         <RequestStatusBadge status={item.status} label={item.statusLabel} />
+        {item.stageLabel ? (
+          <Typography variant="12/regular" className="mt-1 truncate text-neutral-500" data-testid="row-stage">
+            {item.stageLabel}
+            {item.revision ? ` · نسخه ${item.revision.toLocaleString('fa-IR')}` : ''}
+          </Typography>
+        ) : null}
       </td>
 
       {/* Column 3: Due Date (16/regular #525252) */}

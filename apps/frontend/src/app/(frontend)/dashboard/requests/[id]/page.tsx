@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react'
 import configPromise from '@payload-config'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
+import { CompanyCorrectionPanel } from '@/components/dashboard/company-correction-panel'
+import { CompanyRequestTracking } from '@/components/dashboard/company-request-tracking'
 import { RequestDossier, type DossierPart } from '@/components/dashboard/request-dossier'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Typography } from '@/components/ui/typography'
@@ -18,8 +21,21 @@ import {
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { dashboardOperationalRole, serverDashboardFetchResult } from '@/utilities/dashboard-server'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
+import { trackingOutcome } from '@/utilities/request-tracking'
+import { serviceFormFields } from '@/utilities/service-form-fields'
+import type { RequestFormField } from '@/components/dashboard/request-form-field'
 
 export const dynamic = 'force-dynamic'
+
+/** The service's fixed form, read from the CMS; a failed read offers no answer fields rather than failing the page. */
+async function serviceFields(payload: Awaited<ReturnType<typeof getPayload>>, serviceId: string): Promise<RequestFormField[]> {
+  try {
+    const service = await payload.findByID({ collection: 'services', id: serviceId, depth: 2 })
+    return serviceFormFields(service)
+  } catch {
+    return []
+  }
+}
 
 /** A section's read: a failure stays distinct from "this role has no such section". */
 async function readPart<T>(path: string): Promise<DossierPart<T>> {
@@ -61,9 +77,15 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
     isCompany ? readPart<{ items: CompanySupplementaryRequestDto[] }>(`${path}/supplementary-requests`) : null,
   ])
 
+  // The correction form edits the service's fixed answers; an unreadable form leaves the team and files editable.
+  const correcting = isCompany && (result.data.request.allowedActions ?? []).includes('correct')
+  const correctionFields = correcting ? await serviceFields(payload, result.data.request.serviceId) : []
+  const outcome = isCompany ? trackingOutcome(result.data.request, result.data.timeline) : null
+
   return (
     <RequestDossier
       role={role}
+      correctionHandled={correcting}
       detail={result.data}
       proposal={proposal}
       round={round}
@@ -71,9 +93,20 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       companySections={
         isCompany ? (
           <CompanySections
-            requestId={result.data.request.id}
+            request={result.data.request}
+            timeline={result.data.timeline}
+            proposalRevision={proposal === 'failed' ? 'failed' : (proposal?.proposal?.revision ?? null)}
             publishedResult={publishedResult}
             supplementary={supplementary}
+            correction={
+              correcting ? (
+                <CompanyCorrectionPanel
+                  request={result.data.request}
+                  fields={correctionFields}
+                  after={outcome?.kind === 'correction' ? outcome.after : null}
+                />
+              ) : null
+            }
           />
         ) : null
       }
@@ -81,35 +114,32 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   )
 }
 
-/** What the company receives from the Secretariat: the published result and document requests. */
+/** The company's tracking, correction and result, then the Secretariat's document requests. */
 function CompanySections({
-  requestId,
+  request,
+  timeline,
+  proposalRevision,
   publishedResult,
   supplementary,
+  correction,
 }: {
-  requestId: string
+  request: RequestDetail['request']
+  timeline: RequestDetail['timeline']
+  proposalRevision: DossierPart<number>
   publishedResult: DossierPart<{ result: PublishedResultDto | null }>
   supplementary: DossierPart<{ items: CompanySupplementaryRequestDto[] }>
+  correction: ReactNode
 }) {
+  const requestId = request.id
   return (
     <>
-      {publishedResult === 'failed' ? (
-        <Typography role="alert" variant="14/regular" color="error">
-          دریافت نتیجه پرونده انجام نشد. صفحه را دوباره بارگذاری کنید.
-        </Typography>
-      ) : publishedResult?.result ? (
-        <section className="flex flex-col gap-2 rounded-2xl border border-brand-600 bg-white p-6">
-          <Typography as="h2" variant="20/bold" className="text-neutral-900">
-            نتیجه پرونده
-          </Typography>
-          <Typography variant="12/regular" className="text-neutral-500">
-            تاریخ انتشار: {formatDate(publishedResult.result.publishedAt)}
-          </Typography>
-          <Typography variant="16/regular" className="whitespace-pre-wrap text-neutral-800">
-            {publishedResult.result.body}
-          </Typography>
-        </section>
-      ) : null}
+      <CompanyRequestTracking
+        request={request}
+        timeline={timeline}
+        proposalRevision={proposalRevision}
+        publishedResult={publishedResult}
+        correction={correction}
+      />
       {supplementary === 'failed' ? (
         <Typography role="alert" variant="14/regular" color="error">
           دریافت درخواست‌های دبیرخانه انجام نشد. صفحه را دوباره بارگذاری کنید.

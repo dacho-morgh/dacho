@@ -37,10 +37,12 @@ Allowed actions with no screen yet get a sentence and no button:
 
 | Action | Owner of the screen | Why it is not here |
 | --- | --- | --- |
-| `submit`, `correct` | FE12, FE13 | Resubmission needs the approved agreement text, which has not been supplied |
+| `submit` | FE12 | Final submission lives on the event application workspace; acceptance uses the unapproved placeholder agreement versions until approved text is supplied |
 | `submitFinancialPackage` | FE19 | The file field cannot record a statement year yet, so a package could never complete |
 | `replaceReviewer`, `replaceEmployer` | FE15 | The round response has no names, so the chief could not tell who is being replaced |
 | Evaluation form | FE17 | The fixed rubric form does not exist |
+
+The company's `correct` action is built (FE13): the company's case page shows a tracking section (stage, next action, submitted proposal revision, the chief's return or rejection reason, an owner's reopen and the published result) and, while the server lists `correct`, a correction form that patches the same case and calls `POST /requests/:id/resubmit`. That form owns the proposal upload while correcting. Acceptance is recorded with the server's current agreement versions, which remain unapproved placeholders until the approved text is supplied.
 
 ## Removed
 

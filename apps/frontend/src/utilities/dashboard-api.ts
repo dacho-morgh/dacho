@@ -6,6 +6,7 @@
 import type { LetterItem } from '@/components/dashboard/inbox-list-view'
 import type { MailData } from '@/components/dashboard/mail-detail-view'
 import type { RequestItem } from '@/components/dashboard/requests/types'
+import { companyNextAction, companyStageLabel } from './request-tracking'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 export type LetterType = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
@@ -75,6 +76,10 @@ export interface ActivityDto {
   title: string
   description: string | null
   at: string
+  /** Transition rows: the server's action key, the reason it recorded and the case revision it produced. */
+  action?: string | null
+  reason?: string | null
+  revision?: number | null
 }
 
 export interface RequestStats {
@@ -530,6 +535,25 @@ export function submitRequest(
   })
 }
 
+/**
+ * Resubmits a case the chief returned for correction: the same application and
+ * tracking code receive a new proposal revision. The server re-checks ownership,
+ * the correction state, verification, required fields and the agreement versions.
+ */
+export function resubmitCorrection(
+  id: string,
+  body: {
+    nonCompeteAcceptance: { accepted: boolean; textVersionId: string }
+    eventRulesAcceptance: { accepted: boolean; textVersionId: string }
+  },
+): Promise<{ request: RequestDto }> {
+  return dashboardFetch<{ request: RequestDto }>(`/requests/${encodeURIComponent(id)}/resubmit`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
 export interface AgreementDefinition {
   type: 'non_compete' | 'event_rules'
   version: string
@@ -748,6 +772,9 @@ export function mapRequestItem(dto: RequestDto): RequestItem {
     status: dto.status as RequestItem['status'],
     statusLabel: REQUEST_STATUS_LABELS[dto.status],
     currentStep: dto.currentStep ?? '',
+    stageLabel: companyStageLabel(dto),
+    nextAction: companyNextAction(dto),
+    revision: dto.revision ?? null,
     allowedActions: dto.allowedActions ?? [],
     dueDate: formatDate(dto.dueDate),
     createdDate: formatDate(dto.createdAt),

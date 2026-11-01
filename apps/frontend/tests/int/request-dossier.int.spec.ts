@@ -188,7 +188,7 @@ describe('RequestDossier per role', () => {
 
   it('names the actions it has no control for instead of offering a button', () => {
     dossier({ role: 'representative', detail: detail(['read', 'correct', 'uploadDocument', 'deleteDocument']) })
-    expect(screen.getByText('اصلاح و ارسال دوباره پرونده')).toBeTruthy()
+    expect(screen.getByText('اصلاح پرونده و ارسال دوباره')).toBeTruthy()
     expect(screen.getByText(/ارسال دوباره از این صفحه هنوز فعال نیست/)).toBeTruthy()
     expect(screen.queryByText('correct')).toBeNull()
   })

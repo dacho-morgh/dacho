@@ -94,6 +94,10 @@ export interface RequestItem {
   status: RequestStatus
   statusLabel: string
   currentStep: string
+  /** The company's view of where the case is, its next step and the case revision (FE13). */
+  stageLabel?: string
+  nextAction?: string
+  revision?: number | null
   allowedActions: RequestAllowedAction[]
   dueDate: string
   createdDate: string
