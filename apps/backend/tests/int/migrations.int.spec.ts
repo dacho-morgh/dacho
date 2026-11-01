@@ -281,4 +281,90 @@ describe('dashboard migrations', () => {
     const rfpCols = await tableColumns('request_rfps')
     expect(rfpCols).toEqual(expect.arrayContaining(['company_id']))
   })
+
+  it('creates request_proposals and request_agreements tables for T20', async () => {
+    const proposalCols = await tableColumns('request_proposals')
+    expect(proposalCols).toEqual(
+      expect.arrayContaining([
+        'request_id',
+        'revision',
+        'form_version',
+        'application_team',
+        'proposal_documents',
+        'created_at',
+      ]),
+    )
+
+    const agreementCols = await tableColumns('request_agreements')
+    expect(agreementCols).toEqual(
+      expect.arrayContaining([
+        'id',
+        'request_id',
+        'revision',
+        'agreement_type',
+        'text_version_id',
+        'accepted_by',
+        'accepted_at',
+      ]),
+    )
+  })
+
+  it('adds the T21 review stage, proposal answers snapshot and triage reason guard', async () => {
+    expect(await tableColumns('requests')).toEqual(expect.arrayContaining(['review_stage']))
+    expect(await tableColumns('request_proposals')).toEqual(expect.arrayContaining(['answers']))
+    const { rows } = await pool.query(
+      `SELECT 1 FROM pg_constraint WHERE conname = 'activities_triage_reason_required'`,
+    )
+    expect(rows).toHaveLength(1)
+  })
+
+  it('adds the T22 review rounds and round-bound slot assignments', async () => {
+    expect(await tableColumns('review_rounds')).toEqual(
+      expect.arrayContaining(['request_revision', 'proposal_revision', 'employer_id', 'superseded_at']),
+    )
+    expect(await tableColumns('case_assignments')).toEqual(expect.arrayContaining(['round_id', 'slot']))
+    const { rows } = await pool.query(
+      `SELECT indexname FROM pg_indexes WHERE schemaname = 'dashboard'
+       AND indexname IN ('case_assignments_round_person_active_unique', 'case_assignments_round_employer_active_unique')`,
+    )
+    expect(rows).toHaveLength(2)
+  })
+
+  it('adds the T26 replacement history with a mandatory employer reason', async () => {
+    expect(await tableColumns('review_replacements')).toEqual(
+      expect.arrayContaining(['round_id', 'slot', 'old_user_id', 'new_user_id', 'replaced_by', 'reason', 'replaced_at']),
+    )
+    const { rows } = await pool.query(
+      `SELECT conname FROM pg_constraint
+       WHERE conname IN ('review_replacements_employer_reason', 'review_replacements_different_people')`,
+    )
+    expect(rows).toHaveLength(2)
+  })
+
+  it('adds the T27 completion time to review rounds', async () => {
+    expect(await tableColumns('review_rounds')).toEqual(expect.arrayContaining(['completed_at']))
+  })
+
+  it('adds the T28 chief decision to review rounds and the advanced review stage', async () => {
+    expect(await tableColumns('review_rounds')).toEqual(
+      expect.arrayContaining(['decision', 'decided_by', 'decided_at', 'decision_reason']),
+    )
+    const { rows } = await pool.query<{ definition: string }>(
+      `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'requests_review_stage_check'`,
+    )
+    expect(rows[0]?.definition).toContain('advanced')
+  })
+
+  it('adds the T29 financial invitations', async () => {
+    expect(await tableColumns('financial_invitations')).toEqual(
+      expect.arrayContaining(['request_id', 'review_round_id', 'request_revision', 'proposal_revision', 'checklist_version', 'checklist']),
+    )
+  })
+
+  it('adds the T30 financial packages and statement years', async () => {
+    expect(await tableColumns('financial_packages')).toEqual(
+      expect.arrayContaining(['request_id', 'invitation_id', 'package_version', 'statement_years', 'documents', 'submitted_by']),
+    )
+    expect(await tableColumns('private_documents')).toEqual(expect.arrayContaining(['statement_year']))
+  })
 })

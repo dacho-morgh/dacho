@@ -9,6 +9,7 @@ import {
   type AdminListLoadState,
 } from '@/components/dashboard/admin-list-view'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 
 export type VerificationStatus =
@@ -209,23 +210,19 @@ export function CompanyList() {
         const active = queueFilter === q.id
         const count = counts[q.id]
         return (
-          <button
+          <Button
             key={q.id}
             type="button"
             role="tab"
             aria-selected={active}
             onClick={() => setQueueFilter(q.id)}
-            className={`inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium transition-colors ${
-              active
-                ? 'bg-brand-600 text-white shadow-xs'
-                : 'border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'
-            }`}
+            size="36"
+            variant={active ? 'default' : 'outline-gray'}
           >
-            <span>{q.label}</span>
-            <span className={`mr-1.5 text-xs ${active ? 'text-brand-100' : 'text-neutral-400'}`}>
-              ({count.toLocaleString('fa-IR')})
-            </span>
-          </button>
+            <Typography as="span" variant="14/regular" color={active ? 'white' : 'secondary'}>
+              {q.label} ({count.toLocaleString('fa-IR')})
+            </Typography>
+          </Button>
         )
       })}
     </div>

@@ -10,12 +10,16 @@ import { CompanyDetailView } from '@/components/dashboard/company-detail-view'
 const navigation = vi.hoisted(() => ({
   push: vi.fn(),
   refresh: vi.fn(),
+  notFound: vi.fn(() => {
+    throw new Error('NEXT_NOT_FOUND')
+  }),
 }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => navigation,
   usePathname: () => '/dashboard/companies',
   useSearchParams: () => new URLSearchParams(),
+  notFound: navigation.notFound,
 }))
 
 const mockDocumentApi = vi.hoisted(() => ({
@@ -353,5 +357,75 @@ describe('FE05: Secretariat Company Verification Workbench', () => {
       expect(within(region).getByText('نام قبلی تأییدشده در اسناد')).toBeTruthy()
       expect(within(region).getByText('نام جدید شرکت ویرایش‌شده')).toBeTruthy()
     })
+  })
+
+  it.each([
+    [401, 'نشست شما منقضی شده است'],
+    [403, 'دسترسی به این بخش مجاز نیست'],
+    [500, 'دریافت اطلاعات انجام نشد'],
+  ])('shows the shared unavailable notice for a %i company response', async (status, title) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'x' }), { status })),
+    )
+
+    render(createElement(CompanyDetailView, { id: 'rep-1' }))
+
+    await waitFor(() => {
+      expect(screen.getByText(title)).toBeTruthy()
+    })
+    expect(screen.queryByText('میز کار بررسی و تصمیم احراز دبیرخانه')).toBeNull()
+  })
+
+  it('sends the refreshed revision on the decision submitted after a stale refresh', async () => {
+    const detail = (revision: number) => ({
+      representative: { id: 'rep-1', name: 'علی رضایی', phone: '09121111111' },
+      companyId: 'comp-1',
+      company: { name: 'شرکت پترو صنعت' },
+      allowedActions: ['read', 'approve', 'return', 'reject'],
+      verification: { id: 'verif-1', status: 'pending', revision, snapshot: {} },
+    })
+    let companyReads = 0
+    const decisions: { expectedRevision?: number; reason?: string; action: string }[] = []
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/verification/decision')) {
+        decisions.push(JSON.parse(String(init?.body)))
+        if (decisions.length === 1) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ error: 'stale_revision' }), { status: 409 }),
+          )
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ verification: { status: 'returned', revision: 3 } }), {
+            status: 200,
+          }),
+        )
+      }
+      if (url.includes('/api/dashboard/admin/companies/rep-1')) {
+        companyReads++
+        return Promise.resolve(
+          new Response(JSON.stringify(detail(companyReads > 1 ? 3 : 2)), { status: 200 }),
+        )
+      }
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 404 }))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(createElement(CompanyDetailView, { id: 'rep-1' }))
+    const textarea = (await screen.findByLabelText(/توضیحات و دلیل تصمیم/)) as HTMLTextAreaElement
+    fireEvent.change(textarea, { target: { value: 'نقص مدارک' } })
+    expect(localStorage.getItem('dacho:company-decision:rep-1')).toBe('نقص مدارک')
+
+    fireEvent.click(screen.getByRole('button', { name: 'برگشت جهت اصلاح' }))
+    await screen.findByText(/نسخه پرونده احراز تغییر یافته است/)
+    await waitFor(() => {
+      expect(screen.getAllByText('نسخه ۳').length).toBeGreaterThanOrEqual(1)
+    })
+    expect(decisions[0]).toMatchObject({ action: 'return', expectedRevision: 2, reason: 'نقص مدارک' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'برگشت جهت اصلاح' }))
+    await screen.findByText('مدارک شرکت با موفقیت جهت اصلاح بازگردانده شد.')
+    expect(decisions[1]).toMatchObject({ action: 'return', expectedRevision: 3, reason: 'نقص مدارک' })
+    expect(localStorage.getItem('dacho:company-decision:rep-1')).toBeNull()
   })
 })

@@ -238,6 +238,31 @@ export class EventRepository implements EventStore {
           JSON.stringify(event),
         ],
       )
+      if (current.responsibleChiefId !== event.responsibleChiefId) {
+        // Case access granted for being the event's responsible chief (T21) moves
+        // with the responsibility: the former chief's system grants are revoked
+        // with history and the new chief receives the submitted cases. Grants an
+        // owner made by hand stay untouched. The event row lock taken above is
+        // the same one triage/submission read the chief under, so no case can be
+        // assigned to the outgoing chief after this commits.
+        await client.query(
+          `UPDATE dashboard.case_assignments a
+           SET active = false, revoked_by = $3, revoked_at = now(), revoke_reason = $4
+           FROM dashboard.request_rfps rfp
+           WHERE rfp.event_id = $1 AND a.request_id = rfp.request_id
+             AND a.user_id = $2 AND a.role = 'chief-reviewer' AND a.assigned_by = 'system' AND a.active`,
+          [event.id, current.responsibleChiefId, input.actorId, input.reason],
+        )
+        await client.query(
+          `INSERT INTO dashboard.case_assignments (request_id, user_id, role, assigned_by)
+           SELECT r.id, $2, 'chief-reviewer', 'system'
+           FROM dashboard.request_rfps rfp
+           JOIN dashboard.requests r ON r.id = rfp.request_id
+           WHERE rfp.event_id = $1 AND r.status <> 'draft'
+           ON CONFLICT (request_id, user_id, role) WHERE active DO NOTHING`,
+          [event.id, event.responsibleChiefId],
+        )
+      }
       await client.query('COMMIT')
       return { ok: true, event }
     } catch (error) {

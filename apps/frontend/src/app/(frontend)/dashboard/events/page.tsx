@@ -14,13 +14,7 @@ export const metadata: Metadata = {
   description: 'مشاهده، ثبت‌نام و رزرو پاویون‌های اختصاصی در رویدادها و نمایشگاه‌های صنعتی و نوآوری',
 }
 
-interface PageProps {
-  searchParams?: Promise<{ state?: 'default' | 'loading' | 'empty' }>
-}
-
-export default async function EventsPage(props: PageProps) {
-  const searchParams = await props.searchParams
-  const state = searchParams?.state ?? 'default'
+export default async function EventsPage() {
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isOwner = dashboardOperationalRole(user) === 'system-owner'
@@ -35,7 +29,6 @@ export default async function EventsPage(props: PageProps) {
         <div className="flex w-full flex-col items-center bg-[#fafafa] px-4 pb-12 sm:px-6 lg:px-8">
           <EventsView
             initialEventsList={exhibitions.docs.map((item) => mapEvent(item, 'exhibitions'))}
-            state={state}
             isOwner
           />
         </div>
@@ -53,7 +46,7 @@ export default async function EventsPage(props: PageProps) {
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">
-      <EventsView initialEventsList={events} state={state} isOwner={isOwner} />
+      <EventsView initialEventsList={events} isOwner={isOwner} />
     </div>
   )
 }

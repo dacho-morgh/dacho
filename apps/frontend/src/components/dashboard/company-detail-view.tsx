@@ -1,18 +1,22 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
+import { notFound } from 'next/navigation'
 import {
   DashboardAddIcon,
   DashboardEditIcon,
   DashboardTrashIcon,
 } from '@/components/icons'
+import type { UnavailableReason } from '@/utilities/dashboard-fetch-result'
 import {
   documentCategoryLabel,
   downloadDocument,
@@ -103,7 +107,7 @@ export interface CompanyDetailResponse {
   history?: VerificationHistoryItem[]
 }
 
-type LoadState = 'loading' | 'ready' | 'unauthenticated' | 'denied' | 'error'
+type LoadState = 'loading' | 'ready' | 'missing' | UnavailableReason
 
 function verificationStatusBadge(status: VerificationStatus): {
   label: string
@@ -127,6 +131,8 @@ function verificationStatusBadge(status: VerificationStatus): {
 export function CompanyDetailView({ id }: { id: string }) {
   const [data, setData] = useState<CompanyDetailResponse | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
+  // Each load gets a sequence number so a slower, older response never overwrites a newer one.
+  const loadSequence = useRef(0)
 
   // Workbench decision form state
   const [decisionReason, setDecisionReason] = useState('')
@@ -135,40 +141,45 @@ export function CompanyDetailView({ id }: { id: string }) {
   const [decisionSuccess, setDecisionSuccess] = useState<string | null>(null)
   const [staleNotice, setStaleNotice] = useState<string | null>(null)
   const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
+  const draftKey = `dacho:company-decision:${id}`
 
   // Protect unsaved decision text across refresh/reloads
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`dacho:company-decision:${id}`)
-      if (saved) {
-        setDecisionReason(saved)
-      }
-    }
-  }, [id])
+    const saved = readDraft(draftKey)
+    if (saved) setDecisionReason(saved)
+  }, [draftKey])
 
   const handleReasonChange = (value: string) => {
     setDecisionReason(value)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`dacho:company-decision:${id}`, value)
-    }
+    writeDraft(draftKey, value)
   }
 
   const loadData = useCallback(async () => {
-    setLoadState('loading')
+    const sequence = ++loadSequence.current
+    const isCurrent = () => sequence === loadSequence.current
+    // Keep the loaded case on screen while refreshing after a decision or a stale revision.
+    setLoadState((previous) => (previous === 'ready' ? 'ready' : 'loading'))
     try {
       const response = await fetch(`/api/dashboard/admin/companies/${encodeURIComponent(id)}`, {
         cache: 'no-store',
       })
+      if (!isCurrent()) return
       if (response.status === 401) {
-        setLoadState('unauthenticated')
+        setLoadState('expired')
         return
       }
       if (response.status === 403) {
         setLoadState('denied')
         return
       }
+      if (response.status === 404) {
+        setLoadState('missing')
+        return
+      }
       if (!response.ok) {
-        setLoadState('error')
+        setLoadState('unavailable')
         return
       }
       const companyData = (await response.json()) as CompanyDetailResponse
@@ -202,15 +213,20 @@ export function CompanyDetailView({ id }: { id: string }) {
         }
       }
 
+      if (!isCurrent()) return
       setData(companyData)
       setLoadState('ready')
     } catch {
-      setLoadState('error')
+      if (isCurrent()) setLoadState('unavailable')
     }
   }, [id])
 
   useEffect(() => {
     void loadData()
+    return () => {
+      // Ignore responses that arrive after unmount or after the id changes.
+      loadSequence.current += 1
+    }
   }, [loadData])
 
   // Handle secretariat verification decision (Approve / Return / Reject)
@@ -284,9 +300,7 @@ export function CompanyDetailView({ id }: { id: string }) {
       }
 
       // Success: clean up draft
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(`dacho:company-decision:${id}`)
-      }
+      writeDraft(draftKey, '')
       setDecisionReason('')
       setDecisionSuccess(
         action === 'approve'
@@ -306,6 +320,7 @@ export function CompanyDetailView({ id }: { id: string }) {
   // Handle authorized document download
   const handleDownloadDocument = async (docId: string, filename: string) => {
     setDownloadingDocId(docId)
+    setDownloadError(null)
     try {
       const { blob, filename: resolvedFilename } = await downloadDocument(docId)
       const blobUrl = URL.createObjectURL(blob)
@@ -317,7 +332,7 @@ export function CompanyDetailView({ id }: { id: string }) {
       link.remove()
       URL.revokeObjectURL(blobUrl)
     } catch {
-      alert('دانلود مدرک انجام نشد. لطفاً دسترسی را بررسی و دوباره تلاش کنید.')
+      setDownloadError('دانلود مدرک انجام نشد. لطفاً دسترسی را بررسی و دوباره تلاش کنید.')
     } finally {
       setDownloadingDocId(null)
     }
@@ -371,58 +386,23 @@ export function CompanyDetailView({ id }: { id: string }) {
     )
   }, [data?.company, data?.verification?.snapshot?.company])
 
-  if (loadState === 'loading') {
+  if (loadState === 'missing') notFound()
+  if (loadState === 'expired' || loadState === 'denied' || loadState === 'unavailable') {
     return (
-      <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:p-10" dir="rtl">
-        <Typography role="status" aria-live="polite" variant="16/regular" color="muted">
-          در حال دریافت اطلاعات پرونده شرکت...
+      <div className="mx-auto w-full max-w-4xl p-6 pt-20 md:p-10" dir="rtl">
+        <OfflineNotice reason={loadState} retryHref={`/dashboard/companies/${encodeURIComponent(id)}`} />
+      </div>
+    )
+  }
+  if (loadState === 'loading' || !data) {
+    return (
+      <div className="flex w-full flex-col gap-5 p-6 pt-20 md:p-10" dir="rtl">
+        <Typography as="span" role="status" variant="14/regular" className="sr-only">
+          در حال دریافت اطلاعات شرکت
         </Typography>
-      </main>
-    )
-  }
-
-  if (loadState === 'unauthenticated') {
-    return (
-      <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:p-10" dir="rtl">
-        <div className="rounded-xl border border-neutral-200 bg-white p-6 text-center">
-          <Typography role="alert" variant="16/regular" color="neutral-700">
-            نشست شما پایان یافته است. برای مشاهده اطلاعات دوباره وارد شوید.
-          </Typography>
-          <Button asChild size="36" className="mt-4">
-            <Link href="/login">ورود دوباره</Link>
-          </Button>
-        </div>
-      </main>
-    )
-  }
-
-  if (loadState === 'denied') {
-    return (
-      <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:p-10" dir="rtl">
-        <div className="rounded-xl border border-neutral-200 bg-white p-6 text-center">
-          <Typography role="alert" variant="16/regular" color="neutral-700">
-            دسترسی به پرونده شرکت مجاز نیست.
-          </Typography>
-          <Button asChild size="36" variant="outline-gray" className="mt-4">
-            <Link href="/dashboard">بازگشت به پیشخوان</Link>
-          </Button>
-        </div>
-      </main>
-    )
-  }
-
-  if (loadState === 'error' || !data) {
-    return (
-      <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:p-10" dir="rtl">
-        <div className="rounded-xl border border-neutral-200 bg-white p-6 text-center">
-          <Typography role="alert" variant="16/regular" color="neutral-700">
-            دریافت اطلاعات پرونده شرکت انجام نشد.
-          </Typography>
-          <Button onClick={() => void loadData()} size="36" variant="outline-gray" className="mt-4">
-            تلاش دوباره
-          </Button>
-        </div>
-      </main>
+        <Skeleton aria-hidden="true" className="h-6 w-48 rounded-lg bg-neutral-200 motion-reduce:animate-none" />
+        <Skeleton aria-hidden="true" className="h-96 w-full rounded-2xl bg-neutral-100 motion-reduce:animate-none" />
+      </div>
     )
   }
 
@@ -450,7 +430,7 @@ export function CompanyDetailView({ id }: { id: string }) {
   const snapshotDocuments = verification?.snapshot?.documents ?? []
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:p-10" dir="rtl">
+    <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 pt-20 md:p-10" dir="rtl">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2">
         <Link href="/dashboard/companies">
@@ -464,8 +444,7 @@ export function CompanyDetailView({ id }: { id: string }) {
       </div>
 
       <div className="flex min-h-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:min-h-[912px] lg:flex-row">
-        {/* Sidebar Nav */}
-        <nav className="order-first flex w-full shrink-0 flex-row gap-2 border-b border-neutral-200 pb-4 lg:order-none lg:w-[200px] lg:flex-col lg:border-b-0 lg:border-l lg:pl-5">
+        <nav className="order-first flex w-full shrink-0 flex-row flex-wrap gap-2 border-b border-neutral-200 pb-4 lg:order-none lg:w-[200px] lg:flex-col lg:border-b-0 lg:border-l lg:pl-5">
           <Typography
             variant="16/semibold"
             color="brand-600"
@@ -492,7 +471,7 @@ export function CompanyDetailView({ id }: { id: string }) {
         <div className="flex w-full max-w-[892px] flex-col gap-6">
           {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 items-center gap-4">
               <Image
                 src="/figma/dashboard/profile-avatar.png"
                 alt={companyName || 'شرکت'}
@@ -500,7 +479,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                 height={80}
                 className="rounded-xl object-cover"
               />
-              <div>
+              <div className="min-w-0 break-words">
                 <Typography variant="20/bold" color="neutral-900">
                   {companyName || '—'}
                 </Typography>
@@ -727,6 +706,14 @@ export function CompanyDetailView({ id }: { id: string }) {
               </div>
             </div>
 
+            {downloadError && (
+              <div
+                role="alert"
+                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+              >
+                {downloadError}
+              </div>
+            )}
             {snapshotDocuments.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 {snapshotDocuments.map((doc) => (
@@ -828,7 +815,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                   key={category}
                   category={category}
                   label={label}
-                  companyId={data?.companyId ?? undefined}
+                  companyId={data.companyId ?? undefined}
                   canUpload
                 />
               ))}
@@ -838,6 +825,24 @@ export function CompanyDetailView({ id }: { id: string }) {
       </div>
     </main>
   )
+}
+
+/** Browser storage can be blocked; the draft is a convenience, so failures are ignored. */
+function readDraft(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeDraft(key: string, value: string) {
+  try {
+    if (value) window.localStorage.setItem(key, value)
+    else window.localStorage.removeItem(key)
+  } catch {
+    // Keep the in-memory draft when storage is unavailable.
+  }
 }
 
 function formatDate(iso: string): string {

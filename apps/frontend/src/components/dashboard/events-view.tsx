@@ -70,7 +70,7 @@ function EventsSkeleton() {
 }
 
 // Empty state matching Figma node 56:13860 / 56:14004
-function EventsEmptyState() {
+function EventsEmptyState({ noMatch = false }: { noMatch?: boolean }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-28 text-center">
       <div className="flex flex-col items-center gap-[4px]">
@@ -78,10 +78,10 @@ function EventsEmptyState() {
           <EmptyInboxIllustration className="size-[80px]" />
         </div>
         <p className="mt-1 font-sans text-[14px] leading-[24px] font-semibold text-[#525252]">
-          رویداد و نمایشگاهی در سیستم موجود نیست
+          {noMatch ? 'نتیجه‌ای پیدا نشد' : 'رویداد و نمایشگاهی در سیستم موجود نیست'}
         </p>
         <p className="font-sans text-[12px] leading-[20px] font-normal text-[#737373]">
-          در صورت ایجاد رویداد یا نمایشگاه به شما اطلاع رسانی خواهیم کرد
+          {noMatch ? 'عبارت جستجو یا فیلتر را تغییر دهید' : 'در صورت ایجاد رویداد یا نمایشگاه به شما اطلاع رسانی خواهیم کرد'}
         </p>
       </div>
     </div>
@@ -308,7 +308,7 @@ export function EventsView({
             )}
 
             {/* Empty State */}
-            {isEmpty && <EventsEmptyState />}
+            {isEmpty && <EventsEmptyState noMatch={state !== 'empty' && events.length > 0} />}
           </>
         )}
       </section>

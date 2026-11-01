@@ -15,6 +15,7 @@ import { Typography } from '@/components/ui/typography'
 import {
   addAddress,
   deleteAddress,
+  describeMutationFailure,
   dossierFieldLabel,
   fetchProfileDossier,
   toEnglishDigits,
@@ -99,6 +100,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
   const [isSavingExecutive, setIsSavingExecutive] = useState(false)
 
   const [error, setError] = useState<string | null>(null)
+  const [savedNotice, setSavedNotice] = useState<string | null>(null)
 
   useEffect(() => {
     if (initialDossier) return
@@ -245,11 +247,12 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       setProfile(updatedProfile)
       setBasicForm(updatedProfile.company)
       setIsEditingBasic(false)
+      setSavedNotice('اطلاعات شرکت ذخیره شد.')
 
       const updatedDossier = await refreshDossier()
       if (updatedDossier) setDossierForm(updatedDossier.dossier)
-    } catch {
-      setError('ذخیره اطلاعات انجام نشد. ورودی‌ها را بررسی کنید.')
+    } catch (cause) {
+      setError(describeMutationFailure(cause, 'ذخیره اطلاعات انجام نشد. ورودی‌ها را بررسی کنید.'))
     } finally {
       basicSaveLock.current = false
       setIsSavingBasic(false)
@@ -391,6 +394,11 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       {error && (
         <Typography role="alert" color="error" className="rounded-xl bg-error-50 p-4">
           {error}
+        </Typography>
+      )}
+      {savedNotice && !error && (
+        <Typography role="status" color="success" className="rounded-xl bg-success-50 p-4">
+          {savedNotice}
         </Typography>
       )}
 

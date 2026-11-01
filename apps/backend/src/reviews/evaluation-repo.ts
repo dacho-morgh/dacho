@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 
+import { syncRoundCompletion } from './round-completion.js'
+
 export interface EvaluationDto {
   id: string
   requestId: string
@@ -97,17 +99,25 @@ export class PostgresEvaluationRepository implements EvaluationStore {
   private async writeGuard(client: PoolClient, input: SaveEvaluationInput): Promise<'stale' | 'forbidden' | undefined> {
     // Share locks allow independent reviewers while preventing a revision change
     // or assignment revocation from committing between authorization and this write.
-    const request = await client.query<{ revision: number; status: string }>(
-      'SELECT revision, status FROM dashboard.requests WHERE id = $1 FOR SHARE',
+    const request = await client.query<{ revision: number; status: string; review_stage: string | null }>(
+      'SELECT revision, status, review_stage FROM dashboard.requests WHERE id = $1 FOR SHARE',
       [input.requestId],
     )
     if (request.rows[0]?.revision !== input.revision || request.rows[0]?.status !== 'in_review') return 'stale'
-    const assignment = await client.query(
-      `SELECT id FROM dashboard.case_assignments
-       WHERE request_id = $1 AND user_id = $2 AND role = $3 AND active FOR SHARE`,
+    // Review is over once the chief advanced the case, even for a hand-made grant.
+    if (request.rows[0]?.review_stage === 'advanced') return 'stale'
+    const assignment = await client.query<{ round_revision: number | null }>(
+      `SELECT rr.request_revision AS round_revision
+       FROM dashboard.case_assignments a
+       LEFT JOIN dashboard.review_rounds rr ON rr.id = a.round_id
+       WHERE a.request_id = $1 AND a.user_id = $2 AND a.role = $3 AND a.active
+       FOR SHARE OF a`,
       [input.requestId, input.userId, input.role],
     )
-    if (!assignment.rows[0]) return 'forbidden'
+    const held = assignment.rows[0]
+    if (!held) return 'forbidden'
+    // A slot of an earlier round must not write into a revision it does not review.
+    if (held.round_revision !== null && held.round_revision !== input.revision) return 'stale'
   }
 
   async findByRequestAndUser(requestId: string, userId: string, revision?: number): Promise<EvaluationDto | null> {
@@ -224,9 +234,13 @@ export class PostgresEvaluationRepository implements EvaluationStore {
           input.scores, input.scoreA, input.scoreB, input.scoreC, input.weightedHundredths, input.answers,
         ],
       )
-      await client.query('COMMIT')
       const row = rows[0]
-      if (!row) return { ok: false, reason: 'locked' }
+      if (!row) {
+        await client.query('ROLLBACK')
+        return { ok: false, reason: 'locked' }
+      }
+      await syncRoundCompletion(client, { requestId: input.requestId, revision: input.revision, actorId: input.userId })
+      await client.query('COMMIT')
       return { ok: true, evaluation: mapRow(row) }
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {})

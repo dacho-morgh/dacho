@@ -40,6 +40,7 @@ const knownDestinations: Record<string, Omit<NavItem, 'href'>> = {
   '/dashboard/companies': { title: 'شرکت‌ها', icon: EventsIcon },
   '/dashboard/employees': { title: 'کارکنان', icon: PeopleIcon },
   '/dashboard/requests': { title: 'درخواست‌ها', icon: RequestsIcon },
+  '/dashboard/follow-ups': { title: 'پیگیری سرمایه‌گذاری', icon: RequestsIcon },
   '/dashboard/letters': { title: 'نامه‌ها', icon: LettersIcon },
   '/dashboard/events': { title: 'رویدادها و نمایشگاه‌ها', icon: EventsIcon },
   '/dashboard/exhibitions': { title: 'مدیریت نمایشگاه‌ها', icon: EventsIcon },

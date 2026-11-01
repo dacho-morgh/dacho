@@ -188,7 +188,7 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
     expect(first.body.evaluation.revision).toBe(2)
     state.revision = 3
     const current = await request(app).get(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-1')).expect(200)
-    expect(current.body).toMatchObject({ revision: 3, evaluation: null, completedEvaluationsCount: 0 })
+    expect(current.body).toEqual({ revision: 3, evaluation: null })
     await request(app).post(`/requests/${REQUEST_ID}/evaluation/finalize`).set(authHeader('reviewer-1')).send(payload).expect(409)
     await request(app).put(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-1')).send({ revision: 3, scores: {} }).expect(200)
     expect((await evaluationStore.findByRequestAndUser(REQUEST_ID, 'reviewer-1', 2))?.state).toBe('final')
@@ -231,11 +231,11 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
       .set(authHeader('rep-1'))
     expect(repRes.status).toBe(403)
 
-    // Unassigned reviewer cannot evaluate this request
+    // Unassigned reviewer cannot evaluate this request, or learn that it exists
     const unassignedRes = await request(app)
       .get(`/requests/${REQUEST_ID}/evaluation`)
       .set(authHeader('reviewer-2'))
-    expect(unassignedRes.status).toBe(403)
+    expect(unassignedRes.status).toBe(404)
 
     // Missing request returns 404
     const notFoundRes = await request(app)
@@ -282,7 +282,22 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
 
     expect(getRes.status).toBe(200)
     expect(getRes.body.evaluation.state).toBe('draft')
-    expect(getRes.body.completedEvaluationsCount).toBe(0)
+  })
+
+  it('keeps the progress of the other reviewers out of a reviewer response', async () => {
+    const { app, authHeader } = await setupTest([
+      { requestId: REQUEST_ID, userId: 'reviewer-1', role: 'reviewer' },
+      { requestId: REQUEST_ID, userId: 'reviewer-2', role: 'reviewer' },
+      { requestId: REQUEST_ID, userId: 'chief-1', role: 'chief-reviewer' },
+    ])
+    await request(app).post(`/requests/${REQUEST_ID}/evaluation/finalize`).set(authHeader('reviewer-1'))
+      .send({ revision: 2, scores: validOrdinaryScores(), answers: validOrdinaryAnswers() }).expect(200)
+
+    const own = await request(app).get(`/requests/${REQUEST_ID}/evaluation`).set(authHeader('reviewer-2')).expect(200)
+    expect(own.body).toEqual({ revision: 2, evaluation: null })
+
+    const oversight = await request(app).get(`/requests/${REQUEST_ID}/evaluations`).set(authHeader('chief-1')).expect(200)
+    expect(oversight.body).toMatchObject({ completedCount: 1, requiredCount: 4, readyForChiefDecision: false })
   })
 
   it('prohibits reviewer from viewing or editing another reviewer evaluation', async () => {
@@ -507,11 +522,11 @@ describe('[T25] Evaluation draft, finalization and lock', () => {
           if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
             return { rows: [] }
           }
-          if (sql.includes('SELECT revision, status FROM dashboard.requests')) {
-            return { rows: [{ revision: 1, status: 'in_review' }] }
+          if (sql.includes('SELECT revision, status, review_stage FROM dashboard.requests')) {
+            return { rows: [{ revision: 1, status: 'in_review', review_stage: 'triaged' }] }
           }
           if (sql.includes('FROM dashboard.case_assignments')) {
-            return { rows: [{ id: 'active-assignment' }] }
+            return { rows: [{ round_revision: null }] }
           }
           if (sql.includes('SELECT state FROM dashboard.evaluations')) {
             return { rows: evaluationRow ? [{ state: evaluationRow.state }] : [] }

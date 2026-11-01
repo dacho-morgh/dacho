@@ -1,9 +1,10 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { DashboardCloseCircle } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import { useDialogFocus } from '../use-dialog-focus'
 
 interface ProfileDialogProps {
   title: string
@@ -13,8 +14,11 @@ interface ProfileDialogProps {
 }
 
 export function ProfileDialog({ title, onClose, children, actions }: ProfileDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, onClose)
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs"
       role="dialog"
       aria-modal="true"

@@ -72,7 +72,7 @@ Before submit, the UI shows a per-field missing checklist and lets the company s
 
 ## Stage 3 — independent event application and consent
 
-One application is bound to one event **subtopic**. Its category is derived from the subtopic, not independently trusted. A company may have several applications to distinct subtopics. The exact agreement and event-rules text has **not** been approved; acceptance UI and UAT requiring it remain blocked until Product supplies published versions.
+One application is bound to one event **subtopic**. Its category is derived from the subtopic, not independently trusted. A company may have several applications to distinct subtopics. The exact agreement and event-rules text has **not** been approved; acceptance UI and UAT requiring it remain blocked until Product supplies published versions. Until then the backend issues the placeholder IDs `non-compete-unapproved-placeholder` and `event-rules-unapproved-placeholder`, and `GET /agreements` reports `approved: false`. Acceptance recorded against a placeholder is not final consent and must be collected again against the published text.
 
 | Proposed key | Type | Submit | Meaning / validation |
 | --- | --- | --- | --- |

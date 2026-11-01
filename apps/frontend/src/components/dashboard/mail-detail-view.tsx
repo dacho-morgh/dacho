@@ -14,7 +14,7 @@ import {
   CalendarBulkIcon, ClockBulkIcon, DashboardMessageTextIcon,
   DashboardMoreIcon, DashboardTrashIcon,
 } from '@/components/icons'
-import { deleteLetter } from '@/utilities/dashboard-api'
+import { deleteLetter, describeMutationFailure } from '@/utilities/dashboard-api'
 
 export interface MailData {
   id: string
@@ -52,10 +52,10 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
       await deleteLetter(mail.id)
       router.push('/dashboard/letters')
       router.refresh()
-    } catch {
+    } catch (cause) {
       deletingRef.current = false
       setDeleting(false)
-      setNotice('حذف نامه انجام نشد. دوباره تلاش کنید.')
+      setNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد. دوباره تلاش کنید.'))
     }
   }
 
