@@ -105,6 +105,7 @@ describe('users roles & access control', () => {
         position: 'مدیرعامل',
         companyName: 'شرکت تست',
         companyNationalId: TEST_COMPANY_NATIONAL_ID,
+        activityDomain: 'انرژی',
         companyEstablishmentDate: '1375',
         companyStatus: 'فعال',
         companyEconomicCode: '1234567890',
@@ -159,6 +160,7 @@ describe('users roles & access control', () => {
         position: 'مدیرعامل',
         companyName: 'شرکت تکراری',
         companyNationalId: TEST_COMPANY_NATIONAL_ID,
+        activityDomain: 'انرژی',
       }),
     })
 
@@ -196,6 +198,7 @@ describe('users roles & access control', () => {
     expect(messages).toContain('password')
     expect(messages).toContain('companyName')
     expect(messages).toContain('companyNationalId')
+    expect(messages).toContain('activityDomain')
   })
 
   it('allows explicit operator provisioning of one role', async () => {

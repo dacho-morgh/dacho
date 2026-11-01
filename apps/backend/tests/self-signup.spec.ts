@@ -128,16 +128,24 @@ describe('self-signup contract (unit)', () => {
     expect(store.calls).toEqual(['precheck', 'begin', 'user', 'company', 'commit'])
   })
 
-  it('accepts an omitted activity domain during the temporary compatibility window', async () => {
-    const store = new MemorySignupStore()
-    const { activityDomain: _omitted, ...bodyWithoutDomain } = validBody
+  it.each([undefined, '', '   '])(
+    'rejects a missing activity domain (%j) before any write now that FE03 collects it',
+    async (activityDomain) => {
+      const store = new MemorySignupStore()
+      const { activityDomain: _omitted, ...bodyWithoutDomain } = validBody
+      const body = activityDomain === undefined ? bodyWithoutDomain : { ...validBody, activityDomain }
 
-    const response = await runSelfSignup(bodyWithoutDomain, store)
+      const response = await runSelfSignup(body, store)
 
-    expect(response.status).toBe(201)
-    expect(store.companies).toHaveLength(1)
-    expect(store.companies[0]?.activityDomain).toBeUndefined()
-  })
+      expect(response.status).toBe(400)
+      expect(response.body.errors).toEqual([
+        expect.objectContaining({ code: 'missing_field', field: 'activityDomain' }),
+      ])
+      expect(store.users).toHaveLength(0)
+      expect(store.companies).toHaveLength(0)
+      expect(store.calls).toEqual([])
+    },
+  )
 
   it('returns a clear conflict for a duplicate national ID and never starts a transaction', async () => {
     const store = new MemorySignupStore()
@@ -258,9 +266,9 @@ describe('self-signup helpers', () => {
     })
   })
 
-  it('requires the stage-1 person fields and the two core company fields', () => {
+  it('requires the stage-1 person fields and the three stage-1 company fields', () => {
     expect(missingUserFields({})).toEqual(['name', 'position', 'phone', 'email', 'password'])
-    expect(missingCompanyFields({})).toEqual(['companyName', 'companyNationalId'])
+    expect(missingCompanyFields({})).toEqual(['companyName', 'companyNationalId', 'activityDomain'])
     expect(
       invalidSignupFields({ ...validBody, phone: '0912345678', companyNationalId: '1234abc' }),
     ).toEqual(['phone', 'companyNationalId'])
