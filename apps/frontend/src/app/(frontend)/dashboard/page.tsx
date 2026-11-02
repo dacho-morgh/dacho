@@ -19,6 +19,8 @@ import { requestQueueHref } from '@/components/dashboard/requests/types'
 import { ServicesQuickAccess, type ServiceCard } from '@/components/dashboard/services-quick-access'
 import { StatCards } from '@/components/dashboard/stat-cards'
 import { WorkQueueOverview } from '@/components/dashboard/work-queue-overview'
+import { ReviewerQueue } from '@/components/dashboard/reviewer/reviewer-queue'
+import { isReviewerRole } from '@/utilities/reviewer-case'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -56,7 +58,8 @@ export default async function DashboardPage({
   const payload = await getPayload({ config: configPromise })
   const requestHeaders = await headers()
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })
-  const workspace = dashboardWorkspace(dashboardOperationalRole(user))
+  const role = dashboardOperationalRole(user)
+  const workspace = dashboardWorkspace(role)
   const overviewResult = await serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview')
   const workQueues = (
     <WorkQueueOverview
@@ -69,7 +72,13 @@ export default async function DashboardPage({
       <>
         {showDeniedNotice && <DeniedNotice />}
         <div className="px-4 pt-6 lg:pt-10">{workQueues}</div>
-        {workspace === 'company-dossiers' ? <CompanyList /> : <AdminRequestList />}
+        {workspace === 'company-dossiers' ? (
+          <CompanyList />
+        ) : isReviewerRole(role) ? (
+          <ReviewerQueue view="open" page={1} />
+        ) : (
+          <AdminRequestList />
+        )}
       </>
     )
   }

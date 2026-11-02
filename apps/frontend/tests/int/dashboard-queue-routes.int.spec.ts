@@ -32,6 +32,14 @@ vi.mock('@/utilities/dashboard-server', async (importOriginal) => ({
 vi.mock('@/components/dashboard/admin-request-list', () => ({
   AdminRequestList: () => createElement('div', null, 'Internal request queue'),
 }))
+vi.mock('@/components/dashboard/reviewer/reviewer-queue', () => ({
+  ReviewerQueue: ({ view, page }: { view: string; page: number }) =>
+    createElement('div', null, `Assigned review queue ${view} ${page}`),
+}))
+vi.mock('@/components/dashboard/reviewer/reviewer-case-file', () => ({
+  ReviewerCaseFile: ({ initial }: { initial: { kind: string } }) =>
+    createElement('div', null, `Reviewer case file ${initial.kind}`),
+}))
 vi.mock('@/components/dashboard/request-dossier', () => ({
   RequestDossier: ({ role }: { role: string }) => createElement('div', null, `Dossier for ${role}`),
 }))
@@ -96,7 +104,7 @@ it('keeps internal authority on an HTTP mobile list navigation', async () => {
   } as unknown as Parameters<typeof extractJWT>[0]['payload']
   backend.auth.mockImplementation(async ({ headers }: { headers: Headers }) => ({
     user: extractJWT({ headers, payload })
-      ? { id: 'reviewer-1', operationalRole: 'reviewer', isActive: true }
+      ? { id: 'chief-1', operationalRole: 'chief-reviewer', isActive: true }
       : null,
   }))
   backend.fetch.mockResolvedValue({ kind: 'unavailable' })
@@ -104,6 +112,34 @@ it('keeps internal authority on an HTTP mobile list navigation', async () => {
   expect(screen.getByText('Internal request queue')).toBeTruthy()
   // The applicant queue stays unread; the internal list loads its own rows in the browser.
   expect(backend.fetch.mock.calls.filter(([path]) => String(path).startsWith('/requests'))).toEqual([])
+})
+
+it.each(['reviewer', 'employer-reviewer'])('gives %s only the assigned review queue', async (role) => {
+  backend.auth.mockResolvedValue({ user: { id: 'user-1', operationalRole: role, isActive: true } })
+  render(await RequestsPage({ searchParams: Promise.resolve({ view: 'closed', page: '2' }) }))
+  expect(screen.getByText('Assigned review queue closed 2')).toBeTruthy()
+  expect(screen.queryByText('Internal request queue')).toBeNull()
+  // The queue reads `/review/queue` in the browser; the generic lists and counts stay unread.
+  expect(backend.fetch).not.toHaveBeenCalled()
+})
+
+it.each([
+  [{ kind: 'ok', data: { case: {} } }, 'ok'],
+  [{ kind: 'unavailable', status: 404 }, 'not-assigned'],
+  [{ kind: 'denied' }, 'denied'],
+  [{ kind: 'unauthenticated' }, 'expired'],
+  [{ kind: 'unavailable', status: 500 }, 'error'],
+])('reads only the assigned case file for a reviewer (%o)', async (result, kind) => {
+  for (const role of ['reviewer', 'employer-reviewer']) {
+    backend.fetch.mockReset()
+    backend.auth.mockResolvedValue({ user: { id: 'user-1', operationalRole: role, isActive: true } })
+    backend.fetch.mockResolvedValue(result)
+    render(await RequestDetailPage({ params: Promise.resolve({ id: 'request-1' }) }))
+    // A 404 is a denied state for an unassigned or guessed id, never the generic not-found page.
+    expect(screen.getByText(`Reviewer case file ${kind}`)).toBeTruthy()
+    expect(backend.fetch.mock.calls.map(([path]) => path)).toEqual(['/review/cases/request-1'])
+    cleanup()
+  }
 })
 
 const dossierReads = async (role: string) => {
@@ -120,8 +156,6 @@ const dossierReads = async (role: string) => {
 
 it.each([
   ['representative', ['', '/proposal', '/result', '/supplementary-requests']],
-  ['reviewer', ['', '/proposal']],
-  ['employer-reviewer', ['', '/proposal']],
   ['investment-reviewer', ['', '/proposal']],
   ['chief-reviewer', ['', '/evaluations', '/proposal', '/review-round', '/verification']],
   ['central-secretariat', ['', '/evaluations', '/proposal', '/review-round', '/verification']],
