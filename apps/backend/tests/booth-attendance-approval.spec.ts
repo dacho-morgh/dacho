@@ -6,6 +6,12 @@ import { createTestApp } from './helpers.js'
 
 const EXHIBITION = 'exhibition-1'
 
+const pdf = (size = 32) => {
+  const body = Buffer.alloc(size)
+  body.write('%PDF-1.7', 0, 'ascii')
+  return body
+}
+
 function headers(user: User) {
   return {
     'x-internal-proxy-secret': 'test-proxy-secret',
@@ -163,15 +169,17 @@ describe('T55: Booth attendance approval and receipt gating', () => {
       active: true,
     })
 
-    // Attendance unlocks eligibility, but T50 must implement actual uploads.
+    // Attendance unlocks receipt submission
     const receiptRes = await request(app)
       .post(`/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt`)
       .set(headers(representative))
-      .send()
+      .attach('file', pdf(), 'receipt.pdf')
 
-    expect(receiptRes.status).toBe(501)
-    expect(receiptRes.body).toMatchObject({
-      error: 'receipt_upload_not_implemented',
+    expect(receiptRes.status).toBe(201)
+    expect(receiptRes.body.receipt).toMatchObject({
+      reservationId,
+      version: 1,
+      status: 'pending_verification',
     })
   })
 

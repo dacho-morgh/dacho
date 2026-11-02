@@ -1005,17 +1005,18 @@ export function EventsView({
                                 const eventIdParam = evt.rawId || evt.id.replace(/^events-/, '')
                                 router.push(`/dashboard/events?eventId=${encodeURIComponent(eventIdParam)}`)
                               } else {
+                                // Booth requests replace the generic request form (S7, #245).
                                 const rawId = evt.rawId || evt.id.replace(/^exhibitions-/, '')
-                                router.push(
-                                  `/dashboard/new-request?service=${evt.serviceKey}&eventId=${encodeURIComponent(rawId)}&eventTitle=${encodeURIComponent(evt.title)}`,
-                                )
+                                router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
                               }
                             }}
                           >
                             <span className="font-sans text-[16px] leading-[28px] font-semibold">
                               {isOwner && evt.serviceKey === 'exhibitions'
                                 ? 'مدیریت غرفه‌ها'
-                                : evt.actionButtonText || 'ثبت درخواست'}
+                                : evt.serviceKey === 'exhibitions'
+                                  ? 'رزرو غرفه'
+                                  : evt.actionButtonText || 'ثبت درخواست'}
                             </span>
                             <TickSquareIcon className="size-[24px] shrink-0 stroke-white" />
                           </Button>

@@ -203,11 +203,11 @@ describe('ParticipationEligibilityPanel', () => {
       items: [
         {
           id: 'r1', boothId: 'b1', boothIdentifier: 'A-12', exhibitionId: '7', active: true,
-          attendanceStatus: 'pending', attendanceReason: null, createdAt: '', allowedActions: ['read'],
+          attendanceStatus: 'pending', attendanceReason: null, paymentStatus: 'unpaid', createdAt: '', allowedActions: ['read'],
         },
         {
           id: 'r2', boothId: 'b2', boothIdentifier: 'B-03', exhibitionId: '7', active: true,
-          attendanceStatus: 'approved', attendanceReason: null, createdAt: '', allowedActions: ['read', 'submit_receipt'],
+          attendanceStatus: 'approved', attendanceReason: null, paymentStatus: 'unpaid', createdAt: '', allowedActions: ['read', 'submit_receipt'],
         },
       ],
     })
