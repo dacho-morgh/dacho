@@ -26,7 +26,6 @@
     "seed:service-media": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-service-media.ts",
     "seed:forms": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-forms.ts",
     "seed:all": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-all.ts",
-    "seed:roles": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed-role-users.ts",
     "prepare": "husky || true",
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
     "test:e2e": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.config.ts",
