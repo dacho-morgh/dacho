@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
 import { ReturnToRegistration } from '@/components/dashboard/profile/return-to-registration'
 import { CompanyProfileView } from '@/components/dashboard/profile/company-profile-view'
-import type { DossierResponseDto, ProfileDto } from '@/utilities/dashboard-api'
+import type { CompanyVerificationDto, DossierResponseDto, ProfileDto } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
 import { getProfileSessionUser, isInternalUser } from '@/utilities/profile-session'
@@ -23,9 +23,10 @@ export default async function CompanyProfilePage({
   const returnTo = (await searchParams)?.returnTo
   if (isInternalUser(await getProfileSessionUser())) redirect('/dashboard/profile/staff')
 
-  const [profile, dossier] = await Promise.all([
+  const [profile, dossier, verification] = await Promise.all([
     serverDashboardFetchResult<ProfileDto>('/profile'),
     serverDashboardFetchResult<DossierResponseDto>('/profile/dossier'),
+    serverDashboardFetchResult<CompanyVerificationDto>('/profile/verification'),
   ])
   if (profile.kind === 'unavailable') throw new Error('profile_load_failed')
   if (profile.kind !== 'ok') {
@@ -38,6 +39,7 @@ export default async function CompanyProfilePage({
       <CompanyProfileView
         initialProfile={profile.data}
         initialDossier={dossier.kind === 'ok' ? dossier.data : undefined}
+        initialVerification={verification.kind === 'ok' ? verification.data : undefined}
       />
     </>
   )

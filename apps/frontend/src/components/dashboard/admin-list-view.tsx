@@ -12,10 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  DashboardAddIcon,
-  DashboardMoreIcon,
-} from '@/components/icons'
+import { DashboardMoreIcon } from '@/components/icons'
 import { getLoginUrl } from '@/utilities/auth-return-url'
 export type AdminColumn<T> = { id: string; header?: string; render: (item: T) => React.ReactNode }
 export type AdminListLoadState = 'loading' | 'ready' | 'unauthenticated' | 'denied' | 'error'
@@ -49,7 +46,7 @@ export function AdminRowActions({
 }
 export function AdminListView<T>({
   title,
-  addLabel,
+  addAction,
   searchPlaceholder = 'جستجو',
   items,
   getSearchText,
@@ -62,7 +59,8 @@ export function AdminListView<T>({
   serverFiltered = false,
 }: {
   title: string
-  addLabel: string
+  /** The page's create action, shown only to whoever may create (e.g. the owner's «شرکت جدید»). */
+  addAction?: React.ReactNode
   searchPlaceholder?: string
   items: T[]
   getSearchText: (item: T) => string
@@ -91,11 +89,7 @@ export function AdminListView<T>({
         {title}
       </Typography>
       <div className="flex flex-row-reverse flex-wrap items-center justify-between gap-3">
-        <Button disabled size="48" icon={<DashboardAddIcon className="size-6" />}>
-          <Typography variant="16/regular" color="white">
-            {addLabel}
-          </Typography>
-        </Button>
+        {addAction}
         {toolbar}
         {!serverFiltered && !toolbar && (
           <div className="flex flex-row-reverse gap-2">

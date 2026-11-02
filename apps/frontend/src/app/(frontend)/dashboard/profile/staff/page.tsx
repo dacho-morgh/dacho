@@ -1,12 +1,10 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { StaffProfileView } from '@/components/dashboard/profile/staff-profile-view'
-import type { DashboardOwnProfileDto } from '@/utilities/dashboard-api'
-import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
-import { getProfileSessionUser, isInternalUser } from '@/utilities/profile-session'
-import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
-import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
+import { PersonalInfoSection } from '@/components/dashboard/profile/personal-info-section'
 import type { DashboardNavigation } from '@/components/dashboard/sidebar-shell'
+import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import { ownAccountOf } from '@/utilities/own-account'
+import { getProfileSessionUser, isInternalUser } from '@/utilities/profile-session'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,21 +16,15 @@ export default async function StaffProfilePage() {
   const user = await getProfileSessionUser()
   if (!user || !isInternalUser(user)) redirect('/dashboard/profile/company')
 
-  const [result, capabilityResult] = await Promise.all([
-    serverDashboardFetchResult<DashboardOwnProfileDto>('/profile/me'),
-    serverDashboardFetchResult<DashboardNavigation>('/capabilities'),
-  ])
-  if (result.kind === 'unauthenticated') redirect('/login?expired=1')
-  if (result.kind !== 'ok') {
-    return <DashboardReadNotice reason={unavailableReasonFor(result) ?? 'unavailable'} retryHref="/dashboard/profile/staff" />
-  }
+  const capabilities = await serverDashboardFetchResult<DashboardNavigation>('/capabilities')
 
   return (
-    <StaffProfileView
-      initialProfile={result.data}
-      name={user.name ?? ''}
-      position={user.position ?? ''}
-      accessLabel={capabilityResult.kind === 'ok' ? capabilityResult.data.roleLabel : '—'}
+    <PersonalInfoSection
+      initialAccount={ownAccountOf(user)}
+      readOnlyFields={[
+        { label: 'سمت', value: user.position ?? '' },
+        { label: 'نوع دسترسی', value: capabilities.kind === 'ok' ? capabilities.data.roleLabel : '—' },
+      ]}
     />
   )
 }

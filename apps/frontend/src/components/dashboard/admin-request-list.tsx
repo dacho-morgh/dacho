@@ -143,7 +143,6 @@ export function AdminRequestList({
     <>
       <AdminListView
         title="درخواست ها"
-        addLabel="درخواست جدید"
         items={requests}
         getSearchText={(item) => Object.values(item).join(' ')}
         getKey={(item) => item.id}

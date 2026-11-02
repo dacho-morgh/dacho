@@ -10,6 +10,7 @@ import {
 } from '@/components/dashboard/admin-list-view'
 import { Badge } from '@/components/ui/badge'
 import { Typography } from '@/components/ui/typography'
+import { CompanyCreateDialog } from '@/components/dashboard/company-create-dialog'
 import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 
 export type VerificationStatus =
@@ -116,7 +117,8 @@ const columns: AdminColumn<Company>[] = [
   },
 ]
 
-export function CompanyList() {
+/** `canCreateCompany`: the System Owner sees «شرکت جدید» (FE34); Secretariat only reviews. */
+export function CompanyList({ canCreateCompany = false }: { canCreateCompany?: boolean } = {}) {
   const searchParams = useSearchParams()
   const initialStatus = (searchParams?.get('status') as VerificationQueue) || 'all'
   const [queueFilter, setQueueFilter] = useState<VerificationQueue>(
@@ -227,7 +229,7 @@ export function CompanyList() {
   return (
     <AdminListView
       title="شرکت ها"
-      addLabel="شرکت جدید"
+      addAction={canCreateCompany ? <CompanyCreateDialog onCreated={() => void loadCompanies()} /> : undefined}
       searchPlaceholder="جستجوی شرکت"
       items={filteredCompanies}
       getSearchText={(item) =>
