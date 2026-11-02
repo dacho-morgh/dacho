@@ -25,15 +25,6 @@ const mail: MailData = {
   body: 'متن واقعی نامه',
 }
 
-it('does not claim feedback was saved when there is no backend endpoint', () => {
-  const request = vi.fn()
-  vi.stubGlobal('fetch', request)
-  render(createElement(MailDetailView, { mail, showActions: true }))
-  fireEvent.click(screen.getByRole('button', { name: 'ثبت بازخورد' }))
-  expect(screen.getByRole('status').textContent).toContain('هنوز در دسترس نیست')
-  expect(request).not.toHaveBeenCalled()
-})
-
 it('hides letter actions when viewing another source', () => {
   render(createElement(MailDetailView, { mail, showActions: false }))
   expect(screen.queryByRole('button')).toBeNull()
@@ -62,7 +53,6 @@ it('renders the Figma breadcrumb, sender, metadata and body without demo control
   expect(screen.getByText(mail.senderName)).toBeTruthy()
   expect(screen.getByText(mail.dayOfWeek)).toBeTruthy()
   expect(screen.getByText(mail.body)).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'ثبت بازخورد' })).toBeTruthy()
   expect(screen.queryByText('نمایش اصلی')).toBeNull()
   expect(screen.queryByText('پاسخ سریع به این نامه')).toBeNull()
 })

@@ -38,6 +38,10 @@ export interface MailData {
   body: string
   /** Authorized attachment metadata; bytes come only from the letter-scoped download route. */
   attachments?: MailAttachment[]
+  /** Other letters of this case the reader may see, oldest first. */
+  thread?: MailData[]
+  /** Why the case history above may be incomplete. */
+  threadNotice?: string
 }
 
 interface MailDetailViewProps {
@@ -45,9 +49,32 @@ interface MailDetailViewProps {
   showActions?: boolean
   supportReply?: boolean
   supportClosed?: boolean
+  /** Compose link that answers this letter; absent when policy does not allow a reply. */
+  replyHref?: string
+  /** Only the recipient's mailbox can drop a letter; its sender keeps their copy. */
+  canDelete?: boolean
 }
 
-export function MailDetailView({ mail, showActions = false, supportReply = false, supportClosed = false }: MailDetailViewProps) {
+function LetterAttachments({ letterId, attachments }: { letterId: string; attachments: MailAttachment[] }) {
+  return (
+    <section aria-label="پیوست‌های نامه" className="flex flex-col gap-2">
+      <Typography variant="14/semibold" className="text-neutral-600">پیوست‌های نامه</Typography>
+      <ul className="flex flex-col gap-2">
+        {attachments.map((attachment) => (
+          <li key={attachment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-100 px-3 py-2">
+            <div className="flex min-w-0 flex-col gap-1">
+              <Typography variant="14/semibold" className="break-all text-neutral-700"><bdi dir="auto">{attachment.name}</bdi></Typography>
+              <Typography variant="12/light" className="text-neutral-400">{attachment.size}</Typography>
+            </div>
+            <PrivateDocumentDownload path={letterAttachmentDownloadPath(letterId, attachment.id)} filename={attachment.name} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+export function MailDetailView({ mail, showActions = false, supportReply = false, supportClosed = false, replyHref, canDelete = true }: MailDetailViewProps) {
   const router = useRouter()
   const deletingRef = useRef(false)
   const [deleting, setDeleting] = useState(false)
@@ -125,11 +152,15 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
             </Button>}
             {showActions && (
               <div className="mr-auto flex items-center gap-1">
-                <Button type="button" variant="white" size="40" onClick={() => setNotice('ثبت بازخورد هنوز در دسترس نیست.')}>
-                  <DashboardMessageTextIcon aria-hidden="true" className="size-6" />
-                  <Typography as="span" variant="16/semibold" className="text-neutral-700">ثبت بازخورد</Typography>
-                </Button>
-                <DropdownMenu dir="rtl">
+                {replyHref && (
+                  <Button asChild variant="white" size="40">
+                    <Link href={replyHref}>
+                      <DashboardMessageTextIcon aria-hidden="true" className="size-6" />
+                      <Typography as="span" variant="16/semibold" className="text-neutral-700">ثبت بازخورد</Typography>
+                    </Link>
+                  </Button>
+                )}
+                {canDelete && <DropdownMenu dir="rtl">
                   <DropdownMenuTrigger asChild>
                     <Button type="button" variant="white" size="icon-40" aria-label="عملیات بیشتر" disabled={deleting}>
                       <DashboardMoreIcon aria-hidden="true" className="size-6" />
@@ -141,7 +172,7 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
                       <Typography as="span" variant="14/regular" className="text-inherit">پاک کردن</Typography>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
-                </DropdownMenu>
+                </DropdownMenu>}
               </div>
             )}
           </div>
@@ -159,20 +190,27 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
           <div role="separator" className="h-0 w-full border-t border-neutral-100" />
           <Typography as="h2" variant="20/bold" className="break-words text-neutral-700">{mail.title}</Typography>
           {mail.body && <Typography variant="16/regular" className="whitespace-pre-wrap break-words text-neutral-500">{mail.body}</Typography>}
-          {!!mail.attachments?.length && (
-            <section aria-label="پیوست‌های نامه" className="flex flex-col gap-2">
-              <Typography variant="14/semibold" className="text-neutral-600">پیوست‌های نامه</Typography>
-              <ul className="flex flex-col gap-2">
-                {mail.attachments.map((attachment) => (
-                  <li key={attachment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-100 px-3 py-2">
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <Typography variant="14/semibold" className="break-all text-neutral-700"><bdi dir="auto">{attachment.name}</bdi></Typography>
-                      <Typography variant="12/light" className="text-neutral-400">{attachment.size}</Typography>
+          {!!mail.attachments?.length && <LetterAttachments letterId={mail.id} attachments={mail.attachments} />}
+          {(!!mail.thread?.length || mail.threadNotice) && (
+            <section aria-label="تاریخچه مکاتبات پرونده" className="flex flex-col gap-4 border-t border-neutral-100 pt-4">
+              <Typography variant="14/semibold" className="text-neutral-600">تاریخچه مکاتبات پرونده</Typography>
+              {mail.threadNotice && <Typography role="status" variant="14/regular" className="text-neutral-500">{mail.threadNotice}</Typography>}
+              {mail.thread?.map((message) => (
+                <article key={message.id} className="flex flex-col gap-3 rounded-xl border border-neutral-100 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <Typography variant="14/semibold" className="break-words text-neutral-700">{message.senderName}</Typography>
+                      <Typography variant="12/regular" className="break-words text-neutral-500">{message.senderRole}</Typography>
                     </div>
-                    <PrivateDocumentDownload path={letterAttachmentDownloadPath(mail.id, attachment.id)} filename={attachment.name} />
-                  </li>
-                ))}
-              </ul>
+                    <Typography variant="12/regular" className="text-neutral-400">
+                      {message.dayOfWeek} {message.datePersian} {message.timeStr && `ساعت ${message.timeStr}`}
+                    </Typography>
+                  </div>
+                  <Typography variant="14/semibold" className="break-words text-neutral-700">{message.title}</Typography>
+                  {message.body && <Typography variant="14/regular" className="whitespace-pre-wrap break-words text-neutral-600">{message.body}</Typography>}
+                  {!!message.attachments?.length && <LetterAttachments letterId={message.id} attachments={message.attachments} />}
+                </article>
+              ))}
             </section>
           )}
         </>}

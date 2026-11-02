@@ -27,6 +27,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }))
 vi.mock('@/utilities/dashboard-server', () => ({
+  dashboardOperationalRole: () => 'reviewer',
   isSeniorManagerUser: mocks.senior,
   serverDashboardFetchResult: mocks.fetch,
 }))

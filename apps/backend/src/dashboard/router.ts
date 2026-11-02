@@ -2613,8 +2613,10 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const read = parseBoolean(req.query.read)
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
+    const requestId = typeof req.query.requestId === 'string' ? req.query.requestId : undefined
+    if (requestId !== undefined && !isUuid(requestId)) { res.status(400).json({ error: 'invalid_request_id' }); return }
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
-    const result = await letters.listScoped(scope, { read, page, limit })
+    const result = await letters.listScoped(scope, { read, page, limit, actorId: actor.id, requestId })
     res.json({ ...result, items: await Promise.all(result.items.map((letter) => presentLetter(letter, actor.id, actor.operationalRole))) })
     } catch (error) { next(error) }
   })
@@ -3329,7 +3331,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const sendLetter = async (req: Request, res: Response, next: NextFunction) => {
     try {
     const actor = actorOf(res)
-    const { title, body, recipientId, type, requestId, attachmentIds, attachments: rawAttachments } = req.body ?? {}
+    const { title, body, recipientId, type, requestId, attachmentIds, attachments: rawAttachments, idempotencyKey } = req.body ?? {}
     const trimmedTitle = typeof title === 'string' ? title.trim() : ''
     const trimmedBody = typeof body === 'string' ? body.trim() : ''
     const trimmedRecipientId = typeof recipientId === 'string' ? recipientId.trim() : ''
@@ -3338,6 +3340,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const recipient = await deps.userStore.findById(trimmedRecipientId)
     const recipientRole = operationalRoleOf(recipient)
     if (!recipientRole || !canSendLetter(actor.operationalRole, recipientRole, Boolean(requestId))) { res.status(403).json({ error: 'forbidden' }); return }
+    if (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || !isUuid(idempotencyKey))) { res.status(400).json({ error: 'invalid_idempotency_key' }); return }
+    const firstSend = idempotencyKey ? await letters.findByIdempotencyKey(actor.id, idempotencyKey) : undefined
+    if (firstSend) { res.status(200).json({ letter: firstSend }); return }
 
     const incomingAttachmentIds: string[] = []
     if (attachmentIds !== undefined) {
@@ -3386,17 +3391,27 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const letterType = isCompanyAdministrator(actor.operationalRole) && (type === 'approved' || type === 'needs_fix' || type === 'rejected' || type === 'notification') ? type : 'official'
     const input: CreateLetterInput = { type: letterType, title: trimmedTitle, body: trimmedBody, recipientId: trimmedRecipientId,
       senderId: actor.id, senderName: actor.user.name ?? null, senderRole: actor.operationalRole, requestId: requestId ?? null,
-      attachments: resolvedAttachments }
+      attachments: resolvedAttachments, idempotencyKey: idempotencyKey ?? null }
     let letter
-    if (requestId) {
-      const senderScope = await resolveScope(actor.id, actor.operationalRole)
-      const recipientScope = await resolveScope(trimmedRecipientId, recipientRole)
-      letter = await letters.createScoped(input, senderScope.scope, recipientScope.scope,
-        actor.operationalRole === 'reviewer' || actor.operationalRole === 'employer-reviewer',
-        actor.operationalRole === 'investment-reviewer' || recipientRole === 'investment-reviewer')
-      if (!letter) { res.status(403).json({ error: 'forbidden' }); return }
-    } else {
-      letter = await letters.create(input)
+    try {
+      if (requestId) {
+        const senderScope = await resolveScope(actor.id, actor.operationalRole)
+        const recipientScope = await resolveScope(trimmedRecipientId, recipientRole)
+        letter = await letters.createScoped(input, senderScope.scope, recipientScope.scope,
+          actor.operationalRole === 'reviewer' || actor.operationalRole === 'employer-reviewer',
+          actor.operationalRole === 'investment-reviewer' || recipientRole === 'investment-reviewer')
+        if (!letter) { res.status(403).json({ error: 'forbidden' }); return }
+      } else {
+        letter = await letters.create(input)
+      }
+    } catch (error) {
+      // Two sends with one key raced past the lookup above; the winner is the letter.
+      const winner = idempotencyKey && (error as { code?: string }).code === '23505'
+        ? await letters.findByIdempotencyKey(actor.id, idempotencyKey)
+        : undefined
+      if (!winner) throw error
+      res.status(200).json({ letter: winner })
+      return
     }
     res.status(201).json({ letter })
     } catch (error) { next(error) }

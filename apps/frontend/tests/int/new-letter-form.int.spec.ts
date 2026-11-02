@@ -108,8 +108,10 @@ describe('NewLetterForm', () => {
     expect(request).toHaveBeenCalledWith('/api/dashboard/admin/letters', expect.objectContaining({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ recipientId: 'company-1', title: 'عنوان تست', type: 'notification', body: 'متن تست' }),
     }))
+    expect(JSON.parse(request.mock.calls[0]![1].body)).toEqual({
+      recipientId: 'company-1', title: 'عنوان تست', type: 'notification', body: 'متن تست', idempotencyKey: expect.any(String),
+    })
     expect(navigation.refresh).toHaveBeenCalledTimes(1)
   })
 

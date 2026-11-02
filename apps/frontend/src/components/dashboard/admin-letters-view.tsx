@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
+import { UnreadMark } from '@/components/dashboard/applicant-letters-view'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -35,6 +36,9 @@ export interface AdminLetterItem {
   senderAvatar?: string
   sentDate: string
   source: 'letter' | 'form' | 'ticket'
+  /** A letter addressed to this reader rather than one seen through oversight. */
+  direction?: 'sent' | 'received'
+  read?: boolean
 }
 
 export function mapAdminLetter(
@@ -191,18 +195,14 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
     }
   }
 
-  const handleFeedback = (item: AdminLetterItem) => {
-    showNotice('ثبت بازخورد برای نامه «' + item.title + '» به‌زودی فعال می‌شود.')
-  }
-
   const filteredLetters = useMemo(() => {
     if (state === 'empty') return []
     const q = searchQuery.trim().toLocaleLowerCase('fa')
     return letters
       .filter((item) => {
         if (tab === 'support') return item.source === 'ticket'
-        if (tab === 'sent') return item.source === 'letter'
-        return item.source === 'form'
+        if (tab === 'sent') return item.source === 'letter' && item.direction !== 'received'
+        return item.source === 'form' || item.direction === 'received'
       })
       .filter((item) => {
         const matchesSearch =
@@ -401,14 +401,13 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
                           </Link>
                         </DropdownMenuItem>
                       ) : <>
-                      <DropdownMenuItem
-                        onClick={() => handleFeedback(item)}
-                        className="flex h-[32px] w-full cursor-pointer items-center justify-end gap-[8px] rounded-[10px] px-[6px] py-[8px] text-[14px] text-neutral-700 hover:bg-neutral-50 focus:bg-neutral-50"
-                      >
-                        <Typography as="span" variant="14/regular" className="text-inherit">
-                          ثبت بازخورد
-                        </Typography>
-                        <DashboardMessageTextIcon className="size-[20px] shrink-0 text-neutral-700" />
+                      <DropdownMenuItem asChild className="flex h-[32px] w-full cursor-pointer items-center justify-end gap-[8px] rounded-[10px] px-[6px] py-[8px] text-[14px] text-neutral-700 hover:bg-neutral-50 focus:bg-neutral-50">
+                        <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>
+                          <Typography as="span" variant="14/regular" className="text-inherit">
+                            مشاهده و پاسخ
+                          </Typography>
+                          <DashboardMessageTextIcon className="size-[20px] shrink-0 text-neutral-700" />
+                        </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleDelete(item)}
@@ -453,9 +452,10 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
               <TableHeaderCell label="عنوان" className="w-full" />
               {filteredLetters.map((item) => (
                 <div key={item.id} className="flex h-[72px] w-full items-center justify-end border-b border-neutral-100 p-[16px]">
+                  {item.read === false && <UnreadMark />}
                   <Link
                     href={`/dashboard/letters/${encodeURIComponent(item.id)}`}
-                    className="block w-full truncate text-right text-[16px] font-normal leading-[28px] text-neutral-600 transition-colors hover:text-brand-600"
+                    className="block min-w-0 flex-1 truncate text-right text-[16px] font-normal leading-[28px] text-neutral-600 transition-colors hover:text-brand-600"
                   >
                     {item.title}
                   </Link>
@@ -494,9 +494,11 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
                           </DropdownMenuItem>
                         ) : (
                           <>
-                            <DropdownMenuItem onSelect={() => handleFeedback(item)}>
-                              <DashboardMessageTextIcon className="size-5" />
-                              <Typography as="span" variant="14/regular">ثبت بازخورد</Typography>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>
+                                <DashboardMessageTextIcon className="size-5" />
+                                <Typography as="span" variant="14/regular">مشاهده و پاسخ</Typography>
+                              </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem variant="destructive" onSelect={() => handleDelete(item)}>
                               <DashboardTrashIcon className="size-5" />
@@ -507,6 +509,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                  {item.read === false && <div className="mt-2"><UnreadMark /></div>}
                   <Typography asChild variant="16/regular" className="mt-2 block break-words text-right leading-7 text-neutral-700 hover:text-brand-600">
                     <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>{item.title}</Link>
                   </Typography>

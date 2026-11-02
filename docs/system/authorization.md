@@ -180,6 +180,8 @@ The investment person writes only case-linked letters, only on a case they hold,
 
 A case letter from the investment person shows that a package was handed off, and package status is confined to the financial audience. So the chief, reviewers and employer are not recipients, even though they are assigned to the case. The company stays with Secretariat support, as the permission matrix requires. The product owner confirmed this reading of "assigned-case participants" on 2026-10-31.
 
+`DELETE /letters/:id` hides the letter from the mailbox and keeps the row, so the sender's copy, `GET /letters?requestId=` (the case's history within the reader's scope) and any evidence survive. `POST /letters` accepts an optional `idempotencyKey`: a repeat with the same key from the same sender returns the first letter with `200` instead of writing another.
+
 A letter opens no file: an attachment needs both parties in its audience, so a correspondence file reaches the investment person only after the [Secretariat delivers it](secretariat-follow-up.md).
 
 ### Permitted recipients

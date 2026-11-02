@@ -2,12 +2,14 @@ import type { ReactNode } from 'react'
 import configPromise from '@payload-config'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { getPayload } from 'payload'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { CompanyCorrectionPanel } from '@/components/dashboard/company-correction-panel'
 import { CompanyRequestTracking } from '@/components/dashboard/company-request-tracking'
 import { RequestDossier, type DossierPart } from '@/components/dashboard/request-dossier'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
+import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
   formatDate,
@@ -220,6 +222,13 @@ function CompanySections({
         publishedResult={publishedResult}
         correction={correction}
       />
+      <div className="flex justify-end">
+        <Button asChild variant="outline" size="40" className="px-4">
+          <Link href={`/dashboard/letters/new?requestId=${encodeURIComponent(requestId)}`}>
+            <Typography as="span" variant="16/semibold" className="text-inherit">نامه به دبیرخانه</Typography>
+          </Link>
+        </Button>
+      </div>
       {supplementary === 'failed' ? (
         <Typography role="alert" variant="14/regular" color="error">
           دریافت درخواست‌های دبیرخانه انجام نشد. صفحه را دوباره بارگذاری کنید.

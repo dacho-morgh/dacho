@@ -36,6 +36,8 @@ export interface ApplicantLetterItem {
   senderAvatar?: string
   sentDate: string
   source?: 'letter' | 'ticket'
+  direction?: 'sent' | 'received'
+  read?: boolean
 }
 
 const statusTagStyles: Record<ApplicantLetterStatus, { bg: string; text: string }> = {
@@ -64,6 +66,14 @@ function TableHeaderCell({ label, className = '' }: { label: string; className?:
         {label}
       </Typography>
     </div>
+  )
+}
+
+export function UnreadMark() {
+  return (
+    <Typography as="span" variant="12/semibold" className="ml-[8px] shrink-0 whitespace-nowrap text-brand-600">
+      خوانده‌نشده
+    </Typography>
   )
 }
 
@@ -132,11 +142,13 @@ function LettersEmptyState({ noMatch = false }: { noMatch?: boolean }) {
 export interface ApplicantLettersViewProps {
   initialLetters: ApplicantLetterItem[]
   state?: 'default' | 'loading' | 'empty'
+  /** Staff also write role-scoped letters; a company writes from its request or by reply. */
+  canComposeLetter?: boolean
 }
 
 /* Applicant letters inbox — pixel match to Figma nodes 33:3919 (default),
    53:11620 (loading), 53:11877 (empty), 53:12126 (row actions). */
-export function ApplicantLettersView({ initialLetters, state = 'default' }: ApplicantLettersViewProps) {
+export function ApplicantLettersView({ initialLetters, state = 'default', canComposeLetter = false }: ApplicantLettersViewProps) {
   const [tab, setTab] = useState<'received' | 'sent' | 'support'>('received')
   const [searchQuery, setSearchQuery] = useState('')
   const [actionNotice, setActionNotice] = useState<string | null>(null)
@@ -146,8 +158,8 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
     return initialLetters
       .filter((item) => {
         if (tab === 'support') return item.source === 'ticket'
-        if (tab === 'sent') return false
-        return item.source !== 'ticket'
+        if (tab === 'sent') return item.direction === 'sent'
+        return item.source !== 'ticket' && item.direction !== 'sent'
       })
       .filter((item) => !query || [item.title, item.senderName, item.typeLabel].some((value) => value?.includes(query)))
   }, [initialLetters, searchQuery, tab])
@@ -170,18 +182,29 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
     <div className="flex w-full min-w-0 flex-col gap-[16px]" dir="rtl">
       {/* Toolbar — Figma nodes 33:3923 / 53:12430: search right, filter left of it, CTA far left */}
       <div className="flex flex-wrap items-center justify-between gap-[8px]">
-        <Button
-          asChild
-          size="48"
-          className="gap-[8px] rounded-[12px] bg-brand-500 px-[12px] py-[8px] text-white hover:bg-brand-600"
-        >
-          <Link href="/dashboard/letters/new?mode=support">
-            <Typography as="span" variant="20/regular" className="text-white">
-              پیام به پشتیبانی
-            </Typography>
-            <DashboardUserTagIcon className="size-[26px]" />
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-[8px]">
+          <Button
+            asChild
+            size="48"
+            className="gap-[8px] rounded-[12px] bg-brand-500 px-[12px] py-[8px] text-white hover:bg-brand-600"
+          >
+            <Link href="/dashboard/letters/new?mode=support">
+              <Typography as="span" variant="20/regular" className="text-white">
+                پیام به پشتیبانی
+              </Typography>
+              <DashboardUserTagIcon className="size-[26px]" />
+            </Link>
+          </Button>
+          {canComposeLetter && (
+            <Button asChild variant="outline" size="48" className="rounded-[12px] px-[12px] py-[8px]">
+              <Link href="/dashboard/letters/new">
+                <Typography as="span" variant="20/regular" className="text-inherit">
+                  نامه جدید
+                </Typography>
+              </Link>
+            </Button>
+          )}
+        </div>
         <div className="flex min-w-0 flex-wrap items-center gap-[8px]">
           <div className="flex h-[48px] max-w-full items-start gap-[8px] overflow-x-auto rounded-[12px] bg-neutral-100 p-[6px]">
             <button
@@ -275,14 +298,18 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
                         </DropdownMenuItem>
                       ) : (
                         <>
-                          <DropdownMenuItem onSelect={() => setActionNotice('ثبت بازخورد به‌زودی')}>
-                            <DashboardMessageTextIcon className="size-[20px]" />
-                            ثبت بازخورد
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>
+                              <DashboardMessageTextIcon className="size-[20px]" />
+                              مشاهده و پاسخ
+                            </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem variant="destructive" onSelect={() => handleDelete(item)}>
-                            <DashboardTrashIcon className="size-[20px]" />
-                            پاک کردن
-                          </DropdownMenuItem>
+                          {item.direction !== 'sent' && (
+                            <DropdownMenuItem variant="destructive" onSelect={() => handleDelete(item)}>
+                              <DashboardTrashIcon className="size-[20px]" />
+                              پاک کردن
+                            </DropdownMenuItem>
+                          )}
                         </>
                       )}
                     </DropdownMenuContent>
@@ -315,7 +342,8 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
               <TableHeaderCell label="عنوان" />
               {filteredLetters.map((item) => (
                 <div key={item.id} className="flex h-[72px] items-center justify-end border-b border-neutral-100 p-[16px]">
-                  <Typography asChild variant="16/regular" className="block w-full truncate text-right text-neutral-600 hover:text-brand-600">
+                  {item.read === false && <UnreadMark />}
+                  <Typography asChild variant={item.read === false ? '16/semibold' : '16/regular'} className="block min-w-0 flex-1 truncate text-right text-neutral-600 hover:text-brand-600">
                     <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>{item.title}</Link>
                   </Typography>
                 </div>
@@ -352,20 +380,25 @@ export function ApplicantLettersView({ initialLetters, state = 'default' }: Appl
                         </DropdownMenuItem>
                       ) : (
                         <>
-                          <DropdownMenuItem onSelect={() => setActionNotice('ثبت بازخورد به‌زودی')}>
-                            <DashboardMessageTextIcon className="size-5" />
-                            <Typography as="span" variant="14/regular">ثبت بازخورد</Typography>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>
+                              <DashboardMessageTextIcon className="size-5" />
+                              <Typography as="span" variant="14/regular">مشاهده و پاسخ</Typography>
+                            </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem variant="destructive" onSelect={() => handleDelete(item)}>
-                            <DashboardTrashIcon className="size-5" />
-                            <Typography as="span" variant="14/regular">پاک کردن</Typography>
-                          </DropdownMenuItem>
+                          {item.direction !== 'sent' && (
+                            <DropdownMenuItem variant="destructive" onSelect={() => handleDelete(item)}>
+                              <DashboardTrashIcon className="size-5" />
+                              <Typography as="span" variant="14/regular">پاک کردن</Typography>
+                            </DropdownMenuItem>
+                          )}
                         </>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                <Typography asChild variant="16/regular" className="mt-2 block break-words text-right leading-7 text-neutral-700 hover:text-brand-600">
+                {item.read === false && <div className="mt-2"><UnreadMark /></div>}
+                <Typography asChild variant={item.read === false ? '16/semibold' : '16/regular'} className="mt-2 block break-words text-right leading-7 text-neutral-700 hover:text-brand-600">
                   <Link href={`/dashboard/letters/${encodeURIComponent(item.id)}`}>{item.title}</Link>
                 </Typography>
                 <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-neutral-100 pt-3">

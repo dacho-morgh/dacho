@@ -117,6 +117,43 @@ describe('T35 - Case-linked letters and private attachments integration', () => 
     }
   })
 
+  it('hides a deleted letter from the mailbox but keeps it in the sender copy and the case history', async () => {
+    const requestId = await createRequest()
+    const sent = await request(payload).post('/letters').set(headers(people.secretariat.id))
+      .send({ title: 'Case letter', body: 'Body', recipientId: people.repA.id, requestId }).expect(201)
+    const letterId = sent.body.letter.id as string
+
+    await request(payload).delete(`/letters/${letterId}`).set(headers(people.repA.id)).expect(200)
+    await request(payload).delete(`/letters/${letterId}`).set(headers(people.repA.id)).expect(404)
+
+    const ids = (body: { items: { id: string }[] }) => body.items.map((item) => item.id)
+    const mailbox = await request(payload).get('/letters').set(headers(people.repA.id)).expect(200)
+    expect(ids(mailbox.body)).not.toContain(letterId)
+    const history = await request(payload).get(`/letters?requestId=${requestId}`).set(headers(people.repA.id)).expect(200)
+    expect(ids(history.body)).toEqual([letterId])
+    const senderCopy = await request(payload).get('/letters').set(headers(people.secretariat.id)).expect(200)
+    expect(ids(senderCopy.body)).toContain(letterId)
+    await request(payload).get(`/letters?requestId=${requestId}`).set(headers(people.repB.id)).expect(200)
+      .expect((res) => expect(res.body.items).toEqual([]))
+    await request(payload).get('/letters?requestId=not-a-uuid').set(headers(people.repA.id)).expect(400)
+  })
+
+  it('returns the first letter when a send is retried with its idempotency key', async () => {
+    const requestId = await createRequest()
+    const idempotencyKey = '6f1a6c1e-0d3b-4c58-9e57-0a4b7c2d1e90'
+    const send = (senderId: string, recipientId: string) => request(payload).post('/letters').set(headers(senderId))
+      .send({ title: 'Once', body: 'Body', recipientId, requestId, idempotencyKey })
+    const first = await send(people.secretariat.id, people.repA.id).expect(201)
+    const retry = await send(people.secretariat.id, people.repA.id).expect(200)
+    expect(retry.body.letter.id).toBe(first.body.letter.id)
+    const concurrent = await Promise.all([1, 2, 3].map(() => send(people.owner.id, people.repA.id)))
+    expect(new Set(concurrent.map((res) => res.body.letter.id)).size).toBe(1)
+    const { rows } = await pool.query('SELECT id FROM dashboard.letters WHERE request_id = $1', [requestId])
+    expect(rows).toHaveLength(2)
+    await request(payload).post('/letters').set(headers(people.owner.id))
+      .send({ title: 'Bad', body: 'Body', recipientId: people.repA.id, idempotencyKey: 'nope' }).expect(400)
+  })
+
   it('rejects attachment sends to unauthorized recipients and detached or mismatched cases', async () => {
     const requestId = await createRequest()
     const otherRequestId = await createRequest(people.repB.id)
