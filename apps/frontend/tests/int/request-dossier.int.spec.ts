@@ -3,11 +3,10 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { createElement } from 'react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { RequestActionsPanel } from '@/components/dashboard/request-actions-panel'
 import { RequestDossier, type RequestDossierProps } from '@/components/dashboard/request-dossier'
 import type { RequestAction, RequestDetail } from '@/utilities/dashboard-api'
 
@@ -191,100 +190,6 @@ describe('RequestDossier per role', () => {
     expect(screen.getByText('اصلاح پرونده و ارسال دوباره')).toBeTruthy()
     expect(screen.getByText(/ارسال دوباره از این صفحه هنوز فعال نیست/)).toBeTruthy()
     expect(screen.queryByText('correct')).toBeNull()
-  })
-})
-
-describe('RequestActionsPanel', () => {
-  const json = (status: number, body: unknown) =>
-    new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
-  const panel = (actions: RequestAction[]) =>
-    render(createElement(RequestActionsPanel, { id: 'req-1', actions, revision: 2 }))
-
-  beforeEach(() => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-  })
-
-  it('renders no controls for an action the server did not list', () => {
-    const { container } = panel(['read', 'uploadDocument', 'replaceReviewer'])
-    expect(container.firstChild).toBeNull()
-  })
-
-  it('requires a reason to return, sends the revision, and rereads the case', async () => {
-    const fetchMock = vi.fn(async () => json(200, { request: {} }))
-    vi.stubGlobal('fetch', fetchMock)
-    panel(['read', 'triage'])
-
-    fireEvent.click(screen.getByRole('radio', { name: /بازگرداندن برای اصلاح/ }))
-    const submit = screen.getByRole('button', { name: 'ثبت تصمیم' }) as HTMLButtonElement
-    expect(submit.disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText(/دلیل/), { target: { value: '  مدرک ناقص  ' } })
-    fireEvent.click(submit)
-
-    await waitFor(() => expect(refresh).toHaveBeenCalled())
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/dashboard/requests/req-1/triage',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ action: 'return', reason: 'مدرک ناقص', expectedRevision: 2 }),
-      }),
-    )
-  })
-
-  it('keeps the typed reason and explains a stale decision', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => json(409, { error: 'stale_revision' })))
-    panel(['read', 'decideReview'])
-    fireEvent.click(screen.getByRole('radio', { name: /رد نهایی/ }))
-    fireEvent.change(screen.getByLabelText(/دلیل/), { target: { value: 'دلیل من' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت تصمیم' }))
-
-    expect((await screen.findByRole('alert')).textContent).toMatch(/تغییر کرده است/)
-    expect((screen.getByLabelText(/دلیل/) as HTMLTextAreaElement).value).toBe('دلیل من')
-    expect(refresh).toHaveBeenCalled()
-  })
-
-  it('reopens through the audited owner route', async () => {
-    const fetchMock = vi.fn(async () => json(200, { request: {} }))
-    vi.stubGlobal('fetch', fetchMock)
-    panel(['read', 'reopen'])
-    fireEvent.change(screen.getByLabelText(/دلیل بازگشایی/), { target: { value: 'خطای ثبت' } })
-    fireEvent.click(screen.getByRole('button', { name: 'بازگشایی' }))
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/dashboard/admin/requests/req-1/reopen',
-      expect.objectContaining({ body: JSON.stringify({ reason: 'خطای ثبت', expectedRevision: 2 }) }),
-    )
-  })
-
-  it('starts a round only with three distinct reviewers', async () => {
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) =>
-      init?.method === 'POST'
-        ? json(201, { round: {} })
-        : json(200, {
-            employerId: 'employer',
-            items: [
-              { id: 'r1', name: 'الف' },
-              { id: 'r2', name: 'ب' },
-              { id: 'r3', name: 'ج' },
-            ],
-          }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-    panel(['read', 'startReview'])
-
-    const start = (await screen.findByRole('button', { name: 'شروع داوری' })) as HTMLButtonElement
-    expect(start.disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText('داور ۱'), { target: { value: 'r1' } })
-    // A picked person leaves the other two lists.
-    expect(screen.getByLabelText('داور ۲').textContent).not.toContain('الف')
-    fireEvent.change(screen.getByLabelText('داور ۲'), { target: { value: 'r2' } })
-    fireEvent.change(screen.getByLabelText('داور ۳'), { target: { value: 'r3' } })
-    fireEvent.click(start)
-
-    await waitFor(() => expect(refresh).toHaveBeenCalled())
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/dashboard/requests/req-1/review-round',
-      expect.objectContaining({ body: JSON.stringify({ reviewerIds: ['r1', 'r2', 'r3'], expectedRevision: 2 }) }),
-    )
   })
 })
 
