@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
-import { DashboardAddIcon, DashboardTrashIcon } from '@/components/icons/generated'
+import { DashboardAddIcon, DashboardCloseCircle, DashboardTrashIcon } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -19,6 +20,7 @@ import {
 } from '@/utilities/dashboard-api'
 import { hasStaleDossierSlice } from '@/utilities/dossier-edits'
 import { ProfileDialog } from './profile-dialog'
+import { toast } from 'sonner'
 
 const emptyDossier: CompanyDossierDto = {
   legalEntityType: '',
@@ -51,7 +53,6 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
   const [pendingDocuments, setPendingDocuments] = useState<Record<string, boolean>>({})
   const documentsPending = Object.values(pendingDocuments).some(Boolean)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   // Products dialog state
   const [productDialog, setProductDialog] = useState(false)
@@ -107,22 +108,23 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
     saveLock.current = true
     setIsSaving(true)
     setError(null)
-    setSuccess(null)
     try {
       const latest = await fetchProfileDossier()
       if (!latest) throw new Error('dossier_load_failed')
       // Array endpoints replace a slice. Refuse to overwrite a slice changed since it was shown.
       if (hasStaleDossierSlice(dossier, latest.dossier, update)) {
         setDossier(latest.dossier)
+        toast.error('ذخیره نشد؛ این بخش تغییر کرده است.')
         setError('اطلاعات این بخش تغییر کرده است. نسخه تازه را بررسی و دوباره تلاش کنید.')
         return false
       }
       const res = await updateProfileDossier(update)
       if (!res?.dossier) throw new Error('update_failed')
       setDossier(res.dossier)
-      setSuccess('تغییرات با موفقیت ذخیره شد.')
+      toast.success('تغییرات با موفقیت ذخیره شد.')
       return true
     } catch {
+      toast.error('ذخیره تغییرات انجام نشد.')
       setError('ذخیره تغییرات انجام نشد. ورودی‌ها را بررسی کنید.')
       return false
     } finally {
@@ -326,15 +328,6 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
         </Typography>
       )}
 
-      {success && (
-        <Typography
-          role="status"
-          variant="14/regular"
-          className="rounded-xl bg-success-50 p-4 text-success-700"
-        >
-          {success}
-        </Typography>
-      )}
 
       {/* 1. محصولات و خدمات */}
       <section id="resume-products" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
@@ -368,11 +361,10 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
                 {product}
               </Typography>
               <Button
-                variant="text-gray"
+                variant="text-destructive"
                 size="icon-32"
                 type="button"
                 aria-label={`حذف ${product}`}
-                className="text-neutral-400 hover:text-error-500"
                 onClick={() => removeProduct(index)}
                 disabled={isSaving}
               >
@@ -446,12 +438,9 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
           <div className="flex items-center gap-3">
             <Typography as="label" className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={isProjectsAbsent}
-                onChange={() => toggleAbsence('pastProjectsCustomers')}
-                className="size-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-              />
+                onCheckedChange={() => toggleAbsence('pastProjectsCustomers')} />
               <Typography variant="14/regular" color="neutral-500">
                 ندارم
               </Typography>
@@ -528,12 +517,9 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
           <div className="flex items-center gap-3">
             <Typography as="label" className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={isRequestedAbsent}
-                onChange={() => toggleAbsence('requestedServices')}
-                className="size-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-              />
+                onCheckedChange={() => toggleAbsence('requestedServices')} />
               <Typography variant="14/regular" color="neutral-500">
                 ندارم
               </Typography>
@@ -576,15 +562,16 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
                 <Typography variant="14/semibold" color="neutral-700">
                   {service}
                 </Typography>
-                <button
+                <Button
                   type="button"
+                  variant="text-destructive"
+                  size="icon-32"
                   aria-label={`حذف ${service}`}
-                  className="text-neutral-400 hover:text-error-500"
                   onClick={() => removeRequestedService(index)}
                   disabled={isSaving}
                 >
-                  ×
-                </button>
+                  <DashboardCloseCircle aria-hidden="true" />
+                </Button>
               </div>
             ))}
           </div>
@@ -604,12 +591,9 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
           <div className="flex items-center gap-3">
             <Typography as="label" className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={isCertsAbsent}
-                onChange={() => toggleAbsence('certificatesLicenses')}
-                className="size-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-              />
+                onCheckedChange={() => toggleAbsence('certificatesLicenses')} />
               <Typography variant="14/regular" color="neutral-500">
                 ندارم
               </Typography>
@@ -697,12 +681,9 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
             </Typography>
           </div>
           <Typography as="label" className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={isCataloguesAbsent}
-              onChange={() => toggleAbsence('catalogues')}
-              className="size-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-            />
+              onCheckedChange={() => toggleAbsence('catalogues')} />
             <Typography variant="14/regular" color="neutral-500">
               ندارم
             </Typography>
@@ -769,8 +750,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={newProduct}
                 placeholder="عنوان محصول یا خدمت جدید…"
-                onChange={(e) => setNewProduct(e.target.value)}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setNewProduct(e.target.value)} containerClassName="mt-1 bg-white"
               />
             </Typography>
           </div>
@@ -812,8 +792,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={newRequestedService}
                 placeholder="خدمت مورد تقاضای جدید…"
-                onChange={(e) => setNewRequestedService(e.target.value)}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setNewRequestedService(e.target.value)} containerClassName="mt-1 bg-white"
               />
             </Typography>
           </div>
@@ -855,8 +834,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={memberForm.name}
                 placeholder="مثال: علی احمدی"
-                onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -864,8 +842,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={memberForm.role}
                 placeholder="مثال: مدیر فنی، سرپرست تحقیق و توسعه"
-                onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
           </div>
@@ -907,8 +884,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={projectForm.project}
                 placeholder="مثال: طراحی و ساخت سامانه هوشمند پایش"
-                onChange={(e) => setProjectForm({ ...projectForm, project: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setProjectForm({ ...projectForm, project: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -916,8 +892,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={projectForm.customer ?? ''}
                 placeholder="مثال: شرکت پتروشیمی پارس"
-                onChange={(e) => setProjectForm({ ...projectForm, customer: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setProjectForm({ ...projectForm, customer: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -968,8 +943,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={certForm.title}
                 placeholder="مثال: پروانه بهره‌برداری، ایزو ۹۰۰۱"
-                onChange={(e) => setCertForm({ ...certForm, title: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setCertForm({ ...certForm, title: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -977,8 +951,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={certForm.issuer ?? ''}
                 placeholder="مثال: وزارت صمت، سازمان استاندارد"
-                onChange={(e) => setCertForm({ ...certForm, issuer: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setCertForm({ ...certForm, issuer: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -986,8 +959,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={certForm.reference ?? ''}
                 placeholder="مثال: IR-1402-998"
-                onChange={(e) => setCertForm({ ...certForm, reference: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setCertForm({ ...certForm, reference: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
           </div>

@@ -52,7 +52,7 @@ describe('chief triage actions', () => {
     expect(within(dialog()).queryByRole('textbox')).toBeNull()
     confirm('پذیرش')
 
-    expect((await screen.findByText(/برای داوری پذیرفته شد/)).closest('[role="status"]')).toBeTruthy()
+    expect((await screen.findByText(/برای داوری پذیرفته شد/)).closest('[aria-live]')).toBeTruthy()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(refresh).toHaveBeenCalled()
     expect(screen.getByRole('link', { name: 'بازگشت به صف درخواست‌ها' }).getAttribute('href')).toBe('/dashboard/requests')
@@ -215,7 +215,7 @@ describe('owner reopen', () => {
     type('خطای ثبت')
     confirm('بازگشایی')
 
-    expect((await screen.findByText(/پرونده بازگشایی شد/)).closest('[role="status"]')).toBeTruthy()
+    expect((await screen.findByText(/پرونده بازگشایی شد/)).closest('[aria-live]')).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/dashboard/admin/requests/req-1/reopen',
       expect.objectContaining({ body: JSON.stringify({ reason: 'خطای ثبت', expectedRevision: 4 }) }),

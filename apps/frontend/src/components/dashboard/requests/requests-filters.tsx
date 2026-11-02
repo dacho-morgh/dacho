@@ -1,74 +1,79 @@
-import Link from 'next/link'
-import { SearchField } from '@/components/dashboard/search-field'
 import React from 'react'
 
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
+import { SearchField } from '@/components/dashboard/search-field'
 import { workQueueLabel } from '@/components/dashboard/work-queue-overview'
-import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
-import { REVIEW_STAGE_OPTIONS, requestQueueHref, type RequestQueueFilters, type RequestStatus } from './types'
-
-const selectClass = 'h-10 rounded-lg border border-neutral-100 bg-background px-2 text-sm text-neutral-700'
+import { REQUEST_STATUS_FILTER_OPTIONS, REVIEW_STAGE_OPTIONS, type RequestQueueFilters, type RequestStatus } from './types'
 
 /**
- * Plain GET form: the filters live in the URL, so back navigation, refresh and
- * sharing keep them, and the API narrows the list inside the actor's own scope.
+ * Search is a plain GET form and the filter button writes the URL, so back
+ * navigation, refresh and sharing keep both; the API narrows the list inside
+ * the actor's own scope.
  */
 export function RequestsFilters({
   basePath = '/dashboard/requests',
   status,
   filters,
   events,
+  counts,
 }: {
   basePath?: string
   status?: RequestStatus
   filters: RequestQueueFilters
   events: { id: string; title: string }[]
+  /** From `GET /stats` with the same filters, so each number is the size of the list it opens. */
+  counts?: Partial<Record<RequestStatus | 'all', number>>
 }) {
   const queueLabel = filters.queue ? workQueueLabel(filters.queue) : undefined
-  const active = Boolean(filters.search || filters.eventId || filters.stage || filters.queue)
   return (
-    <form method="get" action={basePath} className="flex flex-wrap items-center gap-2" dir="rtl" role="search">
-      {status && <input type="hidden" name="status" value={status} />}
-      {filters.queue && <input type="hidden" name="queue" value={filters.queue} />}
-      <SearchField
-        className="sm:w-72"
-        name="search"
-        defaultValue={filters.search ?? ''}
-        maxLength={100}
-        placeholder="جستجوی عنوان یا کد پیگیری"
-        aria-label="جستجوی عنوان یا کد پیگیری"
+    <div className="flex flex-wrap items-center gap-2" dir="rtl">
+      <form method="get" action={basePath} className="min-w-0 flex-1 sm:flex-none" role="search">
+        {status && <input type="hidden" name="status" value={status} />}
+        {filters.eventId && <input type="hidden" name="eventId" value={filters.eventId} />}
+        {filters.stage && <input type="hidden" name="stage" value={filters.stage} />}
+        {filters.queue && <input type="hidden" name="queue" value={filters.queue} />}
+        <SearchField
+          className="sm:w-[400px]"
+          name="search"
+          defaultValue={filters.search ?? ''}
+          maxLength={100}
+          placeholder="جستجوی عنوان یا کد پیگیری"
+          aria-label="جستجوی عنوان یا کد پیگیری"
+        />
+      </form>
+      <ListFilterButton
+        label="فیلتر درخواست‌ها"
+        groups={[
+          {
+            key: 'status',
+            label: 'وضعیت',
+            value: status,
+            options: REQUEST_STATUS_FILTER_OPTIONS.map((option) => ({
+              value: option.value === 'all' ? '' : option.value,
+              label: option.label,
+              count: counts?.[option.value],
+            })),
+          },
+          {
+            key: 'eventId',
+            label: 'رویداد',
+            value: filters.eventId,
+            options: [{ value: '', label: 'همه رویدادها' }, ...events.map((event) => ({ value: event.id, label: event.title }))],
+          },
+          {
+            key: 'stage',
+            label: 'مرحله',
+            value: filters.stage,
+            options: [{ value: '', label: 'همه مرحله‌ها' }, ...REVIEW_STAGE_OPTIONS],
+          },
+        ]}
       />
-      <select name="eventId" defaultValue={filters.eventId ?? ''} aria-label="رویداد" className={selectClass}>
-        <option value="">همه رویدادها</option>
-        {events.map((event) => (
-          <option key={event.id} value={event.id}>
-            {event.title}
-          </option>
-        ))}
-      </select>
-      <select name="stage" defaultValue={filters.stage ?? ''} aria-label="مرحله" className={selectClass}>
-        <option value="">همه مرحله‌ها</option>
-        {REVIEW_STAGE_OPTIONS.map((stage) => (
-          <option key={stage.value} value={stage.value}>
-            {stage.label}
-          </option>
-        ))}
-      </select>
-      <Button size="40" type="submit" variant="outline-gray">
-        <Typography>اعمال فیلتر</Typography>
-      </Button>
-      {active && (
-        <Button size="40" asChild variant="text-gray">
-          <Link href={requestQueueHref(basePath, status)}>
-            <Typography>حذف فیلترها</Typography>
-          </Link>
-        </Button>
-      )}
       {queueLabel && (
         <Typography variant="14/regular" color="secondary" className="w-full">
           صف: {queueLabel}
         </Typography>
       )}
-    </form>
+    </div>
   )
 }

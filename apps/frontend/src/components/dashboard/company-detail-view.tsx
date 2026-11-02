@@ -22,6 +22,7 @@ import {
   downloadDocument,
   formatDocumentSize,
 } from '@/utilities/document-api'
+import { toast } from 'sonner'
 
 export type VerificationStatus =
   | 'unsubmitted'
@@ -138,7 +139,11 @@ export function CompanyDetailView({ id }: { id: string }) {
   const [decisionReason, setDecisionReason] = useState('')
   const [decisionSubmitting, setDecisionSubmitting] = useState(false)
   const [decisionError, setDecisionError] = useState<string | null>(null)
-  const [decisionSuccess, setDecisionSuccess] = useState<string | null>(null)
+  // A refused decision keeps its explanation inline (with the typed reason) and is also toasted.
+  const failDecision = (message: string) => {
+    toast.error('ثبت تصمیم انجام نشد.')
+    setDecisionError(message)
+  }
   const [staleNotice, setStaleNotice] = useState<string | null>(null)
   const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -238,7 +243,6 @@ export function CompanyDetailView({ id }: { id: string }) {
 
     setDecisionSubmitting(true)
     setDecisionError(null)
-    setDecisionSuccess(null)
     setStaleNotice(null)
 
     try {
@@ -270,7 +274,7 @@ export function CompanyDetailView({ id }: { id: string }) {
           return
         }
         if (result.error === 'invalid_verification_state') {
-          setDecisionError('وضعیت احراز در انتظار بررسی نیست.')
+          failDecision('وضعیت احراز در انتظار بررسی نیست.')
           await loadData()
           return
         }
@@ -278,31 +282,31 @@ export function CompanyDetailView({ id }: { id: string }) {
 
       if (response.status === 403) {
         if (result.error === 'self_approval_prohibited') {
-          setDecisionError('تأیید یا رد شرکت توسط نماینده خود مجاز نیست (ممنوعیت تأیید خود).')
+          failDecision('تأیید یا رد شرکت توسط نماینده خود مجاز نیست (ممنوعیت تأیید خود).')
           return
         }
-        setDecisionError('شما دسترسی لازم برای ثبت تصمیم در این پرونده را ندارید.')
+        failDecision('شما دسترسی لازم برای ثبت تصمیم در این پرونده را ندارید.')
         return
       }
 
       if (response.status === 400) {
         if (result.error === 'reason_required') {
-          setDecisionError('ثبت دلیل برای بازگرداندن یا رد الزامی است.')
+          failDecision('ثبت دلیل برای بازگرداندن یا رد الزامی است.')
           return
         }
-        setDecisionError('درخواست ثبت تصمیم نامعتبر است.')
+        failDecision('درخواست ثبت تصمیم نامعتبر است.')
         return
       }
 
       if (!response.ok) {
-        setDecisionError('خطا در ثبت تصمیم. لطفاً ارتباط را بررسی و دوباره تلاش کنید.')
+        failDecision('خطا در ثبت تصمیم. لطفاً ارتباط را بررسی و دوباره تلاش کنید.')
         return
       }
 
       // Success: clean up draft
       writeDraft(draftKey, '')
       setDecisionReason('')
-      setDecisionSuccess(
+      toast.success(
         action === 'approve'
           ? 'احراز شرکت با موفقیت تأیید شد.'
           : action === 'return'
@@ -311,7 +315,7 @@ export function CompanyDetailView({ id }: { id: string }) {
       )
       await loadData()
     } catch {
-      setDecisionError('خطا در ارسال درخواست به سرور.')
+      failDecision('خطا در ارسال درخواست به سرور.')
     } finally {
       setDecisionSubmitting(false)
     }
@@ -573,14 +577,6 @@ export function CompanyDetailView({ id }: { id: string }) {
                 className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
               >
                 {decisionError}
-              </div>
-            )}
-            {decisionSuccess && (
-              <div
-                role="status"
-                className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
-              >
-                {decisionSuccess}
               </div>
             )}
 

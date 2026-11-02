@@ -1,20 +1,24 @@
-import { cn } from '@/utilities/ui'
 import * as React from 'react'
 
-const Textarea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement>> = ({
-  className,
-  ...props
-}) => {
-  return (
+import { typographyVariants } from '@/components/ui/typography'
+import { cn } from '@/utilities/ui'
+
+/** Multi-line input styled like Input (Figma node 263:3294): RTL, 8px radius, brand focus, error on aria-invalid. */
+const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<'textarea'>>(
+  ({ className, dir = 'rtl', ...props }, ref) => (
     <textarea
+      ref={ref}
+      dir={dir}
       data-slot="textarea"
       className={cn(
-        'border-input placeholder:text-muted-foreground ring-ring/10 outline-ring/50 aria-invalid:outline-destructive/60 aria-invalid:ring-destructive/20 aria-invalid:border-destructive/60 flex field-sizing-content min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] focus-visible:ring-4 focus-visible:outline-1 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:focus-visible:ring-[3px] aria-invalid:focus-visible:outline-none md:text-sm',
+        typographyVariants({ variant: '16/regular', color: 'neutral-600' }),
+        'flex field-sizing-content min-h-24 w-full rounded-lg border border-neutral-100 bg-white p-2 text-right outline-none transition-colors placeholder:font-light placeholder:text-neutral-400 hover:border-brand-500 focus-visible:border-brand-500 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-400 aria-invalid:border-error-100 aria-invalid:focus-visible:border-error-500',
         className,
       )}
       {...props}
     />
-  )
-}
+  ),
+)
+Textarea.displayName = 'Textarea'
 
 export { Textarea }

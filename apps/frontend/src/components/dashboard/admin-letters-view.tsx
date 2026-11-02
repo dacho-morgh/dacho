@@ -24,6 +24,7 @@ import {
   DashboardTrashIcon,
 } from '@/components/icons'
 import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
+import { toast } from 'sonner'
 
 export type AdminLetterStatus = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -174,25 +175,18 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
   const [tab, setTab] = useState<'received' | 'sent' | 'support'>('received')
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | AdminLetterStatus>('all')
-  const [actionNotice, setActionNotice] = useState<string | null>(null)
-
-  const showNotice = (message: string) => {
-    setActionNotice(message)
-    window.setTimeout(() => setActionNotice(null), 3500)
-  }
-
   const handleDelete = async (item: AdminLetterItem) => {
     if (item.source !== 'letter') {
-      showNotice('فرم‌های وب‌سایت از اینجا حذف نمی‌شوند.')
+      toast.info('فرم‌های وب‌سایت از اینجا حذف نمی‌شوند.')
       return
     }
     try {
       const response = await fetch(`/api/dashboard/letters/${encodeURIComponent(item.id)}`, { method: 'DELETE' })
       if (!response.ok) throw new DashboardApiError(response.status, 'delete_failed')
       setLetters((current) => current.filter((letter) => letter.id !== item.id))
-      showNotice(`نامه «${item.title}» با موفقیت حذف گردید.`)
+      toast.success(`نامه «${item.title}» با موفقیت حذف گردید.`)
     } catch (cause) {
-      showNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
+      toast.error(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
     }
   }
 
@@ -235,66 +229,54 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
         <div className="flex min-w-0 flex-wrap items-center gap-[8px]">
           {/* Tabs — Figma frame 30865:18197 */}
           <div className="flex h-[48px] max-w-full items-start gap-[8px] overflow-x-auto rounded-[12px] bg-neutral-100 p-[6px]">
-            <button
+            <Button
               type="button"
+              variant="segment"
+              size="36"
               onClick={() => setTab('sent')}
               aria-pressed={tab === 'sent'}
-              className={`flex h-[36px] items-center gap-[8px] rounded-[10px] p-[8px] transition-colors ${
-                tab === 'sent' ? 'bg-white' : 'bg-transparent'
-              }`}
             >
-              <Typography
-                variant="16/regular"
-                className={`whitespace-nowrap leading-[28px] ${tab === 'sent' ? 'text-neutral-700' : 'text-neutral-600'}`}
-              >
+              <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
                 نامه‌های ارسالی
               </Typography>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="segment"
+              size="36"
               onClick={() => setTab('received')}
               aria-pressed={tab === 'received'}
-              className={`flex h-[36px] items-center gap-[8px] rounded-[10px] p-[8px] transition-colors ${
-                tab === 'received' ? 'bg-white' : 'bg-transparent'
-              }`}
             >
-              <Typography
-                variant="16/regular"
-                className={`whitespace-nowrap leading-[28px] ${tab === 'received' ? 'text-neutral-700' : 'text-neutral-600'}`}
-              >
+              <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
                 نامه‌های دریافتی
               </Typography>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="segment"
+              size="36"
               onClick={() => setTab('support')}
               aria-pressed={tab === 'support'}
-              className={`flex h-[36px] items-center gap-[8px] rounded-[10px] p-[8px] transition-colors ${
-                tab === 'support' ? 'bg-white' : 'bg-transparent'
-              }`}
             >
-              <Typography
-                variant="16/regular"
-                className={`whitespace-nowrap leading-[28px] ${tab === 'support' ? 'text-neutral-700' : 'text-neutral-600'}`}
-              >
+              <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
                 تیکت‌های پشتیبانی
               </Typography>
-            </button>
+            </Button>
           </div>
 
           {/* Filter button — Figma node 30852:17811 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
+              <Button
                 type="button"
+                variant="filter"
+                size="icon-48"
                 title="فیلتر نوع نامه"
-                className={`flex h-[48px] shrink-0 items-center gap-[8px] rounded-[12px] bg-white px-[12px] py-[8px] transition-colors hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-brand-500 ${
-                  typeFilter !== 'all' ? 'text-brand-600 ring-2 ring-brand-500/20' : 'text-neutral-600'
-                }`}
+                data-active={typeFilter !== 'all'}
               >
-                <DashboardFilterIcon className="size-[26px]" />
+                <DashboardFilterIcon />
                 <span className="sr-only">فیلتر</span>
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="start"
@@ -334,26 +316,6 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
         </div>
       </div>
 
-      {/* Toast */}
-      {actionNotice && (
-        <div
-          role="status"
-          className="flex w-full items-center justify-between rounded-xl border border-brand-100 bg-brand-50 p-3 text-brand-900 shadow-xs"
-        >
-          <Typography variant="14/regular" className="text-inherit">
-            {actionNotice}
-          </Typography>
-          <Button variant="text-gray" size="icon-32"
-            type="button"
-            onClick={() => setActionNotice(null)}
-            aria-label="بستن پیام"
-          >
-            <span aria-hidden="true" className="text-xl leading-none">
-              ×
-            </span>
-          </Button>
-        </div>
-      )}
 
       {/* Table card — Figma frame 30852:17813 */}
       <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4">
@@ -373,14 +335,10 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
                 <div key={item.id} className="flex h-[72px] w-full items-center border-b border-neutral-100 p-[16px]">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        title="منوی عملیات"
-                        className="flex size-[20px] shrink-0 cursor-pointer items-center justify-center text-neutral-600 transition-colors hover:text-neutral-800 focus-visible:outline-2 focus-visible:outline-brand-500"
-                      >
-                        <DashboardMoreIcon className="size-[20px]" />
+                      <Button type="button" variant="text-gray" size="icon-32" title="منوی عملیات">
+                        <DashboardMoreIcon />
                         <span className="sr-only">منوی عملیات</span>
-                      </button>
+                      </Button>
                     </DropdownMenuTrigger>
                     {/* Action dropdown — Figma node 30865:18777 */}
                     <DropdownMenuContent

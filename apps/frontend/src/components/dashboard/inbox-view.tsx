@@ -37,6 +37,7 @@ import {
   type LetterType,
 } from '@/utilities/dashboard-api'
 import { cn } from '@/utilities/ui'
+import { toast } from 'sonner'
 
 /** One inbox row, prepared on the server from a letter and the reader's side of it. */
 export interface InboxRow {
@@ -188,7 +189,7 @@ const menuItemClass = 'flex h-8 cursor-pointer items-center justify-start gap-2 
 function ActionLink({ row }: { row: InboxRow }) {
   if (!row.action) return null
   return (
-    <Button asChild variant="text" size="32" className="text-brand-600">
+    <Button asChild variant="text" size="32">
       <Link href={row.action.href}>
         <Typography as="span" variant="14/semibold" className="whitespace-nowrap text-inherit">
           {row.action.label}
@@ -240,7 +241,6 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
   const [pending, startTransition] = useTransition()
   const [rows, setRows] = useState(initialRows)
   const [search, setSearch] = useState(query.q ?? '')
-  const [notice, setNotice] = useState<string | null>(null)
   const [supportOpen, setSupportOpen] = useState(false)
 
   // A new server render (another tab, page or filter) replaces the rows.
@@ -261,18 +261,13 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
     startTransition(() => router.push(qs ? `${pathname}?${qs}` : pathname))
   }
 
-  const showNotice = (message: string) => {
-    setNotice(message)
-    window.setTimeout(() => setNotice(null), 3500)
-  }
-
   const toggleRead = async (row: InboxRow) => {
     try {
       await setLetterRead(row.id, !row.read)
       setRows((current) => current.map((item) => (item.id === row.id ? { ...item, read: !row.read } : item)))
       startTransition(() => router.refresh())
     } catch (cause) {
-      showNotice(describeMutationFailure(cause, 'تغییر وضعیت خواندن انجام نشد.'))
+      toast.error(describeMutationFailure(cause, 'تغییر وضعیت خواندن انجام نشد.'))
     }
   }
 
@@ -280,10 +275,10 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
     try {
       await deleteLetter(row.id)
       setRows((current) => current.filter((item) => item.id !== row.id))
-      showNotice(`نامه «${row.title}» از کارتابل حذف شد.`)
+      toast.success(`نامه «${row.title}» از کارتابل حذف شد.`)
       startTransition(() => router.refresh())
     } catch (cause) {
-      showNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
+      toast.error(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
     }
   }
 
@@ -292,13 +287,6 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
-      {notice && (
-        <div role="status" className="mb-4 rounded-xl border border-brand-100 bg-brand-50 p-3 text-brand-900">
-          <Typography variant="14/regular" className="text-inherit">
-            {notice}
-          </Typography>
-        </div>
-      )}
 
       {/* Toolbar, Figma 30852:17808 */}
       <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -323,12 +311,12 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
-                variant="white"
+                variant="filter"
                 size="icon-48"
                 aria-label="فیلتر نامه‌ها"
-                className={cn('shrink-0', query.status && 'text-brand-600 ring-2 ring-brand-100')}
+                data-active={Boolean(query.status)}
               >
-                <FilterIcon className="size-[26px]" />
+                <FilterIcon />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-xs">
@@ -376,16 +364,14 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
           {/* Received / sent, Figma 30865:18197 */}
           <div role="tablist" aria-label="صندوق نامه" className="flex h-12 shrink-0 items-center gap-2 rounded-xl bg-neutral-100 p-1.5">
             {(['received', 'sent'] as const).map((box) => (
-              <button
+              <Button
                 key={box}
                 type="button"
+                variant="segment"
+                size="36"
                 role="tab"
                 aria-selected={query.box === box}
                 onClick={() => navigate({ box, status: box === 'sent' ? undefined : query.status })}
-                className={cn(
-                  'flex h-9 items-center gap-2 rounded-[10px] px-2 transition-colors focus-visible:outline-2 focus-visible:outline-brand-500',
-                  query.box === box ? 'bg-white text-neutral-700' : 'text-neutral-600 hover:text-neutral-700',
-                )}
               >
                 <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
                   {box === 'received' ? 'نامه‌های دریافتی' : 'نامه‌های ارسالی'}
@@ -397,7 +383,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
                     </Typography>
                   </span>
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -518,7 +504,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
           isOpen={supportOpen}
           onClose={() => setSupportOpen(false)}
           onSuccess={(code) => {
-            showNotice(`پیام شما با کد پیگیری ${code} برای پشتیبانی ارسال شد.`)
+            toast.success(`پیام شما با کد پیگیری ${code} برای پشتیبانی ارسال شد.`)
             startTransition(() => router.refresh())
           }}
         />

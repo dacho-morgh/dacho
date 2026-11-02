@@ -9,8 +9,8 @@ import {
   type AdminListLoadState,
 } from '@/components/dashboard/admin-list-view'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 
 export type VerificationStatus =
   | 'unsubmitted'
@@ -200,32 +200,28 @@ export function CompanyList() {
     return companies.filter((c) => c.verificationStatus === queueFilter)
   }, [companies, queueFilter])
 
-  const filterTabs = (
-    <div
-      className="flex flex-wrap items-center gap-2"
-      role="tablist"
-      aria-label="صف‌های احراز شرکت‌ها"
-    >
-      {QUEUES.map((q) => {
-        const active = queueFilter === q.id
-        const count = counts[q.id]
-        return (
-          <Button
-            key={q.id}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => setQueueFilter(q.id)}
-            size="36"
-            variant={active ? 'default' : 'outline-gray'}
-          >
-            <Typography as="span" variant="14/regular" color={active ? 'white' : 'secondary'}>
-              {q.label} ({count.toLocaleString('fa-IR')})
-            </Typography>
-          </Button>
-        )
-      })}
-    </div>
+  const filter = (
+    <ListFilterButton
+      label="فیلتر شرکت‌ها"
+      groups={[
+        {
+          key: 'status',
+          label: 'وضعیت احراز',
+          value: queueFilter === 'all' ? undefined : queueFilter,
+          options: QUEUES.map((q) => ({ value: q.id === 'all' ? '' : q.id, label: q.label, count: counts[q.id] })),
+        },
+      ]}
+      onChange={(_, value) => {
+        const next = (value as VerificationQueue | undefined) ?? 'all'
+        setQueueFilter(next)
+        // Keep the queue in the URL so back, refresh and sharing reopen it.
+        const params = new URLSearchParams(window.location.search)
+        if (next === 'all') params.delete('status')
+        else params.set('status', next)
+        const query = params.toString()
+        window.history.replaceState(null, '', query ? `?${query}` : window.location.pathname)
+      }}
+    />
   )
 
   return (
@@ -240,7 +236,7 @@ export function CompanyList() {
       getKey={(item) => item.id}
       columns={columns}
       loadState={loadState}
-      filterTabs={filterTabs}
+      filter={filter}
       onRetry={() => void loadCompanies()}
     />
   )

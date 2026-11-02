@@ -7,21 +7,17 @@ import { PrivateDocumentField } from '@/components/documents/private-document-fi
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Typography, typographyVariants } from '@/components/ui/typography'
+import { Typography } from '@/components/ui/typography'
 import { DashboardApiError, describeMutationFailure, LETTER_TYPE_LABELS, type LetterType, type RequestDto } from '@/utilities/dashboard-api'
 import type { PrivateDocumentDto } from '@/utilities/document-api'
-import { cn } from '@/utilities/ui'
+import { NativeSelect } from '@/components/ui/native-select'
+import { toast } from 'sonner'
 
 export interface LetterRecipient {
   id: string
   companyName?: string
   name?: string
 }
-
-const fieldClassName = cn(
-  typographyVariants({ variant: '16/regular', color: 'neutral-600' }),
-  'h-10 w-full appearance-none rounded-lg border border-neutral-100 bg-white p-2 text-right outline-none focus:border-brand-500 disabled:bg-neutral-50',
-)
 
 const SUPPORT_PRIORITY_LABELS: Record<string, string> = {
   normal: 'عادی',
@@ -161,9 +157,11 @@ export function NewLetterForm({
         if (!response.ok) throw new DashboardApiError(response.status, 'ticket_not_created')
         const result = await response.json()
         if (!result?.ticket?.id) throw new Error('ticket_not_created')
+        toast.success('پیام شما برای پشتیبانی ارسال شد.')
         router.push('/dashboard/letters')
         router.refresh()
       } catch (cause) {
+        toast.error('ارسال پیام پشتیبانی انجام نشد.')
         setError(describeMutationFailure(cause, 'ارسال پیام پشتیبانی انجام نشد. لطفاً دوباره تلاش کنید.'))
       } finally {
         submitting.current = false
@@ -212,9 +210,11 @@ export function NewLetterForm({
       if (!response.ok) throw new DashboardApiError(response.status, 'letter_not_created')
       const result = await response.json()
       if (!result?.letter?.id) throw new Error('letter_not_created')
+      toast.success('نامه ارسال شد.')
       router.push('/dashboard/letters')
       router.refresh()
     } catch (cause) {
+      toast.error('ارسال نامه انجام نشد.')
       setError(describeMutationFailure(cause, 'ارسال نامه انجام نشد. لطفاً دوباره تلاش کنید.'))
     } finally {
       submitting.current = false
@@ -268,16 +268,15 @@ export function NewLetterForm({
             گیرنده
           </Typography>
           {isSupport ? (
-            <input
+            <Input
               id="letter-recipient"
               name="recipientName"
               disabled
               value="پشتیبانی کارخانه نوآوری صنایع انرژی بوشهر"
-              className={fieldClassName}
             />
           ) : (
             <>
-              <select
+              <NativeSelect
                 id="letter-recipient"
                 name="recipientId"
                 required
@@ -289,7 +288,6 @@ export function NewLetterForm({
                   setAttachments([])
                 }}
                 disabled={saving || uploading || changingCase || !companies.length}
-                className={fieldClassName}
               >
                 <option value="" disabled>انتخاب گیرنده</option>
                 {companies.map((company) => (
@@ -297,7 +295,7 @@ export function NewLetterForm({
                     {company.companyName || company.name || company.id}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
               {!companies.length && (
                 <Typography
                   role={recipientsError ? 'alert' : 'status'}
@@ -336,32 +334,30 @@ export function NewLetterForm({
               {isSupport ? 'میزان اهمیت' : 'نوع نامه'}
             </Typography>
             {isSupport ? (
-              <select
+              <NativeSelect
                 id="letter-type"
                 name="priority"
                 required
                 defaultValue="normal"
                 disabled={saving}
-                className={fieldClassName}
               >
                 {Object.entries(SUPPORT_PRIORITY_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
-              </select>
+              </NativeSelect>
             ) : (
-              <select
+              <NativeSelect
                 id="letter-type"
                 name="type"
                 required
                 defaultValue={officialOnly ? 'official' : ''}
                 disabled={saving}
-                className={fieldClassName}
               >
                 {!officialOnly && <option value="" disabled>انتخاب نوع نامه</option>}
                 {letterTypes.map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
-              </select>
+              </NativeSelect>
             )}
           </div>
         </div>
@@ -377,10 +373,7 @@ export function NewLetterForm({
             required
             disabled={saving}
             placeholder={isSupport ? 'متن پیام یا درخواست پشتیبانی خود را بنویسید...' : 'متن پلیس هولدر'}
-            className={cn(
-              typographyVariants({ variant: '16/regular', color: 'neutral-600' }),
-              'h-[380px] min-h-[380px] resize-y rounded-lg border-neutral-100 bg-white p-2 shadow-none placeholder:font-[150] placeholder:text-neutral-400 md:text-base',
-            )}
+            className="h-[380px] min-h-[380px] resize-y"
           />
         </div>
 
@@ -398,15 +391,14 @@ export function NewLetterForm({
               {requestId && !caseOptions ? 'پرونده مرتبط' : 'پرونده مرتبط (اختیاری)'}
             </Typography>
             {requestId && !caseOptions ? (
-              <input id="letter-case" disabled value={caseTitle ?? 'پرونده این نامه'} className={fieldClassName} />
+              <Input id="letter-case" disabled value={caseTitle ?? 'پرونده این نامه'} />
             ) : caseOptions ? (
-              <select
+              <NativeSelect
                 id="letter-case"
                 name="requestId"
                 value={requestId ?? ''}
                 onChange={(event) => chooseCase(event.target.value)}
                 disabled={saving || uploading || changingCase}
-                className={fieldClassName}
               >
                 <option value="">بدون پرونده</option>
                 {requestId && !caseOptions.some((item) => item.id === requestId) ? (
@@ -415,9 +407,9 @@ export function NewLetterForm({
                 {caseOptions.map((item) => (
                   <option key={item.id} value={item.id}>{caseLabel(item)}</option>
                 ))}
-              </select>
+              </NativeSelect>
             ) : (
-              <select
+              <NativeSelect
                 id="letter-case"
                 name="requestId"
                 value={caseId}
@@ -426,7 +418,6 @@ export function NewLetterForm({
                   setAttachments([])
                 }}
                 disabled={saving || uploading || cases.kind !== 'ready' || cases.items.length === 0}
-                className={fieldClassName}
               >
                 <option value="">بدون پرونده</option>
                 {cases.kind === 'ready'
@@ -434,7 +425,7 @@ export function NewLetterForm({
                       <option key={item.id} value={item.id}>{caseLabel(item)}</option>
                     ))
                   : null}
-              </select>
+              </NativeSelect>
             )}
             {casesError ? (
               <Typography role="alert" variant="12/regular" className="text-error-600">

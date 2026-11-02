@@ -20,6 +20,8 @@ import {
 } from '@/utilities/dashboard-api'
 import { BoothPageHeader } from './booth-page-header'
 import { BoothRequestStageBadge, boothFailure, receiptStatusLabel } from './booth-status'
+import { FileInput } from '@/components/ui/file-input'
+import { toast } from 'sonner'
 
 export interface BoothExhibitionInfo {
   id: string
@@ -68,11 +70,10 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
     setNotice(null)
     try {
       await reserveBooth(exhibition.id, booth.id)
-      setNotice({
-        tone: 'success',
-        text: `درخواست غرفه ${booth.identifier} ثبت شد و در انتظار تأیید حضور است.`,
-      })
+      setNotice(null)
+      toast.success(`درخواست غرفه ${booth.identifier} ثبت شد و در انتظار تأیید حضور است.`)
     } catch (error) {
+      toast.error('ثبت درخواست غرفه انجام نشد.')
       setNotice({ tone: 'error', text: boothFailure(error, 'ثبت درخواست غرفه ممکن نشد.') })
     } finally {
       setReservingId(null)
@@ -369,8 +370,10 @@ function ReceiptUploadForm({
         trackingCode: trackingCode.trim() || undefined,
         amountToman: request.priceAmount,
       })
+      toast.success('فیش پرداخت بارگذاری شد.')
       await onUploaded()
     } catch (uploadError) {
+      toast.error('بارگذاری فیش انجام نشد.')
       setError(boothFailure(uploadError, 'بارگذاری فیش ممکن نشد. دوباره تلاش کنید.'))
       // A stale view (receipt already pending or confirmed) refreshes the card.
       await onUploaded()
@@ -394,12 +397,10 @@ function ReceiptUploadForm({
           <Typography as="span" variant="12/regular" color="neutral-500">
             فایل فیش (PDF یا Word، حداکثر ۱۰ مگابایت)
           </Typography>
-          <input
+          <FileInput
             id={inputId}
-            type="file"
             accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="block w-full rounded-[10px] border border-neutral-200 bg-white p-2 text-sm text-neutral-600 file:me-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1 file:text-neutral-700"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="w-full"
           />
         </label>
         <label className="flex flex-1 flex-col gap-1">

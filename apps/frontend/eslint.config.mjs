@@ -30,6 +30,32 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // Dashboard controls come from components/ui (frontend AGENTS.md, FE42/FE44).
+    files: ['src/components/dashboard/**/*.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXOpeningElement[name.name='button']",
+          message: 'Use the shared Button from @/components/ui/button.',
+        },
+        {
+          selector:
+            "JSXOpeningElement[name.name='input']:not(:has(JSXAttribute[name.name='type'][value.value='hidden']))",
+          message: 'Use Input, FileInput, Checkbox or RadioGroup from @/components/ui.',
+        },
+        {
+          selector: "JSXOpeningElement[name.name='select']",
+          message: 'Use NativeSelect (or Select) from @/components/ui.',
+        },
+        {
+          selector: "JSXOpeningElement[name.name='textarea']",
+          message: 'Use Textarea from @/components/ui/textarea.',
+        },
+      ],
+    },
+  },
   globalIgnores([
     '.next/**',
     'out/**',

@@ -17,6 +17,7 @@ import {
 } from '@/components/icons'
 import { deleteLetter, describeMutationFailure } from '@/utilities/dashboard-api'
 import { letterAttachmentDownloadPath } from '@/utilities/document-api'
+import { toast } from 'sonner'
 
 export interface MailAttachment {
   id: string
@@ -80,6 +81,7 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
   const router = useRouter()
   const deletingRef = useRef(false)
   const [deleting, setDeleting] = useState(false)
+
   const [notice, setNotice] = useState<string | null>(null)
 
   async function handleDelete() {
@@ -88,11 +90,13 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
     setDeleting(true)
     try {
       await deleteLetter(mail.id)
+      toast.success('نامه از کارتابل حذف شد.')
       router.push('/dashboard/letters')
       router.refresh()
     } catch (cause) {
       deletingRef.current = false
       setDeleting(false)
+      toast.error('حذف نامه انجام نشد.')
       setNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد. دوباره تلاش کنید.'))
     }
   }

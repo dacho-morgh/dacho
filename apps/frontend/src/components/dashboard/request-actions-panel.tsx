@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useId, useState } from 'react'
 
@@ -17,6 +16,8 @@ import {
   reopenRequest,
   type RequestAction,
 } from '@/utilities/dashboard-api'
+import { toast } from 'sonner'
+import Link from 'next/link'
 
 const ERROR_MESSAGES: Record<string, string> = {
   stale_revision: 'پرونده پس از باز شدن این صفحه تغییر کرده است (برای نمونه شرکت نسخه تازه‌ای فرستاده است). صفحه به‌روز شد؛ وضعیت را دوباره بررسی کنید.',
@@ -143,7 +144,6 @@ const REOPEN: Decision = {
   done: 'پرونده بازگشایی شد و به بررسی اولیه بازگشت.',
 }
 
-type Notice = { kind: 'success' | 'error'; text: string }
 
 /**
  * The commands the server lists for this person on this case and stage. Nothing here
@@ -161,7 +161,6 @@ export function RequestActionsPanel({
 }) {
   const router = useRouter()
   const [open, setOpen] = useState<Decision | null>(null)
-  const [notice, setNotice] = useState<Notice | null>(null)
 
   const groups = [
     actions.includes('triage')
@@ -175,26 +174,11 @@ export function RequestActionsPanel({
       : null,
   ].filter((group) => group !== null)
 
-  if (!groups.length && !notice && !open) return null
+  if (!groups.length && !open) return null
 
   return (
     <section className="flex flex-col gap-6 rounded-2xl border border-brand-600 bg-white p-4 sm:p-6">
       <Typography as="h2" variant="20/bold" color="neutral-900">اقدام شما</Typography>
-      {notice ? (
-        <div
-          role={notice.kind === 'error' ? 'alert' : 'status'}
-          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg p-3 ${notice.kind === 'error' ? 'bg-error-50' : 'bg-success-50'}`}
-        >
-          <Typography variant="14/regular" color={notice.kind === 'error' ? 'error' : 'success'}>{notice.text}</Typography>
-          {notice.kind === 'success' ? (
-            <Button asChild variant="text-primary" size="32">
-              <Link href="/dashboard/requests">
-                <Typography variant="14/regular" className="text-inherit">بازگشت به صف درخواست‌ها</Typography>
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
       {groups.map((group) => (
         <div key={group.key} className="flex flex-col gap-3">
           <Typography as="h3" variant="16/semibold" color="neutral-900">{group.title}</Typography>
@@ -207,7 +191,6 @@ export function RequestActionsPanel({
                 variant={item.variant}
                 size="40"
                 onClick={() => {
-                  setNotice(null)
                   setOpen(item)
                 }}
               >
@@ -228,9 +211,18 @@ export function RequestActionsPanel({
             try {
               await open.send(id, reason, revision)
               setOpen(null)
-              setNotice({ kind: 'success', text: `${open.done} پرونده و صف به‌روز شد.` })
+              toast.success(`${open.done} پرونده و صف به‌روز شد.`, {
+                action: (
+                  <Button asChild variant="text-primary" size="32">
+                    <Link href="/dashboard/requests">
+                      <Typography variant="14/regular" className="text-inherit">بازگشت به صف درخواست‌ها</Typography>
+                    </Link>
+                  </Button>
+                ),
+              })
               return null
             } catch (cause) {
+              toast.error('ثبت تصمیم انجام نشد.')
               return errorMessage(cause)
             } finally {
               router.refresh()

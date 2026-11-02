@@ -22,6 +22,16 @@ export function parseRequestPage(value?: string | string[]): number {
   return Number.isSafeInteger(page) && Number.isSafeInteger((page - 1) * 50) ? page : 1
 }
 
+/** The status choices of the requests filter; counts come from `GET /stats`. */
+export const REQUEST_STATUS_FILTER_OPTIONS: { value: RequestStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'همه' },
+  { value: 'in_review', label: 'در حال بررسی' },
+  { value: 'action_needed', label: 'نیازمند اقدام' },
+  { value: 'approved', label: 'تایید شده' },
+  { value: 'rejected', label: 'رد شده' },
+  { value: 'draft', label: 'پیش‌نویس' },
+]
+
 export const REVIEW_STAGE_OPTIONS = [
   { value: 'chief_triage', label: 'بررسی اولیه' },
   { value: 'triaged', label: 'داوری' },

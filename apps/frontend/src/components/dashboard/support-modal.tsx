@@ -7,11 +7,19 @@ import {
   Send,
   X,
 } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
 import { DashboardUserTagIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Typography } from '@/components/ui/typography'
 import { createSupportTicket } from '@/utilities/dashboard-api'
+import { Form, FormField } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { resolver } from './owner-admin'
+import { toast } from 'sonner'
 
 export interface SupportModalProps {
   isOpen: boolean
@@ -28,40 +36,42 @@ const SUPPORT_CATEGORIES = [
 ] as const
 
 const PRIORITIES = [
-  { id: 'normal', label: 'عادی', color: 'bg-neutral-100 text-neutral-600 border-neutral-200' },
-  { id: 'important', label: 'مهم', color: 'bg-warning-50 text-warning-500 border-warning-200' },
-  { id: 'urgent', label: 'فوری', color: 'bg-error-50 text-error-600 border-error-200' },
+  { id: 'normal', label: 'عادی' },
+  { id: 'important', label: 'مهم' },
+  { id: 'urgent', label: 'فوری' },
 ] as const
+
+const supportSchema = z.object({
+  subject: z.string().trim().min(1, 'عنوان پیام را بنویسید.'),
+  phone: z.string().trim(),
+  message: z.string().trim().min(1, 'متن پیام را بنویسید.'),
+})
+type SupportValues = z.infer<typeof supportSchema>
+const EMPTY_SUPPORT: SupportValues = { subject: '', phone: '', message: '' }
 
 export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) {
   const [category, setCategory] = useState<string>(SUPPORT_CATEGORIES[0])
   const [priority, setPriority] = useState<string>('normal')
-  const [subject, setSubject] = useState('')
-  const [message, setMessage] = useState('')
-  const [phone, setPhone] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const form = useForm<SupportValues>({ resolver: resolver(supportSchema), defaultValues: EMPTY_SUPPORT })
+  const { isSubmitting } = form.formState
   const [trackingCode, setTrackingCode] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   if (!isOpen) return null
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!subject.trim() || !message.trim()) return
-
-    setIsSubmitting(true)
+  // A failed send keeps every field as typed; only a successful one moves on.
+  const submit = async ({ subject, phone, message }: SupportValues) => {
     setSubmitError(null)
     try {
       const result = await createSupportTicket({
-        subject: `[${category} / ${priority}] ${subject.trim()}`,
-        message: `${message.trim()}${phone.trim() ? `\n\nشماره تماس: ${phone.trim()}` : ''}`,
+        subject: `[${category} / ${priority}] ${subject}`,
+        message: `${message}${phone ? `\n\nشماره تماس: ${phone}` : ''}`,
       })
       const generatedCode = result.ticket.id
-      setIsSubmitting(false)
       setTrackingCode(generatedCode)
       if (onSuccess) onSuccess(generatedCode)
     } catch {
-      setIsSubmitting(false)
+      toast.error('ارسال پیام انجام نشد.')
       setSubmitError('ارسال پیام انجام نشد. لطفاً دوباره تلاش کنید.')
     }
   }
@@ -69,23 +79,19 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
   const handleReset = () => {
     setCategory(SUPPORT_CATEGORIES[0])
     setPriority('normal')
-    setSubject('')
-    setMessage('')
-    setPhone('')
+    form.reset(EMPTY_SUPPORT)
     setTrackingCode(null)
     setSubmitError(null)
     onClose()
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs transition-opacity duration-200"
-      dir="rtl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="support-modal-title"
-    >
-      <div className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150">
+    <Dialog open onOpenChange={(open) => !open && handleReset()}>
+      <DialogContent
+        showCloseButton={false}
+        aria-describedby={undefined}
+        className="max-h-[90vh] max-w-xl gap-0 overflow-hidden p-0 sm:p-0"
+      >
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-neutral-100 px-6 py-4">
           <div className="flex items-center gap-3">
@@ -93,9 +99,11 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
               <DashboardUserTagIcon className="size-6" />
             </div>
             <div>
-              <Typography as="h2" id="support-modal-title" variant="20/bold" className="text-neutral-700">
-                پیام به پشتیبانی
-              </Typography>
+              <DialogTitle asChild>
+                <Typography as="h2" id="support-modal-title" variant="20/bold" className="text-neutral-700">
+                  پیام به پشتیبانی
+                </Typography>
+              </DialogTitle>
               <Typography variant="12/regular" className="text-neutral-400">
                 کارخانه نوآوری صنایع انرژی بوشهر
               </Typography>
@@ -148,7 +156,8 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
             </div>
           ) : (
             /* Form View */
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <Form {...form}>
+            <form noValidate onSubmit={form.handleSubmit(submit)} className="space-y-4">
               {submitError && <Typography role="alert" variant="14/regular" className="text-error-600">{submitError}</Typography>}
               {/* Quick Contact Banner */}
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-neutral-50 p-3 text-xs text-neutral-600">
@@ -171,18 +180,16 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {SUPPORT_CATEGORIES.map((cat) => (
-                    <button
+                    <Button
                       key={cat}
                       type="button"
+                      variant="chip"
+                      size="32"
+                      aria-pressed={category === cat}
                       onClick={() => setCategory(cat)}
-                      className={`h-8 rounded-lg px-3 text-xs transition-all ${
-                        category === cat
-                          ? 'bg-brand-500 font-medium text-white shadow-xs'
-                          : 'border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'
-                      }`}
                     >
                       {cat}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -196,75 +203,47 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                 </label>
                 <div className="flex gap-2">
                   {PRIORITIES.map((p) => (
-                    <button
+                    <Button
                       key={p.id}
                       type="button"
+                      variant="chip"
+                      size="32"
+                      className="flex-1"
+                      aria-pressed={priority === p.id}
                       onClick={() => setPriority(p.id)}
-                      className={`flex h-8 flex-1 items-center justify-center rounded-lg border text-xs transition-all ${
-                        priority === p.id
-                          ? `${p.color} font-semibold ring-2 ring-brand-500/20`
-                          : 'border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50'
-                      }`}
                     >
                       {p.label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
 
-              {/* Subject */}
-              <div>
-                <label htmlFor="support-subject" className="mb-1.5 block">
-                  <Typography variant="14/semibold" className="text-neutral-700">
-                    عنوان پیام <span className="text-error-600">*</span>
-                  </Typography>
-                </label>
-                <input
-                  id="support-subject"
-                  type="text"
-                  required
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="مثال: سوال در خصوص مدارک همایش یا درخواست اصلاح نامه"
-                  className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3.5 text-sm text-neutral-700 placeholder:text-neutral-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="subject"
+                label={<>عنوان پیام <span className="text-error-600">*</span></>}
+                render={({ field, controlProps }) => (
+                  <Input {...field} {...controlProps} type="text" aria-required="true" placeholder="مثال: سوال در خصوص مدارک همایش یا درخواست اصلاح نامه" />
+                )}
+              />
 
-              {/* Contact Phone (Optional) */}
-              <div>
-                <label htmlFor="support-phone" className="mb-1.5 block">
-                  <Typography variant="14/semibold" className="text-neutral-700">
-                    شماره همراه جهت تماس ضروری <span className="text-xs text-neutral-400">(اختیاری)</span>
-                  </Typography>
-                </label>
-                <input
-                  id="support-phone"
-                  type="tel"
-                  dir="ltr"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="۰۹۱۲..."
-                  className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3.5 text-left text-sm text-neutral-700 placeholder:text-neutral-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="phone"
+                label={<>شماره همراه جهت تماس ضروری <span className="text-neutral-400">(اختیاری)</span></>}
+                render={({ field, controlProps }) => (
+                  <Input {...field} {...controlProps} type="tel" dir="ltr" placeholder="۰۹۱۲..." />
+                )}
+              />
 
-              {/* Message Body */}
-              <div>
-                <label htmlFor="support-message" className="mb-1.5 block">
-                  <Typography variant="14/semibold" className="text-neutral-700">
-                    متن پیام / شرح درخواست <span className="text-error-600">*</span>
-                  </Typography>
-                </label>
-                <textarea
-                  id="support-message"
-                  required
-                  rows={4}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="توضیحات کامل درخواست یا سوال خود را اینجا یادداشت فرمایید..."
-                  className="w-full rounded-xl border border-neutral-200 bg-white p-3.5 text-sm leading-relaxed text-neutral-700 placeholder:text-neutral-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="message"
+                label={<>متن پیام / شرح درخواست <span className="text-error-600">*</span></>}
+                render={({ field, controlProps }) => (
+                  <Textarea {...field} {...controlProps} aria-required="true" rows={4} placeholder="توضیحات کامل درخواست یا سوال خود را اینجا یادداشت فرمایید..." />
+                )}
+              />
 
               {/* Form Actions */}
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -280,7 +259,7 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                   type="submit"
                   variant="primary"
                   size="48"
-                  disabled={isSubmitting || !subject.trim() || !message.trim()}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     'در حال ارسال...'
@@ -293,9 +272,10 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                 </Button>
               </div>
             </form>
+            </Form>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

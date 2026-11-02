@@ -170,7 +170,8 @@ describe('employee list', () => {
       vi.fn(async () => json({ docs: staff, hasNextPage: false })),
     )
     render(createElement(EmployeeList, { canManage: true }))
-    expect(screen.getByText('کارمند جدید ثبت شد.')).toBeTruthy()
+    // The saved result is a toast (FE43), rendered after mount.
+    expect(await screen.findByText('کارمند جدید ثبت شد.')).toBeTruthy()
   })
 })
 

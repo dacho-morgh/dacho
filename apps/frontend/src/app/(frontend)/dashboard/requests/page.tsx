@@ -7,7 +7,6 @@ import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import {
   parseRequestStatus,
   RequestsListView,
-  RequestsStatusFilter,
   type RequestItem,
 } from '@/components/dashboard/requests'
 import { RequestsFilters } from '@/components/dashboard/requests/requests-filters'
@@ -90,23 +89,13 @@ export default async function RequestsPage({
       status={status}
       filters={filters}
       events={overviewResult.kind === 'ok' ? (overviewResult.data.events ?? []) : []}
+      counts={counts}
     />
   )
 
   if (isInternal) {
     return (
-      <>
-        <div className="flex flex-col gap-3 px-4 pt-6 lg:pt-10">
-          <RequestsStatusFilter
-            basePath="/dashboard/requests"
-            active={status ?? 'all'}
-            counts={counts}
-            filters={filters}
-          />
-          {filterForm}
-        </div>
-        <AdminRequestList status={status} page={page} filters={filters} />
-      </>
+      <AdminRequestList status={status} page={page} filters={filters} toolbar={filterForm} />
     )
   }
 
@@ -123,11 +112,8 @@ export default async function RequestsPage({
       <RequestsListView
         items={items}
         notice={notice}
-        activeStatus={status ?? 'all'}
         retryHref={requestQueueHref('/dashboard/requests', status, page, filters)}
         state={result.kind === 'ok' && items.length === 0 ? 'empty' : 'default'}
-        counts={counts}
-        filters={filters}
         filterForm={filterForm}
       />
       {result.kind === 'ok' && (

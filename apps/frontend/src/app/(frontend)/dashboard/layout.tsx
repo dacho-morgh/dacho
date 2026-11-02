@@ -10,6 +10,8 @@ import { MenuIcon } from '@/components/icons'
 import { DashboardContent } from '@/components/dashboard/dashboard-content'
 import { DashboardSidebar, type DashboardNavigation } from '@/components/dashboard/sidebar-shell'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
+import { DirectionProvider } from '@/components/ui/direction'
+import { Toaster } from '@/components/ui/sonner'
 import { Typography } from '@/components/ui/typography'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -89,6 +91,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const sidebarDefaultOpen = (await cookies()).get('sidebar_state')?.value !== 'false'
 
   return (
+    <DirectionProvider>
     <SidebarProvider
       defaultOpen={sidebarDefaultOpen}
       style={{ '--sidebar-width-icon': '4.5rem' } as React.CSSProperties}
@@ -121,7 +124,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </SidebarTrigger>
           <DashboardContent>{children}</DashboardContent>
         </SidebarInset>
+        <Toaster />
       </div>
     </SidebarProvider>
+    </DirectionProvider>
   )
 }

@@ -3,6 +3,7 @@
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
+import { NativeSelect } from '@/components/ui/native-select'
 
 export interface RequestFormOption { label: string; value: string }
 export interface RequestFormField { name: string; label?: string; blockType: string; required?: boolean; options?: RequestFormOption[] }
@@ -38,17 +39,16 @@ export function RequestFormFieldInput({
     return (
       <label className="block">
         <Typography variant="14/semibold" className="mb-2 block text-neutral-700">{label}</Typography>
-        <select
+        <NativeSelect
           name={field.name}
           required={field.required}
           disabled={disabled}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-3"
         >
           <option value="">انتخاب کنید</option>
           {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+        </NativeSelect>
       </label>
     )
   }

@@ -6,6 +6,8 @@ import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { DashboardApiError, describeMutationFailure, formatDate, formatTime, type SupportMessageDto, type SupportTicketDto } from '@/utilities/dashboard-api'
+import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
 
 interface SupportTicketActionsProps {
   id: string
@@ -23,13 +25,11 @@ export function SupportTicketActions({ id, status, isAdmin, initialMessages, ini
   const [currentStatus, setCurrentStatus] = useState(status)
   const [response, setResponse] = useState('')
   const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
 
   const act = async (action: 'respond' | 'close') => {
     if (pending.current || currentStatus === 'closed' || (action === 'respond' && !response.trim())) return
     pending.current = true
     setBusy(true)
-    setNotice(null)
     try {
       const result = await fetch(`/api/dashboard/support/${encodeURIComponent(id)}/${action}`, {
         method: 'POST',
@@ -41,10 +41,10 @@ export function SupportTicketActions({ id, status, isAdmin, initialMessages, ini
       setMessages(data.ticket.messages ?? messages)
       setCurrentStatus(data.ticket.status)
       setResponse('')
-      setNotice(action === 'close' ? 'تیکت لغو شد.' : 'پاسخ شما ارسال شد.')
+      toast.success(action === 'close' ? 'تیکت لغو شد.' : 'پاسخ شما ارسال شد.')
       router.refresh()
     } catch (cause) {
-      setNotice(describeMutationFailure(cause, 'عملیات انجام نشد. دوباره تلاش کنید.'))
+      toast.error(describeMutationFailure(cause, 'عملیات انجام نشد. دوباره تلاش کنید.'))
       // The ticket changed under this page: show its current state, keep the typed reply.
       if (cause instanceof DashboardApiError && cause.status === 409) router.refresh()
     } finally {
@@ -73,8 +73,6 @@ export function SupportTicketActions({ id, status, isAdmin, initialMessages, ini
         })}
       </div>
 
-      {notice && <Typography role="status" variant="14/regular" className="rounded-lg bg-neutral-100 p-3 text-neutral-600">{notice}</Typography>}
-
       {currentStatus === 'closed' ? (
         <Typography variant="14/semibold" className="rounded-xl bg-neutral-100 p-3 text-neutral-600">این تیکت لغو شده است.</Typography>
       ) : (
@@ -82,13 +80,13 @@ export function SupportTicketActions({ id, status, isAdmin, initialMessages, ini
           <label htmlFor="support-reply">
             <Typography as="span" variant="14/semibold" className="text-neutral-700">پاسخ جدید</Typography>
           </label>
-          <textarea
+          <Textarea
             id="support-reply"
             value={response}
             onChange={(event) => setResponse(event.target.value)}
             rows={4}
             placeholder="متن پاسخ خود را بنویسید..."
-            className="w-full rounded-xl border border-neutral-200 bg-white p-3 text-sm text-neutral-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            className="w-full"
           />
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="40" disabled={busy || !response.trim()} onClick={() => act('respond')}>

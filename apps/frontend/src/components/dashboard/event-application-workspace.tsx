@@ -44,6 +44,7 @@ import {
   type ParticipationTarget,
   type SubmissionFailureKind,
 } from '@/utilities/participation-eligibility'
+import { toast } from 'sonner'
 
 interface WorkspaceProps {
   serviceId: string
@@ -395,10 +396,11 @@ function ApplicationCard({
     setBusy('save')
     try {
       const saved = await persistDraft(current)
-      if (saved && current === attempt.current) setNotice('پیش‌نویس ذخیره شد. می‌توانید بعداً از همین صفحه ادامه دهید.')
+      if (saved && current === attempt.current) toast.success('پیش‌نویس ذخیره شد. می‌توانید بعداً از همین صفحه ادامه دهید.')
     } catch (cause) {
       if (current !== attempt.current) return
       if (await handleConflict(cause, current)) return
+      toast.error('ذخیره پیش‌نویس انجام نشد.')
       fail(cause, 'ذخیره پیش‌نویس انجام نشد. اطلاعات واردشده حفظ شده است؛ دوباره تلاش کنید.')
     } finally {
       if (current === attempt.current) setBusy(null)
@@ -435,6 +437,7 @@ function ApplicationCard({
       if (current !== attempt.current) return
       if (verification.status !== 'approved') {
         setFailureKind('not_verified')
+        toast.error('ارسال پروپوزال انجام نشد.')
         setError('وضعیت احراز هویت شرکت شما پس از باز شدن این فرم تغییر کرده و دیگر تأییدشده نیست. پروپوزال ارسال نشد؛ پیش‌نویس حفظ شده است.')
         onVerificationChanged()
         return
@@ -447,9 +450,11 @@ function ApplicationCard({
       })
       if (current !== attempt.current) return
       setRequest(result.request)
+      toast.success('پروپوزال ارسال شد.')
     } catch (cause) {
       if (current !== attempt.current) return
       if (await handleConflict(cause, current)) return
+      toast.error('ارسال پروپوزال انجام نشد.')
       fail(cause, fallback)
     } finally {
       if (current === attempt.current) setBusy(null)

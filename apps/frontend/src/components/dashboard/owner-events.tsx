@@ -24,11 +24,15 @@ import {
   RequestError,
   adminRequest,
   cardClass,
-  controlClass,
   loadPeople,
   resolver,
   type Person,
 } from './owner-admin'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Input } from '@/components/ui/input'
+import { FileInput } from '@/components/ui/file-input'
+import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
 
 type Event = {
   id: string
@@ -151,8 +155,10 @@ function EventForm({
         },
       )
       if (!result.event?.id) throw new Error('invalid_event_response')
+      toast.success(event ? 'تغییرات رویداد ذخیره شد.' : 'رویداد ساخته شد.')
       onSaved()
     } catch (error) {
+      toast.error('ذخیره رویداد انجام نشد.')
       setFailure(error)
       if (error instanceof AdminError) {
         if (error.status === 409) setStale(true)
@@ -221,16 +227,15 @@ function EventForm({
           (name) => (
             <Field key={name} name={name} label={labels[name]} error={errors[name]?.message}>
               {name === 'description' ? (
-                <textarea id={name} className={`${controlClass} h-24 py-2`} {...register(name)} />
+                <Textarea id={name} className="h-24" {...register(name)} />
               ) : (
-                <input
+                <Input
                   id={name}
                   type={name.startsWith('registration') ? 'datetime-local' : 'text'}
                   step={name.startsWith('registration') ? '0.001' : undefined}
                   dir={name.startsWith('registration') ? 'ltr' : 'rtl'}
                   aria-invalid={!!errors[name]}
                   aria-describedby={errors[name] ? `${name}-error` : undefined}
-                  className={controlClass}
                   {...register(name)}
                 />
               )}
@@ -246,11 +251,10 @@ function EventForm({
           )
           return (
             <Field key={name} name={name} label={labels[name]} error={errors[name]?.message}>
-              <select
+              <NativeSelect
                 id={name}
                 aria-invalid={!!errors[name]}
                 aria-describedby={errors[name] ? `${name}-error` : undefined}
-                className={controlClass}
                 {...register(name)}
               >
                 <option value="">انتخاب شخص</option>
@@ -259,7 +263,7 @@ function EventForm({
                     {person.name || 'بدون نام'} — {person.phone || person.id}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
               {eligible.length === 0 && (
                 <Typography variant="14/regular" color="warning">
                   شخص واجد شرایط وجود ندارد؛ ابتدا حساب فعال بسازید.
@@ -270,9 +274,8 @@ function EventForm({
         })}
         {event && (
           <Field name="reason" label={labels.reason} error={errors.reason?.message}>
-            <input
+            <Input
               id="reason"
-              className={controlClass}
               aria-invalid={!!errors.reason}
               aria-describedby={errors.reason ? 'reason-error' : undefined}
               {...register('reason')}
@@ -354,8 +357,10 @@ function CategoryForm({
         },
       )
       if (!result.category?.id) throw new Error('invalid_category_response')
+      toast.success('دسته فناوری اضافه شد.')
       onSaved()
     } catch (error) {
+      toast.error('افزودن دسته فناوری انجام نشد.')
       setFailure(error)
       if (error instanceof AdminError && error.data?.error === 'invalid_category') {
         setError(
@@ -376,9 +381,8 @@ function CategoryForm({
     >
       <Typography variant="16/semibold">افزودن دسته فناوری</Typography>
       <Field name="title" label="عنوان دسته فناوری" error={errors.title?.message}>
-        <input
+        <Input
           id="title"
-          className={controlClass}
           aria-invalid={!!errors.title}
           aria-describedby={errors.title ? 'title-error' : undefined}
           {...register('title')}
@@ -466,8 +470,10 @@ function SubtopicForm({
         },
       )
       if (!result.subtopic?.id) throw new Error('invalid_subtopic_response')
+      toast.success('زیرعنوان اضافه شد.')
       onSaved()
     } catch (error) {
+      toast.error('افزودن زیرعنوان انجام نشد.')
       setFailure(error)
       if (error instanceof AdminError) {
         if (error.data?.error === 'invalid_category_event') {
@@ -502,9 +508,8 @@ function SubtopicForm({
     >
       <Typography variant="16/semibold">افزودن زیرعنوان جدید</Typography>
       <Field name="categoryId" label="دسته فناوری" error={errors.categoryId?.message}>
-        <select
+        <NativeSelect
           id="categoryId"
-          className={controlClass}
           aria-invalid={!!errors.categoryId}
           aria-describedby={errors.categoryId ? 'categoryId-error' : undefined}
           {...register('categoryId')}
@@ -515,13 +520,12 @@ function SubtopicForm({
               {c.title}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </Field>
 
       <Field name="title" label="عنوان زیرعنوان" error={errors.title?.message}>
-        <input
+        <Input
           id="title"
-          className={controlClass}
           aria-invalid={!!errors.title}
           aria-describedby={errors.title ? 'title-error' : undefined}
           {...register('title')}
@@ -529,9 +533,8 @@ function SubtopicForm({
       </Field>
 
       <Field name="employerId" label="کارفرمای مسئول" error={errors.employerId?.message}>
-        <select
+        <NativeSelect
           id="employerId"
-          className={controlClass}
           aria-invalid={!!errors.employerId}
           aria-describedby={errors.employerId ? 'employerId-error' : undefined}
           {...register('employerId')}
@@ -542,7 +545,7 @@ function SubtopicForm({
               {p.name || 'بدون نام'} — {p.phone || p.id}
             </option>
           ))}
-        </select>
+        </NativeSelect>
         {eligibleEmployers.length === 0 && (
           <Typography variant="14/regular" color="warning">
             شخص کارفرمای واجد شرایط وجود ندارد؛ ابتدا در بخش پرسنل حساب فعال با نقش کارفرما بسازید.
@@ -594,7 +597,6 @@ function RfpManager({
   const [requestFailure, setRequestFailure] = useState<unknown>(null)
   const [stale, setStale] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [savedSuccess, setSavedSuccess] = useState(false)
 
   // Upload form state (preserved across 409 stale conflict)
   const [reason, setReason] = useState('')
@@ -638,7 +640,6 @@ function RfpManager({
     setFormError(null)
     setFailure(null)
     setRequestFailure(null)
-    setSavedSuccess(false)
     if (!reason.trim()) {
       setFormError('توضیحات و دلیل نسخه جدید الزامی است.')
       return
@@ -680,11 +681,12 @@ function RfpManager({
 
       if (!res.version?.id) throw new Error('invalid_rfp_response')
       acceptServerVersion(res.version)
-      setSavedSuccess(true)
+      toast.success('نسخه جدید RFP با موفقیت بارگذاری شد.')
       setReason('')
       setSelectedFiles([])
       setFileInputKey((value) => value + 1)
     } catch (err) {
+      toast.error('بارگذاری RFP انجام نشد.')
       const code = err instanceof AdminError ? String(err.data?.error) : ''
       if (err instanceof AdminError && err.status === 409) {
         setStale(true)
@@ -774,21 +776,15 @@ function RfpManager({
       >
         <Typography variant="16/semibold">بارگذاری نسخه جدید RFP</Typography>
 
-        {savedSuccess && (
-          <Typography role="status" variant="14/regular" color="success">
-            نسخه جدید RFP با موفقیت بارگذاری شد.
-          </Typography>
-        )}
 
         <div className="flex min-w-0 flex-col gap-2">
           <Typography asChild variant="16/semibold">
             <label htmlFor="rfp-reason">توضیحات و دلیل نسخه جدید</label>
           </Typography>
-          <input
+          <Input
             id="rfp-reason"
             aria-label="توضیحات و دلیل نسخه جدید"
             type="text"
-            className={controlClass}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
@@ -798,14 +794,12 @@ function RfpManager({
           <Typography asChild variant="16/semibold">
             <label htmlFor="rfp-files">انتخاب فایل‌های RFP</label>
           </Typography>
-          <input
+          <FileInput
             key={fileInputKey}
             id="rfp-files"
             aria-label="انتخاب فایل‌های RFP"
-            type="file"
             multiple
             accept={DOCUMENT_ACCEPT}
-            className={controlClass}
             onChange={(e) => {
               const fileList = e.target.files ? Array.from(e.target.files) : []
               setSelectedFiles(fileList)

@@ -14,7 +14,6 @@ import {
   DashboardAddIcon,
   DashboardEditIcon,
   DashboardEyeIcon,
-  DashboardFilterIcon,
   DashboardMoreVerticalIcon,
   DashboardTrashIcon,
   EmptyInboxIllustration,
@@ -34,6 +33,8 @@ import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
 import { roleTag, setEmployeeActive, type Employee } from './employees/employee-data'
 import { RequestError, adminErrorMessage, adminRequest, loadPeople } from './owner-admin'
+import { toast } from 'sonner'
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 
 const SAVED_NOTICES: Record<string, string> = {
   created: 'کارمند جدید ثبت شد.',
@@ -238,9 +239,11 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
   const [pending, setPending] = useState<Employee | null>(null)
   const [toggling, setToggling] = useState(false)
   const [actionError, setActionError] = useState<unknown>(null)
-  const [notice, setNotice] = useState<string | null>(
-    () => SAVED_NOTICES[searchParams?.get('saved') ?? ''] ?? null,
-  )
+  // A save on the employee form redirects here with ?saved=…; confirm it once.
+  const savedNotice = SAVED_NOTICES[searchParams?.get('saved') ?? '']
+  useEffect(() => {
+    if (savedNotice) toast.success(savedNotice)
+  }, [savedNotice])
 
   useEffect(() => {
     let current = true
@@ -287,7 +290,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
     try {
       const updated = await setEmployeeActive(pending, !pending.isActive)
       setPeople((current) => current.map((item) => (item.id === updated.id ? updated : item)))
-      setNotice(
+      toast.success(
         updated.isActive
           ? `حساب «${updated.name || 'بدون نام'}» دوباره فعال شد.`
           : `«${updated.name || 'بدون نام'}» از کارکنان فعال حذف شد.`,
@@ -295,12 +298,21 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
       setPending(null)
     } catch (cause) {
       setActionError(cause)
+      toast.error('تغییر وضعیت کارمند انجام نشد.')
     } finally {
       setToggling(false)
     }
   }
 
   const roleOptions = OPERATIONAL_ROLES.filter((role) => role !== 'representative')
+  const counts = people.reduce<Record<string, number>>(
+    (acc, person) => {
+      acc.all += 1
+      if (person.operationalRole) acc[person.operationalRole] = (acc[person.operationalRole] ?? 0) + 1
+      return acc
+    },
+    { all: 0 },
+  )
   const ready = !loading && error === null
 
   return (
@@ -312,7 +324,8 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {/* Toolbar — Figma frame 30722:2455 */}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+          {/* Phone: search and filter take their own row, so the add button wraps below instead of under them. */}
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
             <SearchField
               aria-label="جستجوی کارمند"
               placeholder="کارمند مورد نظر را جست و جو کنید"
@@ -320,40 +333,21 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
               onChange={(event) => setQuery(event.target.value)}
               className="sm:w-[400px]"
             />
-            <DropdownMenu dir="rtl">
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="white"
-                  size="icon-48"
-                  aria-label="فیلتر نقش"
-                  className={cn(roleFilter !== 'all' && 'text-brand-600 ring-2 ring-brand-500/20')}
-                >
-                  <DashboardFilterIcon className="size-[26px]" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-52 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-md"
-              >
-                {(['all', ...roleOptions] as const).map((role) => (
-                  <DropdownMenuItem
-                    key={role}
-                    onSelect={() => setRoleFilter(role)}
-                    className={cn(
-                      'flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5',
-                      roleFilter === role ? 'bg-brand-50 text-brand-600' : 'text-neutral-700',
-                    )}
-                  >
-                    <Typography as="span" variant="14/regular" className="text-inherit">
-                      {role === 'all' ? 'همه نقش‌ها' : OPERATIONAL_ROLE_LABELS[role]}
-                    </Typography>
-                    {roleFilter === role && (
-                      <span aria-hidden="true" className="size-1.5 rounded-full bg-brand-500" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <ListFilterButton
+              label="فیلتر نقش"
+              groups={[
+                {
+                  key: 'role',
+                  label: 'نقش',
+                  value: roleFilter === 'all' ? undefined : roleFilter,
+                  options: [
+                    { value: '', label: 'همه نقش‌ها', count: counts.all },
+                    ...roleOptions.map((role) => ({ value: role, label: OPERATIONAL_ROLE_LABELS[role], count: counts[role] ?? 0 })),
+                  ],
+                },
+              ]}
+              onChange={(_, value) => setRoleFilter((value as typeof roleFilter | undefined) ?? 'all')}
+            />
           </div>
           {canManage && (
             <Button asChild size="48">
@@ -367,26 +361,6 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
           )}
         </div>
 
-        {notice && (
-          <div
-            role="status"
-            className="flex items-center justify-between gap-3 rounded-xl border border-success-50 bg-success-50 px-3 py-2"
-          >
-            <Typography variant="14/regular" color="success">
-              {notice}
-            </Typography>
-            <Button
-              variant="text-gray"
-              size="icon-32"
-              aria-label="بستن پیام"
-              onClick={() => setNotice(null)}
-            >
-              <span aria-hidden="true" className="text-xl leading-none">
-                ×
-              </span>
-            </Button>
-          </div>
-        )}
 
         {/* Table card — Figma frame 30722:2460 */}
         <div className="relative flex min-h-[420px] flex-1 flex-col rounded-2xl border border-neutral-200 bg-white p-4">
@@ -403,7 +377,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
           ) : (
             <ScrollArea className="min-h-0 flex-1">
               <table className="w-full min-w-[860px] border-collapse text-right">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr>
                     <HeaderCell label="نام کارمند" />
                     <HeaderCell label="نقش" className="w-[200px]" />

@@ -25,6 +25,7 @@ import {
 } from '@/utilities/participation-eligibility'
 
 export type { RequestFormField, RequestFormOption } from '@/components/dashboard/request-form-field'
+import { toast } from 'sonner'
 
 export function NewRequestForm(props: NewRequestFormProps) {
   // Event entries are independent per-subtopic applications (FE12), not one generic request.
@@ -101,8 +102,10 @@ function GenericRequestForm({
       const created = await createRequest({ serviceId, title, answers })
       if (current !== attempt.current) return
       setDraftId(created.request.id)
+      toast.success('پیش‌نویس درخواست ساخته شد.')
     } catch (cause) {
       if (current !== attempt.current) return
+      toast.error('ایجاد پیش‌نویس انجام نشد.')
       if (gated) fail(cause, 'ایجاد پیش‌نویس انجام نشد. لطفاً دوباره تلاش کنید.')
       else setError(describeMutationFailure(cause, 'ایجاد پیش‌نویس انجام نشد. لطفاً دوباره تلاش کنید.'))
     } finally {
@@ -138,9 +141,11 @@ function GenericRequestForm({
       if (!(await recheckEligibility(current))) return
       await submitRequest(draftId)
       if (current !== attempt.current) return
+      toast.success('درخواست ارسال شد.')
       router.push(`/dashboard/requests/${encodeURIComponent(draftId)}`)
     } catch (cause) {
       if (current !== attempt.current) return
+      toast.error('ارسال درخواست انجام نشد.')
       if (gated) fail(cause, fallback)
       else setError(describeMutationFailure(cause, fallback))
     } finally {

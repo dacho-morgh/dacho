@@ -22,6 +22,8 @@ import {
   type ReviewRoundDto,
   type ReviewRoundSlotDto,
 } from '@/utilities/dashboard-api'
+import { NativeSelect } from '@/components/ui/native-select'
+import { toast } from 'sonner'
 
 /** Each optional read: null when this role has no such read, `failed` when it did not arrive. */
 type Part<T> = T | null | 'failed'
@@ -98,14 +100,13 @@ export function ReviewAssignmentPanel({
   employerId = null,
 }: ReviewAssignmentPanelProps) {
   const [dialog, setDialog] = useState<Dialog | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
 
   const current = round === 'failed' ? null : (round?.round ?? null)
   const canStart = actions.includes('startReview')
   const canReplaceReviewer = actions.includes('replaceReviewer')
   const canReplaceEmployer = actions.includes('replaceEmployer')
   if (round === null && !canStart) return null
-  if (round !== 'failed' && !current && !canStart && !notice) return null
+  if (round !== 'failed' && !current && !canStart) return null
 
   const nameOf = (userId: string | null | undefined, fallback: string) => (userId && people[userId]) || fallback
   const finals = new Map<string, SlotState>()
@@ -140,9 +141,6 @@ export function ReviewAssignmentPanel({
         ) : null}
       </div>
 
-      {notice ? (
-        <Typography role="status" variant="14/regular" color="success" className="rounded-lg bg-success-50 p-3">{notice}</Typography>
-      ) : null}
 
       {round === 'failed' ? (
         <Typography role="alert" variant="14/regular" color="error">دریافت اطلاعات داوری انجام نشد. صفحه را دوباره بارگذاری کنید.</Typography>
@@ -157,7 +155,6 @@ export function ReviewAssignmentPanel({
             type="button"
             size="40" className="w-full sm:w-fit"
             onClick={() => {
-              setNotice(null)
               setDialog({ kind: 'start' })
             }}
           >
@@ -189,7 +186,6 @@ export function ReviewAssignmentPanel({
                   assignedAt={employerSlot.assignedAt}
                   replaceLabel={canReplaceEmployer && isCurrent ? 'جایگزینی کارفرما' : null}
                   onReplace={() => {
-                    setNotice(null)
                     setDialog({ kind: 'replace', slot: 'employer', outgoing: employerSlot })
                   }}
                 />
@@ -210,7 +206,6 @@ export function ReviewAssignmentPanel({
                     // Only an unfinished ordinary reviewer is replaceable; the server re-checks it under lock.
                     replaceLabel={canReplaceReviewer && isCurrent && state !== null && state !== 'final' ? 'جایگزینی داور' : null}
                     onReplace={() => {
-                      setNotice(null)
                       setDialog({ kind: 'replace', slot: 'ordinary', outgoing: slot })
                     }}
                   />
@@ -251,7 +246,7 @@ export function ReviewAssignmentPanel({
           onClose={() => setDialog(null)}
           onDone={() => {
             setDialog(null)
-            setNotice('پرونده به چهار داور ارجاع شد. پرونده به‌روز شد.')
+            toast.success('پرونده به چهار داور ارجاع شد. پرونده به‌روز شد.')
           }}
         />
       ) : null}
@@ -268,7 +263,7 @@ export function ReviewAssignmentPanel({
           onClose={() => setDialog(null)}
           onDone={(text) => {
             setDialog(null)
-            setNotice(text)
+            toast.success(text)
           }}
         />
       ) : null}
@@ -354,18 +349,17 @@ function PersonSelect({
       <label htmlFor={selectId}>
         <Typography as="span" variant="14/semibold" color="neutral-700">{label}</Typography>
       </label>
-      <select
+      <NativeSelect
         id={selectId}
         value={value}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full min-w-0 rounded-lg border border-neutral-200 bg-white px-2 text-neutral-800"
+        onChange={(event) => onChange(event.target.value)} containerClassName="min-w-0"
       >
         <option value="">انتخاب کنید</option>
         {options.map((person) => (
           <option key={person.id} value={person.id}>{person.name ?? 'بدون نام'}</option>
         ))}
-      </select>
+      </NativeSelect>
     </div>
   )
 }
@@ -410,6 +404,7 @@ function StartRoundDialog({
       await startReviewRound(id, picked, revision)
       onDone()
     } catch (cause) {
+      toast.error('ثبت ارجاع انجام نشد.')
       setError(errorMessage(cause))
       setBusy(false)
     } finally {
@@ -535,6 +530,7 @@ function ReplaceDialog({
       else await replaceReviewer(id, outgoingId as string, picked, trimmed, revision)
       onDone(employer ? 'کارفرمای پرونده جایگزین شد و در تاریخچه ثبت شد.' : 'داور جایگزین شد و در تاریخچه ثبت شد.')
     } catch (cause) {
+      toast.error('ثبت ارجاع انجام نشد.')
       setError(errorMessage(cause))
       setBusy(false)
     } finally {

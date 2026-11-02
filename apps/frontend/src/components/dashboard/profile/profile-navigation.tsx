@@ -74,9 +74,8 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
         <SheetTrigger asChild>
           <Button
             type="button"
-            variant="text-gray"
+            variant="text-destructive"
             size="40"
-            className="text-error-500"
             onClick={() => setLogoutError(null)}
           >
             خروج از حساب کاربری

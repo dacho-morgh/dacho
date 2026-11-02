@@ -1,5 +1,4 @@
 import { OPERATIONAL_ROLE_LABELS, type OperationalRole } from '@cms-core/access/roles'
-import type { LetterItem } from '@/components/dashboard/inbox-list-view'
 import type { MailData } from '@/components/dashboard/mail-detail-view'
 import { type LetterDto, type Paginated, LETTER_TYPE_LABELS, formatDate, formatWeekday, formatTime, dashboardFetch } from './core'
 
@@ -27,18 +26,6 @@ export function letterSenderRoleLabel(role: string | null): string {
   return (role && OPERATIONAL_ROLE_LABELS[role as OperationalRole]) || role || ''
 }
 
-export function mapLetterItem(dto: LetterDto): LetterItem {
-  return {
-    id: dto.id,
-    title: dto.title,
-    status: dto.type,
-    statusLabel: LETTER_TYPE_LABELS[dto.type],
-    senderName: dto.senderName ?? 'کارخانه نوآوری',
-    senderRole: letterSenderRoleLabel(dto.senderRole),
-    sentDate: formatDate(dto.sentAt),
-    read: dto.read,
-  }
-}
 
 export function mapMailData(dto: LetterDto): MailData {
   return {

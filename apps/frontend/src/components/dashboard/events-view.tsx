@@ -2,12 +2,11 @@
 
 import { SearchField } from '@/components/dashboard/search-field'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   AlertCircle,
-  Check,
   ChevronDown,
-  ChevronLeft,
   Download,
   FileText,
   Folder,
@@ -21,16 +20,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CalendarBulkIcon,
   EmptyInboxIllustration,
-  FilterIcon,
   LocationBulkIcon,
   TickSquareIcon,
 } from '@/components/icons'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { ParticipationEligibilityPanel } from '@/components/dashboard/participation-eligibility-panel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
@@ -46,6 +38,9 @@ import {
   type RfpVersionDto,
 } from '@/utilities/dashboard-api'
 import type { Eligibility } from '@/utilities/participation-eligibility'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 
 export interface EventItem {
   id: string
@@ -181,20 +176,14 @@ function QuickSelectModal({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="quick-select-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs"
-      dir="rtl"
-    >
-      <div className="relative flex w-full max-w-md flex-col gap-5 rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl sm:p-6">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
           <div>
-            <h3 id="quick-select-title" className="font-sans text-[18px] leading-[28px] font-bold text-neutral-800">
+            <DialogTitle id="quick-select-title" className="text-[18px] leading-[28px]">
               انتخاب عنوان
-            </h3>
+            </DialogTitle>
             <p className="mt-1 font-sans text-[13px] leading-[20px] font-normal text-neutral-500">
               برای مشاهده فرم عنوان و زیر عنوان مورد نظر خود را انتخاب کنید.
             </p>
@@ -214,32 +203,30 @@ function QuickSelectModal({
             <label htmlFor="modal-cat-select" className="font-sans text-[14px] leading-[24px] font-semibold text-neutral-700">
               عنوان
             </label>
-            <select
+            <NativeSelect
               id="modal-cat-select"
               aria-label="عنوان"
               value={selectedCatId}
               onChange={(e) => setSelectedCatId(e.target.value)}
-              className="h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 font-sans text-[14px] text-neutral-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             >
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.title}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="modal-sub-select" className="font-sans text-[14px] leading-[24px] font-semibold text-neutral-700">
               زیر عنوان
             </label>
-            <select
+            <NativeSelect
               id="modal-sub-select"
               aria-label="زیر عنوان"
               value={selectedSubId}
               disabled={availableSubtopics.length === 0}
               onChange={(e) => setSelectedSubId(e.target.value)}
-              className="h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 font-sans text-[14px] text-neutral-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-neutral-50 disabled:text-neutral-400"
             >
               {availableSubtopics.length === 0 ? (
                 <option value="">زیرعنوانی یافت نشد</option>
@@ -250,7 +237,7 @@ function QuickSelectModal({
                   </option>
                 ))
               )}
-            </select>
+            </NativeSelect>
           </div>
         </div>
 
@@ -270,8 +257,8 @@ function QuickSelectModal({
             تایید
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -510,17 +497,20 @@ export function EventsView({
         <div className="flex flex-wrap items-center justify-between gap-4 py-2">
           {/* Breadcrumb path */}
           <nav aria-label="مسیر راهنما" className="flex items-center gap-2 font-sans text-[14px] text-neutral-600">
-            <button
+            <Button
               type="button"
+              variant="link-gray"
+              size="clear"
               onClick={() => {
                 setSelectedEvent(null)
                 router.push('/dashboard/events')
               }}
-              className="cursor-pointer font-medium text-neutral-500 hover:text-brand-600 hover:underline"
               aria-label="بازگشت به رویدادها و نمایشگاه‌ها"
             >
-              رویدادها و نمایشگاه‌ها
-            </button>
+              <Typography as="span" variant="14/regular" className="text-inherit">
+                رویدادها و نمایشگاه‌ها
+              </Typography>
+            </Button>
             <span className="text-neutral-400">/</span>
             <span className="font-bold text-neutral-800 truncate max-w-[280px] sm:max-w-md">
               {selectedEvent.title}
@@ -695,10 +685,12 @@ export function EventsView({
                     className="overflow-hidden rounded-xl border border-neutral-200/80 bg-neutral-50/50"
                   >
                     {/* Category Accordion Header */}
-                    <button
+                    <Button
                       type="button"
+                      variant="row"
+                      size="clear"
                       onClick={() => toggleCategory(cat.id)}
-                      className="flex w-full items-center justify-between p-3.5 text-right transition-colors hover:bg-neutral-100/70"
+                      className="p-3.5"
                       aria-expanded={isExpanded}
                     >
                       <div className="flex items-center gap-3">
@@ -715,7 +707,7 @@ export function EventsView({
                           isExpanded ? 'rotate-180' : ''
                         }`}
                       />
-                    </button>
+                    </Button>
 
                     {/* Subtopics List */}
                     {isExpanded && (
@@ -735,13 +727,10 @@ export function EventsView({
                                   {/* Right side: Checkbox + Subtopic title + Employer tag */}
                                   <div className="flex items-start gap-3 flex-1 min-w-[260px]">
                                     <label className="flex items-center gap-2 cursor-pointer pt-0.5">
-                                      <input
-                                        type="checkbox"
+                                      <Checkbox
                                         checked={isChecked}
-                                        onChange={() => toggleSubtopicSelect(sub.id)}
-                                        aria-label={`انتخاب زیرعنوان ${sub.title}`}
-                                        className="size-5 rounded border-neutral-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
-                                      />
+                                        onCheckedChange={() => toggleSubtopicSelect(sub.id)}
+                                        aria-label={`انتخاب زیرعنوان ${sub.title}`} />
                                       <span className="sr-only">انتخاب {sub.title}</span>
                                     </label>
 
@@ -872,60 +861,22 @@ export function EventsView({
                 placeholder="درخواست خود را جست و جو کنید"
                 aria-label="جستجوی رویدادها"
               />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className={`flex h-[48px] w-[50px] shrink-0 items-center justify-center rounded-[12px] bg-white transition-colors hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-brand-500 ${
-                  filterType !== 'all'
-                    ? 'text-brand-600 ring-2 ring-brand-500/20'
-                    : 'text-[#525252]'
-                }`}
-                title="فیلتر رویدادها"
-              >
-                <FilterIcon className="size-[26px]" />
-                <span className="sr-only">فیلتر</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-52 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-md"
-            >
-              <DropdownMenuItem
-                onClick={() => setFilterType('all')}
-                className={`flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5 text-sm ${
-                  filterType === 'all'
-                    ? 'bg-brand-50 font-medium text-brand-600'
-                    : 'text-neutral-700 hover:bg-neutral-100'
-                }`}
-              >
-                <span>همه رویدادها</span>
-                {filterType === 'all' && <Check className="size-4 text-brand-600" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setFilterType('ended')}
-                className={`flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5 text-sm ${
-                  filterType === 'ended'
-                    ? 'bg-brand-50 font-medium text-brand-600'
-                    : 'text-neutral-700 hover:bg-neutral-100'
-                }`}
-              >
-                <span>تمام شده</span>
-                {filterType === 'ended' && <Check className="size-4 text-brand-600" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setFilterType('active')}
-                className={`flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5 text-sm ${
-                  filterType === 'active'
-                    ? 'bg-brand-50 font-medium text-brand-600'
-                    : 'text-neutral-700 hover:bg-neutral-100'
-                }`}
-              >
-                <span>در حال ثبت‌نام</span>
-                {filterType === 'active' && <Check className="size-4 text-brand-600" />}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ListFilterButton
+            label="فیلتر رویدادها"
+            groups={[
+              {
+                key: 'state',
+                label: 'وضعیت ثبت‌نام',
+                value: filterType === 'all' ? undefined : filterType,
+                options: [
+                  { value: '', label: 'همه رویدادها' },
+                  { value: 'active', label: 'در حال ثبت‌نام' },
+                  { value: 'ended', label: 'تمام شده' },
+                ],
+              },
+            ]}
+            onChange={(_, value) => setFilterType((value as typeof filterType | undefined) ?? 'all')}
+          />
         </div>
       </div>
 

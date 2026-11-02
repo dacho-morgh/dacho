@@ -253,16 +253,16 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
     // Select subtopic 1
     const checkbox1 = screen.getByRole('checkbox', {
       name: /انتخاب زیرعنوان ساخت دستگاه پلیمرزدایی از تاورها/i,
-    }) as HTMLInputElement
+    })
     fireEvent.click(checkbox1)
-    expect(checkbox1.checked).toBe(true)
+    expect(checkbox1.getAttribute('aria-checked')).toBe('true')
 
     // Select subtopic 2
     const checkbox2 = screen.getByRole('checkbox', {
       name: /انتخاب زیرعنوان طراحی و ساخت پمپ مگنتی مقاوم به خوردگی/i,
-    }) as HTMLInputElement
+    })
     fireEvent.click(checkbox2)
-    expect(checkbox2.checked).toBe(true)
+    expect(checkbox2.getAttribute('aria-checked')).toBe('true')
 
     // Counter badge shows 2 selected
     expect(screen.getByText(/۲ زیرعنوان انتخاب شده/i)).toBeDefined()

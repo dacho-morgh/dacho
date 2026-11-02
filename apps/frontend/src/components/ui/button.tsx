@@ -11,6 +11,24 @@ import { cn } from "@/utilities/ui"
  * Styles: Fill | Outline | Text
  * Colors: Primary (#3B82F6) | Gray (#F5F5F5 / #525252) | White (#FFFFFF)
  * Sizes:  32 (h-8) | 36 (h-9) | 40 (h-10) | 48 (h-12)
+ *
+ * Usage → variant / size. Pick from this table; do not restyle a Button with
+ * colour, border or radius classes (layout classes such as width are fine).
+ *
+ * | Usage                                        | variant        | size             |
+ * | -------------------------------------------- | -------------- | ---------------- |
+ * | Primary action (submit, save, approve)       | primary        | 40 (48 page CTA) |
+ * | Secondary action (cancel, back, close)       | outline-gray   | 40               |
+ * | Tertiary / quiet action                      | text-gray      | 40 or 36         |
+ * | Destructive action (delete, reject)          | destructive    | 40               |
+ * | Quiet destructive (remove item, sign out)    | text-destructive | 40 or icon-32  |
+ * | Toolbar icon action                          | text-gray      | icon-40          |
+ * | Row ⋮ menu trigger                           | text-gray      | icon-32          |
+ * | List filter button (set data-active)         | filter         | icon-48          |
+ * | Tab in a segmented bar (aria-pressed/selected) | segment      | 36               |
+ * | Single choice chip (aria-pressed)            | chip           | 32               |
+ * | Inline link, breadcrumb                      | link, link-gray| clear            |
+ * | Disclosure row (accordion header)            | row            | clear            |
  */
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center border font-sans whitespace-nowrap transition-colors outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-500/50 disabled:pointer-events-none disabled:cursor-not-allowed aria-disabled:pointer-events-none aria-disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -48,6 +66,8 @@ const buttonVariants = cva(
           "border-transparent bg-transparent text-brand-500 hover:bg-white hover:text-brand-600 active:text-brand-700 disabled:text-neutral-300 disabled:bg-transparent",
         "text-gray":
           "border-transparent bg-transparent text-neutral-600 hover:bg-neutral-100 hover:text-neutral-600 active:bg-neutral-200 active:text-neutral-600 disabled:text-neutral-300 disabled:bg-transparent",
+        "text-destructive":
+          "border-transparent bg-transparent text-error-500 hover:bg-error-50 hover:text-error-600 active:bg-error-100 disabled:text-neutral-300 disabled:bg-transparent",
         "text-white":
           "border-transparent bg-transparent text-white hover:bg-white/10 hover:text-white active:bg-white/20 active:text-white disabled:text-neutral-300 disabled:bg-transparent",
 
@@ -56,6 +76,22 @@ const buttonVariants = cva(
           "border-transparent bg-error-500 text-white hover:bg-error-700 active:bg-red-800 disabled:bg-neutral-200 disabled:text-neutral-300",
         link:
           "border-transparent bg-transparent text-brand-500 underline-offset-4 hover:underline disabled:text-neutral-300 p-0 h-auto",
+        "link-gray":
+          "border-transparent bg-transparent text-neutral-500 underline-offset-4 hover:text-brand-600 hover:underline disabled:text-neutral-300 p-0 h-auto",
+
+        // --- COMPOSITE CONTROLS ---
+        // A tab inside a neutral-100 segmented bar; the selected tab turns white.
+        segment:
+          "border-transparent bg-transparent text-neutral-600 hover:text-neutral-700 aria-pressed:bg-white aria-pressed:text-neutral-700 aria-selected:bg-white aria-selected:text-neutral-700 disabled:text-neutral-300",
+        // The shared list filter trigger; data-active marks applied filters.
+        filter:
+          "border-transparent bg-white text-neutral-600 hover:bg-neutral-50 data-[active=true]:text-brand-600 data-[active=true]:ring-2 data-[active=true]:ring-brand-500/20 disabled:text-neutral-300",
+        // One choice in a group of options; the chosen one is aria-pressed.
+        chip:
+          "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 aria-pressed:border-transparent aria-pressed:bg-brand-500 aria-pressed:text-white aria-pressed:hover:bg-brand-600 disabled:text-neutral-300",
+        // A full-width disclosure header that opens a nested list.
+        row:
+          "w-full justify-between rounded-none border-transparent bg-transparent text-start text-neutral-800 hover:bg-neutral-100/70 disabled:text-neutral-300",
       },
       size: {
         // Figma standard sizes

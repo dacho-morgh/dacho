@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
+import { NativeSelect } from '@/components/ui/native-select'
+import { toast } from 'sonner'
 
 interface Assignment {
   id: string
@@ -85,12 +87,15 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
         body: JSON.stringify({ userId: employee.id, role: employee.operationalRole }),
       })
       if (!response.ok) {
+        toast.error('انتساب انجام نشد.')
         await failure(response, 'انتساب انجام نشد.')
         return
       }
       setSelectedEmployee('')
+      toast.success(`${employee.name || 'کارمند'} به پرونده منتسب شد.`)
       await loadAssignments()
     } catch (cause) {
+      toast.error('انتساب انجام نشد.')
       setError(describeMutationFailure(cause, 'انتساب انجام نشد.'))
     } finally {
       setBusy(false)
@@ -108,11 +113,14 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
         body: JSON.stringify({ reason: 'revoked by owner' }),
       })
       if (!response.ok) {
+        toast.error('لغو انتساب انجام نشد.')
         await failure(response, 'لغو انتساب انجام نشد.')
         return
       }
+      toast.success('انتساب لغو شد.')
       await loadAssignments()
     } catch (cause) {
+      toast.error('لغو انتساب انجام نشد.')
       setError(describeMutationFailure(cause, 'لغو انتساب انجام نشد.'))
     } finally {
       setBusy(false)
@@ -146,10 +154,9 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex w-full flex-col gap-1 sm:w-auto sm:min-w-60">
           <Typography variant="12/regular" color="neutral-500">شخص</Typography>
-          <select
+          <NativeSelect
             value={selectedEmployee}
             onChange={(event) => setSelectedEmployee(event.target.value)}
-            className="h-10 rounded-lg border border-neutral-200 bg-white px-2"
           >
             <option value="">انتخاب کنید</option>
             {employees.map((employee) => (
@@ -157,7 +164,7 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
                 {employee.name ?? employee.id} — {assignmentRoleLabel(employee.operationalRole)}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <Button type="button" size="40" disabled={!selectedEmployee || busy} onClick={assign}>
           <Typography variant="14/regular" className="text-inherit">ثبت انتساب</Typography>

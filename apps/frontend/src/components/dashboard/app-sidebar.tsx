@@ -30,6 +30,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import type { DashboardNavigation } from './sidebar-shell'
 
@@ -105,20 +106,23 @@ export function AppSidebar({
         <div className="flex flex-col gap-6">
           <SidebarHeader className="flex flex-row items-center justify-between gap-2 p-0 group-data-[collapsible=icon]:justify-center">
             {isCollapsed ? (
-              <button
+              <Button
                 type="button"
+                variant="text-gray"
+                size="icon-40"
                 onClick={toggleSidebar}
                 aria-label="باز کردن سایدبار"
                 aria-expanded={false}
-                title="باز کردن سایدبار"
-                className="group/logo relative flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-neutral-100"
+                aria-keyshortcuts="Control+B Meta+B"
+                title="باز کردن سایدبار (Ctrl+B)"
+                className="group/logo relative"
               >
                 <BrandSandoqLogomark className="h-8 w-[37px] shrink-0 transition-opacity group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0" />
                 <SidebarExpandIcon
                   aria-hidden="true"
                   className="absolute size-6 scale-x-[-1] text-neutral-600 opacity-0 transition-opacity group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100"
                 />
-              </button>
+              </Button>
             ) : (
               <Link
                 href="/dashboard"
@@ -133,6 +137,8 @@ export function AppSidebar({
               <SidebarTrigger
                 aria-label="جمع کردن سایدبار"
                 aria-expanded
+                aria-keyshortcuts="Control+B Meta+B"
+                title="جمع کردن سایدبار (Ctrl+B)"
                 data-sidebar-anim
                 className="size-8 shrink-0 rounded-lg text-neutral-600"
               >

@@ -9,6 +9,7 @@ import {
   DashboardTrashIcon,
 } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -33,6 +34,7 @@ import {
 import { buildCompanyDossierPatch } from '@/utilities/dossier-edits'
 import { InlineProfileField } from './inline-profile-field'
 import { ProfileDialog } from './profile-dialog'
+import { toast } from 'sonner'
 
 const emptyAddress: Omit<AddressDto, 'id'> = {
   title: '',
@@ -100,7 +102,6 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
   const [isSavingExecutive, setIsSavingExecutive] = useState(false)
 
   const [error, setError] = useState<string | null>(null)
-  const [savedNotice, setSavedNotice] = useState<string | null>(null)
 
   useEffect(() => {
     if (initialDossier) return
@@ -157,7 +158,9 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       setDossier(result.dossier)
       setDossierForm(result.dossier)
       setMissing(result.missing)
+      toast.success('وضعیت آگهی تغییرات ثبت شد.')
     } catch {
+      toast.error('ثبت وضعیت آگهی تغییرات انجام نشد.')
       setError(
         'ثبت وضعیت آگهی تغییرات انجام نشد. ابتدا فایل‌های این بخش را حذف کنید یا دوباره تلاش کنید.',
       )
@@ -247,11 +250,12 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       setProfile(updatedProfile)
       setBasicForm(updatedProfile.company)
       setIsEditingBasic(false)
-      setSavedNotice('اطلاعات شرکت ذخیره شد.')
+      toast.success('اطلاعات شرکت ذخیره شد.')
 
       const updatedDossier = await refreshDossier()
       if (updatedDossier) setDossierForm(updatedDossier.dossier)
     } catch (cause) {
+      toast.error('ذخیره اطلاعات شرکت انجام نشد.')
       setError(describeMutationFailure(cause, 'ذخیره اطلاعات انجام نشد. ورودی‌ها را بررسی کنید.'))
     } finally {
       basicSaveLock.current = false
@@ -302,8 +306,10 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
           : [...current.addresses, result.address],
       }))
       setAddressDialogOpen(false)
+      toast.success(editingAddressId ? 'آدرس ویرایش شد.' : 'آدرس اضافه شد.')
       await refreshDossier()
     } catch {
+      toast.error(editingAddressId ? 'ویرایش آدرس انجام نشد.' : 'افزودن آدرس انجام نشد.')
       setError(editingAddressId ? 'ویرایش آدرس انجام نشد.' : 'افزودن آدرس انجام نشد.')
     } finally {
       setIsSavingAddress(false)
@@ -318,8 +324,10 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
         ...current,
         addresses: current.addresses.filter((address) => address.id !== id),
       }))
+      toast.success('آدرس حذف شد.')
       await refreshDossier()
     } catch {
+      toast.error('حذف آدرس انجام نشد.')
       setError('حذف آدرس انجام نشد.')
     }
   }
@@ -394,11 +402,6 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       {error && (
         <Typography role="alert" color="error" className="rounded-xl bg-error-50 p-4">
           {error}
-        </Typography>
-      )}
-      {savedNotice && !error && (
-        <Typography role="status" color="success" className="rounded-xl bg-success-50 p-4">
-          {savedNotice}
         </Typography>
       )}
 
@@ -610,12 +613,9 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
                     as="label"
                     className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isWebsiteAbsent}
-                      onChange={() => toggleDossierAbsence('website')}
-                      className="size-3.5 rounded border-neutral-300 text-brand-600"
-                    />
+                      onCheckedChange={() => toggleDossierAbsence('website')} />
                     ندارم
                   </Typography>
                 )}
@@ -651,12 +651,9 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
                     as="label"
                     className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isCenterAbsent}
-                      onChange={() => toggleDossierAbsence('centerEstablishment')}
-                      className="size-3.5 rounded border-neutral-300 text-brand-600"
-                    />
+                      onCheckedChange={() => toggleDossierAbsence('centerEstablishment')} />
                     ندارم
                   </Typography>
                 )}
@@ -695,12 +692,9 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
                     as="label"
                     className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isInsuredAbsent}
-                      onChange={() => toggleDossierAbsence('insuredEmployeeCount')}
-                      className="size-3.5 rounded border-neutral-300 text-brand-600"
-                    />
+                      onCheckedChange={() => toggleDossierAbsence('insuredEmployeeCount')} />
                     ندارم
                   </Typography>
                 )}
@@ -761,12 +755,10 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
             <div key={category} className="flex flex-col gap-3">
               {category === 'amendmentNotices' && (
                 <Typography as="label" className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={dossier.notAvailable.includes('amendmentNotices')}
                     disabled={isSavingBasic || isEditingBasic || documentsPending}
-                    onChange={(event) => void setAmendmentsAbsent(event.target.checked)}
-                  />
+                    onCheckedChange={(checked) => void setAmendmentsAbsent(checked === true)} />
                   آگهی تغییرات ندارم
                 </Typography>
               )}

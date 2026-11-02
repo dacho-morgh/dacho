@@ -99,14 +99,8 @@ describe('FE05: Secretariat Company Verification Workbench', () => {
 
     render(createElement(CompanyList))
 
-    // Queue tabs
-    await waitFor(() => {
-      expect(screen.getByRole('tab', { name: /همه/ })).toBeTruthy()
-      expect(screen.getByRole('tab', { name: /در انتظار بررسی/ })).toBeTruthy()
-      expect(screen.getByRole('tab', { name: /تأیید شده/ })).toBeTruthy()
-      expect(screen.getByRole('tab', { name: /برگشت داده شده/ })).toBeTruthy()
-      expect(screen.getByRole('tab', { name: /رد شده/ })).toBeTruthy()
-    })
+    // Wait for the list
+    await screen.findByText('شرکت پترو صنعت')
 
     // Companies displayed
     expect(screen.getByText('شرکت پترو صنعت')).toBeTruthy()
@@ -119,8 +113,13 @@ describe('FE05: Secretariat Company Verification Workbench', () => {
     expect(screen.getAllByText('تأیید شده').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('برگشت داده شده').length).toBeGreaterThanOrEqual(1)
 
-    // Filter by clicking 'در انتظار بررسی' tab
-    fireEvent.click(screen.getByRole('tab', { name: /در انتظار بررسی/ }))
+    // The verification queues live in the shared filter button (FE35), with their counts.
+    fireEvent.keyDown(screen.getByRole('button', { name: 'فیلتر شرکت‌ها' }), { key: 'Enter' })
+    for (const name of [/همه/, /در انتظار بررسی/, /تأیید شده/, /برگشت داده شده/, /رد شده/]) {
+      expect(await screen.findByRole('menuitemradio', { name })).toBeTruthy()
+    }
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /در انتظار بررسی/ }))
+    expect(await screen.findByRole('button', { name: /فیلتر شرکت‌ها \(۱ فیلتر فعال\)/ })).toBeTruthy()
     expect(screen.getByText('شرکت پترو صنعت')).toBeTruthy()
     expect(screen.queryByText('شرکت نفت و گاز جنوب')).toBeNull()
     expect(screen.queryByText('شرکت توسعه انرژی')).toBeNull()
