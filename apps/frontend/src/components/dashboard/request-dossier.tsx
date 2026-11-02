@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { InvestmentMemoPanel } from '@/components/dashboard/investment-memo-panel'
 import { RequestActionsPanel } from '@/components/dashboard/request-actions-panel'
 import { RequestAssignmentPanel } from '@/components/dashboard/request-assignment-panel'
+import { ReviewAssignmentPanel } from '@/components/dashboard/review-assignment-panel'
 import { SecretariatFollowUpPanel } from '@/components/dashboard/secretariat-follow-up-panel'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
@@ -55,8 +56,6 @@ const UNBUILT_ACTION_NOTES: Partial<Record<RequestAction, string>> = {
   submit: 'ارسال نهایی این پیش‌نویس از این صفحه هنوز فعال نیست.',
   correct: 'مدارک را می‌توانید جایگزین کنید. ارسال دوباره از این صفحه هنوز فعال نیست و به متن تأییدشده توافق‌نامه‌ها نیاز دارد.',
   submitFinancialPackage: 'ارسال نهایی بسته مالی از این صفحه هنوز فعال نیست.',
-  replaceReviewer: 'جایگزینی داور از این صفحه هنوز فعال نیست.',
-  replaceEmployer: 'جایگزینی کارفرما از این صفحه هنوز فعال نیست.',
 }
 
 const REVIEW_STAGE_LABELS: Record<string, string> = {
@@ -90,6 +89,10 @@ export interface RequestDossierProps {
   evaluations: DossierPart<EvaluationListDto>
   /** The company profile pinned at submission; oversight roles only. */
   profile?: DossierPart<RequestVerificationDto>
+  /** Display names of the round's people, resolved on the server for oversight only. */
+  people?: Record<string, string>
+  /** The employer a new round would take, from the chief's candidate read. */
+  roundEmployerId?: string | null
   /** Company-only sections, rendered above the request details. */
   companySections?: React.ReactNode
   /** The company sections include the FE13 correction form, which owns the proposal upload while correcting. */
@@ -108,6 +111,8 @@ export function RequestDossier({
   round,
   evaluations,
   profile = null,
+  people = {},
+  roundEmployerId = null,
   companySections,
   correctionHandled = false,
 }: RequestDossierProps) {
@@ -258,6 +263,16 @@ export function RequestDossier({
         </div>
       </section>
 
+      <ReviewAssignmentPanel
+        id={id}
+        actions={actions}
+        revision={request.revision}
+        proposalRevision={proposalDetail?.revision ?? null}
+        round={round}
+        evaluations={evaluations}
+        people={people}
+        employerId={roundEmployerId}
+      />
       {round !== null || evaluations !== null ? <ReviewProgress round={round} evaluations={evaluations} /> : null}
 
       {role === 'system-owner' || role === 'central-secretariat' ? <SecretariatFollowUpPanel id={id} /> : null}
@@ -312,7 +327,7 @@ export function RequestDossier({
   )
 }
 
-/** Oversight only: how far the round is, each final evaluation's scores and the decision taken. */
+/** Oversight only: each final evaluation's scores and the decision taken. The four slots are in ReviewAssignmentPanel. */
 function ReviewProgress({
   round,
   evaluations,
@@ -320,43 +335,35 @@ function ReviewProgress({
   round: DossierPart<{ round: ReviewRoundDto | null }>
   evaluations: DossierPart<EvaluationListDto>
 }) {
-  const failed = round === 'failed' || evaluations === 'failed'
   const current = round === 'failed' ? null : round?.round
   const finals = evaluations === 'failed' ? [] : (evaluations?.items ?? []).filter((item) => item.state === 'final')
-  if (!failed && !current) return null
+  if (evaluations !== 'failed' && !finals.length && !current?.decision) return null
 
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-6">
-      <Typography as="h2" variant="20/bold" color="neutral-900">دور داوری</Typography>
-      {failed ? (
-        <Typography role="alert" variant="14/regular" color="error">دریافت اطلاعات داوری انجام نشد. صفحه را دوباره بارگذاری کنید.</Typography>
+      <Typography as="h2" variant="20/bold" color="neutral-900">ارزیابی‌ها و تصمیم</Typography>
+      {evaluations === 'failed' ? (
+        <Typography role="alert" variant="14/regular" color="error">دریافت ارزیابی‌ها انجام نشد. صفحه را دوباره بارگذاری کنید.</Typography>
       ) : null}
-      {current ? (
-        <>
-          <Typography variant="14/regular" color="neutral-700">
-            ارزیابی نهایی: {current.completion.finalized.toLocaleString('fa-IR')} از {current.completion.required.toLocaleString('fa-IR')} · نسخه پروپوزال {current.proposalRevision.toLocaleString('fa-IR')}
-          </Typography>
-          {finals.length ? (
-            <ul className="flex flex-col gap-2">
-              {finals.map((item) => (
-                <li key={item.id} className="rounded-lg bg-neutral-50 p-3">
-                  <Typography variant="14/semibold" color="neutral-800">
-                    {item.variant === 'employer' ? 'ارزیابی کارفرما' : 'ارزیابی داور'}
-                    {' · '}
-                    امتیاز {((item.weightedHundredths ?? 0) / 100).toLocaleString('fa-IR')}
-                  </Typography>
-                  <Typography variant="12/regular" color="neutral-500">نهایی‌شده در {formatDate(item.finalizedAt)}</Typography>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {current.decision ? (
-            <Typography variant="14/regular" color="neutral-700" className="whitespace-pre-wrap">
-              تصمیم: {DECISION_LABELS[current.decision.action] ?? current.decision.action} · {formatDate(current.decision.decidedAt)}
-              {current.decision.reason ? `\n${current.decision.reason}` : ''}
-            </Typography>
-          ) : null}
-        </>
+      {finals.length ? (
+        <ul className="flex flex-col gap-2">
+          {finals.map((item) => (
+            <li key={item.id} className="rounded-lg bg-neutral-50 p-3">
+              <Typography variant="14/semibold" color="neutral-800">
+                {item.variant === 'employer' ? 'ارزیابی کارفرما' : 'ارزیابی داور'}
+                {' · '}
+                امتیاز {((item.weightedHundredths ?? 0) / 100).toLocaleString('fa-IR')}
+              </Typography>
+              <Typography variant="12/regular" color="neutral-500">نهایی‌شده در {formatDate(item.finalizedAt)}</Typography>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {current?.decision ? (
+        <Typography variant="14/regular" color="neutral-700" className="whitespace-pre-wrap">
+          تصمیم: {DECISION_LABELS[current.decision.action] ?? current.decision.action} · {formatDate(current.decision.decidedAt)}
+          {current.decision.reason ? `\n${current.decision.reason}` : ''}
+        </Typography>
       ) : null}
     </section>
   )

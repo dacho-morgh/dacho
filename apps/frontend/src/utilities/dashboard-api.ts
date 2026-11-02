@@ -386,19 +386,90 @@ export function startReviewRound(id: string, reviewerIds: string[], expectedRevi
   )
 }
 
-/** Oversight's view of the latest round; progress only, without who holds a slot. */
+/** Ordinary reviewers the chief may pick, or employers the owner may substitute (T22, T26). */
+export function getEmployerCandidates(id: string): Promise<ReviewCandidatesDto> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/review-round/employer-candidates`)
+}
+
+const replaceBody = (fields: Record<string, string>, reason: string, expectedRevision?: number) => ({
+  ...fields,
+  ...(reason ? { reason } : {}),
+  ...(expectedRevision ? { expectedRevision } : {}),
+})
+
+/** The responsible chief replaces one unfinished ordinary reviewer; the reason is optional. */
+export function replaceReviewer(
+  id: string,
+  outgoingUserId: string,
+  replacementId: string,
+  reason: string,
+  expectedRevision?: number,
+): Promise<{ round: ReviewRoundDto }> {
+  return dashboardFetch(
+    `/requests/${encodeURIComponent(id)}/review-round/reviewers/${encodeURIComponent(outgoingUserId)}/replace`,
+    postJson(replaceBody({ replacementId }, reason, expectedRevision)),
+  )
+}
+
+/** Only the System Owner replaces the case's employer, always with a reason. */
+export function replaceEmployer(
+  id: string,
+  employerId: string,
+  reason: string,
+  expectedRevision?: number,
+): Promise<{ round: ReviewRoundDto }> {
+  return dashboardFetch(
+    `/requests/${encodeURIComponent(id)}/review-round/employer/replace`,
+    postJson(replaceBody({ employerId }, reason, expectedRevision)),
+  )
+}
+
+export type ReviewSlotKind = 'employer' | 'ordinary'
+
+/** One assignment of a round; revoked ones stay as history. */
+export interface ReviewRoundSlotDto {
+  assignmentId: string
+  userId: string
+  role: 'employer-reviewer' | 'reviewer'
+  slot: ReviewSlotKind
+  active: boolean
+  assignedAt: string
+  revokedAt: string | null
+  revokeReason: string | null
+}
+
+export interface ReviewReplacementDto {
+  id: string
+  slot: ReviewSlotKind
+  oldUserId: string
+  newUserId: string
+  replacedBy: string
+  reason: string | null
+  replacedAt: string
+}
+
+/**
+ * Oversight's view of the latest round. Slots and replacements are only sent to the
+ * owner, the Secretariat and the case's chief; an older client may omit them.
+ */
 export interface ReviewRoundDto {
   id: string
   requestRevision: number
   proposalRevision: number
+  employerId?: string
   startedAt: string
+  supersededAt?: string | null
   completion: { required: number; finalized: number; ready: boolean; completedAt: string | null }
   decision: { action: ReviewDecisionAction; decidedAt: string; reason: string | null } | null
+  slots?: ReviewRoundSlotDto[]
+  replacements?: ReviewReplacementDto[]
 }
 
 /** Unfinished evaluations reach oversight without scores or answers. */
 export interface EvaluationSummaryDto {
   id: string
+  /** Whose evaluation it is; lets oversight tell a finished slot from an unfinished one. */
+  userId?: string
   variant: 'ordinary' | 'employer'
   state: 'draft' | 'final'
   scoreA?: number

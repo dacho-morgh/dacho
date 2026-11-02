@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useId, useState } from 'react'
+import { useId, useState } from 'react'
 
 import { DecisionDialog } from '@/components/dashboard/decision-dialog'
 import { Button } from '@/components/ui/button'
@@ -13,11 +13,8 @@ import {
   decideReview,
   decideTriage,
   describeMutationFailure,
-  getReviewCandidates,
   reopenRequest,
-  startReviewRound,
   type RequestAction,
-  type ReviewCandidatesDto,
 } from '@/utilities/dashboard-api'
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -26,12 +23,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_decision_state: 'پرونده دیگر در مرحله تصمیم سردبیر نیست. صفحه به‌روز شد.',
   round_not_ready: 'هنوز هر چهار ارزیابی نهایی نشده است.',
   invalid_reopen_state: 'این پرونده دیگر قابل بازگشایی نیست. صفحه به‌روز شد.',
-  invalid_round_state: 'پرونده در مرحله شروع داوری نیست. صفحه به‌روز شد.',
-  round_already_started: 'دور داوری این نسخه قبلاً آغاز شده است. صفحه به‌روز شد.',
-  employer_unavailable: 'کارفرمای فعالی برای این پرونده در دسترس نیست.',
-  reviewer_not_eligible: 'یکی از داوران انتخاب‌شده دیگر واجد شرایط نیست.',
-  duplicate_people: 'سه داور باید متفاوت باشند.',
-  three_reviewers_required: 'سه داور را انتخاب کنید.',
   reason_required: 'نوشتن دلیل الزامی است.',
   forbidden: 'این اقدام برای نقش شما مجاز نیست یا دسترسی شما تغییر کرده است.',
   not_found: 'پرونده پیدا نشد یا دیگر در دسترس شما نیست.',
@@ -179,9 +170,8 @@ export function RequestActionsPanel({
       ? { key: 'reopen', title: 'بازگشایی پرونده ردشده', hint: 'فقط صاحب سیستم می‌تواند پرونده ردشده را با ثبت دلیل بازگشایی کند.', items: [REOPEN] }
       : null,
   ].filter((group) => group !== null)
-  const startsRound = actions.includes('startReview')
 
-  if (!groups.length && !startsRound && !notice && !open) return null
+  if (!groups.length && !notice && !open) return null
 
   return (
     <section className="flex flex-col gap-6 rounded-2xl border border-brand-600 bg-white p-4 sm:p-6">
@@ -224,7 +214,6 @@ export function RequestActionsPanel({
           </div>
         </div>
       ))}
-      {startsRound ? <StartRoundForm id={id} revision={revision} /> : null}
       {open ? (
         <DecisionForm
           key={open.key}
@@ -333,91 +322,5 @@ function DecisionForm({
       ) : null}
       {error ? <Typography role="alert" variant="14/regular" color="error">{error}</Typography> : null}
     </DecisionDialog>
-  )
-}
-
-function StartRoundForm({ id, revision }: { id: string; revision?: number }) {
-  const router = useRouter()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [candidates, setCandidates] = useState<ReviewCandidatesDto | null>(null)
-  const [failed, setFailed] = useState(false)
-  const [picked, setPicked] = useState<string[]>(['', '', ''])
-
-  useEffect(() => {
-    let active = true
-    getReviewCandidates(id)
-      .then((next) => {
-        if (active) setCandidates(next)
-      })
-      .catch(() => {
-        if (active) setFailed(true)
-      })
-    return () => {
-      active = false
-    }
-  }, [id])
-
-  const complete = picked.every(Boolean) && new Set(picked).size === 3
-  const start = async () => {
-    setBusy(true)
-    setError(null)
-    try {
-      await startReviewRound(id, picked, revision)
-    } catch (cause) {
-      setError(errorMessage(cause))
-    } finally {
-      setBusy(false)
-      router.refresh()
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <Typography as="h3" variant="16/semibold" color="neutral-900">شروع دور داوری</Typography>
-      <Typography variant="14/regular" color="neutral-500">
-        کارفرمای پرونده خودکار جایگاه چهارم را می‌گیرد. سه داور متفاوت انتخاب کنید.
-      </Typography>
-      {failed ? (
-        <Typography role="alert" variant="14/regular" color="error">دریافت فهرست داوران انجام نشد. صفحه را دوباره بارگذاری کنید.</Typography>
-      ) : !candidates ? (
-        <Typography role="status" variant="14/regular" color="neutral-500">در حال دریافت فهرست داوران…</Typography>
-      ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {picked.map((value, slot) => (
-              <label key={slot} className="flex min-w-0 flex-col gap-1">
-                <Typography variant="12/regular" color="neutral-500">داور {(slot + 1).toLocaleString('fa-IR')}</Typography>
-                <select
-                  value={value}
-                  disabled={busy}
-                  onChange={(event) =>
-                    setPicked((current) => current.map((item, index) => (index === slot ? event.target.value : item)))
-                  }
-                  className="h-10 rounded-lg border border-neutral-200 bg-white px-2"
-                >
-                  <option value="">انتخاب کنید</option>
-                  {candidates.items
-                    .filter((person) => person.id === value || !picked.includes(person.id))
-                    .map((person) => (
-                      <option key={person.id} value={person.id}>{person.name ?? person.id}</option>
-                    ))}
-                </select>
-              </label>
-            ))}
-          </div>
-          <Button
-            type="button"
-            size="40"
-            className="w-fit"
-            disabled={busy || !complete}
-            onClick={() => void start()}
-          >
-            <Typography variant="14/regular" className="text-inherit">شروع داوری</Typography>
-          </Button>
-        </>
-      )}
-      {error ? <Typography role="alert" variant="14/regular" color="error">{error}</Typography> : null}
-    </div>
   )
 }
