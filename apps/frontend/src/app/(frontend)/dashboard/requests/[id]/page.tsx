@@ -17,6 +17,7 @@ import {
   type RequestDetail,
   type RequestProposalDetail,
   type RequestVerificationDto,
+  type ReviewCandidatesDto,
   type ReviewRoundDto,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
@@ -49,6 +50,44 @@ async function readProfile(path: string): Promise<DossierPart<RequestVerificatio
   const result = await serverDashboardFetchResult<RequestVerificationDto>(path)
   if (result.kind === 'ok') return result.data
   return result.kind === 'unavailable' && result.status === 404 ? { verification: null } : 'failed'
+}
+
+/** Everyone the round response names: slot holders, replaced people and who replaced them. */
+function roundPeople(round: DossierPart<{ round: ReviewRoundDto | null }>): string[] {
+  const current = round && round !== 'failed' ? round.round : null
+  if (!current) return []
+  return [
+    ...(current.employerId ? [current.employerId] : []),
+    ...(current.slots ?? []).map((slot) => slot.userId),
+    ...(current.replacements ?? []).flatMap((item) => [item.oldUserId, item.newUserId, item.replacedBy]),
+  ]
+}
+
+/**
+ * Display names for ids the dashboard API already returned to this oversight reader.
+ * Only names are read; a failed lookup leaves the generic slot labels.
+ */
+async function peopleNames(payload: Awaited<ReturnType<typeof getPayload>>, ids: string[]): Promise<Record<string, string>> {
+  const unique = [...new Set(ids.filter(Boolean))]
+  if (!unique.length) return {}
+  try {
+    const found = await payload.find({
+      collection: 'users',
+      where: { id: { in: unique } },
+      depth: 0,
+      limit: unique.length,
+      pagination: false,
+      select: { name: true },
+    })
+    const names: Record<string, string> = {}
+    for (const user of found.docs) {
+      const name = typeof user.name === 'string' ? user.name.trim() : ''
+      if (name) names[String(user.id)] = name
+    }
+    return names
+  } catch {
+    return {}
+  }
 }
 
 export default async function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -87,6 +126,14 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
     oversees ? readProfile(`${path}/verification`) : null,
   ])
 
+  // A new round's fixed employer comes from the chief's candidate read; the dialog reads the picks itself.
+  const starts = role === 'chief-reviewer' && (result.data.request.allowedActions ?? []).includes('startReview')
+  const startCandidates = starts ? await readPart<ReviewCandidatesDto>(`${path}/review-round/candidates`) : null
+  const roundEmployerId = startCandidates && startCandidates !== 'failed' ? startCandidates.employerId : null
+  const people = oversees
+    ? await peopleNames(payload, [...roundPeople(round), ...(roundEmployerId ? [roundEmployerId] : [])])
+    : {}
+
   // The correction form edits the service's fixed answers; an unreadable form leaves the team and files editable.
   const correcting = isCompany && (result.data.request.allowedActions ?? []).includes('correct')
   const correctionFields = correcting ? await serviceFields(payload, result.data.request.serviceId) : []
@@ -101,6 +148,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       round={round}
       evaluations={evaluations}
       profile={profile}
+      people={people}
+      roundEmployerId={roundEmployerId}
       companySections={
         isCompany ? (
           <CompanySections
