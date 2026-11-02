@@ -19,6 +19,7 @@ import { Form, FormField } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { resolver } from './owner-admin'
+import { toast } from 'sonner'
 
 export interface SupportModalProps {
   isOpen: boolean
@@ -70,6 +71,7 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
       setTrackingCode(generatedCode)
       if (onSuccess) onSuccess(generatedCode)
     } catch {
+      toast.error('ارسال پیام انجام نشد.')
       setSubmitError('ارسال پیام انجام نشد. لطفاً دوباره تلاش کنید.')
     }
   }

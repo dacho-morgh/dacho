@@ -8,7 +8,6 @@ import {
   InfoCircleIcon as AlertCircle,
   CarouselArrowRightIcon as ArrowRight,
   CheckSquareIcon as Check,
-  TickCircleIcon as CheckCircle2,
   DashboardEditIcon as Edit2,
   DashboardRequestsIcon as FileText,
   EventsLocationIcon as MapPin,
@@ -38,6 +37,7 @@ import {
 } from '@/utilities/dashboard-api'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Input } from '@/components/ui/input'
+import { toast } from 'sonner'
 
 export interface ExhibitionInfo {
   id: string
@@ -94,7 +94,6 @@ export function ExhibitionBoothAdmin({
     initialCatalogue?.guideMapReference ?? '',
   )
   const [settingsSaving, setSettingsSaving] = useState<boolean>(false)
-  const [settingsSuccess, setSettingsSuccess] = useState<boolean>(false)
   const [settingsError, setSettingsError] = useState<string | null>(null)
 
   // Booth filtering and search
@@ -135,8 +134,6 @@ export function ExhibitionBoothAdmin({
     settingsLock.current = true
     setSettingsSaving(true)
     setSettingsError(null)
-    setSettingsSuccess(false)
-
     const limit = parsePersianNumber(companyLimitInput)
     if (!limit || limit < 1) {
       setSettingsError('سقف غرفه هر شرکت باید عدد صحیح بزرگتر از صفر باشد')
@@ -159,9 +156,9 @@ export function ExhibitionBoothAdmin({
             }
           : prev,
       )
-      setSettingsSuccess(true)
-      setTimeout(() => setSettingsSuccess(false), 3000)
+      toast.success('تنظیمات کاتالوگ با موفقیت به‌روزرسانی شد.')
     } catch (err: unknown) {
+      toast.error('ذخیره تنظیمات نمایشگاه انجام نشد.')
       setSettingsError(catalogueFailure(err, 'ذخیره تنظیمات نمایشگاه انجام نشد. دوباره تلاش کنید.'))
     } finally {
       setSettingsSaving(false)
@@ -350,14 +347,6 @@ export function ExhibitionBoothAdmin({
           </Button>
         </form>
 
-        {settingsSuccess && (
-          <div role="status" className="flex items-center gap-2 text-xs text-success-500">
-            <CheckCircle2 className="size-4" />
-            <Typography as="span" variant="14/regular">
-              تنظیمات کاتالوگ با موفقیت به‌روزرسانی شد.
-            </Typography>
-          </div>
-        )}
         {settingsError && (
           <div role="alert" className="flex items-center gap-2 text-xs text-error-600">
             <AlertCircle className="size-4" />
@@ -692,6 +681,7 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
         }
         const res = await updateBooth(exhibitionId, booth.id, payload)
         onSaved(res.booth)
+        toast.success(`غرفه ${res.booth.identifier} ذخیره شد.`)
       } else {
         const payload: CreateBoothInput = {
           identifier: data.identifier.trim(),
@@ -704,8 +694,10 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
         }
         const res = await createBooth(exhibitionId, payload)
         onSaved(res.booth)
+        toast.success(`غرفه ${res.booth.identifier} اضافه شد.`)
       }
     } catch (err: unknown) {
+      toast.error('ثبت غرفه انجام نشد.')
       setServerError(
         catalogueFailure(err, 'ثبت غرفه انجام نشد. اطلاعات شما حفظ شده است؛ دوباره تلاش کنید.'),
       )

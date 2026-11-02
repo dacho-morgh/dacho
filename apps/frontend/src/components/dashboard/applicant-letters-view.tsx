@@ -23,6 +23,7 @@ import {
   DashboardUserTagIcon,
 } from '@/components/icons'
 import { deleteLetter, describeMutationFailure } from '@/utilities/dashboard-api'
+import { toast } from 'sonner'
 
 export type ApplicantLetterStatus = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -151,7 +152,6 @@ export interface ApplicantLettersViewProps {
 export function ApplicantLettersView({ initialLetters, state = 'default', canComposeLetter = false }: ApplicantLettersViewProps) {
   const [tab, setTab] = useState<'received' | 'sent' | 'support'>('received')
   const [searchQuery, setSearchQuery] = useState('')
-  const [actionNotice, setActionNotice] = useState<string | null>(null)
 
   const filteredLetters = useMemo(() => {
     const query = searchQuery.trim()
@@ -168,11 +168,9 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
     if (item.source === 'ticket') return
     try {
       await deleteLetter(item.id)
-      setActionNotice(null)
       window.location.reload()
     } catch (cause) {
-      setActionNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
-      window.setTimeout(() => setActionNotice(null), 3500)
+      toast.error(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
     }
   }
 
@@ -255,11 +253,6 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
         </div>
       </div>
 
-      {actionNotice && (
-        <Typography role="status" variant="14/regular" className="rounded-lg bg-neutral-100 p-3 text-neutral-600">
-          {actionNotice}
-        </Typography>
-      )}
 
       {/* Card — Figma node 33:3926: white, grey-200 border, rounded-16, 16px padding, 848px tall */}
       <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4">

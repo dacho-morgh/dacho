@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
 import { NativeSelect } from '@/components/ui/native-select'
+import { toast } from 'sonner'
 
 interface Assignment {
   id: string
@@ -86,12 +87,15 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
         body: JSON.stringify({ userId: employee.id, role: employee.operationalRole }),
       })
       if (!response.ok) {
+        toast.error('انتساب انجام نشد.')
         await failure(response, 'انتساب انجام نشد.')
         return
       }
       setSelectedEmployee('')
+      toast.success(`${employee.name || 'کارمند'} به پرونده منتسب شد.`)
       await loadAssignments()
     } catch (cause) {
+      toast.error('انتساب انجام نشد.')
       setError(describeMutationFailure(cause, 'انتساب انجام نشد.'))
     } finally {
       setBusy(false)
@@ -109,11 +113,14 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
         body: JSON.stringify({ reason: 'revoked by owner' }),
       })
       if (!response.ok) {
+        toast.error('لغو انتساب انجام نشد.')
         await failure(response, 'لغو انتساب انجام نشد.')
         return
       }
+      toast.success('انتساب لغو شد.')
       await loadAssignments()
     } catch (cause) {
+      toast.error('لغو انتساب انجام نشد.')
       setError(describeMutationFailure(cause, 'لغو انتساب انجام نشد.'))
     } finally {
       setBusy(false)

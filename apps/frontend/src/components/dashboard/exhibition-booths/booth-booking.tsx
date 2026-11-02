@@ -21,6 +21,7 @@ import {
 import { BoothPageHeader } from './booth-page-header'
 import { BoothRequestStageBadge, boothFailure, receiptStatusLabel } from './booth-status'
 import { FileInput } from '@/components/ui/file-input'
+import { toast } from 'sonner'
 
 export interface BoothExhibitionInfo {
   id: string
@@ -69,11 +70,10 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
     setNotice(null)
     try {
       await reserveBooth(exhibition.id, booth.id)
-      setNotice({
-        tone: 'success',
-        text: `درخواست غرفه ${booth.identifier} ثبت شد و در انتظار تأیید حضور است.`,
-      })
+      setNotice(null)
+      toast.success(`درخواست غرفه ${booth.identifier} ثبت شد و در انتظار تأیید حضور است.`)
     } catch (error) {
+      toast.error('ثبت درخواست غرفه انجام نشد.')
       setNotice({ tone: 'error', text: boothFailure(error, 'ثبت درخواست غرفه ممکن نشد.') })
     } finally {
       setReservingId(null)
@@ -370,8 +370,10 @@ function ReceiptUploadForm({
         trackingCode: trackingCode.trim() || undefined,
         amountToman: request.priceAmount,
       })
+      toast.success('فیش پرداخت بارگذاری شد.')
       await onUploaded()
     } catch (uploadError) {
+      toast.error('بارگذاری فیش انجام نشد.')
       setError(boothFailure(uploadError, 'بارگذاری فیش ممکن نشد. دوباره تلاش کنید.'))
       // A stale view (receipt already pending or confirmed) refreshes the card.
       await onUploaded()

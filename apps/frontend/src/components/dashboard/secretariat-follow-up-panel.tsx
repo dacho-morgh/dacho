@@ -16,6 +16,7 @@ import {
   type CaseFollowUpDto,
 } from '@/utilities/dashboard-api'
 import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
 
 const ERROR_MESSAGES: Record<string, string> = {
   investment_stage_closed: 'پرونده دیگر در مرحله پیگیری سرمایه‌گذاری نیست و این اقدام انجام نشد.',
@@ -73,8 +74,10 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
     try {
       await action()
       after?.()
-      setMessage({ tone: 'success', text: success })
+      setMessage(null)
+      toast.success(success)
     } catch (error) {
+      toast.error('اقدام انجام نشد.')
       setMessage({ tone: 'error', text: errorMessage(error) })
     } finally {
       await load()

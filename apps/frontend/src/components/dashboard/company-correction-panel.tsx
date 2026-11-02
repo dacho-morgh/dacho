@@ -30,6 +30,7 @@ import {
   describeCorrectionFailure,
   type CorrectionFailure,
 } from '@/utilities/request-tracking'
+import { toast } from 'sonner'
 
 const toPersianDigits = (value: number | string) =>
   String(value).replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)] ?? digit)
@@ -138,9 +139,11 @@ export function CompanyCorrectionPanel({ request, fields, after }: CompanyCorrec
       })
       if (current !== attempt.current) return
       setDone(true)
+      toast.success('اصلاحیه ارسال شد.')
       router.refresh()
     } catch (cause) {
       if (current !== attempt.current) return
+      toast.error('ارسال اصلاحیه انجام نشد.')
       const described = describeCorrectionFailure(cause, fieldLabels)
       setFailure(described)
       // A stale case is reread so the page shows what the server now holds; the typed input stays.

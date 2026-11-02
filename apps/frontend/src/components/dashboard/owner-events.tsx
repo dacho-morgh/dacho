@@ -32,6 +32,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Input } from '@/components/ui/input'
 import { FileInput } from '@/components/ui/file-input'
 import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
 
 type Event = {
   id: string
@@ -154,8 +155,10 @@ function EventForm({
         },
       )
       if (!result.event?.id) throw new Error('invalid_event_response')
+      toast.success(event ? 'تغییرات رویداد ذخیره شد.' : 'رویداد ساخته شد.')
       onSaved()
     } catch (error) {
+      toast.error('ذخیره رویداد انجام نشد.')
       setFailure(error)
       if (error instanceof AdminError) {
         if (error.status === 409) setStale(true)
@@ -354,8 +357,10 @@ function CategoryForm({
         },
       )
       if (!result.category?.id) throw new Error('invalid_category_response')
+      toast.success('دسته فناوری اضافه شد.')
       onSaved()
     } catch (error) {
+      toast.error('افزودن دسته فناوری انجام نشد.')
       setFailure(error)
       if (error instanceof AdminError && error.data?.error === 'invalid_category') {
         setError(
@@ -465,8 +470,10 @@ function SubtopicForm({
         },
       )
       if (!result.subtopic?.id) throw new Error('invalid_subtopic_response')
+      toast.success('زیرعنوان اضافه شد.')
       onSaved()
     } catch (error) {
+      toast.error('افزودن زیرعنوان انجام نشد.')
       setFailure(error)
       if (error instanceof AdminError) {
         if (error.data?.error === 'invalid_category_event') {
@@ -590,7 +597,6 @@ function RfpManager({
   const [requestFailure, setRequestFailure] = useState<unknown>(null)
   const [stale, setStale] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [savedSuccess, setSavedSuccess] = useState(false)
 
   // Upload form state (preserved across 409 stale conflict)
   const [reason, setReason] = useState('')
@@ -634,7 +640,6 @@ function RfpManager({
     setFormError(null)
     setFailure(null)
     setRequestFailure(null)
-    setSavedSuccess(false)
     if (!reason.trim()) {
       setFormError('توضیحات و دلیل نسخه جدید الزامی است.')
       return
@@ -676,11 +681,12 @@ function RfpManager({
 
       if (!res.version?.id) throw new Error('invalid_rfp_response')
       acceptServerVersion(res.version)
-      setSavedSuccess(true)
+      toast.success('نسخه جدید RFP با موفقیت بارگذاری شد.')
       setReason('')
       setSelectedFiles([])
       setFileInputKey((value) => value + 1)
     } catch (err) {
+      toast.error('بارگذاری RFP انجام نشد.')
       const code = err instanceof AdminError ? String(err.data?.error) : ''
       if (err instanceof AdminError && err.status === 409) {
         setStale(true)
@@ -770,11 +776,6 @@ function RfpManager({
       >
         <Typography variant="16/semibold">بارگذاری نسخه جدید RFP</Typography>
 
-        {savedSuccess && (
-          <Typography role="status" variant="14/regular" color="success">
-            نسخه جدید RFP با موفقیت بارگذاری شد.
-          </Typography>
-        )}
 
         <div className="flex min-w-0 flex-col gap-2">
           <Typography asChild variant="16/semibold">

@@ -25,6 +25,7 @@ import {
   type EligibilityState,
   type ParticipationTarget,
 } from '@/utilities/participation-eligibility'
+import { toast } from 'sonner'
 
 type LoadState =
   | { kind: 'loading' }
@@ -183,8 +184,10 @@ export function ParticipationEligibilityPanel({
     setRequestError(null)
     try {
       await submitCompanyVerification()
+      toast.success('درخواست احراز هویت ارسال شد.')
       await refresh()
     } catch (cause) {
+      toast.error('ارسال درخواست احراز هویت انجام نشد.')
       if (cause instanceof DashboardApiError && cause.code === 'incomplete_dossier') {
         setRequestError('پرونده شرکت هنوز کامل نیست. موارد الزامی را تکمیل کنید.')
         await refresh()

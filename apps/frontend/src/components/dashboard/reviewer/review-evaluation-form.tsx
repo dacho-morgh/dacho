@@ -44,6 +44,7 @@ import {
 import { reviewerRoleLabel, type ReviewQueueItemDto } from '@/utilities/reviewer-case'
 
 import { DecisionDialog } from '../decision-dialog'
+import { toast } from 'sonner'
 
 const STEPS = ['نوآوری', 'تجاری‌سازی و بازار', 'مستندسازی', 'اظهار نظر کیفی', 'جمع‌بندی'] as const
 const SUMMARY_STEP = STEPS.length - 1
@@ -130,12 +131,14 @@ export function ReviewEvaluationForm({ requestId, caseItem, initial }: ReviewEva
         setErrors({})
         setDirty(false)
         setNotice(kind === 'finalize' ? 'finalized' : 'saved')
+        toast.success(kind === 'finalize' ? 'ارزیابی نهایی شد.' : 'پیش‌نویس ارزیابی ذخیره شد.')
         if (kind === 'finalize') setStep(SUMMARY_STEP)
         return
       case 'invalid': {
         const translated = Object.fromEntries(Object.entries(result.errors).map(([path, message]) => [path, serverErrorText(message)]))
         setErrors(translated)
         setNotice('invalid')
+        toast.error('برخی پاسخ‌ها معتبر نیست؛ موارد مشخص‌شده را اصلاح کنید.')
         const first = Object.keys(translated)[0]
         if (first) setStep(stepOfPath(first))
         return
@@ -143,9 +146,11 @@ export function ReviewEvaluationForm({ requestId, caseItem, initial }: ReviewEva
       case 'stale':
         setStale(true)
         setNotice('stale')
+        toast.error('ارزیابی ذخیره نشد؛ نسخه تازه‌تری روی سرور هست.')
         return
       case 'locked':
         setNotice('locked')
+        toast.error('این ارزیابی قفل شده و ذخیره نشد.')
         await reloadOwnEvaluation()
         return
       case 'denied':
@@ -159,6 +164,7 @@ export function ReviewEvaluationForm({ requestId, caseItem, initial }: ReviewEva
         return
       default:
         setNotice('error')
+        toast.error('ذخیره ارزیابی انجام نشد.')
     }
   }
 

@@ -30,6 +30,7 @@ import {
   type Employee,
   type PersonnelFileRef,
 } from './employee-data'
+import { toast } from 'sonner'
 
 /** docs/system/document-policy.json — Word/PDF, 10 MB (decimal) per file. */
 const RESUME_TYPES: Record<string, string> = {
@@ -519,6 +520,7 @@ function EmployeeEditor({
       if (removed.length) void discardPersonnelFiles(removed.map((file) => file.id))
       router.push(`/dashboard/employees?saved=${employee ? 'updated' : 'created'}`)
     } catch (error) {
+      toast.error(employee ? 'ذخیره تغییرات کارمند انجام نشد.' : 'افزودن کارمند انجام نشد.')
       if (uploaded.length) void discardPersonnelFiles(uploaded)
       setFailure(error)
       if (error instanceof AdminError && Array.isArray(error.data.errors)) {

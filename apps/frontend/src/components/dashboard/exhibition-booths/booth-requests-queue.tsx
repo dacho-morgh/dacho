@@ -17,6 +17,8 @@ import {
 import { BoothPageHeader } from './booth-page-header'
 import { BoothRequestStageBadge, boothFailure, receiptStatusLabel } from './booth-status'
 import type { BoothExhibitionInfo } from './booth-booking'
+import { FieldError } from '@/components/ui/field'
+import { toast } from 'sonner'
 
 type QueueFilter = 'all' | 'attendance' | 'receipt' | 'done'
 
@@ -49,6 +51,7 @@ export function BoothRequestsQueue({ exhibition }: { exhibition: BoothExhibition
   const [notice, setNotice] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
   const [reasonFor, setReasonFor] = useState<PendingDecision | null>(null)
   const [reason, setReason] = useState('')
+  const [reasonError, setReasonError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -72,10 +75,11 @@ export function BoothRequestsQueue({ exhibition }: { exhibition: BoothExhibition
     setNotice(null)
     try {
       await action()
-      setNotice({ tone: 'success', text: success })
+      toast.success(success)
       setReasonFor(null)
       setReason('')
     } catch (error) {
+      toast.error('ثبت تصمیم انجام نشد.')
       setNotice({
         tone: 'error',
         text: boothFailure(error, 'ثبت تصمیم ممکن نشد. دوباره تلاش کنید.'),
@@ -89,7 +93,7 @@ export function BoothRequestsQueue({ exhibition }: { exhibition: BoothExhibition
   function submitReason(decision: PendingDecision) {
     const text = reason.trim()
     if (!text) {
-      setNotice({ tone: 'error', text: 'نوشتن دلیل الزامی است.' })
+      setReasonError('نوشتن دلیل الزامی است.')
       return
     }
     if (decision.kind === 'reject_attendance') {
@@ -341,9 +345,15 @@ export function BoothRequestsQueue({ exhibition }: { exhibition: BoothExhibition
                       <Textarea
                         id={`reason-${item.id}`}
                         value={reason}
-                        onChange={(event) => setReason(event.target.value)}
+                        onChange={(event) => {
+                          setReason(event.target.value)
+                          setReasonError(null)
+                        }}
                         rows={3}
+                        aria-invalid={reasonError ? true : undefined}
+                        aria-describedby={reasonError ? `reason-${item.id}-error` : undefined}
                       />
+                      <FieldError id={`reason-${item.id}-error`}>{reasonError}</FieldError>
                       <div className="flex justify-end gap-2">
                         <Button
                           size="36"

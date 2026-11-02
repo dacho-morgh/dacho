@@ -20,6 +20,7 @@ import {
 } from '@/utilities/dashboard-api'
 import { hasStaleDossierSlice } from '@/utilities/dossier-edits'
 import { ProfileDialog } from './profile-dialog'
+import { toast } from 'sonner'
 
 const emptyDossier: CompanyDossierDto = {
   legalEntityType: '',
@@ -52,7 +53,6 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
   const [pendingDocuments, setPendingDocuments] = useState<Record<string, boolean>>({})
   const documentsPending = Object.values(pendingDocuments).some(Boolean)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   // Products dialog state
   const [productDialog, setProductDialog] = useState(false)
@@ -108,22 +108,23 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
     saveLock.current = true
     setIsSaving(true)
     setError(null)
-    setSuccess(null)
     try {
       const latest = await fetchProfileDossier()
       if (!latest) throw new Error('dossier_load_failed')
       // Array endpoints replace a slice. Refuse to overwrite a slice changed since it was shown.
       if (hasStaleDossierSlice(dossier, latest.dossier, update)) {
         setDossier(latest.dossier)
+        toast.error('ذخیره نشد؛ این بخش تغییر کرده است.')
         setError('اطلاعات این بخش تغییر کرده است. نسخه تازه را بررسی و دوباره تلاش کنید.')
         return false
       }
       const res = await updateProfileDossier(update)
       if (!res?.dossier) throw new Error('update_failed')
       setDossier(res.dossier)
-      setSuccess('تغییرات با موفقیت ذخیره شد.')
+      toast.success('تغییرات با موفقیت ذخیره شد.')
       return true
     } catch {
+      toast.error('ذخیره تغییرات انجام نشد.')
       setError('ذخیره تغییرات انجام نشد. ورودی‌ها را بررسی کنید.')
       return false
     } finally {
@@ -327,15 +328,6 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
         </Typography>
       )}
 
-      {success && (
-        <Typography
-          role="status"
-          variant="14/regular"
-          className="rounded-xl bg-success-50 p-4 text-success-700"
-        >
-          {success}
-        </Typography>
-      )}
 
       {/* 1. محصولات و خدمات */}
       <section id="resume-products" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">

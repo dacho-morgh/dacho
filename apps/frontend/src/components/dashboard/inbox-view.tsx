@@ -37,6 +37,7 @@ import {
   type LetterType,
 } from '@/utilities/dashboard-api'
 import { cn } from '@/utilities/ui'
+import { toast } from 'sonner'
 
 /** One inbox row, prepared on the server from a letter and the reader's side of it. */
 export interface InboxRow {
@@ -240,7 +241,6 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
   const [pending, startTransition] = useTransition()
   const [rows, setRows] = useState(initialRows)
   const [search, setSearch] = useState(query.q ?? '')
-  const [notice, setNotice] = useState<string | null>(null)
   const [supportOpen, setSupportOpen] = useState(false)
 
   // A new server render (another tab, page or filter) replaces the rows.
@@ -261,18 +261,13 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
     startTransition(() => router.push(qs ? `${pathname}?${qs}` : pathname))
   }
 
-  const showNotice = (message: string) => {
-    setNotice(message)
-    window.setTimeout(() => setNotice(null), 3500)
-  }
-
   const toggleRead = async (row: InboxRow) => {
     try {
       await setLetterRead(row.id, !row.read)
       setRows((current) => current.map((item) => (item.id === row.id ? { ...item, read: !row.read } : item)))
       startTransition(() => router.refresh())
     } catch (cause) {
-      showNotice(describeMutationFailure(cause, 'تغییر وضعیت خواندن انجام نشد.'))
+      toast.error(describeMutationFailure(cause, 'تغییر وضعیت خواندن انجام نشد.'))
     }
   }
 
@@ -280,10 +275,10 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
     try {
       await deleteLetter(row.id)
       setRows((current) => current.filter((item) => item.id !== row.id))
-      showNotice(`نامه «${row.title}» از کارتابل حذف شد.`)
+      toast.success(`نامه «${row.title}» از کارتابل حذف شد.`)
       startTransition(() => router.refresh())
     } catch (cause) {
-      showNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
+      toast.error(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
     }
   }
 
@@ -292,13 +287,6 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
-      {notice && (
-        <div role="status" className="mb-4 rounded-xl border border-brand-100 bg-brand-50 p-3 text-brand-900">
-          <Typography variant="14/regular" className="text-inherit">
-            {notice}
-          </Typography>
-        </div>
-      )}
 
       {/* Toolbar, Figma 30852:17808 */}
       <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -516,7 +504,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
           isOpen={supportOpen}
           onClose={() => setSupportOpen(false)}
           onSuccess={(code) => {
-            showNotice(`پیام شما با کد پیگیری ${code} برای پشتیبانی ارسال شد.`)
+            toast.success(`پیام شما با کد پیگیری ${code} برای پشتیبانی ارسال شد.`)
             startTransition(() => router.refresh())
           }}
         />

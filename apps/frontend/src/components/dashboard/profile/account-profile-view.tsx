@@ -7,6 +7,7 @@ import { Typography } from '@/components/ui/typography'
 import type { ContactInfoDto, ProfileDto } from '@/utilities/dashboard-api'
 import { describeMutationFailure, updateProfile } from '@/utilities/dashboard-api'
 import { InlineProfileField } from './inline-profile-field'
+import { toast } from 'sonner'
 
 export function AccountProfileView({ initialProfile }: { initialProfile: ProfileDto }) {
   const [profile, setProfile] = useState(initialProfile)
@@ -14,18 +15,15 @@ export function AccountProfileView({ initialProfile }: { initialProfile: Profile
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
 
   const handleEdit = () => {
     setForm({ ...profile.contacts })
     setError(null)
-    setSaved(false)
     setIsEditing(true)
   }
 
   const handleSave = async () => {
     setError(null)
-    setSaved(false)
     setIsSaving(true)
     try {
       const updated = await updateProfile({ contacts: form })
@@ -33,8 +31,9 @@ export function AccountProfileView({ initialProfile }: { initialProfile: Profile
       setProfile(updated)
       setForm(updated.contacts)
       setIsEditing(false)
-      setSaved(true)
+      toast.success('اطلاعات تماس ذخیره شد.')
     } catch (cause) {
+      toast.error('ذخیره اطلاعات تماس انجام نشد.')
       setError(describeMutationFailure(cause, 'ذخیره اطلاعات تماس انجام نشد.'))
     } finally {
       setIsSaving(false)
@@ -46,11 +45,6 @@ export function AccountProfileView({ initialProfile }: { initialProfile: Profile
       {error && (
         <Typography role="alert" color="error" className="rounded-lg bg-error-50 p-3">
           {error}
-        </Typography>
-      )}
-      {saved && (
-        <Typography role="status" color="success" className="rounded-lg bg-success-50 p-3">
-          اطلاعات تماس ذخیره شد.
         </Typography>
       )}
       <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4">

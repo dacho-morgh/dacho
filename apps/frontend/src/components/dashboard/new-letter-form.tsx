@@ -11,6 +11,7 @@ import { Typography } from '@/components/ui/typography'
 import { DashboardApiError, describeMutationFailure, LETTER_TYPE_LABELS, type LetterType, type RequestDto } from '@/utilities/dashboard-api'
 import type { PrivateDocumentDto } from '@/utilities/document-api'
 import { NativeSelect } from '@/components/ui/native-select'
+import { toast } from 'sonner'
 
 export interface LetterRecipient {
   id: string
@@ -156,9 +157,11 @@ export function NewLetterForm({
         if (!response.ok) throw new DashboardApiError(response.status, 'ticket_not_created')
         const result = await response.json()
         if (!result?.ticket?.id) throw new Error('ticket_not_created')
+        toast.success('پیام شما برای پشتیبانی ارسال شد.')
         router.push('/dashboard/letters')
         router.refresh()
       } catch (cause) {
+        toast.error('ارسال پیام پشتیبانی انجام نشد.')
         setError(describeMutationFailure(cause, 'ارسال پیام پشتیبانی انجام نشد. لطفاً دوباره تلاش کنید.'))
       } finally {
         submitting.current = false
@@ -207,9 +210,11 @@ export function NewLetterForm({
       if (!response.ok) throw new DashboardApiError(response.status, 'letter_not_created')
       const result = await response.json()
       if (!result?.letter?.id) throw new Error('letter_not_created')
+      toast.success('نامه ارسال شد.')
       router.push('/dashboard/letters')
       router.refresh()
     } catch (cause) {
+      toast.error('ارسال نامه انجام نشد.')
       setError(describeMutationFailure(cause, 'ارسال نامه انجام نشد. لطفاً دوباره تلاش کنید.'))
     } finally {
       submitting.current = false

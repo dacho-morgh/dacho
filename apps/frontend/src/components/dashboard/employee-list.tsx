@@ -34,6 +34,7 @@ import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
 import { roleTag, setEmployeeActive, type Employee } from './employees/employee-data'
 import { RequestError, adminErrorMessage, adminRequest, loadPeople } from './owner-admin'
+import { toast } from 'sonner'
 
 const SAVED_NOTICES: Record<string, string> = {
   created: 'کارمند جدید ثبت شد.',
@@ -238,9 +239,11 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
   const [pending, setPending] = useState<Employee | null>(null)
   const [toggling, setToggling] = useState(false)
   const [actionError, setActionError] = useState<unknown>(null)
-  const [notice, setNotice] = useState<string | null>(
-    () => SAVED_NOTICES[searchParams?.get('saved') ?? ''] ?? null,
-  )
+  // A save on the employee form redirects here with ?saved=…; confirm it once.
+  const savedNotice = SAVED_NOTICES[searchParams?.get('saved') ?? '']
+  useEffect(() => {
+    if (savedNotice) toast.success(savedNotice)
+  }, [savedNotice])
 
   useEffect(() => {
     let current = true
@@ -287,7 +290,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
     try {
       const updated = await setEmployeeActive(pending, !pending.isActive)
       setPeople((current) => current.map((item) => (item.id === updated.id ? updated : item)))
-      setNotice(
+      toast.success(
         updated.isActive
           ? `حساب «${updated.name || 'بدون نام'}» دوباره فعال شد.`
           : `«${updated.name || 'بدون نام'}» از کارکنان فعال حذف شد.`,
@@ -295,6 +298,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
       setPending(null)
     } catch (cause) {
       setActionError(cause)
+      toast.error('تغییر وضعیت کارمند انجام نشد.')
     } finally {
       setToggling(false)
     }
@@ -367,26 +371,6 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
           )}
         </div>
 
-        {notice && (
-          <div
-            role="status"
-            className="flex items-center justify-between gap-3 rounded-xl border border-success-50 bg-success-50 px-3 py-2"
-          >
-            <Typography variant="14/regular" color="success">
-              {notice}
-            </Typography>
-            <Button
-              variant="text-gray"
-              size="icon-32"
-              aria-label="بستن پیام"
-              onClick={() => setNotice(null)}
-            >
-              <span aria-hidden="true" className="text-xl leading-none">
-                ×
-              </span>
-            </Button>
-          </div>
-        )}
 
         {/* Table card — Figma frame 30722:2460 */}
         <div className="relative flex min-h-[420px] flex-1 flex-col rounded-2xl border border-neutral-200 bg-white p-4">

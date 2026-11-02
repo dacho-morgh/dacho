@@ -240,7 +240,8 @@ describe('EventApplicationWorkspace drafts', () => {
     fireEvent.change(first.getByLabelText('عنوان طرح'), { target: { value: 'طرح اصلاح‌شده' } })
     fireEvent.click(await enabledButton(first, 'ذخیره پیش‌نویس'))
 
-    await first.findByText(/پیش‌نویس ذخیره شد/)
+    // The saved result is a toast outside the workspace (FE43).
+    await screen.findByText(/پیش‌نویس ذخیره شد/)
     expect(create).not.toHaveBeenCalled()
     expect(update).toHaveBeenCalledWith('req-9', {
       answers: { projectTitle: 'طرح اصلاح‌شده', applicationTeam: [{ name: 'رضا', role: 'مدیر' }] },

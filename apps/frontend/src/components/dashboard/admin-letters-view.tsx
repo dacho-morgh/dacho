@@ -24,6 +24,7 @@ import {
   DashboardTrashIcon,
 } from '@/components/icons'
 import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
+import { toast } from 'sonner'
 
 export type AdminLetterStatus = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -174,25 +175,18 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
   const [tab, setTab] = useState<'received' | 'sent' | 'support'>('received')
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | AdminLetterStatus>('all')
-  const [actionNotice, setActionNotice] = useState<string | null>(null)
-
-  const showNotice = (message: string) => {
-    setActionNotice(message)
-    window.setTimeout(() => setActionNotice(null), 3500)
-  }
-
   const handleDelete = async (item: AdminLetterItem) => {
     if (item.source !== 'letter') {
-      showNotice('فرم‌های وب‌سایت از اینجا حذف نمی‌شوند.')
+      toast.info('فرم‌های وب‌سایت از اینجا حذف نمی‌شوند.')
       return
     }
     try {
       const response = await fetch(`/api/dashboard/letters/${encodeURIComponent(item.id)}`, { method: 'DELETE' })
       if (!response.ok) throw new DashboardApiError(response.status, 'delete_failed')
       setLetters((current) => current.filter((letter) => letter.id !== item.id))
-      showNotice(`نامه «${item.title}» با موفقیت حذف گردید.`)
+      toast.success(`نامه «${item.title}» با موفقیت حذف گردید.`)
     } catch (cause) {
-      showNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
+      toast.error(describeMutationFailure(cause, 'حذف نامه انجام نشد.'))
     }
   }
 
@@ -322,26 +316,6 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
         </div>
       </div>
 
-      {/* Toast */}
-      {actionNotice && (
-        <div
-          role="status"
-          className="flex w-full items-center justify-between rounded-xl border border-brand-100 bg-brand-50 p-3 text-brand-900 shadow-xs"
-        >
-          <Typography variant="14/regular" className="text-inherit">
-            {actionNotice}
-          </Typography>
-          <Button variant="text-gray" size="icon-32"
-            type="button"
-            onClick={() => setActionNotice(null)}
-            aria-label="بستن پیام"
-          >
-            <span aria-hidden="true" className="text-xl leading-none">
-              ×
-            </span>
-          </Button>
-        </div>
-      )}
 
       {/* Table card — Figma frame 30852:17813 */}
       <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4">
