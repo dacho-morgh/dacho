@@ -265,7 +265,7 @@ test('separates management-list loading, empty, expired, denied, and unavailable
     await route.fulfill({ status, json: status === 200 ? { items: [] } : { error: 'test response' } })
   })
 
-  await page.goto('http://localhost:3000/dashboard')
+  await page.goto('http://localhost:3000/dashboard/companies')
   await firstRequestSeen
   await expect(page.getByRole('status').filter({ hasText: 'در حال دریافت اطلاعات' })).toBeVisible()
   releaseFirstResponse()
