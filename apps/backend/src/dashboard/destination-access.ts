@@ -44,7 +44,8 @@ export function canOpenDashboardDestination(role: OperationalRole, value: string
     return role === 'representative' || role === 'system-owner'
   }
   if (path === '/dashboard/exhibitions' || path.startsWith('/dashboard/exhibitions/')) {
-    return role === 'system-owner'
+    // Companies open a booth page from the events list; S7 (#245).
+    return managementRoles.includes(role) || role === 'representative'
   }
   if (path === '/dashboard/new-request') return role === 'representative'
 

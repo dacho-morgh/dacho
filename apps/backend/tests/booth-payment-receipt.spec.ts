@@ -424,6 +424,20 @@ describe('T50: Booth payment receipt and payment history', () => {
     expect(v1Res.status).toBe(201)
     expect(v1Res.body.receipt.version).toBe(1)
 
+    // A second upload waits for the Secretariat's decision on version 1.
+    const early = await request(app)
+      .post(`/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt`)
+      .set(headers(repA))
+      .attach('file', pdf(80), 'receipt-early.pdf')
+    expect(early.status).toBe(409)
+    expect(early.body.error).toBe('receipt_pending')
+
+    const returned = await request(app)
+      .post(`/admin/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt/decision`)
+      .set(headers(secretariat))
+      .send({ action: 'return', receiptId: v1Res.body.receipt.id, reason: 'مهر بانک خوانا نیست' })
+    expect(returned.status).toBe(200)
+
     // Correction submission -> Version 2 (same reservation can update)
     const v2Res = await request(app)
       .post(`/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt`)
@@ -445,12 +459,100 @@ describe('T50: Booth payment receipt and payment history', () => {
       version: 1,
       trackingCode: 'TRK-CORRECTION-1',
       description: 'فیش اولیه',
+      status: 'returned',
+      decisionReason: 'مهر بانک خوانا نیست',
     })
     expect(historyRes.body.items[1]).toMatchObject({
       version: 2,
       trackingCode: 'TRK-CORRECTION-2',
       description: 'فیش اصلاح‌شده با مهر بانک',
     })
+  })
+
+  it('lets the Secretariat confirm a pending receipt once, without a second financial effect', async () => {
+    const { app, repA, secretariat, reviewer, booth1 } = await setup()
+    const reserve = await request(app)
+      .post(`/exhibitions/${EXHIBITION}/booths/${booth1.id}/reserve`)
+      .set(headers(repA))
+      .send()
+    const reservationId = reserve.body.reservation.id
+    await request(app)
+      .post(`/admin/exhibitions/${EXHIBITION}/reservations/${reservationId}/attendance`)
+      .set(headers(secretariat))
+      .send({ action: 'approve' })
+    const upload = await request(app)
+      .post(`/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt`)
+      .set(headers(repA))
+      .attach('file', pdf(), 'receipt.pdf')
+    const receiptId = upload.body.receipt.id
+    const decisionUrl = `/admin/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt/decision`
+
+    const byCompany = await request(app).post(decisionUrl).set(headers(repA)).send({ action: 'confirm', receiptId })
+    expect(byCompany.status).toBe(403)
+    const byReviewer = await request(app).post(decisionUrl).set(headers(reviewer)).send({ action: 'confirm', receiptId })
+    expect(byReviewer.status).toBe(403)
+
+    const noReason = await request(app).post(decisionUrl).set(headers(secretariat)).send({ action: 'return', receiptId })
+    expect(noReason.status).toBe(400)
+    expect(noReason.body.error).toBe('reason_required')
+
+    const confirmed = await request(app).post(decisionUrl).set(headers(secretariat)).send({ action: 'confirm', receiptId })
+    expect(confirmed.status).toBe(200)
+    expect(confirmed.body.receipt.status).toBe('confirmed')
+    expect(confirmed.body.reservation).toMatchObject({ paymentStatus: 'confirmed', active: true })
+
+    const again = await request(app).post(decisionUrl).set(headers(secretariat)).send({ action: 'confirm', receiptId })
+    expect(again.status).toBe(409)
+    expect(again.body.error).toBe('invalid_state')
+
+    const afterConfirm = await request(app)
+      .post(`/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt`)
+      .set(headers(repA))
+      .attach('file', pdf(90), 'receipt-2.pdf')
+    expect(afterConfirm.status).toBe(409)
+    expect(afterConfirm.body.error).toBe('payment_confirmed')
+
+    const mine = await request(app).get(`/exhibitions/${EXHIBITION}/my-reservations`).set(headers(repA))
+    expect(mine.body.items[0]).toMatchObject({ paymentStatus: 'confirmed', allowedActions: ['read'] })
+    expect(mine.body.items[0].latestReceipt).toMatchObject({ id: receiptId, status: 'confirmed' })
+  })
+
+  it('rejects a decision on a receipt version that is no longer the latest', async () => {
+    const { app, repA, secretariat, booth1 } = await setup()
+    const reserve = await request(app)
+      .post(`/exhibitions/${EXHIBITION}/booths/${booth1.id}/reserve`)
+      .set(headers(repA))
+      .send()
+    const reservationId = reserve.body.reservation.id
+    await request(app)
+      .post(`/admin/exhibitions/${EXHIBITION}/reservations/${reservationId}/attendance`)
+      .set(headers(secretariat))
+      .send({ action: 'approve' })
+    const v1 = await request(app)
+      .post(`/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt`)
+      .set(headers(repA))
+      .attach('file', pdf(), 'v1.pdf')
+    const decisionUrl = `/admin/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt/decision`
+    await request(app).post(decisionUrl).set(headers(secretariat))
+      .send({ action: 'return', receiptId: v1.body.receipt.id, reason: 'مبلغ ناخوانا' })
+    await request(app)
+      .post(`/exhibitions/${EXHIBITION}/reservations/${reservationId}/receipt`)
+      .set(headers(repA))
+      .attach('file', pdf(70), 'v2.pdf')
+
+    const stale = await request(app).post(decisionUrl).set(headers(secretariat))
+      .send({ action: 'confirm', receiptId: v1.body.receipt.id })
+    expect(stale.status).toBe(409)
+    expect(stale.body.error).toBe('stale_receipt')
+
+    const list = await request(app).get(`/admin/exhibitions/${EXHIBITION}/reservations`).set(headers(secretariat))
+    expect(list.status).toBe(200)
+    expect(list.body.items[0]).toMatchObject({
+      companyName: 'شرکت آلفا',
+      paymentStatus: 'pending_verification',
+      allowedActions: expect.arrayContaining(['verify_receipt', 'return_receipt']),
+    })
+    expect(list.body.items[0].latestReceipt.version).toBe(2)
   })
 
   it('authorizes receipt file download with private security headers', async () => {

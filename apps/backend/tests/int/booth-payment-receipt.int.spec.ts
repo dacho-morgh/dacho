@@ -238,6 +238,26 @@ describe('T50: Booth payment receipt PostgreSQL integration', () => {
     if (!sub1.ok) return
     expect(sub1.receipt.version).toBe(1)
 
+    // V2 is accepted only after the Secretariat returns V1 (T51).
+    const early = await reservations.submitReceipt({
+      reservationId: res.reservation.id,
+      companyId: 'company-a',
+      actorId: 'user-a',
+      files: [{ filename: 'early.pdf', mimeType: 'application/pdf', sizeBytes: 900, storageKey: 'key-early', fileHash: 'hash-early' }],
+    })
+    expect(early).toMatchObject({ ok: false, error: 'receipt_pending' })
+    const missingReason = await reservations.decideReceipt({
+      reservationId: res.reservation.id, receiptId: sub1.receipt.id, action: 'return', reason: ' ', actorId: 'sec-1',
+    })
+    expect(missingReason).toMatchObject({ ok: false, error: 'reason_required' })
+    const returned = await reservations.decideReceipt({
+      reservationId: res.reservation.id, receiptId: sub1.receipt.id, action: 'return', reason: 'ناخوانا', actorId: 'sec-1',
+    })
+    expect(returned.ok).toBe(true)
+    if (!returned.ok) return
+    expect(returned.receipt).toMatchObject({ status: 'returned', decisionReason: 'ناخوانا' })
+    expect(returned.reservation).toMatchObject({ paymentStatus: 'returned', active: true })
+
     // V2 (correction)
     const sub2 = await reservations.submitReceipt({
       reservationId: res.reservation.id,
@@ -257,6 +277,19 @@ describe('T50: Booth payment receipt PostgreSQL integration', () => {
     expect(sub2.ok).toBe(true)
     if (!sub2.ok) return
     expect(sub2.receipt.version).toBe(2)
+
+    const stale = await reservations.decideReceipt({
+      reservationId: res.reservation.id, receiptId: sub1.receipt.id, action: 'confirm', actorId: 'sec-1',
+    })
+    expect(stale).toMatchObject({ ok: false, error: 'stale_receipt' })
+    const confirmed = await reservations.decideReceipt({
+      reservationId: res.reservation.id, receiptId: sub2.receipt.id, action: 'confirm', actorId: 'sec-1',
+    })
+    expect(confirmed).toMatchObject({ ok: true, reservation: { paymentStatus: 'confirmed' } })
+    const repeat = await reservations.decideReceipt({
+      reservationId: res.reservation.id, receiptId: sub2.receipt.id, action: 'confirm', actorId: 'sec-1',
+    })
+    expect(repeat).toMatchObject({ ok: false, error: 'invalid_state' })
 
     // List all versions
     const all = await reservations.listReceipts(res.reservation.id)

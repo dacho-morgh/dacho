@@ -220,6 +220,9 @@ describe('dashboard migrations', () => {
         'status',
         'submitted_by',
         'created_at',
+        'decision_reason',
+        'decided_by',
+        'decided_at',
       ]),
     )
 
