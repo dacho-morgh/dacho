@@ -127,23 +127,116 @@ export function updateBooth(
 /* ── Event Categories, Subtopics, and RFP (FE11 / T17 / T18) ─────────────── */
 
 export type BoothAttendanceStatus = 'pending' | 'approved' | 'rejected'
+export type BoothPaymentStatus = 'unpaid' | 'pending_verification' | 'returned' | 'confirmed' | 'cancelled'
+export type BoothReceiptStatus = 'pending_verification' | 'returned' | 'confirmed'
 
-/** The company's own booth reservation; attendance and payment are decided per booth. */
+export interface BoothReceiptFileDto {
+  id: string
+  receiptId: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  createdAt: string
+}
+
+export interface BoothReceiptDto {
+  id: string
+  reservationId: string
+  version: number
+  trackingCode: string | null
+  amountToman: number | null
+  paidAt: string | null
+  description: string | null
+  status: BoothReceiptStatus
+  createdAt: string
+  decisionReason: string | null
+  decidedAt: string | null
+  files: BoothReceiptFileDto[]
+}
+
+/** One booth request; attendance and payment are decided per booth. */
 export interface BoothReservationDto {
   id: string
   boothId: string
   boothIdentifier?: string
   exhibitionId: string
+  companyId?: string
+  companyName?: string
   active: boolean
   attendanceStatus: BoothAttendanceStatus
   attendanceReason: string | null
+  paymentStatus: BoothPaymentStatus
   priceAmount?: number
   createdAt: string
+  latestReceipt?: BoothReceiptDto | null
   allowedActions: string[]
 }
 
+const exhibitionPath = (exhibitionId: string) => `/exhibitions/${encodeURIComponent(exhibitionId)}`
+const adminExhibitionPath = (exhibitionId: string) =>
+  `/admin/exhibitions/${encodeURIComponent(exhibitionId)}`
+
 export function listMyBoothReservations(exhibitionId: string): Promise<{ items: BoothReservationDto[] }> {
-  return dashboardFetch<{ items: BoothReservationDto[] }>(
-    `/exhibitions/${encodeURIComponent(exhibitionId)}/my-reservations`,
+  return dashboardFetch<{ items: BoothReservationDto[] }>(`${exhibitionPath(exhibitionId)}/my-reservations`)
+}
+
+export function reserveBooth(
+  exhibitionId: string,
+  boothId: string,
+): Promise<{ reservation: BoothReservationDto }> {
+  return dashboardFetch(
+    `${exhibitionPath(exhibitionId)}/booths/${encodeURIComponent(boothId)}/reserve`,
+    { method: 'POST' },
+  )
+}
+
+export interface UploadBoothReceiptInput {
+  file: File
+  trackingCode?: string
+  amountToman?: number
+}
+
+export function uploadBoothReceipt(
+  exhibitionId: string,
+  reservationId: string,
+  input: UploadBoothReceiptInput,
+): Promise<{ receipt: BoothReceiptDto; reservation: BoothReservationDto }> {
+  const form = new FormData()
+  form.set('file', input.file)
+  if (input.trackingCode) form.set('trackingCode', input.trackingCode)
+  if (input.amountToman !== undefined) form.set('amountToman', String(input.amountToman))
+  return dashboardFetch(
+    `${exhibitionPath(exhibitionId)}/reservations/${encodeURIComponent(reservationId)}/receipt`,
+    { method: 'POST', body: form },
+  )
+}
+
+export function boothReceiptFileUrl(exhibitionId: string, reservationId: string, fileId: string): string {
+  return `/api/dashboard${exhibitionPath(exhibitionId)}/reservations/${encodeURIComponent(reservationId)}/receipt/files/${encodeURIComponent(fileId)}/download`
+}
+
+export function listBoothRequests(exhibitionId: string): Promise<{ items: BoothReservationDto[] }> {
+  return dashboardFetch(`${adminExhibitionPath(exhibitionId)}/reservations`)
+}
+
+export function decideBoothAttendance(
+  exhibitionId: string,
+  reservationId: string,
+  input: { action: 'approve' | 'reject'; reason?: string },
+): Promise<{ reservation: BoothReservationDto }> {
+  return dashboardFetch(
+    `${adminExhibitionPath(exhibitionId)}/reservations/${encodeURIComponent(reservationId)}/attendance`,
+    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) },
+  )
+}
+
+export function decideBoothReceipt(
+  exhibitionId: string,
+  reservationId: string,
+  input: { action: 'confirm' | 'return'; receiptId: string; reason?: string },
+): Promise<{ receipt: BoothReceiptDto; reservation: BoothReservationDto }> {
+  return dashboardFetch(
+    `${adminExhibitionPath(exhibitionId)}/reservations/${encodeURIComponent(reservationId)}/receipt/decision`,
+    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) },
   )
 }

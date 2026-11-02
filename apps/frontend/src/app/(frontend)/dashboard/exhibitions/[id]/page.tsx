@@ -4,14 +4,16 @@ import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import { ExhibitionBoothAdmin } from '@/components/dashboard/exhibition-admin/exhibition-booth-admin'
+import { BoothBooking } from '@/components/dashboard/exhibition-booths/booth-booking'
+import { BoothRequestsQueue } from '@/components/dashboard/exhibition-booths/booth-requests-queue'
 import { dashboardOperationalRole } from '@/utilities/dashboard-server'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'مدیریت کاتالوگ غرفه‌ها',
-  description: 'مدیریت مشخصات، سقف و قیمت‌گذاری غرفه‌های نمایشگاه',
+  title: 'غرفه‌های نمایشگاه',
+  description: 'کاتالوگ، درخواست، تأیید حضور و فیش پرداخت غرفه‌های نمایشگاه',
 }
 
 interface PageProps {
@@ -24,7 +26,7 @@ export default async function ExhibitionAdminPage({ params }: PageProps) {
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
 
   const role = dashboardOperationalRole(user)
-  if (role !== 'system-owner') {
+  if (role !== 'system-owner' && role !== 'central-secretariat' && role !== 'representative') {
     redirect('/dashboard?access=denied')
   }
 
@@ -49,16 +51,22 @@ export default async function ExhibitionAdminPage({ params }: PageProps) {
   const startDate = typeof exhibitionDoc.startDate === 'string' ? exhibitionDoc.startDate : ''
   const endDate = typeof exhibitionDoc.endDate === 'string' ? exhibitionDoc.endDate : ''
 
+  const exhibition = {
+    id: String(exhibitionDoc.id),
+    title: String(exhibitionDoc.title ?? 'نمایشگاه'),
+    location: exhibitionDoc.location ? String(exhibitionDoc.location) : null,
+    dates: startDate ? `${formatDate(startDate)} تا ${formatDate(endDate)}` : null,
+  }
+
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-neutral-50 px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">
-      <ExhibitionBoothAdmin
-        exhibition={{
-          id: String(exhibitionDoc.id),
-          title: String(exhibitionDoc.title ?? 'نمایشگاه'),
-          location: exhibitionDoc.location ? String(exhibitionDoc.location) : null,
-          dates: startDate ? `${formatDate(startDate)} تا ${formatDate(endDate)}` : null,
-        }}
-      />
+      {role === 'system-owner' ? (
+        <ExhibitionBoothAdmin exhibition={exhibition} />
+      ) : role === 'central-secretariat' ? (
+        <BoothRequestsQueue exhibition={exhibition} />
+      ) : (
+        <BoothBooking exhibition={exhibition} />
+      )}
     </div>
   )
 }

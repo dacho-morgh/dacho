@@ -38,6 +38,14 @@ vi.mock('@/components/dashboard/exhibition-admin/exhibition-booth-admin', () => 
   ExhibitionBoothAdmin: ({ exhibition }: { exhibition: { title: string } }) =>
     createElement('div', null, exhibition.title),
 }))
+vi.mock('@/components/dashboard/exhibition-booths/booth-requests-queue', () => ({
+  BoothRequestsQueue: ({ exhibition }: { exhibition: { title: string } }) =>
+    createElement('div', null, `Queue ${exhibition.title}`),
+}))
+vi.mock('@/components/dashboard/exhibition-booths/booth-booking', () => ({
+  BoothBooking: ({ exhibition }: { exhibition: { title: string } }) =>
+    createElement('div', null, `Booking ${exhibition.title}`),
+}))
 import ExhibitionAdminPage from '@/app/(frontend)/dashboard/exhibitions/[id]/page'
 import OwnerExhibitionsPage from '@/app/(frontend)/dashboard/exhibitions/page'
 
@@ -63,8 +71,8 @@ it('keeps owner booth navigation independent of the operational events workspace
     screen.getByRole('link', { name: 'مدیریت اطلاعات نمایشگاه در CMS' }).getAttribute('href'),
   ).toBe('/admin/collections/exhibitions')
 })
-it.each(['representative', 'chief-reviewer', 'central-secretariat'])(
-  'denies %s both exhibition administration pages',
+it.each(['chief-reviewer', 'reviewer', 'investment-reviewer'])(
+  'denies %s both exhibition pages',
   async (role) => {
     backend.auth.mockResolvedValue({ user: { operationalRole: role, isActive: true } })
     await expect(OwnerExhibitionsPage()).rejects.toThrow('REDIRECT')
@@ -74,6 +82,32 @@ it.each(['representative', 'chief-reviewer', 'central-secretariat'])(
     expect(backend.findByID).not.toHaveBeenCalled()
   },
 )
+it('gives the Secretariat the booth request queue instead of booth administration', async () => {
+  backend.auth.mockResolvedValue({ user: { operationalRole: 'central-secretariat', isActive: true } })
+  render(await ExhibitionAdminPage({ params: Promise.resolve({ id: '17' }) }))
+  expect(screen.getByText('Queue Exhibition')).toBeTruthy()
+  cleanup()
+  render(await OwnerExhibitionsPage())
+  expect(screen.getByRole('link', { name: 'بررسی درخواست‌ها' }).getAttribute('href')).toBe(
+    '/dashboard/exhibitions/17',
+  )
+})
+it('gives a company the booth request page and lists only exhibitions that have not ended', async () => {
+  backend.auth.mockResolvedValue({ user: { operationalRole: 'representative', isActive: true } })
+  render(await ExhibitionAdminPage({ params: Promise.resolve({ id: '17' }) }))
+  expect(screen.getByText('Booking Exhibition')).toBeTruthy()
+  cleanup()
+  backend.find.mockResolvedValue({
+    docs: [
+      { id: 17, title: 'Open', status: 'upcoming' },
+      { id: 18, title: 'Ended', status: 'past' },
+    ],
+    hasNextPage: false,
+  })
+  render(await OwnerExhibitionsPage())
+  expect(screen.getByText('Open')).toBeTruthy()
+  expect(screen.queryByText('Ended')).toBeNull()
+})
 it('preserves owner cookie authentication when mobile HTTP omits browser fetch metadata', async () => {
   const { extractJWT } = await vi.importActual<typeof import('payload')>('payload')
   const payload = {
