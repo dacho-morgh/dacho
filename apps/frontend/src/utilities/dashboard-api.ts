@@ -462,7 +462,7 @@ export interface ReviewRoundDto {
   startedAt: string
   supersededAt?: string | null
   completion: { required: number; finalized: number; ready: boolean; completedAt: string | null }
-  decision: { action: ReviewDecisionAction; decidedAt: string; reason: string | null } | null
+  decision: { action: ReviewDecisionAction; decidedAt: string; reason: string | null; decidedBy?: string } | null
   slots?: ReviewRoundSlotDto[]
   replacements?: ReviewReplacementDto[]
 }
@@ -485,6 +485,21 @@ export interface EvaluationListDto {
   items: EvaluationSummaryDto[]
   completedCount: number
   requiredCount: number
+  /** The request revision these evaluations review (`?revision=` reads a past round). */
+  revision?: number
+  /** The server's readiness for the chief's decision; never a decision by itself. */
+  readyForChiefDecision?: boolean
+}
+
+/** GET /requests/:id/review-rounds: every round of the case, newest first (oversight only). */
+export interface ReviewRoundListDto {
+  items: ReviewRoundDto[]
+}
+
+/** One earlier round with its own evaluations, read by its request revision. */
+export interface ReviewRoundHistoryEntry {
+  round: ReviewRoundDto
+  evaluations: EvaluationListDto | 'failed'
 }
 
 export interface InvestmentMemoDto {

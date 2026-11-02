@@ -157,9 +157,9 @@ const dossierReads = async (role: string) => {
 it.each([
   ['representative', ['', '/proposal', '/result', '/supplementary-requests']],
   ['investment-reviewer', ['', '/proposal']],
-  ['chief-reviewer', ['', '/evaluations', '/proposal', '/review-round', '/verification']],
-  ['central-secretariat', ['', '/evaluations', '/proposal', '/review-round', '/verification']],
-  ['system-owner', ['', '/evaluations', '/proposal', '/review-round', '/verification']],
+  ['chief-reviewer', ['', '/evaluations', '/proposal', '/review-round', '/review-rounds', '/verification']],
+  ['central-secretariat', ['', '/evaluations', '/proposal', '/review-round', '/review-rounds', '/verification']],
+  ['system-owner', ['', '/evaluations', '/proposal', '/review-round', '/review-rounds', '/verification']],
 ])('reads only what %s may see on the shared dossier', async (role, reads) => {
   expect(await dossierReads(role)).toEqual(reads)
 })
