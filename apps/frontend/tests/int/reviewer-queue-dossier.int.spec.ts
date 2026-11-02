@@ -150,13 +150,14 @@ describe('ReviewerQueue', () => {
     await screen.findAllByText('پلتفرم پایش انرژی')
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe('/api/dashboard/review/queue?view=open&page=1&limit=25')
-    // Counts come from the server, over every active assignment of the caller.
-    expect(screen.getByText('بسته‌شده (۲)')).toBeTruthy()
-    expect(screen.getByText('همه (۳)')).toBeTruthy()
     const links = screen.getAllByRole('link').map((link) => link.getAttribute('href'))
     expect(links).toContain('/dashboard/requests/11111111-1111-4111-8111-111111111111')
     // No generic request listing is read for this role.
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/admin/requests'))).toBe(false)
+    // Counts come from the server, over every active assignment of the caller; they sit in the shared filter (FE35).
+    fireEvent.keyDown(screen.getByRole('button', { name: 'فیلتر پرونده‌های داوری' }), { key: 'Enter' })
+    expect((await screen.findByRole('menuitemradio', { name: /بسته‌شده/ })).textContent).toContain('۲')
+    expect(screen.getByRole('menuitemradio', { name: /همه/ }).textContent).toContain('۳')
   })
 
   it('shows only the cases the server returned and never other people’s scores', async () => {

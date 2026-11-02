@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   DashboardAddIcon,
-  DashboardFilterIcon,
   DashboardMoreIcon,
 } from '@/components/icons'
 import { getLoginUrl } from '@/utilities/auth-return-url'
@@ -58,7 +57,7 @@ export function AdminListView<T>({
   columns,
   loadState = 'ready',
   onRetry,
-  filterTabs,
+  filter,
   serverFiltered = false,
 }: {
   title: string
@@ -70,7 +69,8 @@ export function AdminListView<T>({
   columns: AdminColumn<T>[]
   loadState?: AdminListLoadState
   onRetry?: () => void
-  filterTabs?: React.ReactNode
+  /** The list's ListFilterButton (FE35); every filter lives inside it. */
+  filter?: React.ReactNode
   /** The caller filters through the API: a search over one page would misreport the list. */
   serverFiltered?: boolean
 }) {
@@ -87,7 +87,6 @@ export function AdminListView<T>({
       <Typography variant="h3" color="neutral-900">
         {title}
       </Typography>
-      {filterTabs}
       <div className="flex flex-row-reverse flex-wrap items-center justify-between gap-3">
         <Button disabled size="48" icon={<DashboardAddIcon className="size-6" />}>
           <Typography variant="16/regular" color="white">
@@ -96,12 +95,7 @@ export function AdminListView<T>({
         </Button>
         {!serverFiltered && (
           <div className="flex flex-row-reverse gap-2">
-            <Button disabled
-              variant="outline-gray"
-              size="48"
-              icon={<DashboardFilterIcon className="size-6" />}
-              aria-label="فیلتر"
-            />
+            {filter}
             <SearchField
               value={query}
               onChange={(event) => setQuery(event.target.value)}

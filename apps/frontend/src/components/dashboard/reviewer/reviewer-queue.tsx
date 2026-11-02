@@ -22,6 +22,7 @@ import {
 } from '@/utilities/reviewer-case'
 
 import { useRevalidateOnFocus } from './use-revalidate'
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 
 export type ReviewerQueueState =
   | { kind: 'loading' }
@@ -104,26 +105,24 @@ export function ReviewerQueue({ view, page }: ReviewerQueueProps) {
         </Typography>
       </div>
 
-      <nav aria-label="فیلتر پرونده‌های داوری" className="flex flex-wrap items-center gap-2">
-        {REVIEW_QUEUE_VIEWS.map((option) => {
-          const active = option.value === view
-          const count = counts?.[option.value]
-          return (
-            <Link
-              key={option.value}
-              href={reviewQueueHref(option.value)}
-              aria-current={active ? 'page' : undefined}
-              className={`inline-flex h-10 items-center rounded-[10px] px-3 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
-                active ? 'bg-brand-600 text-white hover:bg-brand-700' : 'bg-white text-neutral-600 hover:bg-neutral-100'
-              }`}
-            >
-              <Typography as="span" variant="14/regular" className="text-inherit">
-                {typeof count === 'number' ? `${option.label} (${count.toLocaleString('fa-IR')})` : option.label}
-              </Typography>
-            </Link>
-          )
-        })}
-      </nav>
+      <div className="flex justify-end">
+        {/* The default view (awaiting evaluation) is the unfiltered state of the shared filter (FE35). */}
+        <ListFilterButton
+          label="فیلتر پرونده‌های داوری"
+          groups={[
+            {
+              key: 'view',
+              label: 'نمای صف',
+              value: view === 'open' ? undefined : view,
+              options: REVIEW_QUEUE_VIEWS.map((option) => ({
+                value: option.value === 'open' ? '' : option.value,
+                label: option.label,
+                count: counts?.[option.value],
+              })),
+            },
+          ]}
+        />
+      </div>
 
       <QueueBody state={state} view={view} page={page} onRetry={() => void load('retry')} />
     </main>

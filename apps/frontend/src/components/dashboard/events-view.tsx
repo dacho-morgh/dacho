@@ -6,9 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   AlertCircle,
-  Check,
   ChevronDown,
-  ChevronLeft,
   Download,
   FileText,
   Folder,
@@ -22,16 +20,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CalendarBulkIcon,
   EmptyInboxIllustration,
-  FilterIcon,
   LocationBulkIcon,
   TickSquareIcon,
 } from '@/components/icons'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { ParticipationEligibilityPanel } from '@/components/dashboard/participation-eligibility-panel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
@@ -49,6 +40,7 @@ import {
 import type { Eligibility } from '@/utilities/participation-eligibility'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 
 export interface EventItem {
   id: string
@@ -869,58 +861,22 @@ export function EventsView({
                 placeholder="درخواست خود را جست و جو کنید"
                 aria-label="جستجوی رویدادها"
               />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="filter"
-                size="icon-48"
-                data-active={filterType !== 'all'}
-                title="فیلتر رویدادها"
-              >
-                <FilterIcon />
-                <span className="sr-only">فیلتر</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-52 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-md"
-            >
-              <DropdownMenuItem
-                onClick={() => setFilterType('all')}
-                className={`flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5 text-sm ${
-                  filterType === 'all'
-                    ? 'bg-brand-50 font-medium text-brand-600'
-                    : 'text-neutral-700 hover:bg-neutral-100'
-                }`}
-              >
-                <span>همه رویدادها</span>
-                {filterType === 'all' && <Check className="size-4 text-brand-600" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setFilterType('ended')}
-                className={`flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5 text-sm ${
-                  filterType === 'ended'
-                    ? 'bg-brand-50 font-medium text-brand-600'
-                    : 'text-neutral-700 hover:bg-neutral-100'
-                }`}
-              >
-                <span>تمام شده</span>
-                {filterType === 'ended' && <Check className="size-4 text-brand-600" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setFilterType('active')}
-                className={`flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5 text-sm ${
-                  filterType === 'active'
-                    ? 'bg-brand-50 font-medium text-brand-600'
-                    : 'text-neutral-700 hover:bg-neutral-100'
-                }`}
-              >
-                <span>در حال ثبت‌نام</span>
-                {filterType === 'active' && <Check className="size-4 text-brand-600" />}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ListFilterButton
+            label="فیلتر رویدادها"
+            groups={[
+              {
+                key: 'state',
+                label: 'وضعیت ثبت‌نام',
+                value: filterType === 'all' ? undefined : filterType,
+                options: [
+                  { value: '', label: 'همه رویدادها' },
+                  { value: 'active', label: 'در حال ثبت‌نام' },
+                  { value: 'ended', label: 'تمام شده' },
+                ],
+              },
+            ]}
+            onChange={(_, value) => setFilterType((value as typeof filterType | undefined) ?? 'all')}
+          />
         </div>
       </div>
 

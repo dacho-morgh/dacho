@@ -14,7 +14,6 @@ import {
   DashboardAddIcon,
   DashboardEditIcon,
   DashboardEyeIcon,
-  DashboardFilterIcon,
   DashboardMoreVerticalIcon,
   DashboardTrashIcon,
   EmptyInboxIllustration,
@@ -35,6 +34,7 @@ import { cn } from '@/utilities/ui'
 import { roleTag, setEmployeeActive, type Employee } from './employees/employee-data'
 import { RequestError, adminErrorMessage, adminRequest, loadPeople } from './owner-admin'
 import { toast } from 'sonner'
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 
 const SAVED_NOTICES: Record<string, string> = {
   created: 'کارمند جدید ثبت شد.',
@@ -305,6 +305,14 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
   }
 
   const roleOptions = OPERATIONAL_ROLES.filter((role) => role !== 'representative')
+  const counts = people.reduce<Record<string, number>>(
+    (acc, person) => {
+      acc.all += 1
+      if (person.operationalRole) acc[person.operationalRole] = (acc[person.operationalRole] ?? 0) + 1
+      return acc
+    },
+    { all: 0 },
+  )
   const ready = !loading && error === null
 
   return (
@@ -324,40 +332,21 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
               onChange={(event) => setQuery(event.target.value)}
               className="sm:w-[400px]"
             />
-            <DropdownMenu dir="rtl">
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="filter"
-                  size="icon-48"
-                  aria-label="فیلتر نقش"
-                  data-active={roleFilter !== 'all'}
-                >
-                  <DashboardFilterIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-52 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-md"
-              >
-                {(['all', ...roleOptions] as const).map((role) => (
-                  <DropdownMenuItem
-                    key={role}
-                    onSelect={() => setRoleFilter(role)}
-                    className={cn(
-                      'flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5',
-                      roleFilter === role ? 'bg-brand-50 text-brand-600' : 'text-neutral-700',
-                    )}
-                  >
-                    <Typography as="span" variant="14/regular" className="text-inherit">
-                      {role === 'all' ? 'همه نقش‌ها' : OPERATIONAL_ROLE_LABELS[role]}
-                    </Typography>
-                    {roleFilter === role && (
-                      <span aria-hidden="true" className="size-1.5 rounded-full bg-brand-500" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <ListFilterButton
+              label="فیلتر نقش"
+              groups={[
+                {
+                  key: 'role',
+                  label: 'نقش',
+                  value: roleFilter === 'all' ? undefined : roleFilter,
+                  options: [
+                    { value: '', label: 'همه نقش‌ها', count: counts.all },
+                    ...roleOptions.map((role) => ({ value: role, label: OPERATIONAL_ROLE_LABELS[role], count: counts[role] ?? 0 })),
+                  ],
+                },
+              ]}
+              onChange={(_, value) => setRoleFilter((value as typeof roleFilter | undefined) ?? 'all')}
+            />
           </div>
           {canManage && (
             <Button asChild size="48">

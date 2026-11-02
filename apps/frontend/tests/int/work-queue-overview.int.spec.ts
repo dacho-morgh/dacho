@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -112,18 +112,19 @@ describe('RequestsPage', () => {
   const searchParams = Promise.resolve({ search: 'طرح', eventId: EVENT_ID, stage: 'triaged', queue: 'company_draft' })
   const query = `search=${encodeURIComponent('طرح')}&eventId=${EVENT_ID}&stage=triaged&queue=company_draft`
 
-  it('reads the list and its counts with the same filters and keeps them on tabs and pages', async () => {
+  it('reads the list and its counts with the same filters and keeps them on the filter and pages', async () => {
     asUser('representative')
     render(await RequestsPage({ searchParams }))
 
     expect(backend.fetch).toHaveBeenCalledWith(`/requests?limit=50&page=1&${query}`)
     expect(backend.fetch).toHaveBeenCalledWith(`/stats?${query}`)
 
-    const approved = screen.getByRole('link', { name: `تایید شده (${(1).toLocaleString('fa-IR')})` })
-    expect(approved.getAttribute('href')).toBe(`/dashboard/requests?status=approved&${query}`)
     expect(screen.getByRole('link', { name: 'صفحه بعد' }).getAttribute('href')).toBe(`/dashboard/requests?page=2&${query}`)
-    expect(screen.getByRole('option', { name: 'رویداد نمونه' })).toBeTruthy()
     expect(screen.getByText('صف: پیش‌نویس‌های ارسال‌نشده')).toBeTruthy()
+    // Status (with its count), event and stage live in the shared filter button (FE35).
+    fireEvent.keyDown(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }), { key: 'Enter' })
+    expect((await screen.findByRole('menuitemradio', { name: /تایید شده/ })).textContent).toContain((1).toLocaleString('fa-IR'))
+    expect(screen.getByRole('menuitemradio', { name: 'رویداد نمونه' })).toBeTruthy()
   })
 
   it('hands the same filters to the internal list', async () => {
@@ -149,7 +150,9 @@ describe('RequestsPage', () => {
           : { kind: 'ok', data: { items: [], total: 0, page: 1, totalPages: 1 } },
     )
     render(await RequestsPage({ searchParams: Promise.resolve({}) }))
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).not.toContain('رویداد نمونه')
-    expect(screen.getByRole('link', { name: `همه (${(7).toLocaleString('fa-IR')})` })).toBeTruthy()
+    fireEvent.keyDown(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }), { key: 'Enter' })
+    const all = (await screen.findAllByRole('menuitemradio')).find((item) => /^همه\s*[۰-۹]/.test(item.textContent ?? ''))
+    expect(all?.textContent).toContain((7).toLocaleString('fa-IR'))
+    expect(screen.queryByRole('menuitemradio', { name: 'رویداد نمونه' })).toBeNull()
   })
 })
