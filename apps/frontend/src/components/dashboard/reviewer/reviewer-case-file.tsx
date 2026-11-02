@@ -114,7 +114,7 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
 
   useRevalidateOnFocus(() => void revalidate())
 
-  if (state.kind !== 'ready') return <CaseUnavailable state={state} path={path} />
+  if (state.kind !== 'ready') return <ReviewerCaseUnavailable kind={state.kind} path={path} />
 
   const { data, notice } = state
   const item = data.case
@@ -150,9 +150,17 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
         <Field label="تاریخ ارجاع" value={formatDate(item.assignment.assignedAt)} />
         <Field label="تاریخ ثبت درخواست" value={formatDate(item.submissionDate) || 'ثبت نشده'} />
       </section>
-      <Typography variant="14/regular" color="neutral-500">
-        فرم ارزیابی از این صفحه هنوز فعال نیست.
-      </Typography>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild size="36" variant={work === 'open' && item.evaluation?.state !== 'final' ? 'default' : 'outline-gray'}>
+          <Link href={`${path}/evaluation`}>
+            <Typography as="span" variant="14/regular" className="text-inherit">
+              {work === 'open' && item.evaluation?.state !== 'final'
+                ? item.evaluation ? 'ادامه فرم ارزیابی' : 'شروع فرم ارزیابی'
+                : 'مشاهده فرم ارزیابی'}
+            </Typography>
+          </Link>
+        </Button>
+      </div>
 
       <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">اطلاعات شرکت</Typography>
@@ -237,8 +245,12 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
   )
 }
 
-function CaseUnavailable({ state, path }: { state: Exclude<ReviewerCaseState, { kind: 'ready' }>; path: string }) {
-  const copy: Record<typeof state.kind, { title: string; body: string }> = {
+export type ReviewerCaseUnavailableKind = Exclude<ReviewerCaseState, { kind: 'ready' }>['kind']
+
+/** Why an assigned reviewer's page shows no case data; also used by the evaluation form route. */
+export function ReviewerCaseUnavailable({ kind, path }: { kind: ReviewerCaseUnavailableKind; path: string }) {
+  const state = { kind }
+  const copy: Record<ReviewerCaseUnavailableKind, { title: string; body: string }> = {
     revoked: {
       title: 'دسترسی شما به این پرونده پایان یافته است',
       body: 'ارجاع این پرونده به شما لغو یا جایگزین شده است و اطلاعات آن دیگر نمایش داده نمی‌شود.',
