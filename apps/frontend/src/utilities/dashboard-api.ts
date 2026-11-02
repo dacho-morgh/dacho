@@ -591,6 +591,25 @@ export interface RequestProposalDetail {
     acceptedBy: string
     acceptedAt: string
   }>
+  /** Every proposal revision of the case the reader may see, oldest first. */
+  revisions?: number[]
+}
+
+/**
+ * The company profile pinned when the request was submitted (T21). Oversight gets the
+ * whole snapshot; the dossier only reads the fields every reviewing role may see.
+ * `null` when the case has no pinned profile (the route answers 404).
+ */
+export interface RequestVerificationDto {
+  verification: {
+    requestId: string
+    revision: number
+    snapshot: {
+      company?: Record<string, unknown>
+      dossier?: Record<string, unknown>
+    }
+    createdAt: string
+  } | null
 }
 
 export function getRequestProposal(id: string, revision?: number): Promise<RequestProposalDetail> {

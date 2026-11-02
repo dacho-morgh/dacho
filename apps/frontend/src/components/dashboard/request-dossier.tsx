@@ -14,6 +14,7 @@ import {
   type RequestAction,
   type RequestDetail,
   type RequestProposalDetail,
+  type RequestVerificationDto,
   type ReviewRoundDto,
 } from '@/utilities/dashboard-api'
 import { documentCategoryLabel, type DocumentCategory } from '@/utilities/document-categories'
@@ -87,6 +88,8 @@ export interface RequestDossierProps {
   proposal: DossierPart<RequestProposalDetail>
   round: DossierPart<{ round: ReviewRoundDto | null }>
   evaluations: DossierPart<EvaluationListDto>
+  /** The company profile pinned at submission; oversight roles only. */
+  profile?: DossierPart<RequestVerificationDto>
   /** Company-only sections, rendered above the request details. */
   companySections?: React.ReactNode
   /** The company sections include the FE13 correction form, which owns the proposal upload while correcting. */
@@ -104,6 +107,7 @@ export function RequestDossier({
   proposal,
   round,
   evaluations,
+  profile = null,
   companySections,
   correctionHandled = false,
 }: RequestDossierProps) {
@@ -171,6 +175,8 @@ export function RequestDossier({
 
       {companySections}
 
+      {profile !== null ? <ProfileSnapshot profile={profile} /> : null}
+
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">اطلاعات درخواست</Typography>
         {proposal === 'failed' ? (
@@ -178,9 +184,19 @@ export function RequestDossier({
             دریافت نسخه پروپوزال انجام نشد. صفحه را دوباره بارگذاری کنید.
           </Typography>
         ) : proposalDetail ? (
-          <Typography variant="14/regular" color="neutral-500" className="mt-2">
-            نسخه پروپوزال: {proposalDetail.revision.toLocaleString('fa-IR')}
-          </Typography>
+          <>
+            <Typography variant="14/regular" color="neutral-500" className="mt-2">
+              نسخه پروپوزال: {proposalDetail.revision.toLocaleString('fa-IR')}
+            </Typography>
+            {!isCompany ? (
+              <Typography variant="14/regular" color="neutral-500">
+                نسخه ثبت‌شده در {formatDate(proposalDetail.createdAt)}
+                {proposalDetail.proposalDocuments.length
+                  ? ` · فایل پروپوزال: ${proposalDetail.proposalDocuments.map((file) => file.filename).join('، ')}`
+                  : ''}
+              </Typography>
+            ) : null}
+          </>
         ) : null}
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {Object.entries(request.answers ?? {})
@@ -346,11 +362,53 @@ function ReviewProgress({
   )
 }
 
+const PROFILE_FIELDS: [section: 'company' | 'dossier', key: string, label: string][] = [
+  ['company', 'name', 'نام شرکت'],
+  ['company', 'nationalId', 'شناسه ملی'],
+  ['company', 'type', 'نوع شرکت'],
+  ['company', 'province', 'استان'],
+  ['company', 'city', 'شهر'],
+  ['dossier', 'legalEntityType', 'نوع شخصیت حقوقی'],
+  ['dossier', 'classification', 'طبقه‌بندی شرکت'],
+  ['dossier', 'activityDomain', 'حوزه فعالیت اصلی'],
+  ['dossier', 'productsServices', 'محصولات و خدمات'],
+]
+
+/**
+ * The profile as it was when the company submitted, not the live profile: only the
+ * fields every reviewing role may see, whatever the snapshot holds for this reader.
+ */
+function ProfileSnapshot({ profile }: { profile: DossierPart<RequestVerificationDto> }) {
+  return (
+    <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+      <Typography as="h2" variant="20/bold" color="neutral-900">اطلاعات شرکت در زمان ثبت</Typography>
+      {profile === 'failed' ? (
+        <Typography role="alert" variant="14/regular" color="error">
+          دریافت پروفایل ثبت‌شده شرکت انجام نشد. صفحه را دوباره بارگذاری کنید.
+        </Typography>
+      ) : profile?.verification ? (
+        <>
+          <Typography variant="14/regular" color="neutral-500">
+            نسخه {profile.verification.revision.toLocaleString('fa-IR')} پروفایل تأییدشده · ثبت در {formatDate(profile.verification.createdAt)}
+          </Typography>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {PROFILE_FIELDS.map(([section, key, label]) => (
+              <Field key={`${section}.${key}`} label={label} value={answerText(profile.verification?.snapshot[section]?.[key])} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <Typography variant="14/regular" color="neutral-500">پروفایلی همراه این درخواست ثبت نشده است.</Typography>
+      )}
+    </section>
+  )
+}
+
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="rounded-lg bg-neutral-50 p-3">
       <Typography variant="12/regular" color="neutral-500">{label}</Typography>
-      <Typography variant="16/regular" color="neutral-800" className={`mt-1 ${mono ? 'font-mono' : ''}`}>{value}</Typography>
+      <Typography variant="16/regular" color="neutral-800" className={`mt-1 break-words ${mono ? 'font-mono' : ''}`}>{value}</Typography>
     </div>
   )
 }

@@ -123,9 +123,9 @@ it.each([
   ['reviewer', ['', '/proposal']],
   ['employer-reviewer', ['', '/proposal']],
   ['investment-reviewer', ['', '/proposal']],
-  ['chief-reviewer', ['', '/evaluations', '/proposal', '/review-round']],
-  ['central-secretariat', ['', '/evaluations', '/proposal', '/review-round']],
-  ['system-owner', ['', '/evaluations', '/proposal', '/review-round']],
+  ['chief-reviewer', ['', '/evaluations', '/proposal', '/review-round', '/verification']],
+  ['central-secretariat', ['', '/evaluations', '/proposal', '/review-round', '/verification']],
+  ['system-owner', ['', '/evaluations', '/proposal', '/review-round', '/verification']],
 ])('reads only what %s may see on the shared dossier', async (role, reads) => {
   expect(await dossierReads(role)).toEqual(reads)
 })

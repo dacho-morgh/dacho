@@ -16,6 +16,7 @@ import {
   type PublishedResultDto,
   type RequestDetail,
   type RequestProposalDetail,
+  type RequestVerificationDto,
   type ReviewRoundDto,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
@@ -41,6 +42,13 @@ async function serviceFields(payload: Awaited<ReturnType<typeof getPayload>>, se
 async function readPart<T>(path: string): Promise<DossierPart<T>> {
   const result = await serverDashboardFetchResult<T>(path)
   return result.kind === 'ok' ? result.data : 'failed'
+}
+
+/** The pinned profile: a 404 means the case has none, which is not a failed read. */
+async function readProfile(path: string): Promise<DossierPart<RequestVerificationDto>> {
+  const result = await serverDashboardFetchResult<RequestVerificationDto>(path)
+  if (result.kind === 'ok') return result.data
+  return result.kind === 'unavailable' && result.status === 404 ? { verification: null } : 'failed'
 }
 
 export default async function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -69,12 +77,14 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   // in the round: these reads are for the chief, the Secretariat and the owner.
   const oversees = role === 'system-owner' || role === 'central-secretariat' || role === 'chief-reviewer'
   const isCompany = role === 'representative'
-  const [proposal, round, evaluations, publishedResult, supplementary] = await Promise.all([
+  const [proposal, round, evaluations, publishedResult, supplementary, profile] = await Promise.all([
     readPart<RequestProposalDetail>(`${path}/proposal`),
     oversees ? readPart<{ round: ReviewRoundDto | null }>(`${path}/review-round`) : null,
     oversees ? readPart<EvaluationListDto>(`${path}/evaluations`) : null,
     isCompany ? readPart<{ result: PublishedResultDto | null }>(`${path}/result`) : null,
     isCompany ? readPart<{ items: CompanySupplementaryRequestDto[] }>(`${path}/supplementary-requests`) : null,
+    // The chief triages the profile as submitted, not the live one the company may have edited since.
+    oversees ? readProfile(`${path}/verification`) : null,
   ])
 
   // The correction form edits the service's fixed answers; an unreadable form leaves the team and files editable.
@@ -90,6 +100,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       proposal={proposal}
       round={round}
       evaluations={evaluations}
+      profile={profile}
       companySections={
         isCompany ? (
           <CompanySections

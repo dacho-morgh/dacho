@@ -19,8 +19,23 @@ type Request = {
   company: string
   request: string
   status: 'پیش‌نویس' | 'درحال بررسی' | 'نیازمند اصلاح' | 'تایید شده' | 'رد شده'
+  stage: string
+  /** The next step the server lists for this person, if any. */
+  pending: string | null
   date: string
 }
+const STAGE_LABELS: Record<string, string> = {
+  chief_triage: 'بررسی اولیه',
+  triaged: 'داوری',
+  advanced: 'مالی و سرمایه‌گذاری',
+}
+/** Most specific first; only commands with a control on the dossier. */
+const PENDING_LABELS: [string, string][] = [
+  ['triage', 'منتظر بررسی اولیه شما'],
+  ['startReview', 'منتظر تعیین داوران'],
+  ['decideReview', 'منتظر تصمیم شما'],
+  ['reopen', 'قابل بازگشایی'],
+]
 const statusStyle: Record<
   Request['status'],
   { color: 'brand-600' | 'error' | 'secondary' | 'success'; bg: string }
@@ -54,6 +69,18 @@ const columns: AdminColumn<Request>[] = [
       const style = statusStyle[item.status] ?? statusStyle['درحال بررسی']
       return <Typography variant="14/regular" color={style.color} className={`inline-block rounded-lg px-3 py-1 ${style.bg}`}>{item.status}</Typography>
     },
+  },
+  {
+    id: 'stage',
+    header: 'مرحله',
+    render: (item) => (
+      <span className="flex flex-col gap-1">
+        {text(item.stage)}
+        {item.pending ? (
+          <Typography variant="12/regular" color="brand-600">{item.pending}</Typography>
+        ) : null}
+      </span>
+    ),
   },
   { id: 'date', header: 'تاریخ ثبت', render: (item) => text(item.date) },
   {
@@ -90,7 +117,7 @@ export function AdminRequestList({
       if (response.status === 401) { setLoadState('unauthenticated'); return }
       if (response.status === 403) { setLoadState('denied'); return }
       if (!response.ok) { setLoadState('error'); return }
-      const data = (await response.json()) as { totalPages?: number; items?: { id: string; title: string; status: string; createdAt: string; owner?: { companyName?: string; name?: string } }[] }
+      const data = (await response.json()) as { totalPages?: number; items?: { id: string; title: string; status: string; reviewStage?: string | null; allowedActions?: string[]; createdAt: string; owner?: { companyName?: string; name?: string } }[] }
       if (load !== latestLoad.current) return
       if (!Array.isArray(data.items)) { setLoadState('error'); return }
       setTotalPages(data.totalPages ?? 1)
@@ -99,6 +126,8 @@ export function AdminRequestList({
         company: item.owner?.companyName || item.owner?.name || '—',
         request: item.title,
         status: ({ draft: 'پیش‌نویس', in_review: 'درحال بررسی', action_needed: 'نیازمند اصلاح', approved: 'تایید شده', rejected: 'رد شده' }[item.status] ?? item.status) as Request['status'],
+        stage: (item.reviewStage && STAGE_LABELS[item.reviewStage]) || '—',
+        pending: PENDING_LABELS.find(([action]) => item.allowedActions?.includes(action))?.[1] ?? null,
         date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fa-IR') : '—',
       })))
       setLoadState('ready')
