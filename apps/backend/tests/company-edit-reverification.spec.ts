@@ -125,4 +125,14 @@ describe('T59: any company dossier edit invalidates verification', () => {
     const res = await request(app).get('/profile/verification').set(headers).expect(200)
     expect(res.body).toMatchObject({ status: 'returned', reason: COMPANY_EDIT_REVERIFICATION_REASON })
   })
+
+  it('lists the current verification with its submission date for the Secretariat queue (FE05, Figma 01)', async () => {
+    const { testApp, company } = await setup('pending')
+    const secretariat = (await testApp.userStore.list()).find((user) => user.operationalRole === 'central-secretariat')!
+    const res = await request(testApp.app).get('/admin/companies')
+      .set({ 'x-internal-proxy-secret': 'test-proxy-secret', 'x-user-id': secretariat.id }).expect(200)
+    const item = res.body.items.find((entry: { companyId: string }) => entry.companyId === company.id)
+    expect(item).toMatchObject({ verificationStatus: 'pending', verificationRevision: 1 })
+    expect(Date.parse(item.verificationSubmittedAt)).not.toBeNaN()
+  })
 })

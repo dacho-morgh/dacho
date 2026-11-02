@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
+import { SupportModal } from '@/components/dashboard/support-modal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
@@ -79,7 +81,7 @@ function bannerFor(verification: CompanyVerificationDto, missing: MissingDossier
         : {
             tone: 'warning',
             title: 'اطلاعات شرکت هنوز کامل نیست',
-            body: 'برای ارسال درخواست احراز هویت، اطلاعات و مدارک الزامی شرکت را تکمیل کنید.',
+            body: 'برای ارسال درخواست احراز هویت، اطلاعات نماینده و مدارک شرکت را تکمیل کنید.',
           }
   }
 }
@@ -110,6 +112,7 @@ export function CompanyVerificationCard({
   submitting: boolean
   onSubmit: () => void
 }) {
+  const [supportOpen, setSupportOpen] = useState(false)
   const banner = bannerFor(verification, missing)
   const { status } = verification
   const canSubmit = verification.canRequestVerification && status !== 'pending' && status !== 'approved'
@@ -191,7 +194,7 @@ export function CompanyVerificationCard({
           </Typography>
         )}
 
-        {status !== 'pending' && status !== 'approved' && missing.required.length > 0 && (
+        {status !== 'pending' && status !== 'approved' && status !== 'rejected' && missing.required.length > 0 && (
           <div className="flex flex-col gap-2">
             <Typography variant="14/semibold" color="neutral-600">
               اطلاعات یا مدارک الزامی ناقص:
@@ -207,7 +210,7 @@ export function CompanyVerificationCard({
             </ul>
           </div>
         )}
-        {status !== 'pending' && status !== 'approved' && missing.optional.length > 0 && (
+        {status !== 'pending' && status !== 'approved' && status !== 'rejected' && missing.optional.length > 0 && (
           <div className="flex flex-col gap-2">
             <Typography variant="12/regular" color="neutral-500">
               موارد اختیاری بدون پاسخ (می‌توانید تکمیل کنید یا گزینه «ندارم» را علامت بزنید):
@@ -230,22 +233,49 @@ export function CompanyVerificationCard({
         )}
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
+          {status !== 'pending' && status !== 'approved' && !verification.canRequestVerification && (
+            <>
+              <Button type="button" size="40" disabled aria-describedby="company-verification-title">
+                {resubmit ? 'ارسال دوباره برای احراز' : 'ارسال برای احراز'}
+              </Button>
+              <Button asChild size="40" variant="outline-gray">
+                <a href="#company-basic">تکمیل اطلاعات شرکت</a>
+              </Button>
+            </>
+          )}
           {canSubmit && (
             <Button type="button" size="40" loading={submitting} onClick={onSubmit}>
               {resubmit ? 'ارسال دوباره برای احراز' : 'ارسال برای احراز'}
             </Button>
           )}
           {status === 'approved' && (
-            <Button asChild size="40">
-              <Link href="/dashboard/events">مشاهده رویدادها</Link>
-            </Button>
+            <>
+              <Button asChild size="40">
+                <Link href="/dashboard/events">مشاهده رویدادها</Link>
+              </Button>
+              {/* The decision letter lands in the inbox (verification-repo writes it). */}
+              <Button asChild size="40" variant="outline-gray">
+                <Link href="/dashboard/inbox">نامه تایید احراز هویت</Link>
+              </Button>
+            </>
           )}
-          {(status === 'pending' || status === 'rejected' || status === 'returned') && (
-            <Button asChild size="40" variant={canSubmit ? 'outline-gray' : 'primary'}>
+          {status === 'pending' && (
+            <Button asChild size="40">
               <Link href="/dashboard/inbox">مشاهده کارتابل نامه</Link>
             </Button>
           )}
+          {(status === 'rejected' || status === 'returned') && (
+            <Button asChild size="40" variant={canSubmit ? 'outline-gray' : 'primary'}>
+              <Link href="/dashboard/inbox">مشاهده نامه دبیرخانه</Link>
+            </Button>
+          )}
+          {status === 'rejected' && (
+            <Button type="button" size="40" variant="outline-gray" onClick={() => setSupportOpen(true)}>
+              پیام به صندوق
+            </Button>
+          )}
         </div>
+        <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
       </div>
     </section>
   )

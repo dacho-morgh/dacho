@@ -29,11 +29,12 @@ afterEach(() => {
 })
 
 describe('S4 company verification card (Figma 16, 22-24)', () => {
-  it('asks for the missing items while the dossier is incomplete and offers no submit', () => {
+  it('asks for the missing items while the dossier is incomplete and points to the form with submit disabled', () => {
     card(verification({ canRequestVerification: false }), { required: ['articlesOfAssociation'], optional: [], canRequestVerification: false })
     expect(screen.getByText('اطلاعات شرکت هنوز کامل نیست')).toBeTruthy()
     expect(screen.getByText('اساس‌نامه')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'ارسال برای احراز' })).toBeNull()
+    expect((screen.getByRole('button', { name: 'ارسال برای احراز' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('link', { name: 'تکمیل اطلاعات شرکت' }).getAttribute('href')).toBe('#company-basic')
   })
 
   it('shows the review steps while pending and the approval facts once approved', () => {
@@ -41,6 +42,7 @@ describe('S4 company verification card (Figma 16, 22-24)', () => {
     expect(screen.getByText('احراز هویت در حال بررسی است')).toBeTruthy()
     expect(screen.getByText('بررسی دبیرخانه')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'مشاهده کارتابل نامه' }).getAttribute('href')).toBe('/dashboard/inbox')
+    expect(screen.queryByRole('button', { name: 'ارسال برای احراز' })).toBeNull()
     cleanup()
     card(verification({ status: 'approved', decidedAt: '2026-11-02T00:00:00.000Z', canRequestVerification: false }))
     expect(screen.getByText('شرکت شما احراز هویت شده است')).toBeTruthy()

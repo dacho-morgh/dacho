@@ -46,6 +46,7 @@ export function AdminRowActions({
 }
 export function AdminListView<T>({
   title,
+  notice,
   addAction,
   searchPlaceholder = 'جستجو',
   items,
@@ -59,6 +60,8 @@ export function AdminListView<T>({
   serverFiltered = false,
 }: {
   title: string
+  /** A status banner under the title, such as the verification queue's pending count. */
+  notice?: React.ReactNode
   /** The page's create action, shown only to whoever may create (e.g. the owner's «شرکت جدید»). */
   addAction?: React.ReactNode
   searchPlaceholder?: string
@@ -88,6 +91,7 @@ export function AdminListView<T>({
       <Typography variant="h3" color="neutral-900">
         {title}
       </Typography>
+      {notice}
       <div className="flex flex-row-reverse flex-wrap items-center justify-between gap-3">
         {addAction}
         {toolbar}

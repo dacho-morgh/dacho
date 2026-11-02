@@ -256,7 +256,7 @@ describe('FE05: Secretariat Company Verification Workbench', () => {
     render(createElement(CompanyDetailView, { id: 'rep-1' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'تأیید مدارک' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'تایید احراز هویت' })).toBeTruthy()
     })
 
     const textarea = screen.getByLabelText(/توضیحات و دلیل تصمیم/) as HTMLTextAreaElement
@@ -264,7 +264,7 @@ describe('FE05: Secretariat Company Verification Workbench', () => {
     expect(textarea.value).toBe('مدارک اولیه بررسی شد اما نسخه تغییر کرد')
 
     // Click approve
-    fireEvent.click(screen.getByRole('button', { name: 'تأیید مدارک' }))
+    fireEvent.click(screen.getByRole('button', { name: 'تایید احراز هویت' }))
 
     // Stale notice displayed
     await waitFor(() => {
@@ -311,7 +311,7 @@ describe('FE05: Secretariat Company Verification Workbench', () => {
     })
 
     // Decision buttons must NOT be present
-    expect(screen.queryByRole('button', { name: 'تأیید مدارک' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'تایید احراز هویت' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'برگشت جهت اصلاح' })).toBeNull()
   })
 

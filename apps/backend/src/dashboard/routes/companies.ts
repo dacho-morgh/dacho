@@ -43,6 +43,7 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
           executives: company?.executives ?? [],
           verificationStatus: currentVerif?.status ?? 'unsubmitted',
           verificationRevision: currentVerif?.revision ?? 0,
+          verificationSubmittedAt: currentVerif?.submittedAt ?? null,
         }
       }))
       const items = requestedStatus && requestedStatus !== 'all'
