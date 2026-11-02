@@ -19,9 +19,9 @@ Only one PR is open: #183 (T50, exhibition backend). It goes to Agent R.
 | | **Agent L — local (this machine)** | **Agent R — remote (codex)** |
 | --- | --- | --- |
 | Focus | Figma-driven frontend, plus the backend it directly needs | Backend-heavy domains, plus their own screens |
-| Owns, in order | S1 Inbox → S2 UI foundation (frontend freeze) → S4 Account & company → S3 Role dashboards | S7 Exhibition basics (backend first) → S6 Financial → investment → result → S5 Owner event/exhibition admin |
-| Frontend dirs | `dashboard/letters/**`, `dashboard/inbox/**`, `dashboard/profile/**`, `dashboard/companies/**`, `dashboard/page.tsx`, `components/ui/**`, `components/dashboard/{*letter*,inbox-*,mail-*,support-*,app-sidebar,account-*,company-*,staff-profile-*,stat-cards,recent-*}` | `dashboard/exhibitions/**`, `dashboard/events/**`, `dashboard/follow-ups/**`, `dashboard/requests/[id]/**` (financial/investment parts), `components/dashboard/{exhibition-*,booth-*,owner-events*,events-view,financial-*,investment-*,secretariat-follow-up-*}` |
-| Backend dirs | `dashboard/letter-*`, `dashboard/notification-outbox.ts`, the profile/company parts of `dashboard/*`, `access/*` (company re-verification) | `exhibitions/**`, `reviews/**` (investment), `dashboard/secretariat-follow-up-repo.ts`, `catalog/**` |
+| Owns, in order | S1 Inbox → S2 UI foundation (frontend freeze) → S4 Account & company | S7 Exhibition basics (backend first) → S3 Role dashboards (gaps after #247) → S6 Financial → investment → result → S5 Owner event/exhibition admin |
+| Frontend dirs | `dashboard/letters/**`, `dashboard/inbox/**`, `dashboard/profile/**`, `dashboard/companies/**`, `components/ui/**`, `components/dashboard/{*letter*,inbox-*,mail-*,support-*,app-sidebar,account-*,company-*,staff-profile-*}` | `dashboard/exhibitions/**`, `dashboard/events/**`, `dashboard/follow-ups/**`, `dashboard/requests/[id]/**` (financial/investment parts), `components/dashboard/{exhibition-*,booth-*,owner-events*,events-view,financial-*,investment-*,secretariat-follow-up-*,stat-cards,recent-*}`, `components/dashboard/owner-overview/**`, `dashboard/page.tsx` |
+| Backend dirs | `dashboard/letter-*`, `dashboard/notification-outbox.ts`, the profile/company parts of `dashboard/*`, `access/*` (company re-verification) | `exhibitions/**`, `reviews/**` (investment), `dashboard/secretariat-follow-up-repo.ts`, `dashboard/stats-repo.ts`, `dashboard/routes/stats.ts`, `catalog/**` |
 
 Why this split has the fewest conflicts:
 
@@ -95,7 +95,7 @@ The `design-check-figma` report is posted on the PR with no open high-severity f
 | Slice | Agent | Absorbs | Figma |
 | --- | --- | --- | --- |
 | S2 UI foundation | L (frontend freeze) | FE42 #233, FE43 #234, FE44 #235, FE29 #78, FE36 #227, FE39 #230, FE35 #226 (rest) | Style page `2:26` |
-| S3 Role dashboards | L | FE33 #224, T56 #218 | Shell frames per role |
+| S3 Role dashboards | R | FE33 #224, T56 #218 (most delivered in #247) | Shell frames per role |
 | S4 Account & company | L | FE37 #228 + T58 #220, FE38 #229 + T59 #221, FE34 #225 + T57 #219, design gaps in FE05 | 16, 22–24 (Missing Screens) |
 | S5 Owner event/exhibition admin | R | FE40 #231, FE41 #232, T60 #222, design gaps in FE10/FE11 | Admin page |
 | S6 Financial → investment → result | R | FE19 #98, FE20 #99, FE21 #100, FE31 #101 | 03, 04, 13, 14, 15, 19, 20, 25 |
