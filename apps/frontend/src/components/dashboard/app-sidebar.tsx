@@ -113,7 +113,8 @@ export function AppSidebar({
                 onClick={toggleSidebar}
                 aria-label="باز کردن سایدبار"
                 aria-expanded={false}
-                title="باز کردن سایدبار"
+                aria-keyshortcuts="Control+B Meta+B"
+                title="باز کردن سایدبار (Ctrl+B)"
                 className="group/logo relative"
               >
                 <BrandSandoqLogomark className="h-8 w-[37px] shrink-0 transition-opacity group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0" />
@@ -136,6 +137,8 @@ export function AppSidebar({
               <SidebarTrigger
                 aria-label="جمع کردن سایدبار"
                 aria-expanded
+                aria-keyshortcuts="Control+B Meta+B"
+                title="جمع کردن سایدبار (Ctrl+B)"
                 data-sidebar-anim
                 className="size-8 shrink-0 rounded-lg text-neutral-600"
               >

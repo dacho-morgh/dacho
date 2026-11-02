@@ -376,7 +376,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
           ) : (
             <ScrollArea className="min-h-0 flex-1">
               <table className="w-full min-w-[860px] border-collapse text-right">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr>
                     <HeaderCell label="نام کارمند" />
                     <HeaderCell label="نقش" className="w-[200px]" />

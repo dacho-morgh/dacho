@@ -23,6 +23,7 @@ import {
 
 import { useRevalidateOnFocus } from './use-revalidate'
 import { ListFilterButton } from '@/components/dashboard/list-filter-button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 export type ReviewerQueueState =
   | { kind: 'loading' }
@@ -95,7 +96,7 @@ export function ReviewerQueue({ view, page }: ReviewerQueueProps) {
   const counts = state.kind === 'ready' ? state.data.counts : undefined
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-5 px-4 pt-6 pb-6 lg:pt-10" dir="rtl">
+    <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 px-4 pt-6 pb-6 lg:pt-10" dir="rtl">
       <div className="flex flex-col gap-1">
         <Typography as="h1" variant="h3" color="neutral-900">
           پرونده‌های ارجاع‌شده به شما
@@ -124,7 +125,10 @@ export function ReviewerQueue({ view, page }: ReviewerQueueProps) {
         />
       </div>
 
-      <QueueBody state={state} view={view} page={page} onRetry={() => void load('retry')} />
+      {/* Title and filter stay put; only the queue scrolls (FE36). */}
+      <ScrollArea className="min-h-0 flex-1">
+        <QueueBody state={state} view={view} page={page} onRetry={() => void load('retry')} />
+      </ScrollArea>
     </main>
   )
 }
@@ -212,9 +216,9 @@ function QueueBody({
         ))}
       </ul>
       {/* Tablet and up: the Figma table. */}
-      <div className="hidden min-w-0 overflow-hidden rounded-xl border border-neutral-200 bg-white md:block">
+      <div className="hidden min-w-0 rounded-xl border border-neutral-200 bg-white md:block">
         <table className="w-full table-fixed border-collapse">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-white">
             <tr className="h-11 border-b border-neutral-200">
               {['نام شرکت', 'عنوان درخواست', 'رویداد', 'وضعیت', 'ارزیابی شما', 'تاریخ ارجاع'].map((header) => (
                 <th key={header} scope="col" className="px-4 text-right">

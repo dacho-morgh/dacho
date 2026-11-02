@@ -58,6 +58,7 @@ export function AdminListView<T>({
   loadState = 'ready',
   onRetry,
   filter,
+  toolbar,
   serverFiltered = false,
 }: {
   title: string
@@ -71,6 +72,8 @@ export function AdminListView<T>({
   onRetry?: () => void
   /** The list's ListFilterButton (FE35); every filter lives inside it. */
   filter?: React.ReactNode
+  /** Replaces search and filter when the caller filters through the API (it brings its own). */
+  toolbar?: React.ReactNode
   /** The caller filters through the API: a search over one page would misreport the list. */
   serverFiltered?: boolean
 }) {
@@ -93,7 +96,8 @@ export function AdminListView<T>({
             {addLabel}
           </Typography>
         </Button>
-        {!serverFiltered && (
+        {toolbar}
+        {!serverFiltered && !toolbar && (
           <div className="flex flex-row-reverse gap-2">
             {filter}
             <SearchField
@@ -107,7 +111,7 @@ export function AdminListView<T>({
       </div>
       <ScrollArea className="min-h-0 min-w-0 flex-1 rounded-xl border border-neutral-200 bg-white">
         <table className="w-full min-w-[900px] border-collapse">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-white">
             <tr className="h-11 border-b border-neutral-200">
               {columns.map((column) => (
                 <th key={column.id} className="px-4 text-right">
@@ -130,8 +134,9 @@ export function AdminListView<T>({
             ))}
             {loadState !== 'ready' && (
               <tr>
-                <td colSpan={columns.length} className="h-60 px-4 text-center">
-                  <div className="flex flex-col items-center justify-center gap-3">
+                <td colSpan={columns.length} className="h-60 text-center">
+                  {/* Pinned to the visible width: the table is wider than a phone and scrolls sideways. */}
+                  <div className="sticky right-0 flex w-[calc(100vw-2rem)] max-w-full flex-col items-center justify-center gap-3 px-4">
                     {loadState === 'loading' && (
                       <Typography role="status" aria-live="polite" variant="16/regular" color="muted">
                         در حال دریافت اطلاعات...
@@ -174,9 +179,11 @@ export function AdminListView<T>({
             {loadState === 'ready' && filtered.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="h-60 text-center">
-                  <Typography variant="16/regular" color="muted">
-                    {items.length === 0 ? 'هنوز موردی برای نمایش وجود ندارد' : 'موردی پیدا نشد'}
-                  </Typography>
+                  <div className="sticky right-0 w-[calc(100vw-2rem)] max-w-full px-4">
+                    <Typography variant="16/regular" color="muted">
+                      {items.length === 0 ? 'هنوز موردی برای نمایش وجود ندارد' : 'موردی پیدا نشد'}
+                    </Typography>
+                  </div>
                 </td>
               </tr>
             )}

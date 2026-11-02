@@ -95,12 +95,7 @@ export default async function RequestsPage({
 
   if (isInternal) {
     return (
-      <>
-        <div className="flex flex-col gap-3 px-4 pt-6 lg:pt-10">
-          {filterForm}
-        </div>
-        <AdminRequestList status={status} page={page} filters={filters} />
-      </>
+      <AdminRequestList status={status} page={page} filters={filters} toolbar={filterForm} />
     )
   }
 

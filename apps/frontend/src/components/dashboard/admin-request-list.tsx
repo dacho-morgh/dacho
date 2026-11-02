@@ -96,10 +96,13 @@ export function AdminRequestList({
   status,
   page = 1,
   filters = {},
+  toolbar,
 }: {
   status?: RequestStatus
   page?: number
   filters?: RequestQueueFilters
+  /** Search and the shared filter button, rendered in the list's toolbar row. */
+  toolbar?: React.ReactNode
 } = {}) {
   const [requests, setRequests] = useState<Request[]>([])
   const [totalPages, setTotalPages] = useState(1)
@@ -148,6 +151,7 @@ export function AdminRequestList({
         loadState={loadState}
         onRetry={() => void loadRequests()}
         serverFiltered
+        toolbar={toolbar}
       />
       {loadState === 'ready' && (
         <div className="pb-4">
