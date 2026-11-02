@@ -100,6 +100,18 @@ export {
   mapMailData,
   mapLetterAttachments,
   deleteLetter,
+  INBOX_PAGE_SIZE,
+  inboxQueryString,
+  parseInboxQuery,
+  NEXT_STEP_ACTIONS,
+  BOOTH_STEP_ACTIONS,
+  letterAction,
+  setLetterRead,
+  type InboxBox,
+  type InboxStatusFilter,
+  type InboxQuery,
+  type InboxCounts,
+  type InboxPage,
 } from './letters'
 export {
   toEnglishDigits,

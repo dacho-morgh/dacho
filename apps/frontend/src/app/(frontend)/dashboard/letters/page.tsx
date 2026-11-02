@@ -5,11 +5,16 @@ import { getPayload } from 'payload'
 import { AdminLettersView, type AdminLetterItem } from '@/components/dashboard/admin-letters-view'
 import { ApplicantLettersView, type ApplicantLetterItem } from '@/components/dashboard/applicant-letters-view'
 import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
+import { InboxView, type InboxRow, type InboxShortcut } from '@/components/dashboard/inbox-view'
 import { Typography } from '@/components/ui/typography'
 import {
   formatDate,
+  inboxQueryString,
   LETTER_TYPE_LABELS,
+  letterAction,
   letterSenderRoleLabel,
+  parseInboxQuery,
+  type InboxPage,
   type LetterDto,
   type Paginated,
   type SupportTicketDto,
@@ -74,10 +79,72 @@ function toAdminLetterItem(dto: LetterDto, names: Map<string, string>, actorId: 
   }
 }
 
-export default async function LettersPage() {
+function toInboxRow(dto: LetterDto, names: Map<string, string>, actorId: string): InboxRow {
+  const received = dto.recipientId === actorId
+  return {
+    id: dto.id,
+    title: dto.title,
+    type: dto.type,
+    typeLabel: LETTER_TYPE_LABELS[dto.type] ?? 'نامه رسمی',
+    counterpartName: received ? (dto.senderName ?? 'کارخانه نوآوری') : (names.get(dto.recipientId) ?? 'گیرنده'),
+    counterpartRole: received ? (letterSenderRoleLabel(dto.senderRole) || 'سامانه') : 'گیرنده نامه',
+    sentDate: formatDate(dto.sentAt),
+    read: received ? dto.read : undefined,
+    received,
+    canReply: received && dto.senderId !== null,
+    action: received ? letterAction(dto) : null,
+  }
+}
+
+function PageFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-0 w-full flex-1 flex-col bg-neutral-50 px-4 pb-4 pt-10 sm:px-6 lg:px-4" dir="rtl">
+      <Typography as="h1" variant="24/bold" className="mb-6 leading-[36px] text-neutral-700">
+        کارتابل نامه
+      </Typography>
+      {children}
+    </div>
+  )
+}
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>
+
+/**
+ * The inbox (S1): the reader's own received and sent letters, with next steps.
+ * Support tickets, website forms and the all-letters oversight list stay
+ * reachable from the filter menu through `?view=`.
+ */
+export default async function LettersPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: await headers() })
   const isSeniorManager = await isSeniorManagerUser(payload, user)
+  const view = params.view === 'all' ? 'all' : undefined
+
+  if (!view) {
+    const query = parseInboxQuery(params)
+    const result = await serverDashboardFetchResult<InboxPage>(`/letters?${inboxQueryString(query)}`)
+    const failure = unavailableReasonFor(result)
+    if (failure || result.kind !== 'ok') return <DashboardReadNotice reason={failure ?? 'unavailable'} retryHref="/dashboard/letters" />
+    const actorId = String(user?.id)
+    const names = await recipientNamesOf(payload, result.data.items.filter((dto) => dto.recipientId !== actorId))
+    const shortcuts: InboxShortcut[] = [
+      { label: isSeniorManager ? 'همه نامه‌ها، فرم‌ها و پشتیبانی' : 'نامه‌ها و تیکت‌های پشتیبانی', href: '/dashboard/letters?view=all' },
+    ]
+    return (
+      <PageFrame>
+        <InboxView
+          rows={result.data.items.map((dto) => toInboxRow(dto, names, actorId))}
+          query={query}
+          counts={result.data.counts}
+          page={result.data.page}
+          totalPages={result.data.totalPages}
+          canCompose={dashboardOperationalRole(user) !== 'representative'}
+          shortcuts={shortcuts}
+        />
+      </PageFrame>
+    )
+  }
 
   if (isSeniorManager) {
     const [lettersRes, ticketsRes] = await Promise.all([

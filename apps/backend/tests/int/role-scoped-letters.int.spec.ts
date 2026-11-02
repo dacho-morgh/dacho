@@ -303,8 +303,14 @@ describe('T34: role-scoped letters (int)', () => {
     expect((await send(app, 'owner', 'investment', id)).status).toBe(201)
 
     // The mailbox holds both directions, and only the recipient marks a letter read.
-    const mailbox = (await get(app, 'investment', '/letters?read=false')).body.items as { id: string; recipientId: string }[]
-    expect(mailbox).toHaveLength(4)
+    const mailbox = (await get(app, 'investment', '/letters?read=false')).body.items as {
+      id: string; recipientId: string; type: string; nextStep: string | null
+    }[]
+    // Four letters, plus the handoff notice asking the investment person for a memo (S1).
+    expect(mailbox).toHaveLength(5)
+    expect(mailbox.filter((letter) => letter.type === 'notification')).toEqual([
+      expect.objectContaining({ recipientId: 'investment', nextStep: 'investment_memo' }),
+    ])
     const reply = mailbox.find((letter) => letter.recipientId === 'investment')!
     expect((await get(app, 'investment', `/letters/${reply.id}`)).body.letter.read).toBe(true)
     expect((await get(app, 'investment', `/letters/${sent.body.letter.id}`)).body.letter.read).toBe(false)

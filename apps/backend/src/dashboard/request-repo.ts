@@ -5,6 +5,7 @@ import { isUuid } from '../db/uuid.js'
 import { countRoundFinals, ROUND_REQUIRED_EVALUATIONS } from '../reviews/round-completion.js'
 import { FINANCIAL_CHECKLIST, FINANCIAL_CHECKLIST_VERSION, type FinancialChecklistItem, type FinancialInvitationDto } from './financial-invitation.js'
 import { appendTransition } from './transition-history.js'
+import { notifyNextRole } from './next-role.js'
 import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 import { lockApprovedVerification } from './verification-repo.js'
 import { requestWorkQueueClause, type RequestWorkQueueFilter } from './work-queues.js'
@@ -684,7 +685,7 @@ export class RequestRepository {
       : '(company_id IS NULL AND owner_id = $2)'
     const client = await this.pool.connect()
     let submittedRequest: RequestDto
-    let notificationJobId: string
+    let notificationJobIds: string[] = []
     try {
       await client.query('BEGIN')
       const { rows } = await client.query<RequestRow & { revision: number }>(
@@ -760,19 +761,17 @@ export class RequestRepository {
         revision: updated.revision,
         reason: null,
       })
-      const job = await this.notificationOutbox.enqueue(client, {
+      notificationJobIds = await notifyNextRole(client, this.notificationOutbox, {
         requestId: updated.id,
-        recipientId: updated.owner_id,
+        deliverAfterCommit: true,
         actorId: ownerId,
         action: 'submit',
         fromState: 'draft',
         toState: updated.status,
-        revision: updated.revision,
         title: 'ارسال درخواست',
         body: `درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} ارسال شد.`,
       })
       submittedRequest = mapRequestRow(updated)
-      notificationJobId = job.id
       await client.query('COMMIT')
     } catch (err) {
       await client.query('ROLLBACK').catch(() => undefined)
@@ -782,11 +781,8 @@ export class RequestRepository {
     }
     // Delivery needs its own connection. Return the transaction client to the
     // pool first so concurrent submissions cannot exhaust it while awaiting delivery.
-    try {
-      await this.notificationOutbox.deliver(notificationJobId)
-    } catch {
-      // The committed pending job remains available for operator recovery.
-    }
+    // The committed pending jobs remain available for operator recovery.
+    for (const jobId of notificationJobIds) await this.deliverQuietly(jobId)
     return submittedRequest
   }
 
@@ -909,7 +905,7 @@ export class RequestRepository {
     if (!isUuid(input.requestId)) return 'not_found'
     const client = await this.pool.connect()
     let decided: RequestRow
-    let notificationJobId: string
+    let notificationJobIds: string[] = []
     try {
       await client.query('BEGIN')
       const locked = await client.query<RequestRow & { chief_id: string }>(
@@ -962,19 +958,17 @@ export class RequestRepository {
         revision: updated.revision,
         reason: input.reason,
       })
-      const job = await this.notificationOutbox.enqueue(client, {
+      notificationJobIds = await notifyNextRole(client, this.notificationOutbox, {
         requestId: updated.id,
-        recipientId: updated.owner_id,
+        deliverAfterCommit: true,
         actorId: input.actorId,
         action: transition.history,
         fromState: current.status,
         toState: updated.status,
-        revision: updated.revision,
         title: transition.title,
         body: transition.body(updated, input.reason),
       })
       decided = updated
-      notificationJobId = job.id
       await client.query('COMMIT')
     } catch (err) {
       await client.query('ROLLBACK').catch(() => undefined)
@@ -982,7 +976,7 @@ export class RequestRepository {
     } finally {
       client.release()
     }
-    await this.deliverQuietly(notificationJobId)
+    for (const jobId of notificationJobIds) await this.deliverQuietly(jobId)
     return { request: mapRequestRow(decided) }
   }
 
@@ -1033,7 +1027,7 @@ export class RequestRepository {
         await client.query('ROLLBACK')
         return missing
       }
-      const chiefId = await ensureChiefAssignment(client, updated.id)
+      await ensureChiefAssignment(client, updated.id)
       await appendTransition(client, {
         requestId: updated.id,
         ownerId: updated.owner_id,
@@ -1044,21 +1038,16 @@ export class RequestRepository {
         revision: updated.revision,
         reason: null,
       })
-      const recipients = new Set([updated.owner_id, ...(chiefId ? [chiefId] : [])])
-      for (const recipientId of recipients) {
-        const job = await this.notificationOutbox.enqueue(client, {
-          requestId: updated.id,
-          recipientId,
-          actorId,
-          action: 'correction_submit',
-          fromState: 'action_needed',
-          toState: updated.status,
-          revision: updated.revision,
-          title: 'ارسال اصلاحیه درخواست',
-          body: `اصلاحیه درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} ارسال شد.`,
-        })
-        jobIds.push(job.id)
-      }
+      jobIds.push(...await notifyNextRole(client, this.notificationOutbox, {
+        requestId: updated.id,
+        deliverAfterCommit: true,
+        actorId,
+        action: 'correction_submit',
+        fromState: 'action_needed',
+        toState: updated.status,
+        title: 'ارسال اصلاحیه درخواست',
+        body: `اصلاحیه درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} ارسال شد.`,
+      }))
       resubmitted = updated
       await client.query('COMMIT')
     } catch (err) {
@@ -1110,7 +1099,7 @@ export class RequestRepository {
       )
       const updated = rows[0]
       if (!updated) throw new Error('UPDATE requests returned no row')
-      const chiefId = await ensureChiefAssignment(client, updated.id)
+      await ensureChiefAssignment(client, updated.id)
       await appendTransition(client, {
         requestId: updated.id,
         ownerId: updated.owner_id,
@@ -1121,21 +1110,16 @@ export class RequestRepository {
         revision: updated.revision,
         reason: input.reason,
       })
-      const recipients = new Set([updated.owner_id, ...(chiefId ? [chiefId] : [])])
-      for (const recipientId of recipients) {
-        const job = await this.notificationOutbox.enqueue(client, {
-          requestId: updated.id,
-          recipientId,
-          actorId: input.actorId,
-          action: 'owner_reopen',
-          fromState: 'rejected',
-          toState: updated.status,
-          revision: updated.revision,
-          title: 'بازگشایی درخواست',
-          body: `درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} بازگشایی شد: ${input.reason}`,
-        })
-        jobIds.push(job.id)
-      }
+      jobIds.push(...await notifyNextRole(client, this.notificationOutbox, {
+        requestId: updated.id,
+        deliverAfterCommit: true,
+        actorId: input.actorId,
+        action: 'owner_reopen',
+        fromState: 'rejected',
+        toState: updated.status,
+        title: 'بازگشایی درخواست',
+        body: `درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} بازگشایی شد: ${input.reason}`,
+      }))
       reopened = updated
       await client.query('COMMIT')
     } catch (err) {

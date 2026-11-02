@@ -32,6 +32,8 @@ vi.mock('@/utilities/dashboard-server', () => ({
   serverDashboardFetchResult: mocks.fetch,
 }))
 
+// The letters, forms and support tables now live behind the inbox's `?view=all` (S1).
+const legacyView = { searchParams: Promise.resolve({ view: 'all' }) }
 afterEach(() => {
   cleanup()
   vi.resetAllMocks()
@@ -49,7 +51,7 @@ describe('letters list', () => {
     mocks.fetch.mockImplementation(async (url: string) =>
       url === path ? { kind: 'unavailable', status: 500 } : ok,
     )
-    render(await LettersPage())
+    render(await LettersPage(legacyView))
     expect(screen.getByRole('alert').getAttribute('data-state')).toBe('unavailable')
     expect(screen.queryByText('صندوق نامه‌های شما خالیست')).toBeNull()
   })
@@ -59,7 +61,7 @@ describe('letters list', () => {
     mocks.fetch.mockImplementation(async (url: string) =>
       url.startsWith('/support') ? { kind: 'denied' } : ok,
     )
-    render(await LettersPage())
+    render(await LettersPage(legacyView))
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.getByText('صندوق نامه‌های شما خالیست')).toBeTruthy()
   })
@@ -69,14 +71,14 @@ describe('letters list', () => {
     mocks.fetch.mockImplementation(async (url: string) =>
       url.startsWith('/support') ? { kind: 'unavailable', status: 503 } : ok,
     )
-    render(await LettersPage())
+    render(await LettersPage(legacyView))
     expect(screen.getByRole('alert').getAttribute('data-state')).toBe('unavailable')
   })
 
   it('offers sign-in again for an expired session', async () => {
     mocks.senior.mockResolvedValue(false)
     mocks.fetch.mockResolvedValue({ kind: 'unauthenticated' })
-    render(await LettersPage())
+    render(await LettersPage(legacyView))
     expect(screen.getByRole('alert').getAttribute('data-state')).toBe('expired')
     expect(screen.getByRole('link', { name: 'ورود دوباره' }).getAttribute('href')).toContain('/login')
   })
@@ -84,7 +86,7 @@ describe('letters list', () => {
   it('separates no search match from an empty mailbox', async () => {
     mocks.senior.mockResolvedValue(false)
     mocks.fetch.mockResolvedValue(ok)
-    render(await LettersPage())
+    render(await LettersPage(legacyView))
     fireEvent.change(screen.getByRole('searchbox', { name: 'جستجو' }), { target: { value: 'چیزی' } })
     expect(screen.getByText('نتیجه‌ای پیدا نشد')).toBeTruthy()
     expect(screen.queryByText('صندوق نامه‌های شما خالیست')).toBeNull()

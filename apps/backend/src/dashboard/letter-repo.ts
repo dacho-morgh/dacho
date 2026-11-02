@@ -31,6 +31,13 @@ export interface LetterDto {
   read: boolean
   sentAt: string
   attachments: unknown[]
+  /** What the recipient is expected to do next (see next-role.ts); null for plain letters. */
+  nextStep: string | null
+  /** The step is still pending: the recipient has not acted and the case has not moved past it. */
+  actionRequired: boolean
+  /** A notice about a booth request (S7) names it and its exhibition instead of a request. */
+  boothReservationId: string | null
+  exhibitionId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -48,14 +55,20 @@ interface LetterRow {
   read: boolean
   sent_at: Date
   attachments: unknown[]
+  next_step: string | null
+  next_step_done_at: Date | null
+  booth_reservation_id: string | null
+  exhibition_id: string | null
   created_at: Date
   updated_at: Date
 }
 
 const LETTER_COLUMNS = `
   id, type, title, body, sender_id, sender_name, sender_role, recipient_id,
-  request_id, read, sent_at, attachments, created_at, updated_at
+  request_id, read, sent_at, attachments, next_step, next_step_done_at, booth_reservation_id, exhibition_id,
+  created_at, updated_at
 `
+const ALIASED_LETTER_COLUMNS = LETTER_COLUMNS.trim().split(/,\s*/).map((column) => `l.${column}`).join(', ')
 
 /**
  * Case letters are visible to current case participants only. Personal letters
@@ -141,6 +154,10 @@ function mapRow(row: LetterRow): LetterDto {
     read: row.read,
     sentAt: row.sent_at.toISOString(),
     attachments: row.attachments,
+    nextStep: row.next_step,
+    actionRequired: row.next_step !== null && row.next_step_done_at === null,
+    boothReservationId: row.booth_reservation_id,
+    exhibitionId: row.exhibition_id,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   }
@@ -158,6 +175,32 @@ export interface LetterList {
   total: number
   page: number
   totalPages: number
+}
+
+/** Received is the actor's own mailbox; sent is what they wrote. Without a box both show. */
+export type LetterBox = 'received' | 'sent'
+export type LetterStatusFilter = 'unread' | 'action_required'
+
+export interface LetterListScopedOptions {
+  read?: boolean
+  page: number
+  limit: number
+  actorId: string
+  requestId?: string
+  box?: LetterBox
+  /** Matched against title, body and sender name. */
+  q?: string
+  status?: LetterStatusFilter
+}
+
+/** Badge counts for the actor's received box. */
+export interface InboxCounts {
+  unread: number
+  actionRequired: number
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
 }
 
 export interface CreateLetterInput {
@@ -281,10 +324,7 @@ export class LetterRepository {
     }
   }
 
-  async listScoped(
-    scope: RequestScope,
-    options: { read?: boolean; page: number; limit: number; actorId: string; requestId?: string },
-  ): Promise<LetterList> {
+  async listScoped(scope: RequestScope, options: LetterListScopedOptions): Promise<LetterList> {
     const params: unknown[] = []
     const where: string[] = [letterScopeClause(scope, params, 'l')]
     // A case's history keeps letters its recipient hid from their mailbox.
@@ -299,6 +339,22 @@ export class LetterRepository {
       params.push(options.read)
       where.push(`l.read = $${params.length}`)
     }
+    if (options.box) {
+      params.push(options.actorId)
+      where.push(`l.${options.box === 'received' ? 'recipient_id' : 'sender_id'} = $${params.length}`)
+    }
+    if (options.q) {
+      params.push(`%${escapeLike(options.q)}%`)
+      const like = `$${params.length}`
+      where.push(`(l.title ILIKE ${like} OR l.body ILIKE ${like} OR l.sender_name ILIKE ${like})`)
+    }
+    if (options.status) {
+      params.push(options.actorId)
+      where.push(`l.recipient_id = $${params.length}`)
+      where.push(options.status === 'unread'
+        ? 'l.read = false'
+        : 'l.next_step IS NOT NULL AND l.next_step_done_at IS NULL')
+    }
     const whereSql = where.join(' AND ')
     const count = await this.pool.query<{ total: string }>(
       `SELECT COUNT(*) AS total FROM dashboard.letters l WHERE ${whereSql}`,
@@ -308,7 +364,7 @@ export class LetterRepository {
     const offset = (options.page - 1) * options.limit
     const { rows } = await this.pool.query<LetterRow>(
       `SELECT l.id, l.type, l.title, l.body, l.sender_id, l.sender_name, l.sender_role,
-              l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments,
+              l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments, l.next_step, l.next_step_done_at, l.booth_reservation_id, l.exhibition_id,
               l.created_at, l.updated_at
        FROM dashboard.letters l
        WHERE ${whereSql}
@@ -324,13 +380,65 @@ export class LetterRepository {
     }
   }
 
+  /** Unread and still-actionable letters in the actor's received box. */
+  async inboxCounts(scope: RequestScope, actorId: string): Promise<InboxCounts> {
+    const params: unknown[] = []
+    const readable = letterScopeClause(scope, params, 'l')
+    params.push(actorId)
+    const { rows } = await this.pool.query<{ unread: string; action_required: string }>(
+      `SELECT COUNT(*) FILTER (WHERE NOT l.read) AS unread,
+              COUNT(*) FILTER (WHERE l.next_step IS NOT NULL AND l.next_step_done_at IS NULL) AS action_required
+       FROM dashboard.letters l
+       WHERE (${readable}) AND l.recipient_id = $${params.length} AND l.mailbox_hidden_at IS NULL`,
+      params,
+    )
+    return { unread: Number(rows[0]?.unread ?? 0), actionRequired: Number(rows[0]?.action_required ?? 0) }
+  }
+
+  /**
+   * Earlier letters of the same case that the actor wrote or received, oldest first.
+   * Hidden letters stay, as the case's history.
+   */
+  async threadScoped(letter: LetterDto, scope: RequestScope, actorId: string, limit = 20): Promise<LetterDto[]> {
+    if (!letter.requestId) return []
+    const params: unknown[] = [letter.requestId, letter.id, letter.sentAt, actorId]
+    const readable = letterScopeClause(scope, params, 'l')
+    params.push(limit)
+    const { rows } = await this.pool.query<LetterRow>(
+      `SELECT * FROM (
+         SELECT ${ALIASED_LETTER_COLUMNS}
+         FROM dashboard.letters l
+         WHERE l.request_id = $1 AND l.id <> $2 AND l.sent_at <= $3
+           AND (l.recipient_id = $4 OR l.sender_id = $4) AND (${readable})
+         ORDER BY l.sent_at DESC
+         LIMIT $${params.length}
+       ) earlier ORDER BY sent_at ASC`,
+      params,
+    )
+    return rows.map(mapRow)
+  }
+
+  /** The recipient marks a letter read or unread from the row menu. */
+  async setReadScoped(id: string, scope: RequestScope, actorId: string, read: boolean): Promise<LetterDto | undefined> {
+    if (!isUuid(id)) return undefined
+    const params: unknown[] = [id, actorId, read]
+    const whereSql = letterScopeClause(scope, params, 'l')
+    const { rows } = await this.pool.query<LetterRow>(
+      `UPDATE dashboard.letters l SET read = $3, updated_at = now()
+       WHERE l.id = $1 AND l.recipient_id = $2 AND ${whereSql}
+       RETURNING ${ALIASED_LETTER_COLUMNS}`,
+      params,
+    )
+    return rows[0] ? mapRow(rows[0]) : undefined
+  }
+
   async findByIdScoped(id: string, scope: RequestScope): Promise<LetterDto | undefined> {
     if (!isUuid(id)) return undefined
     const params: unknown[] = [id]
     const whereSql = letterScopeClause(scope, params, 'l')
     const { rows } = await this.pool.query<LetterRow>(
       `SELECT l.id, l.type, l.title, l.body, l.sender_id, l.sender_name, l.sender_role,
-              l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments,
+              l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments, l.next_step, l.next_step_done_at, l.booth_reservation_id, l.exhibition_id,
               l.created_at, l.updated_at
        FROM dashboard.letters l WHERE l.id = $1 AND ${whereSql}`,
       params,
@@ -348,7 +456,7 @@ export class LetterRepository {
       `UPDATE dashboard.letters l SET read = true, updated_at = now()
        WHERE l.id = $1 AND l.recipient_id = $2 AND ${whereSql}
        RETURNING l.id, l.type, l.title, l.body, l.sender_id, l.sender_name, l.sender_role,
-                 l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments,
+                 l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments, l.next_step, l.next_step_done_at, l.booth_reservation_id, l.exhibition_id,
                  l.created_at, l.updated_at`,
       params,
     )

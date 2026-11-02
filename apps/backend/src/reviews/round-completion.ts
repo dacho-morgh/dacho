@@ -1,6 +1,8 @@
 import type { Pool, PoolClient } from 'pg'
 
 import { appendTransition } from '../dashboard/transition-history.js'
+import { notifyNextRole } from '../dashboard/next-role.js'
+import type { NotificationOutbox } from '../dashboard/notification-outbox.js'
 
 /** One employer and three ordinary reviewers. */
 export const ROUND_REQUIRED_EVALUATIONS = 4
@@ -35,7 +37,7 @@ export async function countRoundFinals(
  */
 export async function syncRoundCompletion(
   client: PoolClient,
-  input: { requestId: string; revision: number; actorId: string },
+  input: { requestId: string; revision: number; actorId: string; outbox?: NotificationOutbox },
 ): Promise<void> {
   const { rows } = await client.query<{ id: string; owner_id: string; status: string; completed_at: Date | null }>(
     `SELECT rr.id, r.owner_id, r.status, rr.completed_at
@@ -68,4 +70,10 @@ export async function syncRoundCompletion(
     toState: round.status,
     revision: input.revision,
   })
+  if (input.outbox) {
+    await notifyNextRole(client, input.outbox, {
+      requestId: input.requestId, actorId: input.actorId, action: 'review_round_complete',
+      fromState: round.status, toState: round.status,
+    })
+  }
 }
