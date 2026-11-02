@@ -190,6 +190,7 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
         res.status(409).json({ error: result.error })
         return
       }
+      // TODO(#239): call notifyNextRole() for the Secretariat once S1 lands it.
       res.status(201).json({ reservation: result.reservation })
     } catch (error) { next(error) }
   })
@@ -206,7 +207,11 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
         res.status(404).json({ error: 'company_not_found' })
         return
       }
-      const items = await boothReservations.listByCompany(company.id, req.params.exhibitionId, actor.operationalRole)
+      const reservations = await boothReservations.listByCompany(company.id, req.params.exhibitionId, actor.operationalRole)
+      const items = await Promise.all(reservations.map(async (reservation) => ({
+        ...reservation,
+        latestReceipt: await boothReservations.getLatestReceipt(reservation.id),
+      })))
       res.json({ items })
     } catch (error) { next(error) }
   }
@@ -255,7 +260,16 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
       const status = statusParam === 'pending' || statusParam === 'approved' || statusParam === 'rejected'
         ? statusParam
         : 'all'
-      const items = await boothReservations.listByExhibition(req.params.exhibitionId, { status }, actor.operationalRole)
+      const reservations = await boothReservations.listByExhibition(req.params.exhibitionId, { status }, actor.operationalRole)
+      const companyNames = new Map<string, string | undefined>()
+      for (const companyId of new Set(reservations.map((item) => item.companyId))) {
+        companyNames.set(companyId, (await deps.companyStore.findById(companyId))?.name)
+      }
+      const items = await Promise.all(reservations.map(async (reservation) => ({
+        ...reservation,
+        companyName: reservation.companyName ?? companyNames.get(reservation.companyId),
+        latestReceipt: await boothReservations.getLatestReceipt(reservation.id),
+      })))
       res.json({ items })
     } catch (error) { next(error) }
   })
@@ -325,6 +339,7 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
         res.status(409).json({ error: result.error })
         return
       }
+      // TODO(#239): call notifyNextRole() for the company once S1 lands it.
       res.json({ reservation: result.reservation })
     } catch (error) { next(error) }
   })
@@ -464,6 +479,7 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
             }
             const status = submitResult.error === 'duplicate_receipt' ? 409
               : submitResult.error === 'reservation_inactive' ? 409
+              : submitResult.error === 'receipt_pending' || submitResult.error === 'payment_confirmed' ? 409
               : submitResult.error === 'not_found' ? 404
               : 403
             res.status(status).json({
@@ -474,6 +490,7 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
             return
           }
 
+          // TODO(#239): call notifyNextRole() for the Secretariat once S1 lands it.
           res.status(201).json({
             receipt: submitResult.receipt,
             reservation: submitResult.reservation,
@@ -541,6 +558,54 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
       }
       const receipt = await boothReservations.getLatestReceipt(reservation.id)
       res.json({ receipt })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/exhibitions/:exhibitionId/reservations/:id/receipt/decision', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isCompanyAdministrator(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isUuid(req.params.id)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const action = req.body?.action
+      if (action !== 'confirm' && action !== 'return') {
+        res.status(400).json({ error: 'invalid_action' })
+        return
+      }
+      const receiptId = typeof req.body?.receiptId === 'string' ? req.body.receiptId : ''
+      if (!isUuid(receiptId)) {
+        res.status(400).json({ error: 'receipt_id_required' })
+        return
+      }
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : null
+      if (action === 'return' && !reason) {
+        res.status(400).json({ error: 'reason_required' })
+        return
+      }
+      const reservation = await boothReservations.findById(req.params.id, actor.operationalRole)
+      if (!reservation || reservation.exhibitionId !== req.params.exhibitionId) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const result = await boothReservations.decideReceipt({
+        reservationId: reservation.id,
+        receiptId,
+        action,
+        reason,
+        actorId: actor.id,
+      })
+      if (!result.ok) {
+        const status = result.error === 'not_found' ? 404 : result.error === 'reason_required' ? 400 : 409
+        res.status(status).json({ error: result.error })
+        return
+      }
+      // TODO(#239): call notifyNextRole() for the company once S1 lands it.
+      res.json({ receipt: result.receipt, reservation: result.reservation })
     } catch (error) { next(error) }
   })
 

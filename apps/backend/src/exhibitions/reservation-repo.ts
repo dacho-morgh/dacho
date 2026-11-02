@@ -32,6 +32,9 @@ export interface BoothPaymentReceiptDto {
   status: ReceiptStatus
   submittedBy: string
   createdAt: string
+  /** Secretariat's reason when the receipt was returned (T51). */
+  decisionReason: string | null
+  decidedAt: string | null
   files: BoothReceiptFileDto[]
 }
 
@@ -66,9 +69,23 @@ export type SubmitReceiptResult =
         | 'reservation_inactive'
         | 'no_files'
         | 'duplicate_receipt'
+        | 'receipt_pending'
+        | 'payment_confirmed'
       reason?: 'tracking_code_already_used' | 'file_already_used'
       attendanceStatus?: AttendanceStatus
     }
+
+export interface ReceiptDecisionInput {
+  reservationId: string
+  receiptId: string
+  action: 'confirm' | 'return'
+  reason?: string | null
+  actorId: string
+}
+
+export type ReceiptDecisionResult =
+  | { ok: true; receipt: BoothPaymentReceiptDto; reservation: BoothReservationDto }
+  | { ok: false; error: 'not_found' | 'reason_required' | 'invalid_state' | 'stale_receipt' }
 
 export interface BoothReservationDto {
   id: string
@@ -141,7 +158,8 @@ export function computeReservationAllowedActions(
     return actions
   }
   if (role === 'representative') {
-    if (reservation.attendanceStatus === 'approved' && reservation.active && reservation.paymentStatus !== 'confirmed') {
+    const canUpload = reservation.paymentStatus === undefined || reservation.paymentStatus === 'unpaid' || reservation.paymentStatus === 'returned'
+    if (reservation.attendanceStatus === 'approved' && reservation.active && canUpload) {
       return ['read', 'submit_receipt']
     }
     return ['read']
@@ -170,6 +188,7 @@ export interface BoothReservationRepository {
   canSubmitReceipt(reservationId: string, companyId: string): Promise<CanSubmitReceiptResult>
   listDecisionsHistory(reservationId: string): Promise<BoothAttendanceDecisionDto[]>
   submitReceipt(input: SubmitReceiptInput): Promise<SubmitReceiptResult>
+  decideReceipt(input: ReceiptDecisionInput): Promise<ReceiptDecisionResult>
   listReceipts(reservationId: string): Promise<BoothPaymentReceiptDto[]>
   getLatestReceipt(reservationId: string): Promise<BoothPaymentReceiptDto | null>
   findReceiptFile(fileId: string): Promise<(BoothReceiptFileDto & { storageKey: string; reservationId: string; companyId: string }) | null>
@@ -486,6 +505,15 @@ export class PostgresBoothReservationRepository implements BoothReservationRepos
         await client.query('ROLLBACK')
         return { ok: false, error: 'reservation_inactive', attendanceStatus: res.attendance_status }
       }
+      // One receipt at a time: a new version is accepted only after a return.
+      if (res.payment_status === 'pending_verification') {
+        await client.query('ROLLBACK')
+        return { ok: false, error: 'receipt_pending' }
+      }
+      if (res.payment_status === 'confirmed') {
+        await client.query('ROLLBACK')
+        return { ok: false, error: 'payment_confirmed' }
+      }
 
       // Check duplicate tracking code across other reservations
       const cleanTracking = input.trackingCode?.trim() || null
@@ -596,12 +624,80 @@ export class PostgresBoothReservationRepository implements BoothReservationRepos
         status: receiptRow.status,
         submittedBy: receiptRow.submitted_by,
         createdAt: new Date(receiptRow.created_at).toISOString(),
+        decisionReason: null,
+        decidedAt: null,
         files: insertedFiles,
       }
 
       return {
         ok: true,
         receipt: receiptDto,
+        reservation: mapReservationRow(updatedRes.rows[0]!),
+      }
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
+  }
+
+  async decideReceipt(input: ReceiptDecisionInput): Promise<ReceiptDecisionResult> {
+    const reason = input.reason?.trim() || null
+    if (input.action === 'return' && !reason) return { ok: false, error: 'reason_required' }
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const existing = await client.query<ReservationRow>(
+        'SELECT * FROM dashboard.booth_reservations WHERE id = $1 FOR UPDATE',
+        [input.reservationId],
+      )
+      const res = existing.rows[0]
+      if (!res) {
+        await client.query('ROLLBACK')
+        return { ok: false, error: 'not_found' }
+      }
+      const latest = await client.query<{ id: string; status: ReceiptStatus }>(
+        `SELECT id, status FROM dashboard.booth_payment_receipts
+         WHERE reservation_id = $1 ORDER BY version DESC LIMIT 1`,
+        [input.reservationId],
+      )
+      const receipt = latest.rows[0]
+      if (!receipt) {
+        await client.query('ROLLBACK')
+        return { ok: false, error: 'not_found' }
+      }
+      // The reviewer decided on a version that has since been replaced.
+      if (receipt.id !== input.receiptId) {
+        await client.query('ROLLBACK')
+        return { ok: false, error: 'stale_receipt' }
+      }
+      // A repeated confirm or return lands here and changes nothing.
+      if (!res.active || res.payment_status !== 'pending_verification' || receipt.status !== 'pending_verification') {
+        await client.query('ROLLBACK')
+        return { ok: false, error: 'invalid_state' }
+      }
+      const nextStatus: ReceiptStatus = input.action === 'confirm' ? 'confirmed' : 'returned'
+      await client.query(
+        `UPDATE dashboard.booth_payment_receipts
+         SET status = $1, decision_reason = $2, decided_by = $3, decided_at = now()
+         WHERE id = $4`,
+        [nextStatus, reason, input.actorId, receipt.id],
+      )
+      const updatedRes = await client.query<ReservationRow>(
+        `UPDATE dashboard.booth_reservations
+         SET payment_status = $1
+         WHERE id = $2
+         RETURNING *,
+           (SELECT pv.price_amount FROM dashboard.booth_price_versions pv WHERE pv.id = price_version_id) AS price_amount,
+           (SELECT pv.price_unit FROM dashboard.booth_price_versions pv WHERE pv.id = price_version_id) AS price_unit`,
+        [nextStatus, input.reservationId],
+      )
+      await client.query('COMMIT')
+      const receipts = await this.listReceipts(input.reservationId)
+      return {
+        ok: true,
+        receipt: receipts.find((item) => item.id === receipt.id)!,
         reservation: mapReservationRow(updatedRes.rows[0]!),
       }
     } catch (err) {
@@ -624,8 +720,11 @@ export class PostgresBoothReservationRepository implements BoothReservationRepos
       status: ReceiptStatus
       submitted_by: string
       created_at: Date | string
+      decision_reason: string | null
+      decided_at: Date | string | null
     }>(
-      `SELECT id, reservation_id, version, tracking_code, amount_toman, paid_at, description, status, submitted_by, created_at
+      `SELECT id, reservation_id, version, tracking_code, amount_toman, paid_at, description, status, submitted_by, created_at,
+              decision_reason, decided_at
        FROM dashboard.booth_payment_receipts
        WHERE reservation_id = $1
        ORDER BY version ASC`,
@@ -673,6 +772,8 @@ export class PostgresBoothReservationRepository implements BoothReservationRepos
       status: r.status,
       submittedBy: r.submitted_by,
       createdAt: new Date(r.created_at).toISOString(),
+      decisionReason: r.decision_reason,
+      decidedAt: r.decided_at ? new Date(r.decided_at).toISOString() : null,
       files: filesByReceipt.get(r.id) ?? [],
     }))
   }
@@ -899,6 +1000,8 @@ export class InMemoryBoothReservationRepository implements BoothReservationRepos
     if (!input.files || input.files.length === 0) {
       return { ok: false, error: 'no_files' }
     }
+    if (eligibility.reservation.paymentStatus === 'pending_verification') return { ok: false, error: 'receipt_pending' }
+    if (eligibility.reservation.paymentStatus === 'confirmed') return { ok: false, error: 'payment_confirmed' }
 
     const cleanTracking = input.trackingCode?.trim() || null
     if (cleanTracking) {
@@ -956,6 +1059,8 @@ export class InMemoryBoothReservationRepository implements BoothReservationRepos
       status: 'pending_verification',
       submittedBy: input.actorId,
       createdAt: now,
+      decisionReason: null,
+      decidedAt: null,
       files: filesDto,
     }
 
@@ -979,6 +1084,38 @@ export class InMemoryBoothReservationRepository implements BoothReservationRepos
       receipt,
       reservation: updatedRes,
     }
+  }
+
+  async decideReceipt(input: ReceiptDecisionInput): Promise<ReceiptDecisionResult> {
+    const reason = input.reason?.trim() || null
+    if (input.action === 'return' && !reason) return { ok: false, error: 'reason_required' }
+    const reservation = this.reservations.get(input.reservationId)
+    const list = this.receipts.get(input.reservationId) ?? []
+    const latest = list[list.length - 1]
+    if (!reservation || !latest) return { ok: false, error: 'not_found' }
+    if (latest.id !== input.receiptId) return { ok: false, error: 'stale_receipt' }
+    if (!reservation.active || reservation.paymentStatus !== 'pending_verification' || latest.status !== 'pending_verification') {
+      return { ok: false, error: 'invalid_state' }
+    }
+    const nextStatus: ReceiptStatus = input.action === 'confirm' ? 'confirmed' : 'returned'
+    const receipt: BoothPaymentReceiptDto = {
+      ...latest,
+      status: nextStatus,
+      decisionReason: reason,
+      decidedAt: new Date().toISOString(),
+    }
+    list[list.length - 1] = receipt
+    const updated: BoothReservationDto = {
+      ...reservation,
+      paymentStatus: nextStatus,
+      allowedActions: computeReservationAllowedActions({
+        attendanceStatus: reservation.attendanceStatus,
+        active: reservation.active,
+        paymentStatus: nextStatus,
+      }),
+    }
+    this.reservations.set(input.reservationId, updated)
+    return { ok: true, receipt, reservation: updated }
   }
 
   async listReceipts(reservationId: string): Promise<BoothPaymentReceiptDto[]> {

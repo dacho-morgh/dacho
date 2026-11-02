@@ -30,7 +30,7 @@ const dashboardRoles = {
   'central-secretariat': {
     label: 'دبیرخانه مرکزی',
     responsibilities: ['پیگیری درخواست‌های ارجاع‌شده در محدوده دبیرخانه', 'مدیریت اطلاعات شرکت‌ها'],
-    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/follow-ups', '/dashboard/letters', '/dashboard/profile'],
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/follow-ups', '/dashboard/letters', '/dashboard/exhibitions', '/dashboard/profile'],
   },
   'chief-reviewer': {
     label: 'سردبیر داوری',
