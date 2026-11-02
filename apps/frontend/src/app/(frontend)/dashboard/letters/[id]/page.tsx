@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
 import { MailDetailView, type MailData } from '@/components/dashboard/mail-detail-view'
 import { SupportTicketActions } from '@/components/dashboard/support-ticket-actions'
-import { formatDate, formatTime, formatWeekday, mapMailData, type LetterDto, type Paginated, type SupportTicketDto } from '@/utilities/dashboard-api'
+import { formatDate, formatTime, formatWeekday, letterAction, mapMailData, type LetterDto, type Paginated, type SupportTicketDto } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { isSeniorManagerUser, serverDashboardFetchResult } from '@/utilities/dashboard-server'
 import { replyRecipient } from '@/utilities/letter-recipients'
@@ -76,7 +76,8 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
     const actorId = String(user?.id)
     if (await replyRecipient(letter, actorId)) replyHref = `/dashboard/letters/new?replyTo=${encodeURIComponent(letter.id)}`
     canDelete = letter.senderId !== actorId
-    mail = { ...mapMailData(letter), ...(await caseThread(letter)) }
+    const action = letter.recipientId === actorId ? letterAction(letter) : null
+    mail = { ...mapMailData(letter), ...(await caseThread(letter)), action }
   }
   return (
     <>

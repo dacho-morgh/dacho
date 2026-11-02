@@ -42,6 +42,8 @@ export interface MailData {
   thread?: MailData[]
   /** Why the case history above may be incomplete. */
   threadNotice?: string
+  /** The reader's pending next step on the case (S1 inbox). */
+  action?: { label: string; href: string } | null
 }
 
 interface MailDetailViewProps {
@@ -152,6 +154,13 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
             </Button>}
             {showActions && (
               <div className="mr-auto flex items-center gap-1">
+                {mail.action && (
+                  <Button asChild size="40">
+                    <Link href={mail.action.href}>
+                      <Typography as="span" variant="16/semibold" className="text-inherit">{mail.action.label}</Typography>
+                    </Link>
+                  </Button>
+                )}
                 {replyHref && (
                   <Button asChild variant="white" size="40">
                     <Link href={replyHref}>

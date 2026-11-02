@@ -22,6 +22,8 @@ export function getLetter(id: string): Promise<{ letter: LetterDto }> {
 
 /** Letters store the sender's operational role; older rows may hold free text. */
 export function letterSenderRoleLabel(role: string | null): string {
+  // Workflow notices are written by the system itself (see notification-outbox).
+  if (role === 'system') return 'اطلاع‌رسانی سامانه'
   return (role && OPERATIONAL_ROLE_LABELS[role as OperationalRole]) || role || ''
 }
 
@@ -82,5 +84,74 @@ export function mapLetterAttachments(raw: unknown): MailData['attachments'] {
 export function deleteLetter(id: string): Promise<{ success: boolean }> {
   return dashboardFetch<{ success: boolean }>(`/letters/${encodeURIComponent(id)}`, {
     method: 'DELETE',
+  })
+}
+
+/* ── Inbox (S1, #239) ──────────────────────────────────────────────────── */
+
+export type InboxBox = 'received' | 'sent'
+export type InboxStatusFilter = 'unread' | 'action_required'
+
+export interface InboxQuery {
+  box: InboxBox
+  q?: string
+  status?: InboxStatusFilter
+  page: number
+}
+
+export interface InboxCounts {
+  unread: number
+  actionRequired: number
+}
+
+export type InboxPage = Paginated<LetterDto> & { counts: InboxCounts }
+
+export const INBOX_PAGE_SIZE = 20
+
+/** Backend query string for one inbox view; the same keys drive the page URL. */
+export function inboxQueryString(query: InboxQuery, limit = INBOX_PAGE_SIZE): string {
+  const qs = new URLSearchParams({ box: query.box, page: String(query.page), limit: String(limit) })
+  if (query.q) qs.set('q', query.q)
+  if (query.status) qs.set('status', query.status)
+  return qs.toString()
+}
+
+/** Parses page search params into a valid inbox view; anything unknown falls back to the default. */
+export function parseInboxQuery(params: Record<string, string | string[] | undefined>): InboxQuery {
+  const one = (key: string) => (typeof params[key] === 'string' ? (params[key] as string) : undefined)
+  const page = Number(one('page'))
+  const status = one('status')
+  return {
+    box: one('box') === 'sent' ? 'sent' : 'received',
+    q: one('q')?.trim().slice(0, 100) || undefined,
+    status: status === 'unread' || status === 'action_required' ? status : undefined,
+    page: Number.isInteger(page) && page > 0 ? page : 1,
+  }
+}
+
+/** The recipient's next step on the case: its button label and where it is done. */
+export const NEXT_STEP_ACTIONS: Record<string, { label: string; path: (requestId: string) => string }> = {
+  triage: { label: 'بررسی اولیه', path: (id) => `/dashboard/requests/${id}` },
+  correct: { label: 'اصلاح', path: (id) => `/dashboard/requests/${id}` },
+  evaluate: { label: 'ارزیابی', path: (id) => `/dashboard/requests/${id}/evaluation` },
+  decide: { label: 'تصمیم‌گیری', path: (id) => `/dashboard/requests/${id}` },
+  financial_package: { label: 'تکمیل فرم', path: (id) => `/dashboard/requests/${id}` },
+  investment_memo: { label: 'ثبت یادداشت', path: (id) => `/dashboard/requests/${id}` },
+  publish_result: { label: 'انتشار نتیجه', path: (id) => `/dashboard/requests/${id}` },
+  supplementary_upload: { label: 'ارسال مدارک', path: (id) => `/dashboard/requests/${id}` },
+}
+
+/** The pending action of a letter, if its recipient still has one to take. */
+export function letterAction(dto: Pick<LetterDto, 'nextStep' | 'actionRequired' | 'requestId'>): { label: string; href: string } | null {
+  if (!dto.actionRequired || !dto.nextStep || !dto.requestId) return null
+  const action = NEXT_STEP_ACTIONS[dto.nextStep]
+  return action ? { label: action.label, href: action.path(encodeURIComponent(dto.requestId)) } : null
+}
+
+export function setLetterRead(id: string, read: boolean): Promise<{ letter: LetterDto }> {
+  return dashboardFetch<{ letter: LetterDto }>(`/letters/${encodeURIComponent(id)}/read`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ read }),
   })
 }

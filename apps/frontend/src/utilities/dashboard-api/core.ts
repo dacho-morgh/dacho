@@ -53,6 +53,10 @@ export interface LetterDto {
   read: boolean
   sentAt: string
   attachments: unknown[]
+  /** What the recipient is expected to do next on the case (S1 inbox); null for plain letters. */
+  nextStep?: string | null
+  /** The step is still pending for the recipient. */
+  actionRequired?: boolean
   createdAt: string
   updatedAt: string
 }

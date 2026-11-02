@@ -14,6 +14,8 @@ vi.mock('@/utilities/dashboard-server', () => ({
   isSeniorManagerUser: async () => true,
   serverDashboardFetchResult: mocks.fetch,
 }))
+// The letters, forms and support tables now live behind the inbox's `?view=all` (S1).
+const legacyView = { searchParams: Promise.resolve({ view: 'all' }) }
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 it('shows fetched support tickets in the admin letters table with a detail link', async () => {
@@ -22,7 +24,7 @@ it('shows fetched support tickets in the admin letters table with a detail link'
     message: 'لطفاً بررسی کنید', status: 'open', response: null,
     createdAt: '2026-09-17T09:00:00Z', updatedAt: '2026-09-17T09:00:00Z',
   }] : [] } }))
-  render(await LettersPage())
+  render(await LettersPage(legacyView))
   expect(screen.queryAllByRole('link', { name: 'پیگیری درخواست پشتیبانی' })).toHaveLength(0)
   fireEvent.click(screen.getByRole('button', { name: 'تیکت‌های پشتیبانی' }))
   expect(screen.getAllByRole('link', { name: 'پیگیری درخواست پشتیبانی' }).map((link) => link.getAttribute('href')))
