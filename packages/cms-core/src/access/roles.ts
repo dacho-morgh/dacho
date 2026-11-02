@@ -20,6 +20,15 @@ export const OPERATIONAL_ROLE_LABELS: Record<OperationalRole, string> = {
   representative: 'نماینده شرکت',
 }
 
+export const PERSONNEL_GENDERS = ['male', 'female'] as const
+export type PersonnelGender = (typeof PERSONNEL_GENDERS)[number]
+export const PERSONNEL_GENDER_LABELS: Record<PersonnelGender, string> = {
+  male: 'مرد',
+  female: 'زن',
+}
+export const PERSONNEL_MIN_AGE = 18
+export const PERSONNEL_MAX_AGE = 100
+
 // Transitional transport for the existing dashboard. Never accept this array
 // as authority: it is projected from the current scalar role and active state.
 export const USER_ROLES = ['admin', 'editor', 'representative', 'referee'] as const

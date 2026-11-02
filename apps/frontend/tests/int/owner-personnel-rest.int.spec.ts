@@ -145,7 +145,21 @@ it('serializes two waiting commands with one token: exactly one success and one 
     expect(responses.map((response) => response.status).sort()).toEqual([200, 409])
     const { doc } = await responses.find((response) => response.status === 200)!.json()
     expect(Object.keys(doc).sort()).toEqual(
-      ['id', 'name', 'phone', 'email', 'operationalRole', 'isActive', 'updatedAt'].sort(),
+      [
+        'id',
+        'name',
+        'phone',
+        'email',
+        'operationalRole',
+        'isActive',
+        'age',
+        'gender',
+        'degree',
+        'activityField',
+        'resume',
+        'personnelAddresses',
+        'updatedAt',
+      ].sort(),
     )
     expect(Date.parse(doc.updatedAt)).toBeGreaterThan(Date.parse(person.updatedAt))
     const saved = await payload.findByID({ collection: 'users', id: person.id })
@@ -335,4 +349,76 @@ it('strips personnel escalation during public signup and protects privileged tar
   expect((await payload.findByID({ collection: 'users', id: ids[0] })).operationalRole).toBe(
     'system-owner',
   )
+})
+
+it('stores the Figma personnel profile, keeps resumes owner-only and rejects self or invalid edits', async () => {
+  const person = await createPerson()
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\nxref\n0 1\ntrailer<<>>\n%%EOF\n', 'latin1')
+  const resume = await payload.create({
+    collection: 'personnel-files',
+    data: {},
+    file: {
+      data: pdf,
+      mimetype: 'application/pdf',
+      name: `resume-${suffix}.pdf`,
+      size: pdf.length,
+    },
+    overrideAccess: true,
+  })
+  try {
+    const edited = await rest(`/personnel/${person.id}`, ownerCookie, 'PATCH', {
+      expectedUpdatedAt: person.updatedAt,
+      age: 34,
+      gender: 'female',
+      degree: 'کارشناسی ارشد',
+      activityField: 'انرژی',
+      resume: [resume.id],
+      personnelAddresses: [{ address: '  بوشهر، خیابان ساحلی  ' }],
+    })
+    expect(edited.status).toBe(200)
+    const { doc } = await edited.json()
+    expect(doc).toMatchObject({
+      age: 34,
+      gender: 'female',
+      degree: 'کارشناسی ارشد',
+      activityField: 'انرژی',
+      resume: [resume.id],
+      personnelAddresses: [{ address: 'بوشهر، خیابان ساحلی' }],
+    })
+
+    for (const invalid of [
+      { age: 12 },
+      { gender: 'other' },
+      { resume: ['x'] },
+      { personnelAddresses: [{ address: ' ' }] },
+    ]) {
+      const rejected = await rest(`/personnel/${person.id}`, ownerCookie, 'PATCH', {
+        expectedUpdatedAt: doc.updatedAt,
+        ...invalid,
+      })
+      expect(rejected.status).toBe(400)
+    }
+
+    const reviewerFile = await handleEndpoints({
+      config,
+      request: new Request(`http://localhost/api/personnel-files/${resume.id}`, {
+        headers: { cookie: reviewerCookie, 'sec-fetch-site': 'same-origin' },
+      }),
+    })
+    expect(reviewerFile.status).toBe(403)
+    const reviewer = await payload.findByID({ collection: 'users', id: ids[1] })
+    const self = await rest(`/${ids[1]}`, reviewerCookie, 'PATCH', { degree: 'خودنوشته' })
+    expect(self.status).toBeLessThan(500)
+    expect((await payload.findByID({ collection: 'users', id: ids[1] })).degree).toBe(
+      reviewer.degree,
+    )
+  } finally {
+    await payload.update({
+      collection: 'users',
+      id: person.id,
+      data: { resume: [] },
+      overrideAccess: true,
+    })
+    await payload.delete({ collection: 'personnel-files', id: resume.id, overrideAccess: true })
+  }
 })

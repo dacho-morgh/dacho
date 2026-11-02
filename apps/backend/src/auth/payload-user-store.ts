@@ -103,6 +103,8 @@ export class PayloadUserStore implements UserStore {
       ...(typeof d.name === 'string' ? { name: d.name } : {}),
       ...(typeof d.email === 'string' ? { email: d.email } : {}),
       ...(typeof d.position === 'string' ? { position: d.position } : {}),
+      ...(typeof d.degree === 'string' ? { degree: d.degree } : {}),
+      ...(typeof d.activityField === 'string' ? { activityField: d.activityField } : {}),
       operationalRole: typeof d.operationalRole === 'string' ? d.operationalRole : null,
       isActive: d.isActive === true,
       backendService: d.backendService === true,
