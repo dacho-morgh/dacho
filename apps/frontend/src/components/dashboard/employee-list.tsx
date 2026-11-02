@@ -1,5 +1,6 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { OPERATIONAL_ROLE_LABELS } from '@cms-core/access/roles'
 import { useEffect, useState } from 'react'
@@ -10,7 +11,6 @@ import {
   RequestError,
   adminRequest,
   cardClass,
-  controlClass,
   loadPeople,
   type Person,
 } from './owner-admin'
@@ -75,10 +75,9 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <input
+            <SearchField
               aria-label="جستجوی کارمند"
               placeholder="جستجوی کارمند"
-              className={`${controlClass} max-w-full sm:w-[400px]`}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />

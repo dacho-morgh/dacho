@@ -1,10 +1,10 @@
 'use client'
+import { SearchField } from '@/components/dashboard/search-field'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Typography } from '@/components/ui/typography'
 import {
   DropdownMenu,
@@ -16,7 +16,6 @@ import {
   DashboardAddIcon,
   DashboardFilterIcon,
   DashboardMoreIcon,
-  DashboardSearchIcon,
 } from '@/components/icons'
 import { getLoginUrl } from '@/utilities/auth-return-url'
 export type AdminColumn<T> = { id: string; header?: string; render: (item: T) => React.ReactNode }
@@ -103,15 +102,12 @@ export function AdminListView<T>({
               icon={<DashboardFilterIcon className="size-6" />}
               aria-label="فیلتر"
             />
-            <div className="relative">
-              <DashboardSearchIcon className="absolute right-3 top-3 size-6 text-neutral-400" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="h-12 w-[400px] max-w-[70vw] rounded-xl pr-11"
-                placeholder={searchPlaceholder}
-              />
-            </div>
+            <SearchField
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+            />
           </div>
         )}
       </div>

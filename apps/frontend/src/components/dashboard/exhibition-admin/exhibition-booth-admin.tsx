@@ -1,5 +1,6 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -12,7 +13,6 @@ import {
   DashboardRequestsIcon as FileText,
   EventsLocationIcon as MapPin,
   DashboardAddIcon as Plus,
-  DashboardSearchIcon as Search,
   DashboardEventsIcon as Store,
   DashboardCloseCircle as X,
 } from '@/components/icons/generated'
@@ -392,16 +392,13 @@ export function ExhibitionBoothAdmin({
 
           {/* Search & Status Filter */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-60">
-              <Search className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="جستجو در غرفه‌ها..."
-                className="h-9 w-full rounded-lg border border-neutral-200 bg-white pr-9 pl-3 text-sm text-neutral-700 transition-colors outline-none focus:border-brand-500"
-              />
-            </div>
+            <SearchField
+              className="sm:w-60"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="جستجو در غرفه‌ها..."
+              aria-label="جستجو در غرفه‌ها"
+            />
             <select
               value={statusFilter}
               onChange={(e) =>

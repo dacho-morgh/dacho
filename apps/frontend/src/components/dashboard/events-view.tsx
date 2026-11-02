@@ -1,5 +1,6 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -22,7 +23,6 @@ import {
   EmptyInboxIllustration,
   FilterIcon,
   LocationBulkIcon,
-  SearchNormalIcon,
   TickSquareIcon,
 } from '@/components/icons'
 import {
@@ -865,17 +865,13 @@ export function EventsView({
       {/* Action Bar - Figma Frame 1 (56:13205) */}
       <div className="mt-5 flex items-center justify-start">
         <div className="flex h-[48px] w-full items-center gap-[8px] sm:w-[458px]">
-          <div className="flex h-[48px] flex-1 items-center gap-[8px] overflow-hidden rounded-[8px] border border-[#f5f5f5] bg-white px-[12px] py-[8px] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100 sm:w-[400px]">
-            <SearchNormalIcon className="size-[24px] shrink-0 text-[#d4d4d4]" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="درخواست خود را جست و جو کنید"
-              aria-label="جستجوی رویدادها"
-              className="h-[28px] w-full bg-transparent text-right font-sans text-[16px] leading-[28px] font-normal text-[#525252] outline-none placeholder:text-[#d4d4d4]"
-            />
-          </div>
+          <SearchField
+                className="flex-1 sm:w-[400px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="درخواست خود را جست و جو کنید"
+                aria-label="جستجوی رویدادها"
+              />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

@@ -1,5 +1,6 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -20,7 +21,6 @@ import {
   DashboardFilterIcon,
   DashboardMessageTextIcon,
   DashboardMoreIcon,
-  DashboardSearchIcon,
   DashboardTrashIcon,
 } from '@/components/icons'
 import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
@@ -325,19 +325,12 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
           </DropdownMenu>
 
           {/* Search input — Figma node 30852:17812 */}
-          <div className="flex h-[48px] w-full max-w-[400px] flex-col gap-[8px]">
-            <div className="flex h-full w-full flex-1 items-center gap-[8px] overflow-hidden rounded-[8px] border border-neutral-100 bg-white px-[12px] py-[8px] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="درخواست خود را جست و جو کنید"
-                aria-label="جستجوی نامه‌ها"
-                className="h-[28px] min-w-0 flex-1 bg-transparent text-right text-[16px] font-normal leading-[28px] text-neutral-600 outline-none placeholder:text-neutral-300"
-              />
-              <DashboardSearchIcon className="size-[24px] shrink-0 text-neutral-300" />
-            </div>
-          </div>
+          <SearchField
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="درخواست خود را جست و جو کنید"
+            aria-label="جستجوی نامه‌ها"
+          />
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -11,7 +12,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -19,7 +19,6 @@ import {
   DashboardFilterIcon,
   DashboardMessageTextIcon,
   DashboardMoreIcon,
-  DashboardSearchIcon,
   DashboardTrashIcon,
   DashboardUserTagIcon,
 } from '@/components/icons'
@@ -244,16 +243,12 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
           >
             <DashboardFilterIcon className="size-[26px]" />
           </Button>
-          <div className="relative w-[400px] max-w-full">
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="درخواست خود را جست و جو کنید"
-              aria-label="جستجو"
-              className="h-[48px] rounded-[8px] border-neutral-100 pr-[12px] pl-[40px]"
-            />
-            <DashboardSearchIcon className="pointer-events-none absolute left-[12px] top-1/2 size-[24px] -translate-y-1/2 text-neutral-400" />
-          </div>
+          <SearchField
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="درخواست خود را جست و جو کنید"
+            aria-label="جستجو"
+          />
         </div>
       </div>
 

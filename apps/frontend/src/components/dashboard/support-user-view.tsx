@@ -1,5 +1,6 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
@@ -158,13 +159,12 @@ export function SupportUserView({
           </button>
         </div>
 
-        <input
-          type="search"
+        <SearchField
+          className="sm:w-64"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="جستجو در تیکت‌ها..."
           aria-label="جستجوی تیکت‌ها"
-          className="h-10 w-full sm:w-64 rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-700 placeholder:text-neutral-400 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         />
       </div>
 
