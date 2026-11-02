@@ -6,4 +6,4 @@ Use `staging` as the integration branch and the default base for feature/fix pul
 
 Staging must run the same lint, typecheck, unit, database-free build, integration and E2E checks as production. Publish staging images only after those checks pass. Keep the integration-test isolation guard active in CI.
 
-For staging build/runtime configuration and operator commands, read [docs/staging.md](docs/staging.md). For approved product scope and task dependencies, read [docs/system/README.md](docs/system/README.md).
+For staging build/runtime configuration and operator commands, read [docs/staging.md](docs/staging.md). To run the integration suites or the apps on a machine without Docker (Windows), read [docs/agents/local-test-db.md](docs/agents/local-test-db.md). For approved product scope and task dependencies, read [docs/system/README.md](docs/system/README.md).
