@@ -1,11 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { InfoCircleIcon } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Typography } from '@/components/ui/typography'
 import {
   boothReceiptFileUrl,
@@ -20,6 +18,7 @@ import {
   type BoothReservationDto,
   type ExhibitionCatalogueDto,
 } from '@/utilities/dashboard-api'
+import { BoothPageHeader } from './booth-page-header'
 import { BoothRequestStageBadge, boothFailure, receiptStatusLabel } from './booth-status'
 
 export interface BoothExhibitionInfo {
@@ -69,7 +68,10 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
     setNotice(null)
     try {
       await reserveBooth(exhibition.id, booth.id)
-      setNotice({ tone: 'success', text: `درخواست غرفه ${booth.identifier} ثبت شد و در انتظار تأیید حضور است.` })
+      setNotice({
+        tone: 'success',
+        text: `درخواست غرفه ${booth.identifier} ثبت شد و در انتظار تأیید حضور است.`,
+      })
     } catch (error) {
       setNotice({ tone: 'error', text: boothFailure(error, 'ثبت درخواست غرفه ممکن نشد.') })
     } finally {
@@ -78,27 +80,29 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
     }
   }
 
-  return (
-    <div dir="rtl" className="flex w-full max-w-[1140px] flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <Typography as="h1" variant="24/bold" color="neutral-800">
-          رزرو غرفه · {exhibition.title}
-        </Typography>
-        {(exhibition.dates || exhibition.location) && (
-          <Typography variant="14/regular" color="neutral-500">
-            {[exhibition.dates, exhibition.location].filter(Boolean).join(' · ')}
-          </Typography>
-        )}
-      </header>
+  const pendingCount = activeRequests.filter((item) => item.paymentStatus !== 'confirmed').length
+  const columns =
+    'md:grid md:grid-cols-[minmax(4rem,0.6fr)_minmax(8rem,1.4fr)_minmax(5rem,0.8fr)_minmax(8rem,1fr)_minmax(5rem,0.7fr)_auto] md:items-center md:gap-4'
 
-      <div className="flex items-start gap-2 rounded-xl border border-neutral-200 bg-white p-4">
-        <InfoCircleIcon className="size-6 shrink-0 text-brand-500" />
-        <Typography variant="14/regular" color="neutral-600">
-          هر غرفه درخواست، مبلغ و فیش جداگانه دارد. رزرو تا تصمیم دبیرخانه برقرار می‌ماند و مهلت خودکار ندارد.
-          بارگذاری فیش پس از تأیید حضور ممکن است.
-          {limit !== null && ` سقف غرفه برای هر شرکت: ${limit.toLocaleString('fa-IR')}.`}
-        </Typography>
-      </div>
+  return (
+    <div dir="rtl" className="flex w-full max-w-[1140px] flex-col gap-5">
+      <BoothPageHeader
+        title="رزرو غرفه"
+        crumb={exhibition.title}
+        summaryTitle={
+          limit !== null
+            ? `${activeRequests.length.toLocaleString('fa-IR')} غرفه از سقف ${limit.toLocaleString('fa-IR')} غرفه برای شرکت شما`
+            : `${activeRequests.length.toLocaleString('fa-IR')} درخواست غرفه فعال`
+        }
+        summary={
+          <>
+            {[exhibition.dates, exhibition.location].filter(Boolean).join(' · ')}
+            {exhibition.dates || exhibition.location ? '. ' : ''}
+            هر غرفه درخواست، مبلغ و فیش جداگانه دارد. رزرو تا تصمیم دبیرخانه برقرار می‌ماند و مهلت
+            خودکار ندارد؛ بارگذاری فیش پس از تأیید حضور ممکن است.
+          </>
+        }
+      />
 
       {notice && (
         <div
@@ -116,13 +120,19 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
       )}
 
       {loading ? (
-        <div className="flex flex-col gap-3" aria-busy="true">
+        <div
+          className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-5"
+          aria-busy="true"
+        >
           <Skeleton className="h-12 w-full rounded-xl" />
           <Skeleton className="h-12 w-full rounded-xl" />
           <Skeleton className="h-12 w-full rounded-xl" />
         </div>
       ) : loadError ? (
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-neutral-200 bg-white p-6">
+        <div
+          role="alert"
+          className="flex flex-col items-start gap-3 rounded-2xl border border-neutral-200 bg-white p-5"
+        >
           <Typography variant="16/regular" color="neutral-700">
             {loadError}
           </Typography>
@@ -132,97 +142,125 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
         </div>
       ) : (
         <>
-          <section aria-labelledby="my-booth-requests" className="flex flex-col gap-3">
+          <section
+            aria-labelledby="my-booth-requests"
+            className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5"
+          >
             <Typography as="h2" id="my-booth-requests" variant="20/bold" color="neutral-800">
               درخواست‌های غرفه من
+              {pendingCount > 0 ? ` (${pendingCount.toLocaleString('fa-IR')} در جریان)` : ''}
             </Typography>
             {requests.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-neutral-200 bg-white p-6">
-                <Typography variant="14/regular" color="neutral-500">
-                  هنوز غرفه‌ای درخواست نکرده‌اید. از فهرست زیر غرفه موردنظر را انتخاب کنید.
-                </Typography>
-              </div>
+              <Typography variant="14/regular" color="neutral-500">
+                هنوز غرفه‌ای درخواست نکرده‌اید. از فهرست زیر غرفه موردنظر را انتخاب کنید.
+              </Typography>
             ) : (
-              <ul className="flex flex-col gap-3">
+              <ul className="flex flex-col divide-y divide-neutral-100">
                 {requests.map((item) => (
-                  <li key={item.id}>
-                    <BoothRequestCard exhibitionId={exhibition.id} request={item} onChanged={load} />
+                  <li key={item.id} className="py-4 first:pt-0 last:pb-0">
+                    <BoothRequestCard
+                      exhibitionId={exhibition.id}
+                      request={item}
+                      onChanged={load}
+                    />
                   </li>
                 ))}
               </ul>
             )}
           </section>
 
-          <section aria-labelledby="booth-catalogue" className="flex flex-col gap-3">
+          <section
+            aria-labelledby="booth-catalogue"
+            className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5"
+          >
             <Typography as="h2" id="booth-catalogue" variant="20/bold" color="neutral-800">
               غرفه‌های نمایشگاه
             </Typography>
             {!catalogue || catalogue.booths.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-neutral-200 bg-white p-6">
-                <Typography variant="14/regular" color="neutral-500">
-                  هنوز غرفه‌ای برای این نمایشگاه تعریف نشده است.
-                </Typography>
-              </div>
+              <Typography variant="14/regular" color="neutral-500">
+                هنوز غرفه‌ای برای این نمایشگاه تعریف نشده است.
+              </Typography>
             ) : (
-              <div className="rounded-xl border border-neutral-200 bg-white">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>شناسه</TableHead>
-                      <TableHead>مشخصات</TableHead>
-                      <TableHead>موقعیت</TableHead>
-                      <TableHead>قیمت</TableHead>
-                      <TableHead>وضعیت</TableHead>
-                      <TableHead className="text-end">اقدام</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {catalogue.booths.map((booth) => {
-                      const mine = requestedBoothIds.has(booth.id)
-                      const disabled = !booth.available || mine || limitReached || reservingId !== null
-                      return (
-                        <TableRow key={booth.id}>
-                          <TableCell>
-                            <Typography variant="14/semibold" color="neutral-800">
-                              {booth.identifier}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="14/regular" color="neutral-600">
-                              {booth.specification}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="14/regular" color="neutral-600">
-                              {booth.location || '—'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="14/semibold" color="neutral-800">
-                              {formatToman(booth.priceAmount)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="14/regular" color={booth.available ? 'success' : 'neutral-400'}>
-                              {mine ? 'درخواست شما' : booth.available ? 'آزاد' : 'رزرو شده'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell className="text-end">
-                            <Button
-                              size="36"
-                              variant="primary"
-                              disabled={disabled}
-                              onClick={() => void requestBooth(booth)}
-                              aria-label={`درخواست غرفه ${booth.identifier}`}
-                            >
-                              {reservingId === booth.id ? 'در حال ثبت…' : 'درخواست غرفه'}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+              <div role="table" aria-label="غرفه‌های نمایشگاه">
+                <div role="row" className={`hidden border-b border-neutral-200 pb-3 ${columns}`}>
+                  {['شناسه', 'مشخصات', 'موقعیت', 'قیمت', 'وضعیت', 'اقدام'].map((label) => (
+                    <Typography
+                      key={label}
+                      as="span"
+                      role="columnheader"
+                      variant="14/regular"
+                      color="neutral-400"
+                    >
+                      {label}
+                    </Typography>
+                  ))}
+                </div>
+                <div role="rowgroup" className="flex flex-col divide-y divide-neutral-100">
+                  {catalogue.booths.map((booth) => {
+                    const mine = requestedBoothIds.has(booth.id)
+                    const disabled =
+                      !booth.available || mine || limitReached || reservingId !== null
+                    return (
+                      <div
+                        key={booth.id}
+                        role="row"
+                        className={`grid grid-cols-2 items-center gap-x-4 gap-y-1 py-4 ${columns}`}
+                      >
+                        <Typography as="span" role="cell" variant="16/semibold" color="neutral-800">
+                          غرفه {booth.identifier}
+                        </Typography>
+                        <Typography
+                          as="span"
+                          role="cell"
+                          variant="14/regular"
+                          color="neutral-600"
+                          className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto"
+                        >
+                          {booth.specification}
+                        </Typography>
+                        <Typography
+                          as="span"
+                          role="cell"
+                          variant="14/regular"
+                          color="neutral-600"
+                          className="row-start-3 md:row-start-auto"
+                        >
+                          {booth.location || '—'}
+                        </Typography>
+                        <Typography
+                          as="span"
+                          role="cell"
+                          variant="14/semibold"
+                          color="neutral-800"
+                          className="row-start-3 text-end md:row-start-auto md:text-start"
+                        >
+                          {formatToman(booth.priceAmount)}
+                        </Typography>
+                        <Typography
+                          as="span"
+                          role="cell"
+                          variant="14/regular"
+                          color={booth.available ? 'success' : 'neutral-400'}
+                          className="col-start-2 row-start-1 text-end md:col-start-auto md:row-start-auto md:text-start"
+                        >
+                          {mine ? 'درخواست شما' : booth.available ? 'آزاد' : 'رزرو شده'}
+                        </Typography>
+                        <span role="cell" className="col-span-2 mt-2 md:col-span-1 md:mt-0">
+                          <Button
+                            size="36"
+                            variant="primary"
+                            disabled={disabled}
+                            onClick={() => void requestBooth(booth)}
+                            aria-label={`درخواست غرفه ${booth.identifier}`}
+                            className="w-full md:w-auto"
+                          >
+                            {reservingId === booth.id ? 'در حال ثبت…' : 'درخواست غرفه'}
+                          </Button>
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
             {limitReached && (
@@ -250,7 +288,7 @@ function BoothRequestCard({
   const canUpload = request.allowedActions.includes('submit_receipt')
 
   return (
-    <article className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-4">
+    <article className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <Typography variant="16/bold" color="neutral-800">
@@ -272,7 +310,8 @@ function BoothRequestCard({
       {receipt && (
         <div className="flex flex-col gap-1 rounded-lg bg-neutral-50 p-3">
           <Typography variant="14/semibold" color="neutral-700">
-            فیش نسخه {receipt.version.toLocaleString('fa-IR')} · {receiptStatusLabel[receipt.status]}
+            فیش نسخه {receipt.version.toLocaleString('fa-IR')} ·{' '}
+            {receiptStatusLabel[receipt.status]}
           </Typography>
           {receipt.status === 'returned' && receipt.decisionReason && (
             <Typography variant="14/regular" color="error">
@@ -341,7 +380,11 @@ function ReceiptUploadForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 border-t border-neutral-100 pt-4" noValidate>
+    <form
+      onSubmit={submit}
+      className="flex flex-col gap-3 border-t border-neutral-100 pt-4"
+      noValidate
+    >
       <Typography variant="14/semibold" color="neutral-700">
         {request.paymentStatus === 'returned' ? 'بارگذاری فیش اصلاح‌شده' : 'بارگذاری فیش پرداخت'} (
         {formatToman(request.priceAmount)})

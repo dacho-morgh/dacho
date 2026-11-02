@@ -12,7 +12,8 @@ export function boothRequestStage(reservation: BoothReservationDto): {
   label: string
   variant: BadgeVariant
 } {
-  if (reservation.attendanceStatus === 'pending') return { label: 'در انتظار تأیید حضور', variant: 'yellow' }
+  if (reservation.attendanceStatus === 'pending')
+    return { label: 'در انتظار تأیید حضور', variant: 'yellow' }
   if (reservation.attendanceStatus === 'rejected') return { label: 'حضور رد شد', variant: 'red' }
   switch (reservation.paymentStatus) {
     case 'pending_verification':

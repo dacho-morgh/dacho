@@ -46,7 +46,9 @@ export function ExhibitionPicker({
                 </Typography>
               </div>
               <Button size="40" variant="primary" asChild>
-                <Link href={`/dashboard/exhibitions/${encodeURIComponent(item.id)}`}>{actionLabel}</Link>
+                <Link href={`/dashboard/exhibitions/${encodeURIComponent(item.id)}`}>
+                  {actionLabel}
+                </Link>
               </Button>
             </li>
           ))}
