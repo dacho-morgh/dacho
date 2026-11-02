@@ -1,17 +1,15 @@
 import { ActivityCard } from '@/components/dashboard/owner-overview/activity-card'
 import { KpiCard } from '@/components/dashboard/owner-overview/kpi-card'
 import { EditIcon, RequestsIcon, LettersIcon, TickCircleIcon } from '@/components/icons'
-import {
-  formatDate,
-  type ActivityDto,
-  type DashboardOverviewDto,
-  type Paginated,
-} from '@/utilities/dashboard-api'
+import { formatDate, type ActivityDto, type Paginated } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import { BreakdownCard } from './breakdown-card'
+import { MEMO_ROWS } from './chart-rows'
 import { CaseCell, DataTableCard, RowAction } from './data-table-card'
+import { NextTasksCard } from './next-tasks-card'
 import { KpiGrid, OverviewShell } from './overview-shell'
-import { READ_FAILED, countText, fa, greeting, queueCount } from './shared'
+import { READ_FAILED, countText, fa, greeting, queueCount, type RoleOverviewDto } from './shared'
 
 interface InvestmentQueueItem {
   requestId: string
@@ -34,7 +32,7 @@ export async function InvestmentOverview({ userName }: { userName?: string | nul
   const now = new Date()
   const [queue, overview, activities] = await Promise.all([
     serverDashboardFetchResult<InvestmentQueueDto>('/investment/queue?page=1&limit=100'),
-    serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview'),
+    serverDashboardFetchResult<RoleOverviewDto>('/stats/overview'),
     serverDashboardFetchResult<Paginated<ActivityDto>>('/activities?limit=4'),
   ])
   const total = queue.kind === 'ok' ? queue.data.total : undefined
@@ -88,10 +86,26 @@ export async function InvestmentOverview({ userName }: { userName?: string | nul
         />
       </KpiGrid>
 
-      <ActivityCard
-        items={activities.kind === 'ok' ? activities.data.items : undefined}
-        notice={unavailableReasonFor(activities)}
-      />
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <BreakdownCard
+          title="وضعیت یادداشت‌های سرمایه‌گذاری"
+          subtitle="پرونده‌های در اختیار شما"
+          rows={MEMO_ROWS}
+          values={
+            pending !== undefined && written !== undefined ? { pending, sent: written } : undefined
+          }
+          notice={unavailableReasonFor(overview) ?? unavailableReasonFor(queue)}
+          emptyText="پرونده‌ای به شما سپرده نشده است."
+        />
+        <NextTasksCard
+          queues={overview.kind === 'ok' ? overview.data.queues : undefined}
+          notice={unavailableReasonFor(overview)}
+        />
+        <ActivityCard
+          items={activities.kind === 'ok' ? activities.data.items : undefined}
+          notice={unavailableReasonFor(activities)}
+        />
+      </div>
 
       <DataTableCard
         title="پرونده‌های در اختیار شما"

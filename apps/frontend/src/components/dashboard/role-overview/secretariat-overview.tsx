@@ -8,12 +8,24 @@ import {
 } from '@/components/icons'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 import { Typography } from '@/components/ui/typography'
-import type { ActivityDto, DashboardOverviewDto, Paginated } from '@/utilities/dashboard-api'
+import type { ActivityDto, Paginated } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import { BreakdownCard } from './breakdown-card'
+import { BOOTH_ROWS, VERIFICATION_ROWS } from './chart-rows'
 import { DataTableCard, RowAction } from './data-table-card'
+import { NextTasksCard } from './next-tasks-card'
 import { KpiGrid, OverviewShell } from './overview-shell'
-import { READ_FAILED, countText, fa, greeting, queueCount } from './shared'
+import {
+  READ_FAILED,
+  chartOf,
+  countText,
+  fa,
+  greeting,
+  queueCount,
+  sectionFailed,
+  type RoleOverviewDto,
+} from './shared'
 
 interface VerificationCompany {
   id: string
@@ -33,19 +45,22 @@ const STATUS: Record<string, { label: string; variant: BadgeProps['variant'] }> 
   rejected: { label: 'رد شده', variant: 'red' },
 }
 
-/** Central Secretariat: verification, support and follow-up work, and the company queue. */
+/** Central Secretariat: verification, booth, support and follow-up work, and the company queue. */
 export async function SecretariatOverview({ userName }: { userName?: string | null }) {
   const now = new Date()
   const [overview, activities, companies] = await Promise.all([
-    serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview'),
+    serverDashboardFetchResult<RoleOverviewDto>('/stats/overview'),
     serverDashboardFetchResult<Paginated<ActivityDto>>('/activities?limit=4'),
     serverDashboardFetchResult<{ items: VerificationCompany[] }>(
       '/admin/companies?verificationStatus=pending',
     ),
   ])
-  const queues = overview.kind === 'ok' ? overview.data.queues : undefined
-  const counts = overview.kind === 'ok' ? overview.data.counts : undefined
+  const data = overview.kind === 'ok' ? overview.data : undefined
+  const queues = data?.queues
   const undelivered = queueCount(queues, 'supplementary_undelivered')
+  const boothFailed = sectionFailed(data, 'booth_requests')
+  const receipts = boothFailed ? undefined : queueCount(queues, 'booth_receipt_pending')
+  const attendance = boothFailed ? undefined : queueCount(queues, 'booth_attendance_pending')
 
   return (
     <OverviewShell greeting={greeting(userName, now)}>
@@ -72,14 +87,41 @@ export async function SecretariatOverview({ userName }: { userName?: string | nu
           }
         />
         <KpiCard
-          label="درخواست‌های در حال بررسی"
+          label="فیش‌های غرفه در انتظار بررسی"
           tone="success"
-          value={counts ? fa(counts.in_review) : '—'}
-          unit={counts ? `از ${fa(counts.total)}` : undefined}
+          value={countText(receipts)}
           icon={<TickCircleIcon />}
-          meta={counts ? `${fa(counts.approved)} درخواست تأیید شده` : READ_FAILED}
+          meta={
+            attendance === undefined
+              ? READ_FAILED
+              : `${fa(attendance)} درخواست غرفه در انتظار تأیید حضور`
+          }
         />
       </KpiGrid>
+
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <BreakdownCard
+          title="وضعیت احراز هویت شرکت‌ها"
+          subtitle="آخرین نسخه ارسال‌شده هر شرکت"
+          rows={VERIFICATION_ROWS}
+          values={chartOf(data, 'company_verification')}
+          notice={unavailableReasonFor(overview)}
+          emptyText="هنوز شرکتی برای احراز هویت ارسال نکرده است."
+        />
+        <BreakdownCard
+          title="درخواست‌های غرفه نمایشگاه‌ها"
+          subtitle="همه نمایشگاه‌ها، به تفکیک مرحله"
+          rows={BOOTH_ROWS}
+          values={chartOf(data, 'booth_requests')}
+          notice={unavailableReasonFor(overview)}
+          emptyText="هنوز درخواست غرفه‌ای ثبت نشده است."
+        />
+        <NextTasksCard
+          queues={queues}
+          notice={unavailableReasonFor(overview)}
+          failed={data?.unavailable}
+        />
+      </div>
 
       <ActivityCard
         items={activities.kind === 'ok' ? activities.data.items : undefined}

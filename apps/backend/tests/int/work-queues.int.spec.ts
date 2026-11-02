@@ -8,6 +8,8 @@ import { InMemoryCompanyStore } from '../../src/auth/company-store.js'
 import { InMemoryUserStore } from '../../src/auth/user-store.js'
 import { InMemoryServiceCatalog } from '../../src/catalog/service-catalog.js'
 import { runMigrations } from '../../src/db/migrate.js'
+import { PostgresBoothCatalogueRepository } from '../../src/exhibitions/catalogue-repo.js'
+import { PostgresBoothReservationRepository } from '../../src/exhibitions/reservation-repo.js'
 import { PrivateDocumentStorage } from '../../src/documents/storage.js'
 import { JwtSigner } from '../../src/jwt.js'
 import { InMemoryCodeStore } from '../../src/otp/code-store.js'
@@ -469,12 +471,27 @@ describe('T38: scoped queues, counts and overview (int)', () => {
     expect(overview.body.counts).toMatchObject({ total: 2, in_review: 1 })
     expect((await get(app, 'company-user-1', '/requests')).body.total).toBe(2)
     expect((await get(app, 'company-user-1', '/requests?status=in_review')).body.total).toBe(1)
-    expect(keys(overview.body)).toEqual(['company_draft', 'company_correction', 'company_financial_package', 'company_supplementary'])
+    expect(keys(overview.body)).toEqual(['company_draft', 'company_correction', 'company_financial_package', 'company_supplementary', 'booth_receipt_due'])
 
     const secretariat = await get(app, 'secretariat', '/stats/overview')
     expect(secretariat.body.counts.total).toBe((await get(app, 'secretariat', '/requests')).body.total)
-    expect(keys(secretariat.body)).toEqual(['follow_up_unpublished', 'supplementary_undelivered', 'verification_pending', 'support_open'])
+    expect(keys(secretariat.body)).toEqual([
+      'follow_up_unpublished', 'supplementary_undelivered', 'verification_pending', 'support_open',
+      'booth_attendance_pending', 'booth_receipt_pending',
+    ])
     expect(keys((await get(app, 'owner', '/stats/overview')).body)).toEqual(['reopen_rejected', 'support_open'])
+
+    // Each role reads the chart series of its own work, and only those.
+    const charts = async (user: string) =>
+      ((await get(app, user, '/stats/overview')).body.charts as { key: string }[]).map((chart) => chart.key)
+    expect(await charts('owner')).toEqual([])
+    expect(await charts('secretariat')).toEqual(['company_verification', 'booth_requests'])
+    expect(await charts('chief')).toEqual([])
+    expect(await charts('reviewer-1')).toEqual(['own_evaluations'])
+    expect(await charts('employer-1')).toEqual(['own_evaluations'])
+    expect(await charts('investment')).toEqual([])
+    expect(await charts('company-user-1')).toEqual(['booth_requests'])
+    expect(overview.body.unavailable).toEqual([])
   })
 
   it('counts verification and support work from the lists those roles already read', async () => {
@@ -492,5 +509,100 @@ describe('T38: scoped queues, counts and overview (int)', () => {
     await pool.query("UPDATE dashboard.company_verifications SET status = 'returned' WHERE representative_id = 'company-user-1'")
     expect(await countOf(app, 'company-user-1', 'company_verification_returned')).toBe(1)
     expect(await countOf(app, 'company-user-2', 'company_verification_returned')).toBeUndefined()
+  })
+
+  it("charts each reviewer's own evaluations in the current round, never another person's", async () => {
+    const app = await makeApp()
+    const { id, revision: submitted } = await newCase(app)
+    const revision = await acceptCase(app, id, submitted)
+    const chart = async (user: string) => {
+      const body = (await get(app, user, '/stats/overview')).body as { charts: { key: string; slices: { key: string; count: number }[] }[] }
+      const slices = body.charts.find((item) => item.key === 'own_evaluations')?.slices ?? []
+      return Object.fromEntries(slices.map((slice) => [slice.key, slice.count]))
+    }
+    expect(await chart('reviewer-1')).toEqual({ not_started: 0, draft: 0, final: 0 })
+
+    await startRound(app, id, revision)
+    expect(await chart('reviewer-1')).toEqual({ not_started: 1, draft: 0, final: 0 })
+    await finalize(app, id, 'reviewer-1', revision)
+    expect(await chart('reviewer-1')).toEqual({ not_started: 0, draft: 0, final: 1 })
+    expect(await chart('reviewer-2')).toEqual({ not_started: 1, draft: 0, final: 0 })
+    expect(await chart('employer-1')).toEqual({ not_started: 1, draft: 0, final: 0 })
+    expect(await chart('reviewer-4')).toEqual({ not_started: 0, draft: 0, final: 0 })
+
+    // Once the case moves on, the finalized evaluation still counts as the person's own work.
+    for (const user of ['employer-1', 'reviewer-2', 'reviewer-3']) await finalize(app, id, user, revision)
+    await advance(app, id, revision)
+    expect(await chart('reviewer-1')).toEqual({ not_started: 0, draft: 0, final: 1 })
+    expect(await chart('employer-1')).toEqual({ not_started: 0, draft: 0, final: 1 })
+  })
+
+  it('counts booth requests for the Secretariat across exhibitions and for a company only its own', async () => {
+    const app = await makeApp()
+    const exhibitionId = 't56-dashboard-booths'
+    const catalogue = new PostgresBoothCatalogueRepository(pool)
+    const reservations = new PostgresBoothReservationRepository(pool)
+    const clearBooths = async () => {
+      const where = 'reservation_id IN (SELECT id FROM dashboard.booth_reservations WHERE exhibition_id = $1)'
+      await pool.query(`DELETE FROM dashboard.booth_receipt_files WHERE ${where}`, [exhibitionId])
+      await pool.query(`DELETE FROM dashboard.booth_payment_receipts WHERE ${where}`, [exhibitionId])
+      await pool.query(`DELETE FROM dashboard.booth_attendance_decisions WHERE ${where}`, [exhibitionId])
+      await pool.query('DELETE FROM dashboard.booth_reservations WHERE exhibition_id = $1', [exhibitionId])
+      await pool.query('UPDATE dashboard.exhibition_booths SET price_version_id = NULL WHERE exhibition_id = $1', [exhibitionId])
+      await pool.query('DELETE FROM dashboard.booth_price_versions WHERE exhibition_id = $1', [exhibitionId])
+      await pool.query('DELETE FROM dashboard.exhibition_booths WHERE exhibition_id = $1', [exhibitionId])
+      await pool.query('DELETE FROM dashboard.exhibition_catalogue_settings WHERE exhibition_id = $1', [exhibitionId])
+    }
+    const slicesOf = async (user: string) => {
+      const body = (await get(app, user, '/stats/overview')).body as {
+        queues: { key: string; count: number }[]
+        charts: { key: string; slices: { key: string; count: number }[] }[]
+      }
+      const booths = body.charts.find((item) => item.key === 'booth_requests')?.slices ?? []
+      return {
+        chart: Object.fromEntries(booths.map((slice) => [slice.key, slice.count])) as Record<string, number>,
+        queue: (key: string) => body.queues.find((item) => item.key === key)?.count,
+      }
+    }
+    await clearBooths()
+    try {
+      const before = await slicesOf('secretariat')
+      const own = (await companyStore.findByRepresentative('company-user-1'))!.id
+      const other = (await companyStore.findByRepresentative('company-user-2'))!.id
+      await catalogue.upsertSettings(exhibitionId, { companyBoothLimit: 3, guideMapReference: null }, 'owner')
+      const reserve = async (identifier: string, companyId: string) => {
+        const booth = await catalogue.createBooth({
+          exhibitionId, identifier, specification: 'غرفه', location: null, status: 'available',
+          active: true, priceAmount: 1_000_000, priceUnit: 'toman', createdBy: 'owner',
+        })
+        if (!booth.ok) throw new Error('booth fixture failed')
+        const reserved = await reservations.reserve({ exhibitionId, boothId: booth.booth.id, companyId, actorId: 'company-user-1' })
+        if (!reserved.ok) throw new Error(`reservation fixture failed: ${reserved.error}`)
+        return reserved.reservation.id
+      }
+      await reserve('D-01', own)
+      const approved = await reserve('D-02', own)
+      expect((await reservations.decideAttendance({ id: approved, action: 'approve', actorId: 'secretariat' })).ok).toBe(true)
+      const rejected = await reserve('D-03', other)
+      expect((await reservations.decideAttendance({ id: rejected, action: 'reject', reason: 'ظرفیت', actorId: 'secretariat' })).ok).toBe(true)
+
+      const secretariat = await slicesOf('secretariat')
+      const added = (key: string) => (secretariat.chart[key] ?? 0) - (before.chart[key] ?? 0)
+      expect([added('attendance_pending'), added('receipt_due'), added('receipt_pending'), added('rejected')]).toEqual([1, 1, 0, 1])
+      expect(secretariat.queue('booth_attendance_pending')).toBe(secretariat.chart.attendance_pending)
+      expect(secretariat.queue('booth_receipt_pending')).toBe(secretariat.chart.receipt_pending)
+      const pending = (await get(app, 'secretariat', `/admin/exhibitions/${exhibitionId}/reservations?status=pending`)).body.items
+      expect(pending).toHaveLength(1)
+
+      const company = await slicesOf('company-user-1')
+      expect(company.chart).toEqual({ attendance_pending: 1, receipt_due: 1, receipt_pending: 0, confirmed: 0, rejected: 0 })
+      expect(company.queue('booth_receipt_due')).toBe(1)
+      expect((await slicesOf('company-user-2')).chart).toMatchObject({ attendance_pending: 0, rejected: 1 })
+      // Roles without booth work get neither the queue nor the chart.
+      expect((await slicesOf('chief')).queue('booth_attendance_pending')).toBeUndefined()
+      expect((await slicesOf('owner')).chart).toEqual({})
+    } finally {
+      await clearBooths()
+    }
   })
 })
