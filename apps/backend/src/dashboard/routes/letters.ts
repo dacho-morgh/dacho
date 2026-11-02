@@ -12,6 +12,8 @@ import { isUuid } from '../../exhibitions/catalogue.js'
 import { parsePositiveInt, parseBoolean, isCompanyAdministrator } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 
+const MAX_LETTER_SEARCH_LENGTH = 100
+
 export function registerLetterRoutes(router: Router, ctx: DashboardContext): void {
   const { deps, repo, letters, assignments, financialPackages, resolveScope, canReadAttachment, attachmentMatchesLetter, attachmentDto, presentLetter } = ctx
 
@@ -23,9 +25,19 @@ export function registerLetterRoutes(router: Router, ctx: DashboardContext): voi
     const limit = parsePositiveInt(req.query.limit, 10)
     const requestId = typeof req.query.requestId === 'string' ? req.query.requestId : undefined
     if (requestId !== undefined && !isUuid(requestId)) { res.status(400).json({ error: 'invalid_request_id' }); return }
+    const box = req.query.box === 'received' || req.query.box === 'sent' ? req.query.box : undefined
+    if (req.query.box !== undefined && !box) { res.status(400).json({ error: 'invalid_box' }); return }
+    const status = req.query.status === 'unread' || req.query.status === 'action_required' ? req.query.status : undefined
+    if (req.query.status !== undefined && !status) { res.status(400).json({ error: 'invalid_status' }); return }
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() || undefined : undefined
+    if (q && q.length > MAX_LETTER_SEARCH_LENGTH) { res.status(400).json({ error: 'search_too_long' }); return }
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
-    const result = await letters.listScoped(scope, { read, page, limit, actorId: actor.id, requestId })
-    res.json({ ...result, items: await Promise.all(result.items.map((letter) => presentLetter(letter, actor.id, actor.operationalRole))) })
+    const result = await letters.listScoped(scope, { read, page, limit, actorId: actor.id, requestId, box, q, status })
+    res.json({
+      ...result,
+      counts: await letters.inboxCounts(scope, actor.id),
+      items: await Promise.all(result.items.map((letter) => presentLetter(letter, actor.id, actor.operationalRole))),
+    })
     } catch (error) { next(error) }
   })
 
@@ -87,6 +99,23 @@ export function registerLetterRoutes(router: Router, ctx: DashboardContext): voi
       res.status(404).json({ error: 'not_found' })
       return
     }
+    const thread = await letters.threadScoped(letter, scope, actor.id)
+    res.json({
+      letter: await presentLetter(letter, actor.id, actor.operationalRole),
+      thread: await Promise.all(thread.map((item) => presentLetter(item, actor.id, actor.operationalRole))),
+    })
+    } catch (error) { next(error) }
+  })
+
+  // The recipient's row menu: mark read or unread. Only the recipient can change it.
+  router.post('/letters/:id/read', async (req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    const read = (req.body as { read?: unknown } | undefined)?.read
+    if (typeof read !== 'boolean') { res.status(400).json({ error: 'invalid_read' }); return }
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
+    const letter = await letters.setReadScoped(req.params.id, scope, actor.id, read)
+    if (!letter) { res.status(404).json({ error: 'not_found' }); return }
     res.json({ letter: await presentLetter(letter, actor.id, actor.operationalRole) })
     } catch (error) { next(error) }
   })

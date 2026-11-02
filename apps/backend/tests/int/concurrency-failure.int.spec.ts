@@ -272,11 +272,14 @@ const actionCount = async (id: string, action: string) =>
 
 const jobs = async (id: string) =>
   (
-    await pool.query<{ id: string; status: string; attempts: number; last_error: string | null; letter_id: string | null; action: string }>(
-      'SELECT id, status, attempts, last_error, letter_id, action FROM dashboard.notification_jobs WHERE request_id = $1 ORDER BY created_at',
+    await pool.query<{ id: string; status: string; attempts: number; last_error: string | null; letter_id: string | null; action: string; recipient_id: string }>(
+      'SELECT id, status, attempts, last_error, letter_id, action, recipient_id FROM dashboard.notification_jobs WHERE request_id = $1 ORDER BY created_at',
       [id],
     )
   ).rows
+// A submission notifies the company and asks the responsible chief to triage (S1);
+// the retry cases follow the company's own notice.
+const companyJobs = async (id: string) => (await jobs(id)).filter((job) => job.recipient_id === 'company-user-1')
 
 async function cleanup() {
   await pool.query("DELETE FROM dashboard.requests WHERE service_id='event-service'; DELETE FROM dashboard.events")
@@ -412,8 +415,9 @@ describe('T44: Concurrency and failure (int)', () => {
         review_stage: 'chief_triage',
         revision: before.revision + 1,
         history: 1,
-        jobs: 1,
-        letters: 1,
+        // One notice for the company, one triage step for the chief (S1).
+        jobs: 2,
+        letters: 2,
         proposals: 1,
         agreements: 2,
         verifications: 1,
@@ -433,7 +437,7 @@ describe('T44: Concurrency and failure (int)', () => {
         const id = await draftCase(app)
         const results = await Promise.all(Array.from({ length: 6 }, () => submit(app, id)))
         expect(results.map((res) => res.status).sort()).toEqual([200, 409, 409, 409, 409, 409])
-        expect((await jobs(id)).map((job) => job.status)).toEqual(['delivered'])
+        expect((await jobs(id)).map((job) => job.status)).toEqual(['delivered', 'delivered'])
       } finally {
         await small.end()
       }
@@ -489,7 +493,7 @@ describe('T44: Concurrency and failure (int)', () => {
       expect(await footprint(id)).toEqual(before)
 
       expect((await submit(app, id)).status).toBe(200)
-      expect(await footprint(id)).toMatchObject({ status: 'in_review', history: 1, jobs: 1, letters: 1, proposals: 1, agreements: 2, verifications: 1 })
+      expect(await footprint(id)).toMatchObject({ status: 'in_review', history: 1, jobs: 2, letters: 2, proposals: 1, agreements: 2, verifications: 1 })
     })
   })
 
@@ -786,8 +790,8 @@ describe('T44: Concurrency and failure (int)', () => {
       const submitted = await failedDelivery(() => submit(app, id))
       expect(submitted.status).toBe(200)
       const committed = await footprint(id)
-      expect(committed).toMatchObject({ status: 'in_review', history: 1, jobs: 1, letters: 0 })
-      const [failed] = await jobs(id)
+      expect(committed).toMatchObject({ status: 'in_review', history: 1, jobs: 2, letters: 0 })
+      const [failed] = await companyJobs(id)
       expect(failed).toMatchObject({ status: 'failed', attempts: 1, letter_id: null })
       expect(failed!.last_error).toContain('forced letters failure')
 
@@ -795,12 +799,12 @@ describe('T44: Concurrency and failure (int)', () => {
       const stillFailing = await failedDelivery(() => retry(app, failed!.id))
       expect(stillFailing.status).toBe(200)
       expect(stillFailing.body.result.status).toBe('failed')
-      expect((await jobs(id))[0]).toMatchObject({ status: 'failed', attempts: 2 })
+      expect((await companyJobs(id))[0]).toMatchObject({ status: 'failed', attempts: 2 })
       expect(await footprint(id)).toEqual(committed)
 
       const recovered = await retry(app, failed!.id)
       expect(recovered.body.result.status).toBe('delivered')
-      expect((await jobs(id))[0]).toMatchObject({ status: 'delivered', attempts: 3, last_error: null })
+      expect((await companyJobs(id))[0]).toMatchObject({ status: 'delivered', attempts: 3, last_error: null })
       expect(await footprint(id)).toEqual({ ...committed, letters: 1 })
       expect((await companyLetters(app)).filter((letter) => letter.requestId === id)).toHaveLength(1)
     })
@@ -809,7 +813,7 @@ describe('T44: Concurrency and failure (int)', () => {
       const app = await makeApp()
       const id = await draftCase(app)
       await failedDelivery(() => submit(app, id))
-      const [job] = await jobs(id)
+      const [job] = await companyJobs(id)
 
       const results = await Promise.all(Array.from({ length: 6 }, () => retry(app, job!.id)))
       expect(results.map((res) => res.status)).toEqual(Array(6).fill(200))
@@ -818,7 +822,7 @@ describe('T44: Concurrency and failure (int)', () => {
       expect(new Set(results.map((res) => res.body.result.letterId)).size).toBe(1)
 
       expect(await countOf('letters', id)).toBe(1)
-      expect((await jobs(id))[0]).toMatchObject({ status: 'delivered', attempts: 2 })
+      expect((await companyJobs(id))[0]).toMatchObject({ status: 'delivered', attempts: 2 })
       expect(await actionCount(id, 'submit')).toBe(1)
     })
 

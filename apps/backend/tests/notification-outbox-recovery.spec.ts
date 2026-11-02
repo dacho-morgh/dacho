@@ -18,7 +18,7 @@ function singleConnectionPool() {
     id: jobId, request_id: requestId, recipient_id: 'person', actor_id: 'person',
     action: 'submit', from_state: 'draft', to_state: 'in_review', revision: 2,
     channel: 'in_app', title: 'Submitted', body: 'Submitted', status: 'pending',
-    attempts: 0, last_error: null, letter_id: null, created_at: now,
+    attempts: 0, last_error: null, letter_id: null, next_step: null, created_at: now,
     updated_at: now, processed_at: null,
   }
   const submitted: RequestRow & { revision: number } = {
@@ -31,6 +31,8 @@ function singleConnectionPool() {
   const client = {
     query: vi.fn(async (sql: string) => {
       if (sql.includes('UPDATE dashboard.requests')) return { rows: [submitted] }
+      // notifyNextRole reads the case it notifies about inside the same transaction.
+      if (sql.includes('SELECT owner_id, revision, title, tracking_code')) return { rows: [submitted] }
       if (sql.includes('INSERT INTO dashboard.notification_jobs') || sql.startsWith('SELECT *'))
         return { rows: [{ ...job }] }
       if (sql.includes('INSERT INTO dashboard.letters')) return { rows: [{ id: 'letter' }] }

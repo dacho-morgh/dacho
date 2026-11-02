@@ -5,6 +5,7 @@ import { isUuid } from '../db/uuid.js'
 import { latestInvitationPackageExists } from './financial-package-repo.js'
 import type { NotificationOutbox } from './notification-outbox.js'
 import { appendTransition } from './transition-history.js'
+import { completeNextSteps, notifyNextRole } from './next-role.js'
 
 export const MAX_RESULT_LENGTH = 20_000
 export const MAX_SUPPLEMENTARY_REQUEST_LENGTH = 5_000
@@ -230,8 +231,8 @@ export class SecretariatFollowUpRepository {
         return { status: 'unchanged', request: mapSupplementary(latest.rows[0]) }
       }
       const letter = await client.query<{ id: string }>(
-        `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
-         VALUES ('official', $1, $2, $3, $4, $5, $6, $7, false)
+        `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, next_step, read)
+         VALUES ('official', $1, $2, $3, $4, $5, $6, $7, 'supplementary_upload', false)
          RETURNING id`,
         [
           `درخواست مدارک تکمیلی پرونده ${open.trackingCode}`,
@@ -289,6 +290,10 @@ export class SecretariatFollowUpRepository {
           fromState: open.status,
           toState: open.status,
           revision: open.revision,
+        })
+        await notifyNextRole(client, this.notificationOutbox, {
+          requestId: input.requestId, actorId: input.actorId, action: 'supplementary_delivery',
+          fromState: open.status, toState: open.status,
         })
       }
       const { rows } = await client.query<FileRow>(`${FILE_SELECT} WHERE d.id = $1`, [input.documentId])
@@ -368,6 +373,7 @@ export class SecretariatFollowUpRepository {
         toState: open.status,
         revision: open.revision,
       })
+      await completeNextSteps(client, input.requestId, { steps: ['publish_result'] })
       // A corrected publication keeps the revision, so the version keeps each notice its own job.
       const job = await this.notificationOutbox.enqueue(client, {
         requestId: input.requestId,

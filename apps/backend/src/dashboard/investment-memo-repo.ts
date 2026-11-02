@@ -4,6 +4,8 @@ import { isFinancialStageOpen } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
 import { CASE_ROWS_SQL } from './investment-case-repo.js'
 import { appendTransition } from './transition-history.js'
+import { notifyNextRole } from './next-role.js'
+import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 
 export const MAX_MEMO_LENGTH = 20_000
 
@@ -96,7 +98,10 @@ async function lockHeldCase(client: PoolClient, actorId: string, requestId: stri
 }
 
 export class InvestmentMemoRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly notificationOutbox: NotificationOutbox = new PostgresNotificationOutbox(pool),
+  ) {}
 
   /**
    * Stores the text as the case's next version. Retrying a save of the holder's latest
@@ -195,6 +200,10 @@ export class InvestmentMemoRepository {
         fromState: held.status,
         toState: held.status,
         revision: held.revision,
+      })
+      await notifyNextRole(client, this.notificationOutbox, {
+        requestId: input.requestId, actorId: input.actorId, action: 'investment_memo_send',
+        fromState: held.status, toState: held.status,
       })
       await client.query('COMMIT')
       return { status: 'sent', memo: mapMemo(updated.rows[0]!) }

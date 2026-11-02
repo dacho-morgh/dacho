@@ -19,6 +19,7 @@ export interface NotificationJobRow {
   attempts: number
   last_error: string | null
   letter_id: string | null
+  next_step: string | null
   created_at: Date
   updated_at: Date
   processed_at: Date | null
@@ -40,6 +41,7 @@ export interface NotificationJobDto {
   attempts: number
   lastError: string | null
   letterId: string | null
+  nextStep: string | null
   createdAt: string
   updatedAt: string
   processedAt: string | null
@@ -56,6 +58,8 @@ export interface EnqueueNotificationInput {
   title: string
   body: string
   channel?: string
+  /** What the recipient is expected to do next; see next-role.ts. */
+  nextStep?: string | null
 }
 
 export interface DeliverResult {
@@ -100,10 +104,41 @@ export function mapNotificationJobRow(row: NotificationJobRow): NotificationJobD
     attempts: row.attempts,
     lastError: row.last_error,
     letterId: row.letter_id,
+    nextStep: row.next_step,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
     processedAt: row.processed_at ? row.processed_at.toISOString() : null,
   }
+}
+
+/**
+ * Writes the in-app letter for a locked or just-inserted job and marks it delivered,
+ * on the caller's connection. Inside a transition's transaction the notice commits
+ * or rolls back together with the transition.
+ */
+export async function deliverInApp(client: PoolClient, job: NotificationJobRow): Promise<string | null> {
+  // ponytail: v1 supports 'in_app' channel; add SMS/SMTP dispatcher when providers configured
+  let letterId = job.letter_id
+  if (!letterId && job.channel === 'in_app') {
+    // The system sends it: naming the actor as sender would let them read a notice
+    // meant for the next role, since mailbox access follows sender and recipient.
+    const letterRes = await client.query<{ id: string }>(
+      `INSERT INTO dashboard.letters
+         (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, next_step, read)
+       VALUES ('notification', $1, $2, NULL, 'سامانه', 'system', $3, $4, $5, false)
+       RETURNING id`,
+      [job.title, job.body, job.recipient_id, job.request_id, job.next_step],
+    )
+    letterId = letterRes.rows[0]?.id ?? null
+  }
+  await client.query(
+    `UPDATE dashboard.notification_jobs
+     SET status = 'delivered', letter_id = $1, processed_at = now(), updated_at = now(),
+         attempts = attempts + 1, last_error = NULL
+     WHERE id = $2`,
+    [letterId, job.id],
+  )
+  return letterId
 }
 
 export class PostgresNotificationOutbox implements NotificationOutbox {
@@ -122,8 +157,8 @@ export class PostgresNotificationOutbox implements NotificationOutbox {
   async enqueue(client: PoolClient, input: EnqueueNotificationInput): Promise<NotificationJobDto> {
     const { rows } = await client.query<NotificationJobRow>(
       `INSERT INTO dashboard.notification_jobs
-         (request_id, recipient_id, actor_id, action, from_state, to_state, revision, channel, title, body, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
+         (request_id, recipient_id, actor_id, action, from_state, to_state, revision, channel, title, body, next_step, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending')
        ON CONFLICT (request_id, revision, action, recipient_id) DO UPDATE
          SET updated_at = now()
        RETURNING *`,
@@ -138,6 +173,7 @@ export class PostgresNotificationOutbox implements NotificationOutbox {
         input.channel ?? 'in_app',
         input.title,
         input.body,
+        input.nextStep ?? null,
       ],
     )
     const row = rows[0]
@@ -177,28 +213,7 @@ export class PostgresNotificationOutbox implements NotificationOutbox {
         throw new Error('Controlled notification failure triggered')
       }
 
-      // Deliver via in-app letter
-      // ponytail: v1 supports 'in_app' channel; add SMS/SMTP dispatcher when providers configured
-      let letterId = job.letter_id
-      if (!letterId && job.channel === 'in_app') {
-        const letterRes = await client.query<{ id: string }>(
-          `INSERT INTO dashboard.letters
-             (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
-           VALUES ('notification', $1, $2, $3, 'سامانه', 'system', $4, $5, false)
-           RETURNING id`,
-          [job.title, job.body, job.actor_id, job.recipient_id, job.request_id],
-        )
-        letterId = letterRes.rows[0]?.id ?? null
-      }
-
-      const { rows: updatedRows } = await client.query<NotificationJobRow>(
-        `UPDATE dashboard.notification_jobs
-         SET status = 'delivered', letter_id = $1, processed_at = now(), updated_at = now(),
-             attempts = attempts + 1, last_error = NULL
-         WHERE id = $2
-         RETURNING *`,
-        [letterId, jobId],
-      )
+      const letterId = await deliverInApp(client, job)
       await client.query('COMMIT')
 
       return {

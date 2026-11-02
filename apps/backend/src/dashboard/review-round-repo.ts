@@ -3,6 +3,8 @@ import type { Pool, PoolClient } from 'pg'
 import { isUuid } from '../db/uuid.js'
 import { countRoundFinals, ROUND_REQUIRED_EVALUATIONS, syncRoundCompletion } from '../reviews/round-completion.js'
 import { appendTransition } from './transition-history.js'
+import { notifyNextRole } from './next-role.js'
+import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 
 export type ReviewSlot = 'employer' | 'ordinary'
 
@@ -218,7 +220,10 @@ export interface ReplaceSlotInput {
 }
 
 export class ReviewRoundRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly notificationOutbox: NotificationOutbox = new PostgresNotificationOutbox(pool),
+  ) {}
 
   async findStartContext(requestId: string): Promise<RoundStartContext | null> {
     if (!isUuid(requestId)) return null
@@ -430,9 +435,13 @@ export class ReviewRoundRepository {
         toState: current.status,
         revision: current.revision,
       })
+      await notifyNextRole(client, this.notificationOutbox, {
+        requestId: current.id, actorId: input.actorId, action: 'review_round_start',
+        fromState: current.status, toState: current.status,
+      })
       // Someone picked here may already hold a final evaluation of this revision
       // from an earlier hand-made grant; it is locked, so it can never be re-sent.
-      await syncRoundCompletion(client, { requestId: current.id, revision: current.revision, actorId: input.actorId })
+      await syncRoundCompletion(client, { requestId: current.id, revision: current.revision, actorId: input.actorId, outbox: this.notificationOutbox })
       const synced = await client.query<RoundRow>(
         `SELECT ${ROUND_COLUMNS} FROM dashboard.review_rounds WHERE id = $1`,
         [round.id],
@@ -565,8 +574,13 @@ export class ReviewRoundRepository {
         revision: current.revision,
         reason: input.reason,
       })
+      await notifyNextRole(client, this.notificationOutbox, {
+        requestId: current.id, actorId: input.actorId,
+        action: input.slot === 'employer' ? 'owner_replace_employer' : 'chief_replace_reviewer',
+        fromState: current.status, toState: current.status,
+      })
       // Whoever left may have held a counted evaluation; completion follows the active slots.
-      await syncRoundCompletion(client, { requestId: current.id, revision: current.revision, actorId: input.actorId })
+      await syncRoundCompletion(client, { requestId: current.id, revision: current.revision, actorId: input.actorId, outbox: this.notificationOutbox })
       await client.query('COMMIT')
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined)

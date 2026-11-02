@@ -1,6 +1,8 @@
 import type { Pool, PoolClient } from 'pg'
 
 import { syncRoundCompletion } from './round-completion.js'
+import { completeNextSteps } from '../dashboard/next-role.js'
+import { PostgresNotificationOutbox, type NotificationOutbox } from '../dashboard/notification-outbox.js'
 
 export interface EvaluationDto {
   id: string
@@ -94,7 +96,10 @@ function mapRow(row: EvaluationRow): EvaluationDto {
 }
 
 export class PostgresEvaluationRepository implements EvaluationStore {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly notificationOutbox: NotificationOutbox = new PostgresNotificationOutbox(pool),
+  ) {}
 
   private async writeGuard(client: PoolClient, input: SaveEvaluationInput): Promise<'stale' | 'forbidden' | undefined> {
     // Share locks allow independent reviewers while preventing a revision change
@@ -239,7 +244,11 @@ export class PostgresEvaluationRepository implements EvaluationStore {
         await client.query('ROLLBACK')
         return { ok: false, reason: 'locked' }
       }
-      await syncRoundCompletion(client, { requestId: input.requestId, revision: input.revision, actorId: input.userId })
+      // Finalizing is this reviewer's answer to their "evaluate" step.
+      await completeNextSteps(client, input.requestId, { userId: input.userId })
+      await syncRoundCompletion(client, {
+        requestId: input.requestId, revision: input.revision, actorId: input.userId, outbox: this.notificationOutbox,
+      })
       await client.query('COMMIT')
       return { ok: true, evaluation: mapRow(row) }
     } catch (error) {

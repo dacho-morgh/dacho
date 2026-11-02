@@ -10,6 +10,8 @@ import {
   type PackageGaps,
 } from './financial-package.js'
 import { appendTransition } from './transition-history.js'
+import { notifyNextRole } from './next-role.js'
+import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 
 export type SubmitFinancialPackageResult =
   | { status: 'submitted' | 'already_submitted'; package: FinancialPackageDto }
@@ -65,7 +67,10 @@ export function latestInvitationPackageExists(requestRef: string): string {
 }
 
 export class FinancialPackageRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly notificationOutbox: NotificationOutbox = new PostgresNotificationOutbox(pool),
+  ) {}
 
   /**
    * Read in its own statement, so a wait for the request lock sees a package that
@@ -210,6 +215,14 @@ export class FinancialPackageRepository {
         fromState: request.status,
         toState: request.status,
         revision: request.revision,
+      })
+      await notifyNextRole(client, this.notificationOutbox, {
+        requestId: input.requestId, actorId: input.actorId, action: 'financial_package_submit',
+        fromState: request.status, toState: request.status,
+      })
+      await notifyNextRole(client, this.notificationOutbox, {
+        requestId: input.requestId, actorId: 'system', action: 'investment_handoff',
+        fromState: request.status, toState: request.status,
       })
       await client.query('COMMIT')
       return { status: 'submitted', package: mapPackage(inserted.rows[0]!) }

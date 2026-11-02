@@ -65,14 +65,14 @@ export function createDashboardContext(deps: DashboardDeps) {
   const dossierDocuments = deps.dossierDocuments ?? new SqlDossierDocumentSource(deps.pool)
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
-  const rounds = new ReviewRoundRepository(deps.pool)
-  const financialPackages = new FinancialPackageRepository(deps.pool)
+  const rounds = new ReviewRoundRepository(deps.pool, notificationOutbox)
+  const financialPackages = new FinancialPackageRepository(deps.pool, notificationOutbox)
   const investmentCases = new InvestmentCaseRepository(deps.pool)
-  const investmentMemos = new InvestmentMemoRepository(deps.pool)
+  const investmentMemos = new InvestmentMemoRepository(deps.pool, notificationOutbox)
   const followUps = new SecretariatFollowUpRepository(deps.pool, notificationOutbox)
   const reviewCases = new ReviewCaseRepository(deps.pool)
   const evaluations =
-    deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool)
+    deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool, notificationOutbox)
   const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
   const categoryStore =
     deps.eventCategoryStore ?? new EventCategoryRepository(deps.pool)
