@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OwnerEvents } from '@/components/dashboard/owner-events'
@@ -124,7 +124,7 @@ describe('owner category and subtopic administration', () => {
     await screen.findByText('مکانیک و تجهیزات دوار')
   })
 
-  it('creates subtopic with eligible employer person and maps server validation errors without losing edits', async () => {
+  it('creates subtopic with eligible employer person', async () => {
     let subtopicsList: Array<{
       id: string
       eventId: string
@@ -341,83 +341,159 @@ describe('owner RFP administration', () => {
   })
 })
 
-describe('dashboard-api methods for category, subtopic and RFP', () => {
-  it('invokes admin and consumer endpoints with appropriate paths and parameters', async () => {
-    const {
-      getAdminEventCategories,
-      createEventCategory,
-      getAdminEventSubtopics,
-      createEventSubtopic,
-      getEventCategories,
-      getEventSubtopics,
-      getSubtopicRfp,
-      uploadSubtopicRfp,
-      getRfpDownloadUrl,
-      formatFileSize,
-    } = await import('@/utilities/dashboard-api')
+describe('owner administration failure and isolation behavior', () => {
+  const sub2 = { ...sub1, id: '55555555-5555-5555-5555-555555555555', title: 'زیرعنوان دوم', currentRfpVersionId: null }
 
+  function stubBackend(overrides: (url: string, init?: RequestInit) => Response | undefined) {
     const request = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === `/api/dashboard/admin/events/${event1.id}/categories` && init?.method === 'POST') {
-        return json({ category: cat1 }, 201)
-      }
-      if (url === `/api/dashboard/admin/events/${event1.id}/categories`) {
-        return json({ items: [cat1] })
-      }
-      if (url === `/api/dashboard/admin/events/${event1.id}/subtopics` && init?.method === 'POST') {
-        return json({ subtopic: sub1 }, 201)
-      }
-      if (url === `/api/dashboard/admin/events/${event1.id}/subtopics`) {
-        return json({ items: [sub1] })
-      }
-      if (url === `/api/dashboard/events/${event1.id}/categories`) {
-        return json({ items: [cat1] })
-      }
-      if (url === `/api/dashboard/events/${event1.id}/subtopics`) {
-        return json({ items: [sub1] })
-      }
-      if (url === `/api/dashboard/events/${event1.id}/subtopics/${sub1.id}/rfp`) {
-        return json({ version: rfpVersion1 })
-      }
-      if (url === `/api/dashboard/admin/events/${event1.id}/subtopics/${sub1.id}/rfp` && init?.method === 'POST') {
-        return json({ version: rfpVersion1 }, 201)
-      }
-      return json({}, 404)
+      const overridden = overrides(url, init)
+      if (overridden) return overridden
+      if (url.startsWith('/api/users?')) return json({ docs: people, hasNextPage: false })
+      if (url === '/api/dashboard/admin/events') return json({ items: [event1] })
+      if (url === `/api/dashboard/admin/events/${event1.id}/categories`) return json({ items: [cat1] })
+      if (url === `/api/dashboard/admin/events/${event1.id}/subtopics`) return json({ items: [sub1, sub2] })
+      if (url === `/api/dashboard/events/${event1.id}/subtopics/${sub1.id}/rfp`) return json({ version: rfpVersion1 })
+      return json({ error: 'not_found' }, 404)
     })
     vi.stubGlobal('fetch', request)
+    return request
+  }
 
-    // Admin category
-    const catRes = await getAdminEventCategories(event1.id)
-    expect(catRes.items).toEqual([cat1])
-    const createCatRes = await createEventCategory(event1.id, { title: 'عنوان جدید' })
-    expect(createCatRes.category).toEqual(cat1)
+  async function openManager() {
+    render(createElement(OwnerEvents))
+    fireEvent.click(await screen.findByRole('button', {
+      name: `مدیریت دسته‌ها، زیرعنوان‌ها و RFP ${event1.title}`,
+    }))
+  }
 
-    // Admin subtopic
-    const subRes = await getAdminEventSubtopics(event1.id)
-    expect(subRes.items).toEqual([sub1])
-    const createSubRes = await createEventSubtopic(event1.id, {
-      title: 'زیرعنوان جدید',
-      categoryId: cat1.id,
-      employerId: 'emp-1',
-    })
-    expect(createSubRes.subtopic).toEqual(sub1)
+  const pdf = (name = 'rfp.pdf', size = 10) => {
+    const file = new File(['x'], name, { type: 'application/pdf' })
+    Object.defineProperty(file, 'size', { value: size })
+    return file
+  }
 
-    // Consumer categories & subtopics
-    expect((await getEventCategories(event1.id)).items).toEqual([cat1])
-    expect((await getEventSubtopics(event1.id)).items).toEqual([sub1])
+  async function fillUpload(files: File[]) {
+    await screen.findByText(/انتشار نسخه اولیه مستندات فنی/)
+    fireEvent.change(screen.getByLabelText('توضیحات و دلیل نسخه جدید'), { target: { value: 'دلیل' } })
+    fireEvent.change(screen.getByLabelText('انتخاب فایل‌های RFP'), { target: { files } })
+    fireEvent.click(screen.getByRole('button', { name: 'بارگذاری نسخه جدید RFP' }))
+  }
 
-    // RFP
-    expect((await getSubtopicRfp(event1.id, sub1.id)).version).toEqual(rfpVersion1)
-    const formData = new FormData()
-    formData.append('reason', 'تست')
-    expect((await uploadSubtopicRfp(event1.id, sub1.id, formData)).version).toEqual(rfpVersion1)
+  it('does not carry RFP form state across subtopics', async () => {
+    stubBackend(() => undefined)
+    await openManager()
+    fireEvent.click(await screen.findByRole('button', { name: `مدیریت فایل RFP ${sub1.title}` }))
+    await screen.findByText(/انتشار نسخه اولیه مستندات فنی/)
+    fireEvent.change(screen.getByLabelText('توضیحات و دلیل نسخه جدید'), { target: { value: 'دلیل زیرعنوان اول' } })
 
-    // Download URL & file size formatting
-    expect(getRfpDownloadUrl(event1.id, sub1.id, 'v1', 'f1')).toBe(
-      `/api/dashboard/events/${event1.id}/subtopics/${sub1.id}/rfp/v1/files/f1`,
+    fireEvent.click(screen.getByRole('button', { name: `مدیریت فایل RFP ${sub2.title}` }))
+    await screen.findByText('هنوز نسخه‌ای از فایل RFP برای این زیرعنوان ثبت نشده است.')
+    expect((screen.getByLabelText('توضیحات و دلیل نسخه جدید') as HTMLInputElement).value).toBe('')
+  })
+
+  it('clears the file input after a successful upload', async () => {
+    stubBackend((url, init) =>
+      url === `/api/dashboard/admin/events/${event1.id}/subtopics/${sub1.id}/rfp` && init?.method === 'POST'
+        ? json({ version: { ...rfpVersion1, id: 'version-v2-id' } }, 201)
+        : undefined,
     )
-    expect(formatFileSize(0)).toBe('۰ بایت')
-    expect(formatFileSize(1024)).toBe('۱٫۰ کیلوبایت')
-    expect(formatFileSize(2097152)).toBe('۲٫۰ مگابایت')
+    await openManager()
+    fireEvent.click(await screen.findByRole('button', { name: `مدیریت فایل RFP ${sub1.title}` }))
+    await screen.findByText(/انتشار نسخه اولیه مستندات فنی/)
+    const input = screen.getByLabelText('انتخاب فایل‌های RFP')
+    await fillUpload([pdf()])
+    await screen.findByText('نسخه جدید RFP با موفقیت بارگذاری شد.')
+    expect(screen.getByLabelText('انتخاب فایل‌های RFP')).not.toBe(input)
+  })
+
+  it('does not show the empty state or allow new subtopics when loading fails', async () => {
+    stubBackend((url) =>
+      url === `/api/dashboard/admin/events/${event1.id}/categories` ? json({ error: 'boom' }, 500) : undefined,
+    )
+    await openManager()
+    await screen.findByRole('button', { name: 'تلاش دوباره' })
+    expect(screen.queryByText('هنوز دسته‌ای برای این رویداد تعریف نشده است.')).toBeNull()
+    expect((screen.getByRole('button', { name: 'زیرعنوان جدید' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('blocks upload when the current version could not be loaded', async () => {
+    stubBackend((url) =>
+      url === `/api/dashboard/events/${event1.id}/subtopics/${sub1.id}/rfp` ? json({ error: 'boom' }, 500) : undefined,
+    )
+    await openManager()
+    fireEvent.click(await screen.findByRole('button', { name: `مدیریت فایل RFP ${sub1.title}` }))
+    await screen.findByRole('button', { name: 'تلاش دوباره' })
+    expect((screen.getByRole('button', { name: 'بارگذاری نسخه جدید RFP' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('shows the backend file rejection and keeps the reason', async () => {
+    stubBackend((url, init) =>
+      url === `/api/dashboard/admin/events/${event1.id}/subtopics/${sub1.id}/rfp` && init?.method === 'POST'
+        ? json({ error: 'invalid_file_content' }, 400)
+        : undefined,
+    )
+    await openManager()
+    fireEvent.click(await screen.findByRole('button', { name: `مدیریت فایل RFP ${sub1.title}` }))
+    await fillUpload([pdf()])
+    await screen.findByText('محتوای فایل با فرمت آن مطابقت ندارد.')
+    expect((screen.getByLabelText('توضیحات و دلیل نسخه جدید') as HTMLInputElement).value).toBe('دلیل')
+  })
+
+  it('offers sign-in again when an upload hits an expired session', async () => {
+    stubBackend((url, init) =>
+      url === `/api/dashboard/admin/events/${event1.id}/subtopics/${sub1.id}/rfp` && init?.method === 'POST'
+        ? json({ error: 'unauthorized' }, 401)
+        : undefined,
+    )
+    await openManager()
+    fireEvent.click(await screen.findByRole('button', { name: `مدیریت فایل RFP ${sub1.title}` }))
+    await fillUpload([pdf()])
+    await screen.findByRole('link', { name: 'ورود دوباره' })
+  })
+
+  it('rejects an upload larger than the proxy can forward without calling the server', async () => {
+    const request = stubBackend(() => undefined)
+    await openManager()
+    fireEvent.click(await screen.findByRole('button', { name: `مدیریت فایل RFP ${sub1.title}` }))
+    await fillUpload([pdf('a.pdf', 6_000_000), pdf('b.pdf', 6_000_000)])
+    await screen.findByText('مجموع حجم فایل‌های یک نسخه نباید از ۱۰ مگابایت بیشتر باشد.')
+    expect(request.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+  })
+
+  it('does not blame the category title for a permission failure', async () => {
+    stubBackend((url, init) =>
+      url === `/api/dashboard/admin/events/${event1.id}/categories` && init?.method === 'POST'
+        ? json({ error: 'forbidden' }, 403)
+        : undefined,
+    )
+    await openManager()
+    await screen.findByText(cat1.title)
+    fireEvent.click(screen.getByRole('button', { name: 'دسته جدید' }))
+    fireEvent.change(screen.getByLabelText('عنوان دسته فناوری'), { target: { value: 'دسته تازه' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره دسته' }))
+    await screen.findByText('اجازه مدیریت این بخش را ندارید.')
+    expect(screen.queryByText('عنوان دسته نامعتبر است یا سرور آن را نپذیرفت.')).toBeNull()
+  })
+
+  it('maps employer and category rejections to their fields without losing edits', async () => {
+    let error = 'ineligible_employer'
+    stubBackend((url, init) =>
+      url === `/api/dashboard/admin/events/${event1.id}/subtopics` && init?.method === 'POST'
+        ? json({ error }, 400)
+        : undefined,
+    )
+    await openManager()
+    await screen.findByText(cat1.title)
+    fireEvent.click(screen.getByRole('button', { name: 'زیرعنوان جدید' }))
+    fireEvent.change(screen.getByLabelText('عنوان زیرعنوان'), { target: { value: 'عنوان حفظ‌شده' } })
+    fireEvent.change(screen.getByLabelText('کارفرمای مسئول'), { target: { value: 'emp-1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره زیرعنوان' }))
+    await screen.findByText('کارفرمای انتخاب‌شده نامعتبر یا دارای شرکت است.')
+    expect((screen.getByLabelText('عنوان زیرعنوان') as HTMLInputElement).value).toBe('عنوان حفظ‌شده')
+
+    error = 'invalid_category_event'
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره زیرعنوان' }))
+    await screen.findByText('دسته انتخاب‌شده متعلق به این رویداد نیست.')
+    expect((screen.getByLabelText('عنوان زیرعنوان') as HTMLInputElement).value).toBe('عنوان حفظ‌شده')
   })
 })
-

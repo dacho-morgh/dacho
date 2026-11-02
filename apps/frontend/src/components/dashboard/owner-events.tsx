@@ -6,7 +6,18 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
-import { formatFileSize, getRfpDownloadUrl } from '@/utilities/dashboard-api'
+import {
+  formatFileSize,
+  getRfpDownloadUrl,
+  type EventCategoryDto,
+  type EventSubtopicDto,
+  type RfpVersionDto,
+} from '@/utilities/dashboard-api'
+import {
+  DOCUMENT_ACCEPT,
+  MAX_DOCUMENT_BYTES,
+  validateSelectedFile,
+} from '@/utilities/document-api'
 import {
   AdminError,
   Field,
@@ -306,38 +317,6 @@ function EventForm({
   )
 }
 
-type EventCategory = {
-  id: string
-  eventId: string
-  title: string
-}
-
-type EventSubtopic = {
-  id: string
-  eventId: string
-  categoryId: string
-  categoryTitle?: string
-  title: string
-  employerId: string
-  currentRfpVersionId: string | null
-}
-
-type RfpFile = {
-  id: string
-  filename: string
-  mimeType: string
-  sizeBytes: number
-}
-
-type RfpVersion = {
-  id: string
-  subtopicId: string
-  createdBy: string
-  createdAt: string
-  reason: string
-  files: RfpFile[]
-}
-
 const categorySchema = z.object({
   title: z.string().trim().min(1, 'عنوان دسته را وارد کنید.'),
 })
@@ -378,7 +357,7 @@ function CategoryForm({
       onSaved()
     } catch (error) {
       setFailure(error)
-      if (error instanceof AdminError) {
+      if (error instanceof AdminError && error.data?.error === 'invalid_category') {
         setError(
           'title',
           { message: 'عنوان دسته نامعتبر است یا سرور آن را نپذیرفت.' },
@@ -408,7 +387,7 @@ function CategoryForm({
       {failure !== null && <RequestError error={failure} returnTo="/dashboard/events" />}
       <div className="flex flex-wrap gap-3">
         <Button type="submit" disabled={isSubmitting}>
-          <Typography variant="14/regular">
+          <Typography variant="14/regular" color="white">
             {isSubmitting ? 'در حال ذخیره...' : 'ذخیره دسته'}
           </Typography>
         </Button>
@@ -435,7 +414,7 @@ function SubtopicForm({
   onCancel,
 }: {
   eventId: string
-  categories: EventCategory[]
+  categories: EventCategoryDto[]
   people: Person[]
   onSaved: () => void
   onCancel: () => void
@@ -468,7 +447,11 @@ function SubtopicForm({
     formState: { errors, isSubmitting },
   } = useForm<SubtopicValues>({
     resolver: resolver(schema),
-    defaultValues: { title: '', categoryId: categories[0]?.id ?? '', employerId: '' },
+    defaultValues: {
+      title: '',
+      categoryId: categories.length === 1 ? categories[0].id : '',
+      employerId: '',
+    },
   })
 
   async function save(values: SubtopicValues) {
@@ -571,7 +554,7 @@ function SubtopicForm({
 
       <div className="flex flex-wrap gap-3">
         <Button type="submit" disabled={isSubmitting || eligibleEmployers.length === 0}>
-          <Typography variant="14/regular">
+          <Typography variant="14/regular" color="white">
             {isSubmitting ? 'در حال ذخیره...' : 'ذخیره زیرعنوان'}
           </Typography>
         </Button>
@@ -583,6 +566,16 @@ function SubtopicForm({
   )
 }
 
+const rfpUploadMessages: Record<string, string> = {
+  file_too_large: 'حجم فایل بیش از سقف مجاز (۱۰ مگابایت) است.',
+  invalid_file: 'فایل انتخاب‌شده نامعتبر است؛ دوباره انتخاب کنید.',
+  invalid_file_type: 'فرمت فایل مجاز نیست (تنها PDF و Word مجاز است).',
+  invalid_file_content: 'محتوای فایل با فرمت آن مطابقت ندارد.',
+  invalid_filename: 'نام فایل نامعتبر است.',
+  empty_file: 'فایل خالی قابل بارگذاری نیست.',
+  invalid_rfp: 'دلیل یا شناسه نسخه نامعتبر است.',
+}
+
 function RfpManager({
   eventId,
   subtopic,
@@ -590,14 +583,15 @@ function RfpManager({
   onClose,
 }: {
   eventId: string
-  subtopic: EventSubtopic
-  onUpdated: (newVersionId: string) => void
+  subtopic: EventSubtopicDto
+  onUpdated: (versionId: string | null) => void
   onClose: () => void
 }) {
-  const [version, setVersion] = useState<RfpVersion | null>(null)
+  const [version, setVersion] = useState<RfpVersionDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<unknown>(null)
   const [failure, setFailure] = useState<string | null>(null)
+  const [requestFailure, setRequestFailure] = useState<unknown>(null)
   const [stale, setStale] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
@@ -605,7 +599,16 @@ function RfpManager({
   // Upload form state (preserved across 409 stale conflict)
   const [reason, setReason] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [fileInputKey, setFileInputKey] = useState(0)
   const [formError, setFormError] = useState<string | null>(null)
+
+  function acceptServerVersion(next: RfpVersionDto | null) {
+    setVersion(next)
+    setStale(false)
+    setFailure(null)
+    setRequestFailure(null)
+    onUpdated(next?.id ?? null)
+  }
 
   const fetchRfp = async () => {
     setLoading(true)
@@ -614,14 +617,10 @@ function RfpManager({
       const res = await adminRequest(
         `/api/dashboard/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopic.id)}/rfp`,
       )
-      if (res.version) {
-        setVersion(res.version)
-      } else {
-        setVersion(null)
-      }
+      acceptServerVersion(res.version ?? null)
     } catch (err) {
       if (err instanceof AdminError && err.status === 404) {
-        setVersion(null)
+        acceptServerVersion(null)
       } else {
         setLoadError(err)
       }
@@ -638,6 +637,7 @@ function RfpManager({
     e.preventDefault()
     setFormError(null)
     setFailure(null)
+    setRequestFailure(null)
     setSavedSuccess(false)
     if (!reason.trim()) {
       setFormError('توضیحات و دلیل نسخه جدید الزامی است.')
@@ -645,6 +645,19 @@ function RfpManager({
     }
     if (selectedFiles.length === 0) {
       setFormError('حداقل یک فایل برای نسخه RFP انتخاب کنید.')
+      return
+    }
+    for (const file of selectedFiles) {
+      const invalid = validateSelectedFile(file)
+      if (invalid) {
+        setFormError(`${file.name}: ${rfpUploadMessages[invalid]}`)
+        return
+      }
+    }
+    // src/proxy.ts covers this route, and Next buffers at most 10MB of a request
+    // body there, so a larger multi-file upload would reach the backend truncated.
+    if (selectedFiles.reduce((total, file) => total + file.size, 0) > MAX_DOCUMENT_BYTES) {
+      setFormError('مجموع حجم فایل‌های یک نسخه نباید از ۱۰ مگابایت بیشتر باشد.')
       return
     }
 
@@ -655,7 +668,7 @@ function RfpManager({
         formData.append('files', file)
       }
       formData.append('reason', reason.trim())
-      formData.append('expectedVersionId', version?.id ?? subtopic.currentRfpVersionId ?? '')
+      formData.append('expectedVersionId', version?.id ?? '')
 
       const res = await adminRequest(
         `/api/dashboard/admin/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopic.id)}/rfp`,
@@ -665,53 +678,24 @@ function RfpManager({
         },
       )
 
-      if (res.version) {
-        setVersion(res.version)
-        setSavedSuccess(true)
-        setStale(false)
-        setReason('')
-        setSelectedFiles([])
-        onUpdated(res.version.id)
-      }
+      if (!res.version?.id) throw new Error('invalid_rfp_response')
+      acceptServerVersion(res.version)
+      setSavedSuccess(true)
+      setReason('')
+      setSelectedFiles([])
+      setFileInputKey((value) => value + 1)
     } catch (err) {
-      if (err instanceof AdminError) {
-        if (err.status === 409) {
-          setStale(true)
-          setFailure('نسخه RFP توسط شخص دیگری تغییر یافته است؛ پیش از ذخیره، آخرین نسخه را بررسی کنید.')
-        } else if (err.data?.error === 'file_too_large' || err.status === 413) {
-          setFailure('حجم فایل بیش از سقف مجاز (۱۰ مگابایت) است.')
-        } else if (err.data?.error === 'invalid_file') {
-          setFailure('فرمت یا محتوای فایل نامعتبر است (تنها PDF و Word مجاز است).')
-        } else if (err.data?.error === 'invalid_rfp') {
-          setFailure('دلیل یا شناسه نسخه نامعتبر است.')
-        } else if (err.status === 403) {
-          setFailure('اجازه مدیریت این بخش را ندارید.')
-        } else {
-          setFailure('بارگذاری فایل RFP انجام نشد؛ دوباره تلاش کنید.')
-        }
+      const code = err instanceof AdminError ? String(err.data?.error) : ''
+      if (err instanceof AdminError && err.status === 409) {
+        setStale(true)
+        setFailure('نسخه RFP توسط شخص دیگری تغییر یافته است؛ پیش از ذخیره، آخرین نسخه را بررسی کنید.')
+      } else if (rfpUploadMessages[code]) {
+        setFailure(rfpUploadMessages[code])
       } else {
-        setFailure('خطا در برقراری ارتباط با سرور.')
+        setRequestFailure(err)
       }
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  async function handleReloadServerVersion() {
-    setLoading(true)
-    setFailure(null)
-    setStale(false)
-    try {
-      const res = await adminRequest(
-        `/api/dashboard/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopic.id)}/rfp`,
-      )
-      if (res.version) {
-        setVersion(res.version)
-      }
-    } catch (err) {
-      setLoadError(err)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -724,10 +708,7 @@ function RfpManager({
         </Button>
       </div>
 
-      <div
-        role="alert"
-        className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"
-      >
+      <div role="note" className="rounded-lg border border-warning-400 bg-warning-50 p-3">
         <Typography variant="14/regular" className="leading-6">
           توجه: تغییرات و نسخه‌های جدید RFP طبق قوانین نگارش سرور اعمال می‌شوند و پرونده‌های ارسال‌شده قبلی شرکت‌ها را بازنویسی نمی‌کنند (نسخه پرونده‌های ثبت‌شده ثابت می‌ماند).
         </Typography>
@@ -741,7 +722,7 @@ function RfpManager({
         <div className="flex flex-col gap-3">
           <Typography variant="14/semibold">وضعیت نسخه فعال:</Typography>
           {version ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-neutral-100 bg-neutral-50 p-3 text-neutral-800">
+            <div className="flex flex-col gap-2 rounded-lg border border-neutral-100 bg-neutral-50 p-3">
               <Typography variant="14/regular">
                 شناسه نسخه: {version.id}
               </Typography>
@@ -755,17 +736,25 @@ function RfpManager({
                 <Typography variant="14/semibold">فایل‌های مستندات RFP:</Typography>
                 {version.files.map((file) => (
                   <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-200 bg-white p-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-sans text-[13px] font-medium text-neutral-800">{file.filename}</span>
-                      <span className="font-sans text-[12px] text-neutral-500">({formatFileSize(file.sizeBytes)})</span>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Typography as="span" variant="14/regular" className="break-all">
+                        {file.filename}
+                      </Typography>
+                      <Typography as="span" variant="12/regular" color="muted">
+                        ({formatFileSize(file.sizeBytes)})
+                      </Typography>
                     </div>
-                    <a
-                      href={getRfpDownloadUrl(eventId, subtopic.id, version.id, file.id)}
-                      download
-                      className="font-sans text-[13px] text-brand-600 hover:underline"
-                    >
-                      دانلود {file.filename}
-                    </a>
+                    <Button asChild variant="outline" className="max-w-full">
+                      <a
+                        href={getRfpDownloadUrl(eventId, subtopic.id, version.id, file.id)}
+                        download
+                        aria-label={`دانلود ${file.filename}`}
+                      >
+                        <Typography as="span" variant="14/regular">
+                          دانلود
+                        </Typography>
+                      </a>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -810,11 +799,12 @@ function RfpManager({
             <label htmlFor="rfp-files">انتخاب فایل‌های RFP</label>
           </Typography>
           <input
+            key={fileInputKey}
             id="rfp-files"
             aria-label="انتخاب فایل‌های RFP"
             type="file"
             multiple
-            accept=".pdf,.doc,.docx"
+            accept={DOCUMENT_ACCEPT}
             className={controlClass}
             onChange={(e) => {
               const fileList = e.target.files ? Array.from(e.target.files) : []
@@ -822,7 +812,7 @@ function RfpManager({
             }}
           />
           <Typography variant="12/regular" color="muted">
-            فرمت‌های مجاز: PDF, DOC, DOCX — حداکثر ۱۰ مگابایت برای هر فایل
+            فرمت‌های مجاز: PDF, DOC, DOCX — حداکثر ۱۰ مگابایت برای مجموع فایل‌های هر نسخه
           </Typography>
         </div>
 
@@ -838,17 +828,24 @@ function RfpManager({
           </Typography>
         )}
 
+        {requestFailure !== null && (
+          <RequestError error={requestFailure} returnTo="/dashboard/events" />
+        )}
+
         {stale && (
           <div className="flex items-center gap-3">
-            <Button type="button" variant="outline" onClick={handleReloadServerVersion} disabled={loading}>
+            <Button type="button" variant="outline" onClick={fetchRfp} disabled={loading}>
               <Typography variant="14/regular">بررسی نسخه جدید سرور</Typography>
             </Button>
           </div>
         )}
 
         <div className="flex flex-wrap gap-3">
-          <Button type="submit" disabled={isSubmitting || loading}>
-            <Typography variant="14/regular">
+          <Button
+            type="submit"
+            disabled={isSubmitting || loading || stale || loadError !== null}
+          >
+            <Typography variant="14/regular" color="white">
               {isSubmitting ? 'در حال بارگذاری...' : 'بارگذاری نسخه جدید RFP'}
             </Typography>
           </Button>
@@ -867,13 +864,13 @@ function EventSubtopicsManager({
   people: Person[]
   onBack: () => void
 }) {
-  const [categories, setCategories] = useState<EventCategory[]>([])
-  const [subtopics, setSubtopics] = useState<EventSubtopic[]>([])
+  const [categories, setCategories] = useState<EventCategoryDto[]>([])
+  const [subtopics, setSubtopics] = useState<EventSubtopicDto[]>([])
   const [loading, setLoading] = useState(true)
   const [failure, setFailure] = useState<unknown>(null)
   const [addingCategory, setAddingCategory] = useState(false)
   const [addingSubtopic, setAddingSubtopic] = useState(false)
-  const [activeRfpSubtopic, setActiveRfpSubtopic] = useState<EventSubtopic | null>(null)
+  const [activeRfpSubtopic, setActiveRfpSubtopic] = useState<EventSubtopicDto | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const loadData = async () => {
@@ -927,11 +924,14 @@ function EventSubtopicsManager({
             setAddingSubtopic(false)
           }}
         >
-          <Typography variant="14/regular">دسته جدید</Typography>
+          <Typography variant="14/regular" color="white">
+            دسته جدید
+          </Typography>
         </Button>
         <Button
           type="button"
           variant="outline"
+          disabled={loading || failure !== null || categories.length === 0}
           onClick={() => {
             setSuccessMessage(null)
             setAddingSubtopic(true)
@@ -970,12 +970,13 @@ function EventSubtopicsManager({
 
       {activeRfpSubtopic && (
         <RfpManager
+          key={activeRfpSubtopic.id}
           eventId={event.id}
           subtopic={activeRfpSubtopic}
-          onUpdated={(newVersionId) => {
+          onUpdated={(versionId) => {
             setSubtopics((prev) =>
               prev.map((s) =>
-                s.id === activeRfpSubtopic.id ? { ...s, currentRfpVersionId: newVersionId } : s,
+                s.id === activeRfpSubtopic.id ? { ...s, currentRfpVersionId: versionId } : s,
               ),
             )
           }}
@@ -985,7 +986,7 @@ function EventSubtopicsManager({
 
       {loading ? (
         <Typography variant="16/regular">در حال بارگذاری عناوین و زیرعنوان‌ها...</Typography>
-      ) : categories.length === 0 ? (
+      ) : failure !== null ? null : categories.length === 0 ? (
         <div className={`${cardClass} py-8 text-center`}>
           <Typography variant="14/regular" color="muted">
             هنوز دسته‌ای برای این رویداد تعریف نشده است.
