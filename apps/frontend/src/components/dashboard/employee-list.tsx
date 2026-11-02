@@ -324,7 +324,8 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {/* Toolbar — Figma frame 30722:2455 */}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+          {/* Phone: search and filter take their own row, so the add button wraps below instead of under them. */}
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
             <SearchField
               aria-label="جستجوی کارمند"
               placeholder="کارمند مورد نظر را جست و جو کنید"
