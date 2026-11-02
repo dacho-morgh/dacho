@@ -21,9 +21,15 @@ import {
   type ReviewRoundDto,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
-import { dashboardOperationalRole, serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import {
+  dashboardOperationalRole,
+  serverDashboardFetchResult,
+  type DashboardFetchResult,
+} from '@/utilities/dashboard-server'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 import { trackingOutcome } from '@/utilities/request-tracking'
+import { ReviewerCaseFile, type ReviewerCaseInitial } from '@/components/dashboard/reviewer/reviewer-case-file'
+import { isReviewerRole, type ReviewCaseFileDto } from '@/utilities/reviewer-case'
 import { serviceFormFields } from '@/utilities/service-form-fields'
 import type { RequestFormField } from '@/components/dashboard/request-form-field'
 
@@ -37,6 +43,13 @@ async function serviceFields(payload: Awaited<ReturnType<typeof getPayload>>, se
   } catch {
     return []
   }
+}
+
+function reviewerCaseInitial(result: DashboardFetchResult<ReviewCaseFileDto>): ReviewerCaseInitial {
+  if (result.kind === 'ok') return { kind: 'ok', data: result.data }
+  if (result.kind === 'unauthenticated') return { kind: 'expired' }
+  if (result.kind === 'denied') return { kind: 'denied' }
+  return result.status === 404 ? { kind: 'not-assigned' } : { kind: 'error' }
 }
 
 /** A section's read: a failure stays distinct from "this role has no such section". */
@@ -96,6 +109,13 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const role = dashboardOperationalRole(user) ?? 'representative'
   const path = `/requests/${encodeURIComponent(id)}`
+
+  // Reviewers and employers read only their assigned case file (T23). The server answers
+  // 404 for an unassigned, foreign-event or guessed id, which is a denied state, not a missing page.
+  if (isReviewerRole(role)) {
+    const caseResult = await serverDashboardFetchResult<ReviewCaseFileDto>(`/review/cases/${encodeURIComponent(id)}`)
+    return <ReviewerCaseFile key={id} requestId={id} initial={reviewerCaseInitial(caseResult)} />
+  }
 
   const result = await serverDashboardFetchResult<RequestDetail>(path)
   if (result.kind !== 'ok') {

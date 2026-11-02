@@ -26,7 +26,13 @@ import {
   type RequestStats,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
-import { isInternalDashboardUser, serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import {
+  dashboardOperationalRole,
+  isInternalDashboardUser,
+  serverDashboardFetchResult,
+} from '@/utilities/dashboard-server'
+import { ReviewerQueue } from '@/components/dashboard/reviewer/reviewer-queue'
+import { isReviewerRole, parseReviewQueuePage, parseReviewQueueView } from '@/utilities/reviewer-case'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
@@ -46,6 +52,7 @@ export default async function RequestsPage({
     eventId?: string | string[]
     stage?: string | string[]
     queue?: string | string[]
+    view?: string | string[]
   }>
 }) {
   const query = await searchParams
@@ -57,6 +64,13 @@ export default async function RequestsPage({
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isInternal = isInternalDashboardUser(user)
+
+  // Reviewers and employers work from their own assignment queue (T23), not the generic list.
+  if (isReviewerRole(dashboardOperationalRole(user))) {
+    const view = parseReviewQueueView(query.view)
+    const reviewPage = parseReviewQueuePage(query.page)
+    return <ReviewerQueue key={`${view}-${reviewPage}`} view={view} page={reviewPage} />
+  }
 
   // Counts come from the same filters as the list, so a tab's number is the size of its list.
   const [statsResult, overviewResult] = await Promise.all([

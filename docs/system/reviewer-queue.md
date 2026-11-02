@@ -1,6 +1,6 @@
 # Assigned reviewer queue and case file (T23 / #39)
 
-Backend slice only. Human acceptance (UAT15) has not been run and the frontend (FE16) is not built.
+Backend slice. The frontend (FE16, #94) reads these two routes on `/dashboard/requests` and `/dashboard/requests/:id` for reviewers and employers; it rechecks access on focus and every minute and drops the case from the page on 401/403/404. Human acceptance (UAT15, UAT19) has not been run.
 
 Ordinary reviewers and employer reviewers get a queue and a case file that are derived from their own active server-side assignment, and from nothing the browser sends. The assignments come from the review round (T22), so the people on a queue are the four chosen for the case revision. Hand-made owner grants, where they still exist, appear the same way.
 
@@ -38,4 +38,4 @@ It never carries the owner or representative, the private verification dossier o
 
 ## Not in this slice
 
-The reviewer frontend (FE16), the rubric/evaluation screens, replacing a reviewer or the employer (T26), the chief's decision ([T28](chief-decision.md)) and notifications. The chief and investment roles keep their own surfaces. Reviewer screens should use the two routes above.
+The rubric/evaluation screens, replacing a reviewer or the employer (T26), the chief's decision ([T28](chief-decision.md)) and notifications. The chief and investment roles keep their own surfaces. Reviewer screens should use the two routes above.
