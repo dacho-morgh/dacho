@@ -125,7 +125,7 @@ export default async function LettersPage() {
       return [item]
     })
     return (
-      <div className="flex min-h-screen w-full flex-col bg-neutral-50 px-4 pb-12 pt-10 sm:px-6 lg:px-4" dir="rtl">
+      <div className="flex min-h-0 w-full flex-1 flex-col bg-neutral-50 px-4 pb-4 pt-10 sm:px-6 lg:px-4" dir="rtl">
         <Typography
           as="h1"
           variant="24/bold"
@@ -181,7 +181,7 @@ export default async function LettersPage() {
   }))
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-neutral-50 px-4 pb-12 pt-10 sm:px-6 lg:px-4" dir="rtl">
+    <div className="flex min-h-0 w-full flex-1 flex-col bg-neutral-50 px-4 pb-4 pt-10 sm:px-6 lg:px-4" dir="rtl">
       <Typography
         as="h1"
         variant="24/bold"

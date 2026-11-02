@@ -119,7 +119,7 @@ export default async function RequestsPage({
   const items: RequestItem[] = result.kind === 'ok' ? result.data.items.map(mapRequestItem) : []
 
   return (
-    <div className="flex flex-1 flex-col bg-neutral-50 px-4 pt-6 pb-4 sm:pt-10">
+    <div className="flex min-h-0 flex-1 flex-col bg-neutral-50 px-4 pt-6 pb-4 sm:pt-10">
       <RequestsListView
         items={items}
         notice={notice}

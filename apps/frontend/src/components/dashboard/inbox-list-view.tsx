@@ -1,5 +1,6 @@
 'use client'
 
+import { ScrollArea } from '@/components/ui/scroll-area'
 import Image from 'next/image'
 import Link from 'next/link'
 import React, { useMemo, useState } from 'react'
@@ -263,7 +264,7 @@ export function InboxListView({
   }
 
   return (
-    <div className="flex w-full flex-1 flex-col text-right" dir="rtl">
+    <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
       {/* Toast Alert */}
       {actionNotice && (
         <div
@@ -366,11 +367,11 @@ export function InboxListView({
           </div>
 
       {/* Main Table Card - Figma Frame 6 (33:3926) */}
-      <section className="relative mt-[16px] flex h-fit h-full w-full flex-col rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
+      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
         {isLoading ? (
           <InboxSkeleton />
         ) : (
-          <>
+          <ScrollArea className="min-h-0 flex-1">
             {/* Desktop Table View */}
             <div className="hidden overflow-x-auto lg:block">
               <table className="w-full table-fixed border-collapse text-right">
@@ -484,7 +485,7 @@ export function InboxListView({
 
             {/* Empty State */}
             {isEmpty && <InboxEmptyState />}
-          </>
+          </ScrollArea>
         )}
       </section>
       </>

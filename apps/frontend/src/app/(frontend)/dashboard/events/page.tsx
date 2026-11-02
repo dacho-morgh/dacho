@@ -1,3 +1,4 @@
+import { ScrollArea } from '@/components/ui/scroll-area'
 import configPromise from '@payload-config'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
@@ -35,7 +36,7 @@ export default async function EventsPage(props: PageProps = {}) {
       collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate',
     })
     return (
-      <>
+      <ScrollArea className="min-h-0 flex-1">
         <OwnerEvents />
         <div className="flex w-full flex-col items-center bg-[#fafafa] px-4 pb-12 sm:px-6 lg:px-8">
           <EventsView
@@ -44,7 +45,7 @@ export default async function EventsPage(props: PageProps = {}) {
             initialSelectedEventId={eventId}
           />
         </div>
-      </>
+      </ScrollArea>
     )
   }
   const [eventResult, exhibitionResult] = await Promise.all([
@@ -57,7 +58,7 @@ export default async function EventsPage(props: PageProps = {}) {
   ].sort((left, right) => left.startTimestamp - right.startTimestamp)
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center bg-[#fafafa] px-4 pt-6 pb-4 sm:px-6 sm:pt-10 lg:px-8">
       <EventsView
         initialEventsList={events}
         isOwner={isOwner}

@@ -2,11 +2,12 @@ import { isActiveAccount } from '@cms-core/access/roles'
 import configPromise from '@payload-config'
 import { GeistMono } from 'geist/font/mono'
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import React from 'react'
 import { MenuIcon } from '@/components/icons'
+import { DashboardContent } from '@/components/dashboard/dashboard-content'
 import { DashboardSidebar, type DashboardNavigation } from '@/components/dashboard/sidebar-shell'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
 import { Typography } from '@/components/ui/typography'
@@ -85,12 +86,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const navigation = capabilityResult.data
+  const sidebarDefaultOpen = (await cookies()).get('sidebar_state')?.value !== 'false'
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider
+      defaultOpen={sidebarDefaultOpen}
+      style={{ '--sidebar-width-icon': '4.5rem' } as React.CSSProperties}
+    >
       <div
         className={cn(
-          'flex min-h-svh w-full overflow-x-clip bg-neutral-50 text-neutral-800 antialiased',
+          'flex h-svh w-full overflow-hidden bg-neutral-50 text-neutral-800 antialiased',
           GeistMono.variable,
         )}
         dir="rtl"
@@ -107,14 +112,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
           user={{ name: user.name, email: user.email }}
           navigation={navigation}
         />
-        <SidebarInset id="dashboard-content" tabIndex={-1} className="flex min-w-0 flex-1 flex-col bg-neutral-50 outline-none">
+        <SidebarInset id="dashboard-content" tabIndex={-1} className="flex h-svh min-w-0 flex-1 flex-col overflow-hidden bg-neutral-50 outline-none">
           <SidebarTrigger
             aria-label="باز کردن منو"
             className="absolute top-6 left-6 z-30 size-10 rounded-[10px] text-black md:hidden"
           >
             <MenuIcon aria-hidden="true" className="size-6" />
           </SidebarTrigger>
-          {children}
+          <DashboardContent>{children}</DashboardContent>
         </SidebarInset>
       </div>
     </SidebarProvider>

@@ -1,5 +1,6 @@
 'use client'
 
+import { ScrollArea } from '@/components/ui/scroll-area'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
@@ -179,7 +180,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
   const showTable = state === 'default' && filteredLetters.length > 0
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-[16px]" dir="rtl">
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-[16px]" dir="rtl">
       {/* Toolbar — Figma nodes 33:3923 / 53:12430: search right, filter left of it, CTA far left */}
       <div className="flex flex-wrap items-center justify-between gap-[8px]">
         <div className="flex flex-wrap items-center gap-[8px]">
@@ -265,7 +266,9 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
       )}
 
       {/* Card — Figma node 33:3926: white, grey-200 border, rounded-16, 16px padding, 848px tall */}
-      <div className="relative min-h-[320px] w-full rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4 lg:min-h-[848px]">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4">
+        <ScrollArea className="min-h-0 flex-1">
+        <div className="min-h-[320px]">
         {state === 'loading' ? (
           <LettersSkeleton />
         ) : !showTable ? (
@@ -410,6 +413,8 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
           </div>
           </>
         )}
+        </div>
+        </ScrollArea>
       </div>
     </div>
   )

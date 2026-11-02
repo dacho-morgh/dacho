@@ -1,4 +1,5 @@
 'use client'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -83,7 +84,7 @@ export function AdminListView<T>({
     [items, query, getSearchText],
   )
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-5 p-4 lg:pt-10" dir="rtl">
+    <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 p-4 lg:pt-10" dir="rtl">
       <Typography variant="h3" color="neutral-900">
         {title}
       </Typography>
@@ -114,7 +115,7 @@ export function AdminListView<T>({
           </div>
         )}
       </div>
-      <div className="min-w-0 flex-1 overflow-x-auto rounded-xl border border-neutral-200 bg-white lg:min-h-[848px]">
+      <ScrollArea className="min-h-0 min-w-0 flex-1 rounded-xl border border-neutral-200 bg-white">
         <table className="w-full min-w-[900px] border-collapse">
           <thead>
             <tr className="h-11 border-b border-neutral-200">
@@ -191,7 +192,7 @@ export function AdminListView<T>({
             )}
           </tbody>
         </table>
-      </div>
+      </ScrollArea>
     </main>
   )
 }

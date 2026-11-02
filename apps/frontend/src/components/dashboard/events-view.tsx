@@ -1,5 +1,6 @@
 'use client'
 
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   AlertCircle,
   Check,
@@ -506,7 +507,7 @@ export function EventsView({
     const selectedCount = selectedSubtopicIds.size
 
     return (
-      <div className="flex w-full flex-1 flex-col text-right" dir="rtl">
+      <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
         {/* Breadcrumbs and Top Action Header - Figma Frame 146 (node 31967:73802) */}
         <div className="flex flex-wrap items-center justify-between gap-4 py-2">
           {/* Breadcrumb path */}
@@ -939,11 +940,11 @@ export function EventsView({
       </div>
 
       {/* Main Events Card - Figma Frame 6 (56:13208) */}
-      <section className="relative mt-[16px] flex w-full flex-col gap-[32px] rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
+      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
         {isLoading ? (
           <EventsSkeleton />
         ) : (
-          <>
+          <ScrollArea className="min-h-0 flex-1">
             {!isEmpty && (
               <div className="flex flex-col gap-[32px]">
                 {filteredEvents.map((evt) => (
@@ -1055,7 +1056,7 @@ export function EventsView({
 
             {/* Empty State */}
             {isEmpty && <EventsEmptyState noMatch={state !== 'empty' && events.length > 0} />}
-          </>
+          </ScrollArea>
         )}
       </section>
     </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { OPERATIONAL_ROLE_LABELS } from '@cms-core/access/roles'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -50,7 +51,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
     setAttempt((value) => value + 1)
   }
   return (
-    <main dir="rtl" className="flex min-w-0 flex-1 flex-col gap-5 p-4 lg:pt-10">
+    <main dir="rtl" className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 p-4 lg:pt-10">
       <Typography variant="h3">کارکنان</Typography>
       {saved && (
         <Typography role="status" variant="14/regular" color="success">
@@ -103,7 +104,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
           ) : error !== null ? (
             <RequestError error={error} returnTo="/dashboard/employees" retry={refresh} />
           ) : (
-            <div className={`${cardClass} overflow-x-auto`}>
+            <ScrollArea className={`${cardClass} min-h-0 flex-1`}>
               <table className="w-full min-w-[600px] text-right">
                 <thead>
                   <tr className="h-11 border-b border-neutral-200">
@@ -176,7 +177,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
                     نتیجه‌ای یافت نشد.
                   </Typography>
                 )}
-            </div>
+            </ScrollArea>
           )}
         </>
       )}

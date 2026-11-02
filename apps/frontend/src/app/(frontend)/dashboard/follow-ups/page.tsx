@@ -1,3 +1,4 @@
+import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -33,7 +34,7 @@ export default async function FollowUpsPage({
 
   const { items, totalPages } = result.data
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6 sm:p-10" dir="rtl">
+    <main className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-6 p-6 sm:p-10" dir="rtl">
       <div className="flex flex-col gap-1">
         <Typography as="h1" variant="24/bold" className="text-neutral-900">پیگیری سرمایه‌گذاری</Typography>
         <Typography variant="14/regular" className="text-neutral-500">
@@ -41,6 +42,7 @@ export default async function FollowUpsPage({
         </Typography>
       </div>
       {items.length ? (
+        <ScrollArea className="min-h-0 flex-1">
         <ul className="flex flex-col gap-3">
           {items.map((item) => (
             <li key={item.requestId}>
@@ -60,6 +62,7 @@ export default async function FollowUpsPage({
             </li>
           ))}
         </ul>
+        </ScrollArea>
       ) : (
         <Typography variant="14/regular" className="rounded-2xl border border-neutral-200 bg-white p-6 text-neutral-500">
           هنوز یادداشتی به دبیرخانه نرسیده است.

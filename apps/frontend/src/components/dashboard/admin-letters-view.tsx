@@ -1,5 +1,6 @@
 'use client'
 
+import { ScrollArea } from '@/components/ui/scroll-area'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
@@ -219,7 +220,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
   const isEmpty = !isLoading && filteredLetters.length === 0
 
   return (
-    <div className="flex w-full flex-col items-end gap-[16px]" dir="rtl">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-end gap-[16px]" dir="rtl">
       {/* Toolbar — Figma frames 30852:17808 / 30873:18804 */}
       <div className="flex w-full flex-wrap items-center justify-between gap-[8px]">
         {/* Left: نامه جدید button */}
@@ -363,7 +364,9 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
       )}
 
       {/* Table card — Figma frame 30852:17813 */}
-      <div className="relative min-h-[320px] w-full rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4 lg:flex lg:h-[848px] lg:flex-row-reverse lg:items-start lg:justify-end">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4">
+        <ScrollArea className="min-h-0 flex-1">
+        <div className="min-h-[320px] lg:flex lg:flex-row-reverse lg:items-start lg:justify-end">
         {isLoading ? (
           <LettersSkeleton />
         ) : isEmpty ? (
@@ -522,6 +525,8 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
             </div>
           </>
         )}
+        </div>
+        </ScrollArea>
       </div>
 
     </div>
