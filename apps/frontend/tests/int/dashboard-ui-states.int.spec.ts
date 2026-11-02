@@ -85,7 +85,7 @@ describe('letters list', () => {
     mocks.senior.mockResolvedValue(false)
     mocks.fetch.mockResolvedValue(ok)
     render(await LettersPage())
-    fireEvent.change(screen.getByRole('textbox', { name: 'جستجو' }), { target: { value: 'چیزی' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'جستجو' }), { target: { value: 'چیزی' } })
     expect(screen.getByText('نتیجه‌ای پیدا نشد')).toBeTruthy()
     expect(screen.queryByText('صندوق نامه‌های شما خالیست')).toBeNull()
   })
