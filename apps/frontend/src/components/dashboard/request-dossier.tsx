@@ -17,6 +17,7 @@ import {
   type ReviewRoundDto,
 } from '@/utilities/dashboard-api'
 import { documentCategoryLabel, type DocumentCategory } from '@/utilities/document-categories'
+import { companyNextAction, companyStageLabel } from '@/utilities/request-tracking'
 
 const FINANCIAL_CATEGORIES: DocumentCategory[] = [
   'financialStatements',
@@ -88,6 +89,8 @@ export interface RequestDossierProps {
   evaluations: DossierPart<EvaluationListDto>
   /** Company-only sections, rendered above the request details. */
   companySections?: React.ReactNode
+  /** The company sections include the FE13 correction form, which owns the proposal upload while correcting. */
+  correctionHandled?: boolean
 }
 
 /**
@@ -95,7 +98,15 @@ export interface RequestDossierProps {
  * so a reviewer's response has no owner and an unauthorized file never reaches the page.
  * The role here only chooses which sections and controls exist.
  */
-export function RequestDossier({ role, detail, proposal, round, evaluations, companySections }: RequestDossierProps) {
+export function RequestDossier({
+  role,
+  detail,
+  proposal,
+  round,
+  evaluations,
+  companySections,
+  correctionHandled = false,
+}: RequestDossierProps) {
   const { request, owner, timeline, workflow } = detail
   const id = request.id
   const actions = request.allowedActions ?? []
@@ -106,8 +117,13 @@ export function RequestDossier({ role, detail, proposal, round, evaluations, com
   // The chief's advancement opens the financial files and closes the proposal for the company.
   const financialStageOpen = request.reviewStage === 'advanced'
   const proposalWritable = !isCompany || !financialStageOpen
-  const nextAction = NEXT_ACTION_LABELS.find(([action]) => actions.includes(action))?.[1]
-  const unbuiltNotes = actions.flatMap((action) => UNBUILT_ACTION_NOTES[action] ?? [])
+  const nextAction = isCompany
+    ? companyNextAction(request)
+    : NEXT_ACTION_LABELS.find(([action]) => actions.includes(action))?.[1]
+  const correcting = correctionHandled && isCompany && actions.includes('correct')
+  const unbuiltNotes = actions.flatMap((action) =>
+    correcting && action === 'correct' ? [] : (UNBUILT_ACTION_NOTES[action] ?? []),
+  )
   if (role === 'reviewer' || role === 'employer-reviewer') {
     unbuiltNotes.push('فرم ارزیابی از این صفحه هنوز فعال نیست.')
   }
@@ -134,7 +150,7 @@ export function RequestDossier({ role, detail, proposal, round, evaluations, com
       <div className="grid gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-3">
         <Field label="کد پیگیری" value={request.trackingCode} mono />
         <Field label="وضعیت" value={STATUS_LABELS[request.status] ?? request.status} />
-        <Field label="مرحله" value={stageLabel(request.reviewStage, request.currentStep)} />
+        <Field label="مرحله" value={isCompany ? companyStageLabel(request) : stageLabel(request.reviewStage, request.currentStep)} />
         <Field label="نسخه پرونده" value={request.revision ? request.revision.toLocaleString('fa-IR') : '—'} />
         <Field label="اقدام بعدی شما" value={nextAction ?? 'اقدامی برای شما تعریف نشده است'} />
         <Field label="تاریخ ثبت" value={formatDate(request.submissionDate) || 'ثبت نشده'} />
@@ -200,14 +216,16 @@ export function RequestDossier({ role, detail, proposal, round, evaluations, com
           </Typography>
         ) : null}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <PrivateDocumentField
-            category="proposal"
-            label={documentCategoryLabel('proposal')}
-            requestId={id}
-            readOnly={!canUpload}
-            canUpload={canUpload && proposalWritable}
-            canDelete={canDelete && proposalWritable}
-          />
+          {correcting ? null : (
+            <PrivateDocumentField
+              category="proposal"
+              label={documentCategoryLabel('proposal')}
+              requestId={id}
+              readOnly={!canUpload}
+              canUpload={canUpload && proposalWritable}
+              canDelete={canDelete && proposalWritable}
+            />
+          )}
           {seesFinancial
             ? FINANCIAL_CATEGORIES.map((category) => (
                 <PrivateDocumentField

@@ -2,9 +2,10 @@ import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { NewRequestForm, type RequestFormField, type RequestFormOption } from '@/components/dashboard/new-request-form'
+import { NewRequestForm } from '@/components/dashboard/new-request-form'
 import { Typography } from '@/components/ui/typography'
 import type { ParticipationTarget } from '@/utilities/participation-eligibility'
+import { serviceFormFields } from '@/utilities/service-form-fields'
 
 export const dynamic = 'force-dynamic'
 export default async function NewRequestPage({ searchParams }: { searchParams: Promise<{ service?: string; eventId?: string; eventTitle?: string; subtopicId?: string; boothId?: string }> }) {
@@ -15,20 +16,7 @@ export default async function NewRequestPage({ searchParams }: { searchParams: P
   const result = await payload.find({ collection: 'services', where: { key: { equals: key } }, depth: 2, limit: 1 })
   const service = result.docs[0]
   if (!service) notFound()
-  const form = typeof service.form === 'object' && service.form ? service.form as { fields?: unknown[] } : null
-  const fields: RequestFormField[] = (form?.fields ?? []).map((field) => {
-    const value = field as { name?: unknown; label?: unknown; blockType?: unknown; required?: unknown; options?: unknown[] }
-    const options = Array.isArray(value.options)
-      ? value.options.flatMap((option): RequestFormOption[] => {
-          if (typeof option === 'string') return [{ label: option, value: option }]
-          if (!option || typeof option !== 'object') return []
-          const item = option as { label?: unknown; value?: unknown }
-          const optionValue = String(item.value ?? item.label ?? '')
-          return optionValue ? [{ label: String(item.label ?? optionValue), value: optionValue }] : []
-        })
-      : undefined
-    return { name: String(value.name ?? ''), label: typeof value.label === 'string' ? value.label : undefined, blockType: String(value.blockType ?? ''), required: value.required === true, options }
-  }).filter((field) => field.name)
+  const fields = serviceFormFields(service)
   const initialAnswers = Object.fromEntries(fields.flatMap((field) => {
     if (!query.eventTitle || !field.name.toLocaleLowerCase().includes('event')) return []
     return [[field.name, field.name.toLocaleLowerCase().includes('id') ? String(query.eventId ?? '') : query.eventTitle]]
