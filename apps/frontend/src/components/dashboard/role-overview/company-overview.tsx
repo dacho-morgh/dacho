@@ -3,10 +3,10 @@ import { ActivityCard } from '@/components/dashboard/owner-overview/activity-car
 import { KpiCard } from '@/components/dashboard/owner-overview/kpi-card'
 import {
   DashboardAddIcon,
-  DashboardEditIcon,
-  DashboardLettersIcon,
-  DashboardRequestsIcon,
-  EventsTimerIcon,
+  EditIcon,
+  LettersIcon,
+  RequestsIcon,
+  ClockBulkIcon,
 } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -100,14 +100,14 @@ export async function CompanyOverview({ userName }: { userName?: string | null }
         <KpiCard
           label="درخواست‌های فعال"
           value={countText(active)}
-          icon={<DashboardRequestsIcon />}
+          icon={<RequestsIcon />}
           meta={counts ? `از ${fa(counts.total)} درخواست شرکت` : READ_FAILED}
         />
         <KpiCard
           label="نیازمند اقدام شما"
           tone="warning"
           value={countText(needAction)}
-          icon={<EventsTimerIcon />}
+          icon={<ClockBulkIcon />}
           meta={
             needAction === undefined
               ? READ_FAILED
@@ -117,36 +117,35 @@ export async function CompanyOverview({ userName }: { userName?: string | null }
         <KpiCard
           label="پیش‌نویس‌های ارسال‌نشده"
           value={countText(queueCount(queues, 'company_draft'))}
-          icon={<DashboardEditIcon />}
+          icon={<EditIcon />}
           meta={queues ? 'هنوز برای بررسی فرستاده نشده‌اند' : READ_FAILED}
         />
         <KpiCard
           label="نامه‌های خوانده‌نشده"
           value={letters.kind === 'ok' ? fa(letters.data.total) : '—'}
-          icon={<DashboardLettersIcon />}
+          icon={<LettersIcon />}
           meta={letters.kind === 'ok' ? 'از دبیرخانه مرکزی' : READ_FAILED}
         />
       </KpiGrid>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        {member ? (
-          <StepperCard
-            title="مراحل عضویت شرکت"
-            subtitle="وضعیت احراز هویت شرکت شما"
-            badge={
-              <Badge variant={member.variant} size="sm" dot>
-                {member.label}
-              </Badge>
-            }
-            steps={MEMBERSHIP_STEPS}
-            current={member.current}
-          />
-        ) : null}
-        <ActivityCard
-          items={activities.kind === 'ok' ? activities.data.items : undefined}
-          notice={unavailableReasonFor(activities)}
+      <ActivityCard
+        items={activities.kind === 'ok' ? activities.data.items : undefined}
+        notice={unavailableReasonFor(activities)}
+      />
+
+      {member ? (
+        <StepperCard
+          title="مراحل عضویت شرکت"
+          subtitle="وضعیت احراز هویت شرکت شما"
+          badge={
+            <Badge variant={member.variant} size="sm" dot>
+              {member.label}
+            </Badge>
+          }
+          steps={MEMBERSHIP_STEPS}
+          current={member.current}
         />
-      </div>
+      ) : null}
 
       <DataTableCard
         title="درخواست‌های شرکت"

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { OfflineNotice, type UnavailableReason } from '@/components/dashboard/offline-notice'
 import { requestQueueHref } from '@/components/dashboard/requests/types'
 import { workQueueLabel } from '@/components/dashboard/work-queue-overview'
-import { DashboardEventsIcon } from '@/components/icons'
+import { EventsIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import type { WorkQueueCountDto } from '@/utilities/dashboard-api'
@@ -29,7 +29,7 @@ export function QueueNotices({
             aria-hidden="true"
             className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-brand-600 [&_svg]:size-5"
           >
-            <DashboardEventsIcon />
+            <EventsIcon />
           </span>
           <Typography
             as="p"

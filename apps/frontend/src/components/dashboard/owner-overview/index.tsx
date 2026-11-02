@@ -1,9 +1,4 @@
-import {
-  DashboardEventsIcon,
-  DashboardRequestsIcon,
-  PeopleIcon,
-  TickCircleIcon,
-} from '@/components/icons'
+import { EventsIcon, RequestsIcon, PeopleIcon, TickCircleIcon } from '@/components/icons'
 import { Typography } from '@/components/ui/typography'
 import type {
   ActivityDto,
@@ -117,7 +112,7 @@ export async function OwnerOverview({ userName }: { userName?: string | null }) 
         <KpiCard
           label="کل درخواست‌ها"
           value={counts ? fa(counts.total) : UNAVAILABLE}
-          icon={<DashboardRequestsIcon />}
+          icon={<RequestsIcon />}
           accessory={months ? <Sparkline values={months.map((month) => month.submitted)} /> : null}
           meta={
             change !== undefined && lastMonth ? (
@@ -153,7 +148,7 @@ export async function OwnerOverview({ userName }: { userName?: string | null }) 
           tone="warning"
           value={open !== undefined ? fa(open) : UNAVAILABLE}
           unit={events.kind === 'ok' ? `از ${fa(events.data.items.length)}` : undefined}
-          icon={<DashboardEventsIcon />}
+          icon={<EventsIcon />}
           meta={open !== undefined ? 'ثبت درخواست برای آن‌ها باز است' : 'دریافت اطلاعات انجام نشد'}
         />
         <KpiCard

@@ -1,11 +1,6 @@
 import { ActivityCard } from '@/components/dashboard/owner-overview/activity-card'
 import { KpiCard } from '@/components/dashboard/owner-overview/kpi-card'
-import {
-  DashboardEditIcon,
-  DashboardRequestsIcon,
-  DashboardLettersIcon,
-  TickCircleIcon,
-} from '@/components/icons'
+import { EditIcon, RequestsIcon, LettersIcon, TickCircleIcon } from '@/components/icons'
 import {
   formatDate,
   type ActivityDto,
@@ -68,20 +63,20 @@ export async function InvestmentOverview({ userName }: { userName?: string | nul
         <KpiCard
           label="پرونده‌های در اختیار"
           value={countText(total)}
-          icon={<DashboardRequestsIcon />}
+          icon={<RequestsIcon />}
           meta={total === undefined ? READ_FAILED : 'همه با بسته مالی کامل'}
         />
         <KpiCard
           label="در انتظار یادداشت"
           tone="warning"
           value={countText(pending)}
-          icon={<DashboardEditIcon />}
+          icon={<EditIcon />}
           meta={pending === undefined ? READ_FAILED : 'پرونده‌هایی که یادداشتشان ارسال نشده'}
         />
         <KpiCard
           label="بسته‌های مالی تازه"
           value={countText(fresh)}
-          icon={<DashboardLettersIcon />}
+          icon={<LettersIcon />}
           meta={fresh === undefined ? READ_FAILED : 'رسیده در هفت روز اخیر'}
         />
         <KpiCard

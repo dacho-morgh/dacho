@@ -47,7 +47,12 @@ export function FunnelCard({
               <Typography variant="14/semibold" color="neutral-800" className="text-end">
                 {fa(step.value)}
                 {index > 0 ? (
-                  <Typography as="span" variant="12/regular" color="neutral-500" className="ms-2 inline-block">
+                  <Typography
+                    as="span"
+                    variant="12/regular"
+                    color="neutral-500"
+                    className="ms-2 inline-block"
+                  >
                     {fa(percent)}٪
                   </Typography>
                 ) : null}

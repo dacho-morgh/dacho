@@ -1,12 +1,7 @@
 import Link from 'next/link'
 import type { ComponentType, SVGProps } from 'react'
 import { OfflineNotice, type UnavailableReason } from '@/components/dashboard/offline-notice'
-import {
-  DashboardCloseCircle,
-  DashboardEditIcon,
-  DashboardRequestsIcon,
-  TickCircleIcon,
-} from '@/components/icons'
+import { DashboardCloseCircle, EditIcon, RequestsIcon, TickCircleIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Typography } from '@/components/ui/typography'
@@ -15,9 +10,9 @@ import { cn } from '@/utilities/ui'
 import { TONE_CHIP, activityTone, type OverviewTone } from './tone'
 
 const TONE_ICON: Record<OverviewTone, ComponentType<SVGProps<SVGSVGElement>>> = {
-  brand: DashboardRequestsIcon,
+  brand: RequestsIcon,
   success: TickCircleIcon,
-  warning: DashboardEditIcon,
+  warning: EditIcon,
   error: DashboardCloseCircle,
 }
 

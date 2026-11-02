@@ -1,11 +1,6 @@
 import { ActivityCard } from '@/components/dashboard/owner-overview/activity-card'
 import { KpiCard } from '@/components/dashboard/owner-overview/kpi-card'
-import {
-  DashboardEditIcon,
-  DashboardRequestsIcon,
-  EventsTimerIcon,
-  TickCircleIcon,
-} from '@/components/icons'
+import { EditIcon, RequestsIcon, ClockBulkIcon, TickCircleIcon } from '@/components/icons'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 import { formatDate, type ActivityDto, type Paginated } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
@@ -71,7 +66,7 @@ export async function ReviewerOverview({
           label="در انتظار ثبت نهایی"
           tone="warning"
           value={waiting === undefined ? '—' : fa(waiting)}
-          icon={<EventsTimerIcon />}
+          icon={<ClockBulkIcon />}
           meta={
             items
               ? `${fa(drafts)} پیش‌نویس، ${fa(actionable.length - drafts)} شروع‌نشده`
@@ -88,13 +83,13 @@ export async function ReviewerOverview({
         <KpiCard
           label="پرونده‌های بسته‌شده"
           value={counts ? fa(counts.closed) : '—'}
-          icon={<DashboardRequestsIcon />}
+          icon={<RequestsIcon />}
           meta={counts ? `از ${fa(counts.all)} پرونده ارجاع‌شده` : READ_FAILED}
         />
         <KpiCard
           label="نسخه جدیدتر ثبت‌شده"
           value={superseded === undefined ? '—' : fa(superseded)}
-          icon={<DashboardEditIcon />}
+          icon={<EditIcon />}
           meta={items ? 'ارزیابی پیشین در دور جدید شمرده نمی‌شود' : READ_FAILED}
         />
       </KpiGrid>

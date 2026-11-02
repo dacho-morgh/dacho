@@ -2,7 +2,7 @@ import { ActivityCard } from '@/components/dashboard/owner-overview/activity-car
 import { KpiCard } from '@/components/dashboard/owner-overview/kpi-card'
 import {
   DashboardMessageTextIcon,
-  DashboardRequestsIcon,
+  RequestsIcon,
   DashboardUserTagIcon,
   TickCircleIcon,
 } from '@/components/icons'
@@ -66,7 +66,7 @@ export async function SecretariatOverview({ userName }: { userName?: string | nu
         <KpiCard
           label="یادداشت بدون نتیجه منتشرشده"
           value={countText(queueCount(queues, 'follow_up_unpublished'))}
-          icon={<DashboardRequestsIcon />}
+          icon={<RequestsIcon />}
           meta={
             undelivered === undefined ? READ_FAILED : `${fa(undelivered)} مدرک تکمیلی تحویل‌نشده`
           }

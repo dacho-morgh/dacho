@@ -1,11 +1,6 @@
 import { ActivityCard } from '@/components/dashboard/owner-overview/activity-card'
 import { KpiCard, Sparkline } from '@/components/dashboard/owner-overview/kpi-card'
-import {
-  DashboardEyeIcon,
-  DashboardRequestsIcon,
-  PeopleIcon,
-  TickCircleIcon,
-} from '@/components/icons'
+import { EyeIcon, RequestsIcon, PeopleIcon, TickCircleIcon } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import {
   REQUEST_STATUS_LABELS,
@@ -60,7 +55,7 @@ export async function ChiefOverview({ userName }: { userName?: string | null }) 
           label="در انتظار بررسی اولیه"
           tone="warning"
           value={countText(queueCount(queues, 'chief_triage'))}
-          icon={<DashboardEyeIcon />}
+          icon={<EyeIcon />}
           meta={queues ? 'پرونده‌های رویدادهای شما' : READ_FAILED}
         />
         <KpiCard
@@ -79,13 +74,13 @@ export async function ChiefOverview({ userName }: { userName?: string | null }) 
         <KpiCard
           label="پرونده‌های رویداد"
           value={counts ? fa(counts.total) : '—'}
-          icon={<DashboardRequestsIcon />}
+          icon={<RequestsIcon />}
           accessory={months ? <Sparkline values={months.map((month) => month.submitted)} /> : null}
           meta={thisWeek ? `${fa(thisWeek.submitted)} پرونده در ${thisWeek.label}` : READ_FAILED}
         />
       </KpiGrid>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         {funnelReady ? (
           <FunnelCard
             title="مسیر درخواست‌ها در رویداد"
