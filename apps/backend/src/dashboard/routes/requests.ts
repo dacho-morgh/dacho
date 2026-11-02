@@ -11,7 +11,7 @@ import { parseRequestFilters, parsePositiveInt, parseRevisionQuery, acceptsAgree
 import type { DashboardContext } from './context.js'
 
 export function registerRequestRoutes(router: Router, ctx: DashboardContext): void {
-  const { deps, repo, activities, assignments, financialPackages, reviewCases, evaluations, verificationStore, actorCompanyId, presentRequests, limitRequest, limitActivities, resolveScope, refuseCommand } = ctx
+  const { deps, repo, activities, assignments, financialPackages, reviewCases, verificationStore, actorCompanyId, presentRequests, limitRequest, limitActivities, resolveScope, refuseCommand } = ctx
 
   router.post('/requests', async (req, res, next) => {
     try {

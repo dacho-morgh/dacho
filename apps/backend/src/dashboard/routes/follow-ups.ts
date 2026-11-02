@@ -10,7 +10,7 @@ import { parsePositiveInt, resolveRequesterNames } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 
 export function registerFollowUpRoutes(router: Router, ctx: DashboardContext): void {
-  const { deps, repo, assignments, investmentMemos, followUps, resolveScope, withAuthorNames } = ctx
+  const { deps, repo, investmentMemos, followUps, resolveScope, withAuthorNames } = ctx
 
   const isFollowUpReader = (role: OperationalRole) => role === 'central-secretariat' || role === 'system-owner'
 

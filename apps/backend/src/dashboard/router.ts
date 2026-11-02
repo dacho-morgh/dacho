@@ -1,5 +1,4 @@
 import { Router } from 'express'
-import type { Request } from 'express'
 import { isOperationalRole } from '../access/roles.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
 import { createDocumentRouter } from '../documents/router.js'
@@ -63,7 +62,7 @@ const dashboardRoles = {
 export function createDashboardRouter(deps: DashboardDeps): Router {
   const router = Router()
   const ctx = createDashboardContext(deps)
-  const { assignments, verificationStore } = ctx
+  const { verificationStore } = ctx
 
   router.use(requireProxyAuth(deps.proxySecret, deps.userStore))
   router.use(createDocumentRouter({ ...deps, verificationStore }))
