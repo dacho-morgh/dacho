@@ -200,7 +200,7 @@ function GenericRequestForm({
         </Link>
       ) : null}
 
-      <Button
+      <Button size="40"
         type="submit"
         loading={saving}
         disabled={saving || uploadPending || !eligible || (locked && requireProposal && !documentsReady)}

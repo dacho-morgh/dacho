@@ -224,7 +224,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
       {/* Toolbar — Figma frames 30852:17808 / 30873:18804 */}
       <div className="flex w-full flex-wrap items-center justify-between gap-[8px]">
         {/* Left: نامه جدید button */}
-        <Button asChild size="48" className="bg-brand-500 hover:bg-brand-600">
+        <Button asChild size="48">
           <Link href="/dashboard/letters/new">
             <Typography as="span" variant="20/regular" className="text-inherit">نامه جدید</Typography>
             <DashboardAddIcon className="size-[26px] shrink-0 stroke-white" />
@@ -350,16 +350,15 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
           <Typography variant="14/regular" className="text-inherit">
             {actionNotice}
           </Typography>
-          <button
+          <Button variant="text-gray" size="icon-32"
             type="button"
             onClick={() => setActionNotice(null)}
-            className="flex size-8 items-center justify-center rounded-lg text-brand-600 hover:bg-brand-100"
             aria-label="بستن پیام"
           >
             <span aria-hidden="true" className="text-xl leading-none">
               ×
             </span>
-          </button>
+          </Button>
         </div>
       )}
 
@@ -483,7 +482,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
                     <TypeTag type={item.type} label={item.typeLabel} />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="text-gray" size="icon-sm" className="size-10 shrink-0 rounded-lg hover:bg-neutral-100" aria-label={`عملیات نامه ${item.title}`}>
+                        <Button variant="text-gray" size="icon-40" aria-label={`عملیات نامه ${item.title}`}>
                           <DashboardMoreIcon className="size-5" />
                         </Button>
                       </DropdownMenuTrigger>

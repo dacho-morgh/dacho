@@ -23,14 +23,14 @@ export function RequestsPagination({
       dir="rtl"
     >
       {page > 1 && (
-        <Button asChild variant="outline-gray">
+        <Button size="40" asChild variant="outline-gray">
           <Link href={href(1)}>
             <Typography>صفحه نخست</Typography>
           </Link>
         </Button>
       )}
       {page > 1 && (
-        <Button asChild variant="outline-gray">
+        <Button size="40" asChild variant="outline-gray">
           <Link href={href(page - 1)}>
             <Typography>صفحه قبل</Typography>
           </Link>
@@ -40,7 +40,7 @@ export function RequestsPagination({
         صفحه {page.toLocaleString('fa-IR')} از {Math.max(1, totalPages).toLocaleString('fa-IR')}
       </Typography>
       {page < totalPages && (
-        <Button asChild variant="outline-gray">
+        <Button size="40" asChild variant="outline-gray">
           <Link href={href(page + 1)}>
             <Typography>صفحه بعد</Typography>
           </Link>

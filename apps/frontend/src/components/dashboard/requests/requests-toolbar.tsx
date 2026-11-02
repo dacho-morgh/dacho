@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@/components/ui/button'
 import React from 'react'
 import { FilterIcon } from '@/components/icons'
 import { RequestsSearchInput } from './requests-search-input'
@@ -27,15 +28,14 @@ export function RequestsToolbar({
           />
         </div>
 
-        <button
+        <Button variant="white" size="icon-48"
           type="button"
           onClick={onFilterClick}
-          className="flex h-12 w-12.5 shrink-0 items-center justify-center rounded-[12px] bg-white text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           title="فیلتر"
         >
           <FilterIcon className="size-6.5" />
           <span className="sr-only">فیلتر</span>
-        </button>
+        </Button>
       </div>
     </div>
   )

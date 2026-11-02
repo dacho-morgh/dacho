@@ -104,14 +104,14 @@ export function RequestError({
         {adminErrorMessage(error)}
       </Typography>
       {error instanceof AdminError && error.status === 401 ? (
-        <Button asChild variant="outline">
+        <Button size="40" asChild variant="outline-gray">
           <a href={`/login?returnUrl=${encodeURIComponent(returnTo)}`}>
             <Typography variant="14/regular">ورود دوباره</Typography>
           </a>
         </Button>
       ) : (
         retry && (
-          <Button type="button" variant="outline" onClick={retry}>
+          <Button size="40" type="button" variant="outline-gray" onClick={retry}>
             <Typography variant="14/regular">تلاش دوباره</Typography>
           </Button>
         )
@@ -284,9 +284,9 @@ export function PersonnelForm({
       </fieldset>
       {failure !== null && <RequestError error={failure} returnTo="/dashboard/employees" />}
       {person && failure instanceof AdminError && failure.status === 409 && (
-        <Button
+        <Button size="40"
           type="button"
-          variant="outline"
+          variant="outline-gray"
           onClick={async () => {
             try {
               const latest = await adminRequest(
@@ -311,7 +311,7 @@ export function PersonnelForm({
         </Button>
       )}
       <div className="flex flex-wrap gap-3">
-        <Button
+        <Button size="40"
           type="submit"
           disabled={isSubmitting || (failure instanceof AdminError && failure.status === 409)}
         >
@@ -319,7 +319,7 @@ export function PersonnelForm({
             {isSubmitting ? 'در حال ذخیره...' : 'ذخیره'}
           </Typography>
         </Button>
-        <Button type="button" variant="outline-gray" disabled={isSubmitting} onClick={onCancel}>
+        <Button size="40" type="button" variant="outline-gray" disabled={isSubmitting} onClick={onCancel}>
           <Typography variant="16/regular">بازگشت به فهرست</Typography>
         </Button>
       </div>

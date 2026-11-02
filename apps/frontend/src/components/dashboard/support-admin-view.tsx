@@ -249,20 +249,18 @@ export function SupportAdminView({
                     placeholder="پاسخ به این تیکت (ارسال پاسخ به صورت خودکار یک نامه رسمی برای متقاضی نیز ایجاد می‌کند)..."
                   />
                   <div className="flex sm:flex-col gap-2 justify-end">
-                    <Button
+                    <Button size="40"
                       type="button"
                       disabled={processingId === ticket.id || !responses[ticket.id]?.trim()}
                       onClick={() => respond(ticket.id)}
-                      className="rounded-xl whitespace-nowrap"
                     >
                       {processingId === ticket.id ? 'در حال ارسال...' : 'ارسال پاسخ'}
                     </Button>
-                    <Button
+                    <Button size="40"
                       type="button"
                       variant="outline-gray"
                       disabled={processingId === ticket.id}
                       onClick={() => close(ticket.id)}
-                      className="rounded-xl whitespace-nowrap"
                     >
                       بستن تیکت
                     </Button>

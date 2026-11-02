@@ -42,7 +42,7 @@ function AccessState({ denied, href = '/dashboard' }: { denied: boolean; href?: 
             ? 'این نشانی در محدوده دسترسی فعلی حساب شما نیست.'
             : 'ارتباط با سرویس دسترسی برقرار نشد. دوباره تلاش کنید یا به پیشخوان برگردید.'}
         </Typography>
-        <Button asChild>
+        <Button size="40" asChild>
           <Link href={href}>{denied ? 'رفتن به پیشخوان' : 'تلاش دوباره'}</Link>
         </Button>
       </section>

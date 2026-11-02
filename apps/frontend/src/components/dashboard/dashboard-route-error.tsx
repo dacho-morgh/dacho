@@ -39,7 +39,7 @@ export function DashboardRouteError({
           {digest}
         </Typography>
       )}
-      <Button type="button" onClick={staleBuild ? () => window.location.reload() : () => retry()}>
+      <Button size="40" type="button" onClick={staleBuild ? () => window.location.reload() : () => retry()}>
         <Typography>{staleBuild ? 'تازه کردن صفحه' : 'تلاش دوباره'}</Typography>
       </Button>
     </section>

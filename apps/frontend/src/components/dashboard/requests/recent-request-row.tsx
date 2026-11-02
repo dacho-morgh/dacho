@@ -48,9 +48,8 @@ export function RecentRequestRow({ item }: RecentRequestRowProps) {
       <td className="px-5 py-4 text-center whitespace-nowrap">
         <Link href={`/dashboard/requests/${item.id}`}>
           <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 rounded-lg px-2.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            variant="text-gray"
+            size="32"
           >
             <Eye className="h-3.5 w-3.5 ml-1" />
             پیگیری

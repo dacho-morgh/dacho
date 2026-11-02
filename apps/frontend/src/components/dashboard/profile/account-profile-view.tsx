@@ -88,7 +88,7 @@ export function AccountProfileView({ initialProfile }: { initialProfile: Profile
         </div>
       </section>
       <div className="flex justify-start">
-        <Button type="button" variant="gray" disabled>
+        <Button size="40" type="button" variant="gray" disabled>
           <DashboardEditIcon className="size-5" />
           تغییر رمز عبور
         </Button>

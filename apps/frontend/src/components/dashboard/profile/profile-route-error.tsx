@@ -17,7 +17,7 @@ export function ProfileRouteError({
       <Typography color="neutral-500">
         مشکلی در دریافت اطلاعات پروفایل رخ داد. لطفاً دوباره تلاش کنید.
       </Typography>
-      <Button type="button" onClick={() => retry()}>
+      <Button size="40" type="button" onClick={() => retry()}>
         تلاش دوباره
       </Button>
     </section>

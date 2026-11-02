@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   AlertCircle,
@@ -198,14 +199,13 @@ function QuickSelectModal({
               برای مشاهده فرم عنوان و زیر عنوان مورد نظر خود را انتخاب کنید.
             </p>
           </div>
-          <button
+          <Button variant="text-gray" size="icon-36"
             type="button"
             onClick={onClose}
             aria-label="بستن پنجره"
-            className="flex size-9 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
           >
             <X className="size-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Dropdowns */}
@@ -256,21 +256,19 @@ function QuickSelectModal({
 
         {/* Action Buttons */}
         <div className="mt-2 flex items-center justify-end gap-3 pt-2">
-          <button
+          <Button variant="outline-gray" size="40"
             type="button"
             onClick={onClose}
-            className="flex h-10 items-center justify-center rounded-lg border border-neutral-300 px-4 font-sans text-[14px] font-medium text-neutral-700 hover:bg-neutral-50"
           >
             لغو
-          </button>
-          <button
+          </Button>
+          <Button size="40"
             type="button"
             onClick={handleConfirm}
             disabled={!selectedSubId}
-            className="flex h-10 items-center justify-center rounded-lg bg-brand-500 px-5 font-sans text-[14px] font-semibold text-white shadow-xs hover:bg-brand-600 disabled:opacity-50"
           >
             تایید
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -531,11 +529,10 @@ export function EventsView({
 
           {/* Top Registration Action Button */}
           <div className="flex items-center gap-3">
-            <button
+            <Button size="40"
               type="button"
               onClick={handleRegisterSelected}
               disabled={isEnded || selectedCount === 0 || !eligibility?.canParticipate}
-              className="flex h-[40px] items-center justify-center gap-2 rounded-[10px] bg-brand-500 px-4 text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500"
             >
               <span className="font-sans text-[15px] font-semibold">
                 {isEnded
@@ -545,7 +542,7 @@ export function EventsView({
                     : 'ثبت‌نام در رویداد'}
               </span>
               <TickSquareIcon className="size-5 shrink-0 stroke-white" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -642,13 +639,12 @@ export function EventsView({
                 </span>
               )}
               {categories.length > 0 && (
-                <button
+                <Button variant="outline-gray" size="36"
                   type="button"
                   onClick={() => setQuickModalOpen(true)}
-                  className="flex h-9 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 font-sans text-[13px] font-medium text-neutral-700 hover:bg-neutral-50"
                 >
                   <span>انتخاب سریع عنوان</span>
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -675,14 +671,13 @@ export function EventsView({
           ) : detailsError ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
               <p className="font-sans text-[14px] text-red-600">{detailsError}</p>
-              <button
+              <Button variant="outline-gray" size="32"
                 type="button"
                 onClick={loadEventHierarchy}
-                className="flex items-center gap-1.5 rounded-lg border border-neutral-300 px-3.5 py-1.5 text-[13px] font-medium text-neutral-700 hover:bg-neutral-50"
               >
                 <RotateCcw className="size-4" />
                 <span>تلاش دوباره</span>
-              </button>
+              </Button>
             </div>
           ) : categories.length === 0 ? (
             <div className="py-12 text-center font-sans text-[14px] text-neutral-500">
@@ -759,15 +754,14 @@ export function EventsView({
 
                                   {/* Left side: RFP Actions */}
                                   <div className="flex items-center gap-2">
-                                    <button
+                                    <Button variant="outline-gray" size="32"
                                       type="button"
                                       onClick={() => toggleRfpViewer(sub)}
                                       aria-label={`دریافت فایل RFP برای ${sub.title}`}
-                                      className="flex h-8 items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-3 text-[13px] font-medium text-neutral-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
                                     >
                                       <FileText className="size-4" />
                                       <span>مشاهده و دانلود RFP</span>
-                                    </button>
+                                    </Button>
                                   </div>
                                 </div>
 
@@ -1004,7 +998,7 @@ export function EventsView({
                           </div>
 
                           {/* Action Button */}
-                          <button
+                          <Button size="40"
                             type="button"
                             onClick={() => {
                               if (isOwner && evt.serviceKey === 'exhibitions') {
@@ -1021,7 +1015,6 @@ export function EventsView({
                                 )
                               }
                             }}
-                            className="flex h-[40px] items-center justify-center gap-[8px] rounded-[10px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500"
                           >
                             <span className="font-sans text-[16px] leading-[28px] font-semibold">
                               {isOwner && evt.serviceKey === 'exhibitions'
@@ -1029,7 +1022,7 @@ export function EventsView({
                                 : evt.actionButtonText || 'ثبت درخواست'}
                             </span>
                             <TickSquareIcon className="size-[24px] shrink-0 stroke-white" />
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         /* Frame 44: Date and Location only */

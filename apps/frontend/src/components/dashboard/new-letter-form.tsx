@@ -242,9 +242,8 @@ export function NewLetterForm({
         <div className="flex items-center gap-2">
           <Button
             type="button"
-            variant="outline"
+            variant="outline-gray"
             size="40"
-            className="px-4"
             disabled={saving}
             onClick={() => router.push('/dashboard/letters')}
           >
@@ -254,7 +253,6 @@ export function NewLetterForm({
             type="submit"
             size="40"
             disabled={saving || uploading || changingCase || (!isSupport && !companies.length)}
-            className="bg-brand-500 px-4 hover:bg-brand-600"
           >
             <Typography as="span" variant="16/semibold" className="text-inherit">
               {saving ? 'در حال ارسال...' : isSupport ? 'ارسال پیام' : 'ارسال نامه'}

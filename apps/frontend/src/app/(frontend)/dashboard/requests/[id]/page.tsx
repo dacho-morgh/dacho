@@ -277,7 +277,7 @@ function CompanySections({
         correction={correction}
       />
       <div className="flex justify-end">
-        <Button asChild variant="outline" size="40" className="px-4">
+        <Button asChild variant="outline-gray" size="40">
           <Link href={`/dashboard/letters/new?requestId=${encodeURIComponent(requestId)}`}>
             <Typography as="span" variant="16/semibold" className="text-inherit">نامه به دبیرخانه</Typography>
           </Link>

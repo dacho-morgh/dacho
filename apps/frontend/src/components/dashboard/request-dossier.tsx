@@ -147,7 +147,7 @@ export function RequestDossier({
           ) : null}
         </div>
         {(role === 'system-owner' || role === 'central-secretariat') && request.ownerId ? (
-          <Button asChild variant="outline" size="40">
+          <Button asChild variant="outline-gray" size="40">
             <Link href={`/dashboard/companies/${encodeURIComponent(request.ownerId)}`}>
               <Typography variant="14/regular" className="text-inherit">مشاهده پروفایل شرکت</Typography>
             </Link>

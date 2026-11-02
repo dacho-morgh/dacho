@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -274,16 +275,15 @@ export function InboxListView({
           <Typography variant="14/regular" className="text-inherit">
             {actionNotice}
           </Typography>
-          <button
+          <Button variant="text-gray" size="icon-32"
             type="button"
             onClick={() => setActionNotice(null)}
-            className="flex size-8 items-center justify-center rounded-lg text-brand-600 hover:bg-brand-100"
             aria-label="بستن پیام"
           >
             <span aria-hidden="true" className="text-xl leading-none">
               ×
             </span>
-          </button>
+          </Button>
         </div>
       )}
 
@@ -355,14 +355,13 @@ export function InboxListView({
               </DropdownMenu>
             </div>
             {showSupport && (
-              <button
+              <Button size="48"
                 type="button"
-                onClick={() => setSupportModalOpen(true)}
-                className="flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[12px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500 sm:w-[199px]"
+                onClick={() => setSupportModalOpen(true)} className="w-full"
               >
                 <span className="font-sans text-[20px] leading-[32px] font-normal">پیام به پشتیبانی</span>
                 <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
-              </button>
+              </Button>
             )}
           </div>
 

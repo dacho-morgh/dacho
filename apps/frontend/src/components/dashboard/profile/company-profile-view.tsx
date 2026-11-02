@@ -381,7 +381,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
           {error ?? 'در حال دریافت اطلاعات پرونده…'}
         </Typography>
         {error && (
-          <Button type="button" onClick={() => window.location.reload()}>
+          <Button size="40" type="button" onClick={() => window.location.reload()}>
             <Typography>تلاش دوباره</Typography>
           </Button>
         )}
@@ -911,7 +911,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
           onClose={() => setAddressDialogOpen(false)}
           actions={
             <>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="outline-primary"
                 className="flex-1"
@@ -919,7 +919,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
               >
                 لغو
               </Button>
-              <Button
+              <Button size="40"
                 type="button"
                 className="flex-1"
                 loading={isSavingAddress}
@@ -969,7 +969,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
           onClose={() => setEditingExecutiveIndex(null)}
           actions={
             <>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="outline-gray"
                 className="flex-1"
@@ -977,7 +977,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
               >
                 انصراف
               </Button>
-              <Button
+              <Button size="40"
                 type="button"
                 className="flex-1"
                 loading={isSavingExecutive}

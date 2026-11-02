@@ -86,7 +86,7 @@ export function InvestmentMemoPanel({ id }: { id: string }) {
       ) : state === 'error' ? (
         <div className="flex flex-wrap items-center gap-3">
           <Typography role="alert" variant="14/regular" color="error">دریافت یادداشت‌ها انجام نشد.</Typography>
-          <Button type="button" variant="outline" size="32" onClick={() => void load()}>
+          <Button type="button" variant="outline-gray" size="32" onClick={() => void load()}>
             <Typography variant="12/semibold" className="text-inherit">تلاش دوباره</Typography>
           </Button>
         </div>
@@ -107,7 +107,7 @@ export function InvestmentMemoPanel({ id }: { id: string }) {
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="outline-gray"
               size="40"
               disabled={busy || !trimmed || canSend}
               onClick={() => void run(() => saveInvestmentMemo(id, trimmed), 'نسخه تازه یادداشت ثبت شد.')}

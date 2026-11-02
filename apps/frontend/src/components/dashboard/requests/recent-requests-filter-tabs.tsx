@@ -72,9 +72,8 @@ export function RecentRequestsFilterTabs({
 
         <Link href="/dashboard/requests">
           <Button
-            variant="outline"
-            size="sm"
-            className="hidden sm:inline-flex rounded-xl text-xs gap-1.5"
+            variant="outline-gray"
+            size="32" className="hidden sm:inline-flex"
           >
             مشاهده همه
             <ChevronLeft className="h-3.5 w-3.5" />

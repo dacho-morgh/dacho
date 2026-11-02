@@ -56,11 +56,11 @@ export function RequestsFilters({
           </option>
         ))}
       </select>
-      <Button type="submit" variant="outline-gray">
+      <Button size="40" type="submit" variant="outline-gray">
         <Typography>اعمال فیلتر</Typography>
       </Button>
       {active && (
-        <Button asChild variant="text-gray">
+        <Button size="40" asChild variant="text-gray">
           <Link href={requestQueueHref(basePath, status)}>
             <Typography>حذف فیلترها</Typography>
           </Link>

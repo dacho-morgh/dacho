@@ -93,7 +93,7 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
         ) : (
           <div className="flex flex-wrap items-center gap-3">
             <Typography role="alert" variant="14/regular" color="error">دریافت اطلاعات پیگیری انجام نشد.</Typography>
-            <Button type="button" variant="outline" size="32" onClick={() => void load()}>
+            <Button type="button" variant="outline-gray" size="32" onClick={() => void load()}>
               <Typography variant="12/semibold" className="text-inherit">تلاش دوباره</Typography>
             </Button>
           </div>
@@ -170,7 +170,7 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
             </label>
             <Button
               type="button"
-              variant="outline"
+              variant="outline-gray"
               size="40"
               className="w-fit"
               disabled={busy || !askBody.trim()}
@@ -198,7 +198,7 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
                 {editable && !file.deliveredAt ? (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="outline-gray"
                     size="32"
                     disabled={busy}
                     onClick={() => void run(() => deliverSupplementaryFile(id, file.id), 'مدرک برای مسئول سرمایه‌گذاری قابل بررسی شد.')}
@@ -244,7 +244,7 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
             </label>
             <Button
               type="button"
-              variant="outline"
+              variant="outline-gray"
               size="40"
               className="w-fit"
               disabled={busy || !trimmed || previewReady}

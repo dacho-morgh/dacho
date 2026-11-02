@@ -293,18 +293,18 @@ function EventForm({
           <Typography variant="14/regular">
             ویرایش شما حفظ شده است. بررسی نسخه جدید، فرم را با اطلاعات سرور جایگزین می‌کند.
           </Typography>
-          <Button type="button" variant="outline" disabled={reloading} onClick={reload}>
+          <Button size="40" type="button" variant="outline-gray" disabled={reloading} onClick={reload}>
             <Typography variant="14/regular">بررسی نسخه جدید</Typography>
           </Button>
         </>
       )}
       <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={isSubmitting || stale || reloading}>
+        <Button size="40" type="submit" disabled={isSubmitting || stale || reloading}>
           <Typography variant="16/semibold">
             {isSubmitting ? 'در حال ذخیره...' : 'ذخیره رویداد'}
           </Typography>
         </Button>
-        <Button
+        <Button size="40"
           type="button"
           variant="outline-gray"
           disabled={isSubmitting || reloading}
@@ -386,12 +386,12 @@ function CategoryForm({
       </Field>
       {failure !== null && <RequestError error={failure} returnTo="/dashboard/events" />}
       <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={isSubmitting}>
+        <Button size="40" type="submit" disabled={isSubmitting}>
           <Typography variant="14/regular" color="white">
             {isSubmitting ? 'در حال ذخیره...' : 'ذخیره دسته'}
           </Typography>
         </Button>
-        <Button type="button" variant="outline-gray" disabled={isSubmitting} onClick={onCancel}>
+        <Button size="40" type="button" variant="outline-gray" disabled={isSubmitting} onClick={onCancel}>
           <Typography variant="14/regular">انصراف</Typography>
         </Button>
       </div>
@@ -553,12 +553,12 @@ function SubtopicForm({
       {failure !== null && <RequestError error={failure} returnTo="/dashboard/events" />}
 
       <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={isSubmitting || eligibleEmployers.length === 0}>
+        <Button size="40" type="submit" disabled={isSubmitting || eligibleEmployers.length === 0}>
           <Typography variant="14/regular" color="white">
             {isSubmitting ? 'در حال ذخیره...' : 'ذخیره زیرعنوان'}
           </Typography>
         </Button>
-        <Button type="button" variant="outline-gray" disabled={isSubmitting} onClick={onCancel}>
+        <Button size="40" type="button" variant="outline-gray" disabled={isSubmitting} onClick={onCancel}>
           <Typography variant="14/regular">انصراف</Typography>
         </Button>
       </div>
@@ -703,7 +703,7 @@ function RfpManager({
     <section className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 pb-3">
         <Typography variant="16/semibold">مدیریت RFP: {subtopic.title}</Typography>
-        <Button type="button" variant="outline-gray" onClick={onClose}>
+        <Button size="40" type="button" variant="outline-gray" onClick={onClose}>
           <Typography variant="14/regular">بستن پنل RFP</Typography>
         </Button>
       </div>
@@ -744,7 +744,7 @@ function RfpManager({
                         ({formatFileSize(file.sizeBytes)})
                       </Typography>
                     </div>
-                    <Button asChild variant="outline" className="max-w-full">
+                    <Button size="40" asChild variant="outline-gray" className="max-w-full">
                       <a
                         href={getRfpDownloadUrl(eventId, subtopic.id, version.id, file.id)}
                         download
@@ -834,14 +834,14 @@ function RfpManager({
 
         {stale && (
           <div className="flex items-center gap-3">
-            <Button type="button" variant="outline" onClick={fetchRfp} disabled={loading}>
+            <Button size="40" type="button" variant="outline-gray" onClick={fetchRfp} disabled={loading}>
               <Typography variant="14/regular">بررسی نسخه جدید سرور</Typography>
             </Button>
           </div>
         )}
 
         <div className="flex flex-wrap gap-3">
-          <Button
+          <Button size="40"
             type="submit"
             disabled={isSubmitting || loading || stale || loadError !== null}
           >
@@ -900,7 +900,7 @@ function EventSubtopicsManager({
         <Typography variant="h3">
           عناوین، زیرعنوان‌ها و RFP رویداد: {event.title}
         </Typography>
-        <Button type="button" variant="outline-gray" onClick={onBack}>
+        <Button size="40" type="button" variant="outline-gray" onClick={onBack}>
           <Typography variant="14/regular">بازگشت به فهرست رویدادها</Typography>
         </Button>
       </div>
@@ -916,7 +916,7 @@ function EventSubtopicsManager({
       )}
 
       <div className="flex flex-wrap gap-3">
-        <Button
+        <Button size="40"
           type="button"
           onClick={() => {
             setSuccessMessage(null)
@@ -928,9 +928,9 @@ function EventSubtopicsManager({
             دسته جدید
           </Typography>
         </Button>
-        <Button
+        <Button size="40"
           type="button"
-          variant="outline"
+          variant="outline-gray"
           disabled={loading || failure !== null || categories.length === 0}
           onClick={() => {
             setSuccessMessage(null)
@@ -1019,8 +1019,8 @@ function EventSubtopicsManager({
                             <Typography variant="14/semibold">{sub.title}</Typography>
                             <Button
                               type="button"
-                              variant="outline"
-                              size="default"
+                              variant="outline-gray"
+                              size="40"
                               aria-label={`مدیریت فایل RFP ${sub.title}`}
                               onClick={() => {
                                 setSuccessMessage(null)
@@ -1149,7 +1149,7 @@ export function OwnerEvents() {
               شناسه‌های این دو بخش یکسان نیستند و اتصال خودکار ندارند. وضعیت آینده/جاری/گذشته در CMS،
               وضعیت انتشار نیست؛ وضعیت منتشرنشده در قرارداد فعلی وجود ندارد.
             </Typography>
-            <Button asChild variant="outline" className="self-start">
+            <Button size="40" asChild variant="outline-gray" className="self-start">
               <Link href="/admin/collections/events">
                 <Typography variant="14/regular">مدیریت محتوای عمومی در CMS</Typography>
               </Link>
@@ -1187,8 +1187,8 @@ export function OwnerEvents() {
                   ?.name || event.responsibleInvestmentId}
               </Typography>
               <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="outline"
+                <Button size="40"
+                  variant="outline-gray"
                   className="self-start"
                   aria-label={`ویرایش ${event.title}`}
                   onClick={() => {
@@ -1198,8 +1198,8 @@ export function OwnerEvents() {
                 >
                   <Typography variant="14/regular">ویرایش</Typography>
                 </Button>
-                <Button
-                  variant="outline"
+                <Button size="40"
+                  variant="outline-gray"
                   className="self-start"
                   aria-label={`مدیریت دسته‌ها، زیرعنوان‌ها و RFP ${event.title}`}
                   onClick={() => {

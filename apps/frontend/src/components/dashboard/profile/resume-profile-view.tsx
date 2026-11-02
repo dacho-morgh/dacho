@@ -288,7 +288,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
         <Typography role="alert" color="error">
           {error ?? 'دریافت اطلاعات رزومه انجام نشد.'}
         </Typography>
-        <Button type="button" onClick={() => window.location.reload()}>
+        <Button size="40" type="button" onClick={() => window.location.reload()}>
           <Typography>تلاش دوباره</Typography>
         </Button>
       </div>
@@ -743,7 +743,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           }}
           actions={
             <>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="outline-gray"
                 className="flex-1"
@@ -751,7 +751,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               >
                 <Typography>انصراف</Typography>
               </Button>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="primary"
                 className="flex-1"
@@ -786,7 +786,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           }}
           actions={
             <>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="outline-gray"
                 className="flex-1"
@@ -794,7 +794,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               >
                 <Typography>انصراف</Typography>
               </Button>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="primary"
                 className="flex-1"
@@ -829,7 +829,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           }}
           actions={
             <>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="outline-gray"
                 className="flex-1"
@@ -837,7 +837,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               >
                 <Typography>انصراف</Typography>
               </Button>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="primary"
                 className="flex-1"
@@ -881,7 +881,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           }}
           actions={
             <>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="outline-gray"
                 className="flex-1"
@@ -889,7 +889,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               >
                 <Typography>انصراف</Typography>
               </Button>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="primary"
                 className="flex-1"
@@ -942,7 +942,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           }}
           actions={
             <>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="outline-gray"
                 className="flex-1"
@@ -950,7 +950,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               >
                 <Typography>انصراف</Typography>
               </Button>
-              <Button
+              <Button size="40"
                 type="button"
                 variant="primary"
                 className="flex-1"

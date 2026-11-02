@@ -187,7 +187,6 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
           <Button
             asChild
             size="48"
-            className="gap-[8px] rounded-[12px] bg-brand-500 px-[12px] py-[8px] text-white hover:bg-brand-600"
           >
             <Link href="/dashboard/letters/new?mode=support">
               <Typography as="span" variant="20/regular" className="text-white">
@@ -197,7 +196,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
             </Link>
           </Button>
           {canComposeLetter && (
-            <Button asChild variant="outline" size="48" className="rounded-[12px] px-[12px] py-[8px]">
+            <Button asChild variant="outline-gray" size="48">
               <Link href="/dashboard/letters/new">
                 <Typography as="span" variant="20/regular" className="text-inherit">
                   نامه جدید
@@ -239,13 +238,12 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
               </Typography>
             </button>
           </div>
-          <button
+          <Button variant="white" size="icon-48"
             type="button"
             aria-label="فیلتر"
-            className="flex h-[48px] w-[48px] items-center justify-center rounded-[12px] bg-white text-neutral-500"
           >
             <DashboardFilterIcon className="size-[26px]" />
-          </button>
+          </Button>
           <div className="relative w-[400px] max-w-full">
             <Input
               value={searchQuery}
@@ -369,7 +367,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
                   <StatusTag type={item.type} label={item.typeLabel} />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="text-gray" size="icon-sm" className="size-10 shrink-0 rounded-lg hover:bg-neutral-100" aria-label={`عملیات نامه ${item.title}`}>
+                      <Button variant="text-gray" size="icon-40" aria-label={`عملیات نامه ${item.title}`}>
                         <DashboardMoreIcon className="size-5" />
                       </Button>
                     </DropdownMenuTrigger>

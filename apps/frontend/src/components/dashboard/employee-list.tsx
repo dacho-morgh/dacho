@@ -146,7 +146,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
                         </td>
                         {canManage && (
                           <td className="px-4">
-                            <Button
+                            <Button size="40"
                               variant="text"
                               aria-label={`ویرایش ${person.name ?? person.id}`}
                               onClick={() => {

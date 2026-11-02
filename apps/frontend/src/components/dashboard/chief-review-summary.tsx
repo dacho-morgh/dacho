@@ -123,7 +123,7 @@ export function ChiefReviewSummary({ round, evaluations, history, people = {}, c
 
 function RefreshButton({ busy, onClick, label }: { busy: boolean; onClick: () => void; label: string }) {
   return (
-    <Button type="button" variant="outline" size="32" className="px-3" disabled={busy} onClick={onClick}>
+    <Button type="button" variant="outline-gray" size="32" disabled={busy} onClick={onClick}>
       <Typography variant="14/regular" className="text-inherit">{busy ? 'در حال به‌روزرسانی…' : label}</Typography>
     </Button>
   )
