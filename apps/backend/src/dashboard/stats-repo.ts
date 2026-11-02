@@ -35,6 +35,25 @@ export interface RequestOverview {
   events: { id: string; title: string }[]
 }
 
+/** One bar of a dashboard chart: a state and how many items are in it now. */
+export interface ChartSlice {
+  key: string
+  count: number
+}
+
+/** Booth requests by the step they wait on, the order the Secretariat and the company act in. */
+export const BOOTH_STATES = ['attendance_pending', 'receipt_due', 'receipt_pending', 'confirmed', 'rejected'] as const
+
+/** The person's own evaluations in the current round of every active assignment. Never a score. */
+export const EVALUATION_STATES = ['not_started', 'draft', 'final'] as const
+
+/** The latest verification of each company, by its decision. */
+export const VERIFICATION_STATES = ['pending', 'returned', 'approved', 'rejected'] as const
+
+function slices(keys: readonly string[], row: Record<string, number> | undefined): ChartSlice[] {
+  return keys.map((key) => ({ key, count: row?.[key] ?? 0 }))
+}
+
 export class StatsRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -125,5 +144,63 @@ export class StatsRepository {
       params,
     )
     return rows
+  }
+
+  /**
+   * Booth requests by state, across every exhibition or one company's own. The same predicates
+   * as the reservation's allowed actions: attendance waits while active and pending, a receipt is
+   * due once attendance is approved and nothing is pending, and a pending receipt waits on review.
+   */
+  async boothStates(companyId?: string): Promise<ChartSlice[]> {
+    const params: unknown[] = []
+    let where = 'TRUE'
+    if (companyId) {
+      params.push(companyId)
+      where = `r.company_id = $1`
+    }
+    const { rows } = await this.pool.query<Record<string, number>>(
+      `SELECT COUNT(*) FILTER (WHERE r.active AND r.attendance_status = 'pending')::int AS attendance_pending,
+              COUNT(*) FILTER (WHERE r.active AND r.attendance_status = 'approved'
+                AND r.payment_status IN ('unpaid', 'returned'))::int AS receipt_due,
+              COUNT(*) FILTER (WHERE r.active AND r.payment_status = 'pending_verification')::int AS receipt_pending,
+              COUNT(*) FILTER (WHERE r.payment_status = 'confirmed')::int AS confirmed,
+              COUNT(*) FILTER (WHERE r.attendance_status = 'rejected')::int AS rejected
+       FROM dashboard.booth_reservations r
+       WHERE ${where}`,
+      params,
+    )
+    return slices(BOOTH_STATES, rows[0])
+  }
+
+  /** Own evaluation state per active assignment in the case's current revision, as the reviewer queue reads it. */
+  async evaluationStates(actor: { id: string; role: OperationalRole }): Promise<ChartSlice[]> {
+    const { rows } = await this.pool.query<Record<string, number>>(
+      `SELECT COUNT(*) FILTER (WHERE ev.id IS NULL)::int AS not_started,
+              COUNT(*) FILTER (WHERE ev.state = 'draft')::int AS draft,
+              COUNT(*) FILTER (WHERE ev.state = 'final')::int AS final
+       FROM dashboard.case_assignments a
+       JOIN dashboard.requests r ON r.id = a.request_id
+       LEFT JOIN dashboard.review_rounds rr ON rr.id = a.round_id
+       LEFT JOIN dashboard.evaluations ev
+         ON ev.request_id = r.id AND ev.user_id = a.user_id AND ev.revision = r.revision
+       WHERE a.user_id = $1 AND a.role = $2 AND a.active
+         AND (a.round_id IS NULL OR rr.request_revision = r.revision)`,
+      [actor.id, actor.role],
+    )
+    return slices(EVALUATION_STATES, rows[0])
+  }
+
+  /** Companies by the decision on their latest verification revision. Unsubmitted companies have none. */
+  async verificationStates(): Promise<ChartSlice[]> {
+    const { rows } = await this.pool.query<{ status: string; count: number }>(
+      `SELECT latest.status, COUNT(*)::int AS count
+       FROM (
+         SELECT DISTINCT ON (v.company_id) v.status
+         FROM dashboard.company_verifications v
+         ORDER BY v.company_id, v.revision DESC
+       ) latest
+       GROUP BY latest.status`,
+    )
+    return slices(VERIFICATION_STATES, Object.fromEntries(rows.map((row) => [row.status, row.count])))
   }
 }

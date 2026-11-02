@@ -3,6 +3,10 @@ import type { Router } from 'express'
 import { actorOf } from '../proxy-auth.js'
 import { parseRequestFilters, parsePositiveInt, isCompanyAdministrator } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
+import type { ChartSlice } from '../stats-repo.js'
+
+/** Booth steps the Secretariat acts on; the others wait on the company or are done. */
+const SECRETARIAT_BOOTH_QUEUES: readonly string[] = ['attendance_pending', 'receipt_pending']
 
 export function registerStatsRoutes(router: Router, ctx: DashboardContext): void {
   const { activities, stats, support, verificationStore, limitActivities, resolveScope } = ctx
@@ -17,7 +21,12 @@ export function registerStatsRoutes(router: Router, ctx: DashboardContext): void
     } catch (error) { next(error) }
   })
 
-  /** The role's overview: status counts, its work queues and the options of the event filter. */
+  /**
+   * The role's overview: status counts, its work queues, the options of the event filter and the
+   * series of its charts. The request counts and queues are the core: when they fail, the whole read
+   * fails. Every other section reads on its own, and one that fails is named in `unavailable`
+   * instead of being reported as zero.
+   */
   router.get('/stats/overview', async (_req, res, next) => {
     try {
     const actor = actorOf(res)
@@ -25,20 +34,67 @@ export function registerStatsRoutes(router: Router, ctx: DashboardContext): void
     const { scope, companyId } = await resolveScope(actor.id, role)
     const overview = await stats.overview(scope, { id: actor.id, role })
     // Work outside the request table. Each count is read from the list its role already has.
-    const other: { key: string; count: number }[] = []
+    type Section = { queues?: { key: string; count: number }[]; chart?: { key: string; slices: ChartSlice[] } }
+    const sections: [key: string, read: () => Promise<Section>][] = []
     if (role === 'central-secretariat') {
-      other.push({ key: 'verification_pending', count: (await verificationStore.listQueue({ status: 'pending' })).length })
+      sections.push(['verification_pending', async () => ({
+        queues: [{ key: 'verification_pending', count: (await verificationStore.listQueue({ status: 'pending' })).length }],
+      })])
     }
     if (isCompanyAdministrator(role)) {
-      other.push({ key: 'support_open', count: (await support.list({ status: 'open', page: 1, limit: 1 })).total })
+      sections.push(['support_open', async () => ({
+        queues: [{ key: 'support_open', count: (await support.list({ status: 'open', page: 1, limit: 1 })).total }],
+      })])
+    }
+    if (role === 'central-secretariat') {
+      sections.push(['company_verification', async () => ({
+        chart: { key: 'company_verification', slices: await stats.verificationStates() },
+      })])
+      sections.push(['booth_requests', async () => {
+        const booths = await stats.boothStates()
+        return {
+          queues: booths.filter((slice) => SECRETARIAT_BOOTH_QUEUES.includes(slice.key))
+            .map((slice) => ({ key: `booth_${slice.key}`, count: slice.count })),
+          chart: { key: 'booth_requests', slices: booths },
+        }
+      }])
+    }
+    if (role === 'reviewer' || role === 'employer-reviewer') {
+      sections.push(['own_evaluations', async () => ({
+        chart: { key: 'own_evaluations', slices: await stats.evaluationStates({ id: actor.id, role }) },
+      })])
     }
     if (companyId) {
-      const verification = await verificationStore.findCurrentByCompanyId(companyId)
-      if (verification?.status === 'returned' || verification?.status === 'rejected') {
-        other.push({ key: 'company_verification_returned', count: 1 })
-      }
+      sections.push(['company_verification_returned', async () => {
+        const verification = await verificationStore.findCurrentByCompanyId(companyId)
+        return {
+          queues: verification?.status === 'returned' || verification?.status === 'rejected'
+            ? [{ key: 'company_verification_returned', count: 1 }]
+            : [],
+        }
+      }])
+      sections.push(['booth_requests', async () => {
+        const booths = await stats.boothStates(companyId)
+        return {
+          queues: [{ key: 'booth_receipt_due', count: booths.find((slice) => slice.key === 'receipt_due')?.count ?? 0 }],
+          chart: { key: 'booth_requests', slices: booths },
+        }
+      }])
     }
-    res.set('Cache-Control', 'private, no-store, max-age=0').json({ ...overview, queues: [...overview.queues, ...other] })
+    const results = await Promise.all(sections.map(async ([key, read]) => {
+      try {
+        return { key, section: await read() }
+      } catch (error) {
+        console.error(`stats/overview: section ${key} failed`, error)
+        return { key, section: undefined }
+      }
+    }))
+    res.set('Cache-Control', 'private, no-store, max-age=0').json({
+      ...overview,
+      queues: [...overview.queues, ...results.flatMap(({ section }) => section?.queues ?? [])],
+      charts: results.flatMap(({ section }) => (section?.chart ? [section.chart] : [])),
+      unavailable: results.filter(({ section }) => !section).map(({ key }) => key),
+    })
     } catch (error) { next(error) }
   })
 
