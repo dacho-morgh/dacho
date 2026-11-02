@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
-import { DashboardAddIcon, DashboardTrashIcon } from '@/components/icons/generated'
+import { DashboardAddIcon, DashboardCloseCircle, DashboardTrashIcon } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -368,11 +368,10 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
                 {product}
               </Typography>
               <Button
-                variant="text-gray"
+                variant="text-destructive"
                 size="icon-32"
                 type="button"
                 aria-label={`حذف ${product}`}
-                className="text-neutral-400 hover:text-error-500"
                 onClick={() => removeProduct(index)}
                 disabled={isSaving}
               >
@@ -576,15 +575,16 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
                 <Typography variant="14/semibold" color="neutral-700">
                   {service}
                 </Typography>
-                <button
+                <Button
                   type="button"
+                  variant="text-destructive"
+                  size="icon-32"
                   aria-label={`حذف ${service}`}
-                  className="text-neutral-400 hover:text-error-500"
                   onClick={() => removeRequestedService(index)}
                   disabled={isSaving}
                 >
-                  ×
-                </button>
+                  <DashboardCloseCircle aria-hidden="true" />
+                </Button>
               </div>
             ))}
           </div>

@@ -206,36 +206,39 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-[8px]">
           <div className="flex h-[48px] max-w-full items-start gap-[8px] overflow-x-auto rounded-[12px] bg-neutral-100 p-[6px]">
-            <button
+            <Button
               type="button"
+              variant="segment"
+              size="36"
               onClick={() => setTab('sent')}
               aria-pressed={tab === 'sent'}
-              className={`flex h-[36px] items-center rounded-[10px] p-[8px] transition-colors ${tab === 'sent' ? 'bg-white' : 'bg-transparent'}`}
             >
-              <Typography variant="16/regular" className={tab === 'sent' ? 'whitespace-nowrap text-neutral-700' : 'whitespace-nowrap text-neutral-600'}>
+              <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
                 نامه‌های ارسالی
               </Typography>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="segment"
+              size="36"
               onClick={() => setTab('received')}
               aria-pressed={tab === 'received'}
-              className={`flex h-[36px] items-center rounded-[10px] p-[8px] transition-colors ${tab === 'received' ? 'bg-white' : 'bg-transparent'}`}
             >
-              <Typography variant="16/regular" className={tab === 'received' ? 'whitespace-nowrap text-neutral-700' : 'whitespace-nowrap text-neutral-600'}>
+              <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
                 نامه‌های دریافتی
               </Typography>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="segment"
+              size="36"
               onClick={() => setTab('support')}
               aria-pressed={tab === 'support'}
-              className={`flex h-[36px] items-center rounded-[10px] p-[8px] transition-colors ${tab === 'support' ? 'bg-white' : 'bg-transparent'}`}
             >
-              <Typography variant="16/regular" className={tab === 'support' ? 'whitespace-nowrap text-neutral-700' : 'whitespace-nowrap text-neutral-600'}>
+              <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
                 تیکت‌های پشتیبانی
               </Typography>
-            </button>
+            </Button>
           </div>
           <Button variant="white" size="icon-48"
             type="button"
@@ -276,13 +279,9 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
                 <div key={item.id} className="flex h-[72px] items-center border-b border-neutral-100 p-[16px] group-hover:bg-neutral-50">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        aria-label={`عملیات نامه ${item.title}`}
-                        className="flex size-[20px] items-center justify-center rounded text-neutral-400 hover:text-neutral-600"
-                      >
-                        <DashboardMoreIcon className="size-[20px]" />
-                      </button>
+                      <Button type="button" variant="text-gray" size="icon-32" aria-label={`عملیات نامه ${item.title}`}>
+                        <DashboardMoreIcon />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-[164px]">
                       {item.source === 'ticket' ? (

@@ -188,7 +188,7 @@ const menuItemClass = 'flex h-8 cursor-pointer items-center justify-start gap-2 
 function ActionLink({ row }: { row: InboxRow }) {
   if (!row.action) return null
   return (
-    <Button asChild variant="text" size="32" className="text-brand-600">
+    <Button asChild variant="text" size="32">
       <Link href={row.action.href}>
         <Typography as="span" variant="14/semibold" className="whitespace-nowrap text-inherit">
           {row.action.label}
@@ -323,12 +323,12 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
-                variant="white"
+                variant="filter"
                 size="icon-48"
                 aria-label="فیلتر نامه‌ها"
-                className={cn('shrink-0', query.status && 'text-brand-600 ring-2 ring-brand-100')}
+                data-active={Boolean(query.status)}
               >
-                <FilterIcon className="size-[26px]" />
+                <FilterIcon />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-xs">
@@ -376,16 +376,14 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
           {/* Received / sent, Figma 30865:18197 */}
           <div role="tablist" aria-label="صندوق نامه" className="flex h-12 shrink-0 items-center gap-2 rounded-xl bg-neutral-100 p-1.5">
             {(['received', 'sent'] as const).map((box) => (
-              <button
+              <Button
                 key={box}
                 type="button"
+                variant="segment"
+                size="36"
                 role="tab"
                 aria-selected={query.box === box}
                 onClick={() => navigate({ box, status: box === 'sent' ? undefined : query.status })}
-                className={cn(
-                  'flex h-9 items-center gap-2 rounded-[10px] px-2 transition-colors focus-visible:outline-2 focus-visible:outline-brand-500',
-                  query.box === box ? 'bg-white text-neutral-700' : 'text-neutral-600 hover:text-neutral-700',
-                )}
               >
                 <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
                   {box === 'received' ? 'نامه‌های دریافتی' : 'نامه‌های ارسالی'}
@@ -397,7 +395,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
                     </Typography>
                   </span>
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

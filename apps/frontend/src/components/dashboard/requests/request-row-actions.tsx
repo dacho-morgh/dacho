@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
   EyeIcon,
@@ -39,14 +40,10 @@ export function RequestRowActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={`flex size-8 items-center justify-center mx-auto rounded-[10px] text-[#525252] hover:bg-[#E5E5E5]/60 transition-colors focus:outline-none ${className}`}
-          title="عملیات بیشتر"
-        >
-          <RequestMoreOptionsIcon className="size-5 text-[#525252]" />
+        <Button type="button" variant="text-gray" size="icon-32" className={`mx-auto ${className}`} title="عملیات بیشتر">
+          <RequestMoreOptionsIcon />
           <span className="sr-only">منوی عملیات</span>
-        </button>
+        </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent

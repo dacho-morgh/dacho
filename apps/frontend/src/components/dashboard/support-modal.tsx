@@ -28,9 +28,9 @@ const SUPPORT_CATEGORIES = [
 ] as const
 
 const PRIORITIES = [
-  { id: 'normal', label: 'عادی', color: 'bg-neutral-100 text-neutral-600 border-neutral-200' },
-  { id: 'important', label: 'مهم', color: 'bg-warning-50 text-warning-500 border-warning-200' },
-  { id: 'urgent', label: 'فوری', color: 'bg-error-50 text-error-600 border-error-200' },
+  { id: 'normal', label: 'عادی' },
+  { id: 'important', label: 'مهم' },
+  { id: 'urgent', label: 'فوری' },
 ] as const
 
 export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) {
@@ -171,18 +171,16 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {SUPPORT_CATEGORIES.map((cat) => (
-                    <button
+                    <Button
                       key={cat}
                       type="button"
+                      variant="chip"
+                      size="32"
+                      aria-pressed={category === cat}
                       onClick={() => setCategory(cat)}
-                      className={`h-8 rounded-lg px-3 text-xs transition-all ${
-                        category === cat
-                          ? 'bg-brand-500 font-medium text-white shadow-xs'
-                          : 'border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'
-                      }`}
                     >
                       {cat}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -196,18 +194,17 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                 </label>
                 <div className="flex gap-2">
                   {PRIORITIES.map((p) => (
-                    <button
+                    <Button
                       key={p.id}
                       type="button"
+                      variant="chip"
+                      size="32"
+                      className="flex-1"
+                      aria-pressed={priority === p.id}
                       onClick={() => setPriority(p.id)}
-                      className={`flex h-8 flex-1 items-center justify-center rounded-lg border text-xs transition-all ${
-                        priority === p.id
-                          ? `${p.color} font-semibold ring-2 ring-brand-500/20`
-                          : 'border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50'
-                      }`}
                     >
                       {p.label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>

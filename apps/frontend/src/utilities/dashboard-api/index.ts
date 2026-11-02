@@ -96,7 +96,6 @@ export {
   listLetters,
   getLetter,
   letterSenderRoleLabel,
-  mapLetterItem,
   mapMailData,
   mapLetterAttachments,
   deleteLetter,

@@ -323,12 +323,12 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
             <DropdownMenu dir="rtl">
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="white"
+                  variant="filter"
                   size="icon-48"
                   aria-label="فیلتر نقش"
-                  className={cn(roleFilter !== 'all' && 'text-brand-600 ring-2 ring-brand-500/20')}
+                  data-active={roleFilter !== 'all'}
                 >
-                  <DashboardFilterIcon className="size-[26px]" />
+                  <DashboardFilterIcon />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent

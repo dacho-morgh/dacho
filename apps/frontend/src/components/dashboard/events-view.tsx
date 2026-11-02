@@ -510,17 +510,20 @@ export function EventsView({
         <div className="flex flex-wrap items-center justify-between gap-4 py-2">
           {/* Breadcrumb path */}
           <nav aria-label="مسیر راهنما" className="flex items-center gap-2 font-sans text-[14px] text-neutral-600">
-            <button
+            <Button
               type="button"
+              variant="link-gray"
+              size="clear"
               onClick={() => {
                 setSelectedEvent(null)
                 router.push('/dashboard/events')
               }}
-              className="cursor-pointer font-medium text-neutral-500 hover:text-brand-600 hover:underline"
               aria-label="بازگشت به رویدادها و نمایشگاه‌ها"
             >
-              رویدادها و نمایشگاه‌ها
-            </button>
+              <Typography as="span" variant="14/regular" className="text-inherit">
+                رویدادها و نمایشگاه‌ها
+              </Typography>
+            </Button>
             <span className="text-neutral-400">/</span>
             <span className="font-bold text-neutral-800 truncate max-w-[280px] sm:max-w-md">
               {selectedEvent.title}
@@ -695,10 +698,12 @@ export function EventsView({
                     className="overflow-hidden rounded-xl border border-neutral-200/80 bg-neutral-50/50"
                   >
                     {/* Category Accordion Header */}
-                    <button
+                    <Button
                       type="button"
+                      variant="row"
+                      size="clear"
                       onClick={() => toggleCategory(cat.id)}
-                      className="flex w-full items-center justify-between p-3.5 text-right transition-colors hover:bg-neutral-100/70"
+                      className="p-3.5"
                       aria-expanded={isExpanded}
                     >
                       <div className="flex items-center gap-3">
@@ -715,7 +720,7 @@ export function EventsView({
                           isExpanded ? 'rotate-180' : ''
                         }`}
                       />
-                    </button>
+                    </Button>
 
                     {/* Subtopics List */}
                     {isExpanded && (
@@ -874,18 +879,16 @@ export function EventsView({
               />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
+              <Button
                 type="button"
-                className={`flex h-[48px] w-[50px] shrink-0 items-center justify-center rounded-[12px] bg-white transition-colors hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-brand-500 ${
-                  filterType !== 'all'
-                    ? 'text-brand-600 ring-2 ring-brand-500/20'
-                    : 'text-[#525252]'
-                }`}
+                variant="filter"
+                size="icon-48"
+                data-active={filterType !== 'all'}
                 title="فیلتر رویدادها"
               >
-                <FilterIcon className="size-[26px]" />
+                <FilterIcon />
                 <span className="sr-only">فیلتر</span>
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="start"

@@ -30,6 +30,19 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // Dashboard controls come from components/ui (frontend AGENTS.md, FE42/FE44).
+    files: ['src/components/dashboard/**/*.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXOpeningElement[name.name='button']",
+          message: 'Use the shared Button from @/components/ui/button.',
+        },
+      ],
+    },
+  },
   globalIgnores([
     '.next/**',
     'out/**',

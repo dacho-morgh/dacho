@@ -238,11 +238,13 @@ export function ReviewEvaluationForm({ requestId, caseItem, initial }: ReviewEva
           <ol className="grid grid-cols-5 gap-1">
             {STEPS.map((label, index) => (
               <li key={label} className="min-w-0">
-                <button
+                <Button
                   type="button"
+                  variant="text-gray"
+                  size="clear"
                   onClick={() => setStep(index)}
                   aria-current={step === index ? 'step' : undefined}
-                  className="flex w-full flex-col items-center gap-1 rounded-lg p-1 focus-visible:outline-2 focus-visible:outline-brand-500"
+                  className="w-full flex-col gap-1 rounded-lg p-1"
                 >
                   <span
                     className={`flex size-6 items-center justify-center rounded-full ${
@@ -261,7 +263,7 @@ export function ReviewEvaluationForm({ requestId, caseItem, initial }: ReviewEva
                     {label}
                   </Typography>
                   <span className="sr-only sm:hidden">{label}</span>
-                </button>
+                </Button>
               </li>
             ))}
           </ol>

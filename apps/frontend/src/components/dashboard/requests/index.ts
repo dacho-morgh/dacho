@@ -13,10 +13,3 @@ export * from './requests-loading-skeleton'
 export * from './requests-empty-state'
 export * from './requests-list-table'
 export * from './requests-list-view'
-
-// Dashboard Overview Requests Table & Subcomponents
-export * from './recent-request-status-badge'
-export * from './recent-request-service-badge'
-export * from './recent-requests-filter-tabs'
-export * from './recent-request-row'
-export * from './requests-table'
