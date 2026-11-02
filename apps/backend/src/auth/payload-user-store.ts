@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 
-import type { ProfileFields, User, UserRole, UserStore } from './user-store.js'
+import type { ProfileFields, User, UserListOptions, UserRole, UserStore } from './user-store.js'
 
 export type HttpFetcher = (
   url: string,
@@ -112,11 +112,12 @@ export class PayloadUserStore implements UserStore {
     }
   }
 
-  async list(options: { role?: UserRole; search?: string } = {}): Promise<User[]> {
+  async list(options: UserListOptions = {}): Promise<User[]> {
     const params = new URLSearchParams({ depth: '0', limit: '100', sort: '-createdAt' })
     // `roles` is a multi-valued select, so membership is an array-containment
     // query rather than an equality match.
     if (options.role) params.set('where[roles][contains]', options.role)
+    if (options.operationalRole) params.set('where[operationalRole][equals]', options.operationalRole)
     if (options.search) params.set('where[or][0][name][contains]', options.search)
     const res = await this.fetcher(`${this.baseUrl}/api/users?${params.toString()}`, {
       headers: this.headers(),

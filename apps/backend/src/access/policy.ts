@@ -5,8 +5,16 @@ export const REQUEST_ACTIONS = [
   'read',
   'submit',
   'assign',
+  'triage',
+  'startReview',
+  'replaceReviewer',
+  'replaceEmployer',
+  'decideReview',
+  'correct',
+  'reopen',
   'uploadDocument',
   'deleteDocument',
+  'submitFinancialPackage',
 ] as const
 
 export type RequestAction = (typeof REQUEST_ACTIONS)[number]
@@ -15,6 +23,50 @@ export interface RequestForPolicy {
   ownerId: string
   companyId?: string | null
   status: string
+  /** Set on event applications once submitted; null for drafts and other services. */
+  reviewStage?: string | null
+  /** True when the actor is the current responsible chief of the request's event. */
+  actorIsResponsibleChief?: boolean
+  /** True when a review round already exists for the request's current revision. */
+  reviewRoundStarted?: boolean
+  /** True when that round holds its four final evaluations and awaits the chief's decision. */
+  reviewRoundComplete?: boolean
+  /** True once the company submitted its financial package for the open stage (T30). */
+  financialPackageSubmitted?: boolean
+}
+
+/** An event case the responsible chief returned at triage; it is resubmitted as a new revision. */
+export function isChiefCorrectionStatus(status: string | null | undefined, reviewStage?: string | null): boolean {
+  return status === 'action_needed' && reviewStage === 'chief_triage'
+}
+
+/** Company edits are open on drafts and on event cases the chief returned for correction. */
+export function isCompanyEditableStatus(status: string | null | undefined, reviewStage?: string | null): boolean {
+  return status === 'draft' || isChiefCorrectionStatus(status, reviewStage)
+}
+
+/** Only the chief's advancement opens the company's financial package (T29). */
+export function isFinancialStageOpen(status: string | null | undefined, reviewStage?: string | null): boolean {
+  return status === 'in_review' && reviewStage === 'advanced'
+}
+
+/**
+ * Request-linked company files. A draft is fully editable; a chief correction
+ * reopens the proposal only (UAT12), so files of other categories submitted with
+ * the case stay as they were. Financial files change once that stage is open and
+ * until the company submits its package, which freezes them (T30).
+ */
+function isCompanyChangeableRequestDocument(
+  category: DocumentCategory | undefined,
+  status: string | null | undefined,
+  reviewStage?: string | null,
+  financialPackageSubmitted = false,
+): boolean {
+  if (status === 'draft') return true
+  if (category && FINANCIAL_CATEGORIES.includes(category)) {
+    return isFinancialStageOpen(status, reviewStage) && !financialPackageSubmitted
+  }
+  return category === 'proposal' && isChiefCorrectionStatus(status, reviewStage)
 }
 
 /**
@@ -70,15 +122,34 @@ export function allowedRequestActions(
 ): RequestAction[] {
   switch (role) {
     case 'system-owner':
-      return ['read', 'assign', 'uploadDocument', 'deleteDocument']
+      return [
+        'read',
+        'assign',
+        ...(request.status === 'rejected' && request.reviewStage === 'chief_triage' ? (['reopen'] as const) : []),
+        // Only the owner may change a case's employer, and only inside a started round.
+        ...(request.status === 'in_review' && request.reviewStage === 'triaged' && request.reviewRoundStarted
+          ? (['replaceEmployer'] as const)
+          : []),
+        'uploadDocument',
+        'deleteDocument',
+      ]
     case 'central-secretariat':
       return ['read', 'uploadDocument']
     case 'chief-reviewer':
+      // Triage and the review round belong to the event's current responsible chief.
+      if (!request.actorIsResponsibleChief || request.status !== 'in_review') return ['read']
+      if (request.reviewStage === 'chief_triage') return ['read', 'triage']
+      if (request.reviewStage === 'triaged') {
+        if (!request.reviewRoundStarted) return ['read', 'startReview']
+        // Every slot of a complete round is final, so nobody is left to replace.
+        return request.reviewRoundComplete ? ['read', 'decideReview'] : ['read', 'replaceReviewer']
+      }
+      return ['read']
     case 'reviewer':
     case 'employer-reviewer':
     case 'investment-reviewer':
-      // Future triage/evaluation/memo actions are not implemented; do not
-      // advertise routes that do not exist yet.
+      // Evaluation and memo commands live on their own routes, which check
+      // the assignment themselves. The memo is not a decision on the request.
       return ['read']
     case 'representative': {
       const belongsToCompany = Boolean(
@@ -87,6 +158,11 @@ export function allowedRequestActions(
       if (!belongsToCompany) return []
       const actions: RequestAction[] = ['read']
       if (request.status === 'draft') actions.push('submit', 'uploadDocument', 'deleteDocument')
+      else if (isCompanyEditableStatus(request.status, request.reviewStage)) {
+        actions.push('correct', 'uploadDocument', 'deleteDocument')
+      } else if (isFinancialStageOpen(request.status, request.reviewStage) && !request.financialPackageSubmitted) {
+        actions.push('uploadDocument', 'deleteDocument', 'submitFinancialPackage')
+      }
       return actions
     }
   }
@@ -153,8 +229,9 @@ export type DocumentAudience = 'company' | 'case' | 'financial' | 'unsupported'
 
 /**
  * Categories whose prerequisite workflow does not exist yet stay denied rather
- * than becoming permissive stubs: RFP/versioning is T18, supplementary files T33,
- * and booth receipts T50. T35 supports request-linked correspondence.
+ * than becoming permissive stubs: RFP/versioning is T18 and booth receipts T50.
+ * T35 supports request-linked correspondence. Supplementary files arrive as
+ * correspondence attachments (T33), so `supplementaryCaseFiles` has no workflow.
  */
 export const UNSUPPORTED_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = [
   'rfp',
@@ -170,7 +247,7 @@ const COMPANY_CATEGORIES: readonly DocumentCategory[] = [
   'certificatesLicenses',
 ]
 
-const FINANCIAL_CATEGORIES: readonly DocumentCategory[] = [
+export const FINANCIAL_CATEGORIES: readonly DocumentCategory[] = [
   'financialStatements',
   'debtFacilityEvidence',
   'taxInsuranceRecords',
@@ -194,6 +271,9 @@ export interface DocumentParent {
   /** The company that owns the request. */
   requestCompanyId?: string | null
   requestStatus?: string | null
+  requestReviewStage?: string | null
+  /** True once the company submitted its financial package; freezes the financial files (T30). */
+  requestFinancialSubmitted?: boolean
   /** True when the current actor holds an active assignment on the request. */
   assigned?: boolean
 }
@@ -226,13 +306,20 @@ export function canUploadOwnedDocument(
     (!parent.requestCompanyId && parent.requestOwnerId === actorId)
   )
   if (!ownsRequest) return false
-  // Draft-only company editing keeps submitted/financial snapshots immutable
-  // until T30 introduces versioned package submissions.
+  // Draft-only company editing keeps submitted snapshots immutable. Financial
+  // files freeze when the company submits its package (T30).
   // Supplementary correspondence is additive and does not edit submitted files.
   if (category === 'correspondenceAttachment') {
     return true
   }
-  return parent.requestStatus === undefined || parent.requestStatus === null || parent.requestStatus === 'draft'
+  if (audience === 'financial') {
+    return isFinancialStageOpen(parent.requestStatus, parent.requestReviewStage) && !parent.requestFinancialSubmitted
+  }
+  return (
+    parent.requestStatus === undefined ||
+    parent.requestStatus === null ||
+    isCompanyChangeableRequestDocument(category, parent.requestStatus, parent.requestReviewStage)
+  )
 }
 
 export interface DocumentForPolicy {
@@ -242,12 +329,17 @@ export interface DocumentForPolicy {
   requestOwnerId: string | null
   requestCompanyId: string | null
   assigned: boolean
+  /** True once the case's latest invitation holds a package, which is what hands the case off (T31). */
+  requestFinancialSubmitted?: boolean
+  /** True once the Secretariat opened this correspondence file to the investment person (T33). */
+  supplementaryDelivered?: boolean
 }
 
 /**
  * Download/list authority, re-evaluated on every request. A document id or URL
  * is never authority. Financial categories are excluded for chief, ordinary and
- * employer reviewers even when those people are assigned to the case.
+ * employer reviewers even when those people are assigned to the case. The
+ * investment person reads them only with an active assignment after the handoff.
  */
 export function canReadDocument(
   role: OperationalRole,
@@ -282,9 +374,12 @@ export function canReadDocument(
       if (document.category === 'correspondenceAttachment') return false
       return document.assigned && audience === 'case'
     case 'investment-reviewer':
-      // Supplementary financial replies need the same persisted handoff as the
-      // financial package. Generic assignment must not bypass that boundary.
-      if (document.category === 'correspondenceAttachment') return false
+      // A correspondence file stays closed until the Secretariat delivers it (T33).
+      if (document.category === 'correspondenceAttachment') {
+        return document.assigned && document.requestFinancialSubmitted === true && document.supplementaryDelivered === true
+      }
+      // A generic assignment alone must not open the financial files.
+      if (audience === 'financial') return document.assigned && document.requestFinancialSubmitted === true
       return document.assigned && audience === 'case'
   }
 }
@@ -295,13 +390,24 @@ export function canDeleteDocument(
     requestOwnerId: string | null
     requestCompanyId?: string | null
     requestStatus: string | null
+    requestReviewStage?: string | null
+    /** Needed outside drafts: a chief correction only reopens proposal files. */
+    category?: DocumentCategory
+    requestFinancialSubmitted?: boolean
   },
   actorId: string,
   actorCompanyId?: string | null,
 ): boolean {
   if (role === 'system-owner') return true
   if (role !== 'representative') return false
-  if (document.requestStatus !== 'draft') return false
+  if (!isCompanyChangeableRequestDocument(
+    document.category,
+    document.requestStatus,
+    document.requestReviewStage,
+    document.requestFinancialSubmitted,
+  )) {
+    return false
+  }
   if (document.requestCompanyId) {
     return Boolean(actorCompanyId && document.requestCompanyId === actorCompanyId)
   }

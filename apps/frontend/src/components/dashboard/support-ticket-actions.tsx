@@ -5,7 +5,7 @@ import { useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
-import { formatDate, formatTime, type SupportMessageDto, type SupportTicketDto } from '@/utilities/dashboard-api'
+import { DashboardApiError, describeMutationFailure, formatDate, formatTime, type SupportMessageDto, type SupportTicketDto } from '@/utilities/dashboard-api'
 
 interface SupportTicketActionsProps {
   id: string
@@ -36,15 +36,17 @@ export function SupportTicketActions({ id, status, isAdmin, initialMessages, ini
         headers: action === 'respond' ? { 'content-type': 'application/json' } : undefined,
         body: action === 'respond' ? JSON.stringify({ body: response.trim() }) : undefined,
       })
-      if (!result.ok) throw new Error('support_action_failed')
+      if (!result.ok) throw new DashboardApiError(result.status, 'support_action_failed')
       const data = (await result.json()) as { ticket: SupportTicketDto }
       setMessages(data.ticket.messages ?? messages)
       setCurrentStatus(data.ticket.status)
       setResponse('')
       setNotice(action === 'close' ? 'تیکت لغو شد.' : 'پاسخ شما ارسال شد.')
       router.refresh()
-    } catch {
-      setNotice('عملیات انجام نشد. دوباره تلاش کنید.')
+    } catch (cause) {
+      setNotice(describeMutationFailure(cause, 'عملیات انجام نشد. دوباره تلاش کنید.'))
+      // The ticket changed under this page: show its current state, keep the typed reply.
+      if (cause instanceof DashboardApiError && cause.status === 409) router.refresh()
     } finally {
       pending.current = false
       setBusy(false)

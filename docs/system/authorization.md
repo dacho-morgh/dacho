@@ -37,7 +37,7 @@ the persisted-responsibility predicate below.
 | Chief Reviewer | assigned requests only | assigned case's necessary profile only, not the CMS dossier | assigned event only |
 | Reviewer | assigned requests only | assigned case's necessary profile only | none |
 | Employer Reviewer | assigned requests only | assigned subtopic/case profile only | none |
-| Investment Reviewer | assigned requests only | assigned case profile; financial package only after an authorized persisted handoff (currently unavailable, so denied) | assigned event only |
+| Investment Reviewer | assigned requests only | assigned case profile; financial package only after the [T31 handoff](investment-handoff.md) | assigned event only |
 | Company Representative | `owner_id = current user` | own company only | none |
 
 `dashboard.case_assignments.role` must exactly match the person's current
@@ -95,7 +95,7 @@ access check.
 | `GET /admin/events`, `GET /admin/events/:id` | internal roles only; System Owner / Central Secretariat all, assigned chief/investment reviewer own event, other internal roles empty/404 |
 | `POST /admin/events`, `PATCH /admin/events/:id` | System Owner only; responsible people must be active and currently hold chief-reviewer / investment-reviewer respectively; registration close must be after open; PATCH requires the current revision and a reason, records an atomic audit entry and returns `409` for a stale revision |
 | `GET /letters`, `GET /letters/:id`, `DELETE /letters/:id` | case letters require current case ownership/assignment and sender-or-recipient participation; deletion additionally requires recipient scope. Non-case personal letters retain sender/recipient scope; all-scope oversight remains explicit |
-| `GET /stats`, `GET /activities` | identical scope as the request list |
+| `GET /stats`, `GET /stats/overview`, `GET /activities` | identical scope as the request list; [queues and filters](work-queues.md) only narrow it |
 | `GET /admin/companies`, `GET /admin/companies/:id` | System Owner / Central Secretariat; explicit projection with no raw user, credential, API key, session or personnel history |
 | `GET /admin/employees` | System Owner / Central Secretariat; id/name/role/active only |
 | `GET /support`, `POST /support`, responses and close | representative's own ticket or System Owner / Central Secretariat |
@@ -143,9 +143,11 @@ absent or denied rather than stubbed permissively:
   backend, as documented in [exhibition booth catalogue](exhibition-booth-catalogue.md).
 - Application revisions, triage, review rounds, four evaluations, replacement
   and chief decisions (T19–T28).
-- Financial package completeness/handoff, investment memo and publication
-  (T29–T33). T10 stores financial files and enforces confidentiality, but no
-  financial submission or handoff state machine exists, so investment financial-document access fails closed even with case assignment.
+- The [investment memo (T32)](investment-memo.md) and
+  [follow-up and publication (T33)](secretariat-follow-up.md) are
+  implemented on their own routes. Financial files open to the
+  investment person only with an active assignment after the
+  [T31 handoff](investment-handoff.md); a generic assignment alone stays denied.
 - Correspondence attachment workflow and booth receipts (T35, T50).
 - Any dashboard action that has no backend command is not advertised in
   `allowedActions`.
@@ -170,8 +172,32 @@ UAT gates remain **Not run**. This implementation does not pass a human
 acceptance test, deploy staging or migrate real data.
 
 
-## Role-scoped correspondence foundation — T34 draft
+## Role-scoped correspondence — T34
 
 `POST /letters` accepts current operational recipients and applies the role policy before writing. Company representatives can contact Secretariat; ordinary/employer reviewers can contact the uniquely active chief on a case for which both hold current access. Owner/chief general letters do not assign a case or broaden dossier/file access. Case-linked sends authorize both parties in the INSERT statement and hold shared locks on active assignment rows so committed/concurrent revocations cannot be bypassed by earlier route reads. Reading a sent/oversight letter leaves its unread flag unchanged; only its recipient marks it read.
 
-Investment-origin letters and case-linked letters to the investment role remain denied until T31 supplies a persisted authorized handoff. Generic assignment is not a financial handoff. T22 still owes authoritative event/round/slot assignment semantics; current generic case assignments and a unique-chief check are only a conservative foundation. Permitted-recipient discovery, frontend sending and classified attachments (T35) remain separate work. This is a partial draft, not completion of T34, T22, T31 or human acceptance. Docker/CI validation limitations must be reported separately from implemented behavior.
+The investment person writes only case-linked letters, only on a case they hold, and only with the Secretariat and the System Owner; those two can write back on that case. Holding means the [T31 handoff](investment-handoff.md): an active assignment and a package on the latest invitation, checked in the INSERT statement. A generic assignment opens no letters, and revoking the assignment ends sending and reading on the next request. Owner and chief general letters to the investment person stay open and carry no case.
+
+A case letter from the investment person shows that a package was handed off, and package status is confined to the financial audience. So the chief, reviewers and employer are not recipients, even though they are assigned to the case. The company stays with Secretariat support, as the permission matrix requires. The product owner confirmed this reading of "assigned-case participants" on 2026-10-31.
+
+A letter opens no file: an attachment needs both parties in its audience, so a correspondence file reaches the investment person only after the [Secretariat delivers it](secretariat-follow-up.md).
+
+### Permitted recipients
+
+`GET /letters/recipients` answers `{ items: [{ id, name, operationalRole }] }` with no contact details, and leaves out the actor. Sending re-checks every rule, so the list is a convenience and not permission.
+
+| Query | Behaviour |
+| --- | --- |
+| none | People the actor may write to without a case. Optional `search` matches the name, and each role returns at most the user store's 100-row page, so a composer should search rather than treat the list as complete. |
+| `requestId` | The owner and Secretariat, then the case's active assignees and its company, each filtered by the role policy. `400 invalid_request_id`; `404` for a case outside the actor's scope. The investment person gets an empty list before the handoff, and a reviewer or employer gets an empty list without one active chief. |
+
+| Actor | Without a case | On a case in their scope |
+| --- | --- | --- |
+| Owner | Everyone | Secretariat, company, assignees, and the investment person after the handoff |
+| Secretariat | Companies | Owner, company, assignees, and the investment person after the handoff |
+| Chief | Everyone | Owner, Secretariat, company, and reviewers on the case; not the investment person |
+| Reviewer, employer | Nobody | The case's one active chief |
+| Investment person | Nobody | Owner and Secretariat, after the handoff |
+| Company | Secretariat | Secretariat |
+
+T22 assignments and the unique-chief check decide the reviewer's chief. Screens are [FE22](frontend-plan.md), and human acceptance (UAT27) has not been run.

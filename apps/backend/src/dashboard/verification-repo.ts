@@ -73,7 +73,7 @@ export interface VerificationStore {
   decide(input: VerificationDecisionInput): Promise<VerificationDecisionResult>
   listQueue(filter?: VerificationQueueFilter): Promise<VerificationQueueItem[]>
   isVerified(companyId: string): Promise<boolean>
-  invalidateApproval(companyId: string, reason: string): Promise<boolean>
+  invalidateApproval(companyId: string, reason: string, transaction?: PoolClient): Promise<boolean>
 }
 
 interface VerificationRow {
@@ -164,44 +164,48 @@ export class PostgresVerificationStore implements VerificationStore {
     return current?.status === 'approved'
   }
 
-  async invalidateApproval(companyId: string, reason: string): Promise<boolean> {
+  /** With `transaction`, the invalidation commits or rolls back with the caller's change. */
+  async invalidateApproval(companyId: string, reason: string, transaction?: PoolClient): Promise<boolean> {
+    if (transaction) return this.invalidateWithin(transaction, companyId, reason)
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
-        `company-verification:${companyId}`,
-      ])
-      const { rows } = await client.query<VerificationRow>(
-        `SELECT ${VERIFICATION_COLUMNS} FROM dashboard.company_verifications
-         WHERE company_id = $1 ORDER BY revision DESC LIMIT 1 FOR UPDATE`,
-        [companyId],
-      )
-      const current = rows[0]
-      if (!current || (current.status !== 'approved' && current.status !== 'pending')) {
-        await client.query('ROLLBACK')
-        return false
-      }
-      await client.query(
-        `UPDATE dashboard.company_verifications
-         SET status = 'returned', reason = $1, updated_at = now()
-         WHERE id = $2`,
-        [reason, current.id],
-      )
-      await client.query(
-        `INSERT INTO dashboard.activities
-           (owner_id, request_id, letter_id, type, title, description,
-            actor_id, action, reason, from_state, to_state, revision)
-         VALUES ($1, NULL, NULL, 'transition', 'ابطال تأیید احراز جهت احراز مجدد', NULL, $2, 'verification_return', $3, $4, 'returned', $5)`,
-        [current.representative_id, current.representative_id, reason, current.status, current.revision],
-      )
+      const invalidated = await this.invalidateWithin(client, companyId, reason)
       await client.query('COMMIT')
-      return true
+      return invalidated
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {})
       throw err
     } finally {
       client.release()
     }
+  }
+
+  private async invalidateWithin(client: PoolClient, companyId: string, reason: string): Promise<boolean> {
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+      `company-verification:${companyId}`,
+    ])
+    const { rows } = await client.query<VerificationRow>(
+      `SELECT ${VERIFICATION_COLUMNS} FROM dashboard.company_verifications
+       WHERE company_id = $1 ORDER BY revision DESC LIMIT 1 FOR UPDATE`,
+      [companyId],
+    )
+    const current = rows[0]
+    if (!current || (current.status !== 'approved' && current.status !== 'pending')) return false
+    await client.query(
+      `UPDATE dashboard.company_verifications
+       SET status = 'returned', reason = $1, updated_at = now()
+       WHERE id = $2`,
+      [reason, current.id],
+    )
+    await client.query(
+      `INSERT INTO dashboard.activities
+         (owner_id, request_id, letter_id, type, title, description,
+          actor_id, action, reason, from_state, to_state, revision)
+       VALUES ($1, NULL, NULL, 'transition', 'ابطال تأیید احراز جهت احراز مجدد', NULL, $2, 'verification_return', $3, $4, 'returned', $5)`,
+      [current.representative_id, current.representative_id, reason, current.status, current.revision],
+    )
+    return true
   }
 
   async submit(input: SubmitVerificationInput): Promise<VerificationSubmitResult> {

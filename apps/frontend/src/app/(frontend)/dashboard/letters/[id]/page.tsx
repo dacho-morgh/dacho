@@ -4,11 +4,12 @@ import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import type { ReactNode } from 'react'
 
+import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
 import { MailDetailView, type MailData } from '@/components/dashboard/mail-detail-view'
 import { SupportTicketActions } from '@/components/dashboard/support-ticket-actions'
-import { formatDate, formatTime, formatWeekday, mapMailData, type LetterDto, type Paginated, type SupportTicketDto } from '@/utilities/dashboard-api'
-import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
-import type { ThreadMessage } from '@/components/dashboard/mail-detail-view'
+import { formatDate, formatTime, formatWeekday, mapMailData, type LetterDto, type SupportTicketDto } from '@/utilities/dashboard-api'
+import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
+import { isSeniorManagerUser, serverDashboardFetchResult } from '@/utilities/dashboard-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,11 +24,12 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
   let mail: MailData
   let actions: ReactNode = null
   let supportClosed = false
-  let replyHref: string | undefined
+  const retryHref = `/dashboard/letters/${encodeURIComponent(raw)}`
   if (prefix === 'support') {
-    const result = await serverDashboardFetch<{ ticket: SupportTicketDto }>(`/support/${encodeURIComponent(id)}`)
-    if (!result?.ticket) notFound()
-    const t = result.ticket
+    const result = await serverDashboardFetchResult<{ ticket: SupportTicketDto }>(`/support/${encodeURIComponent(id)}`)
+    if (result.kind === 'unavailable' && result.status === 404) notFound()
+    if (result.kind !== 'ok') return <DashboardReadNotice reason={unavailableReasonFor(result) ?? 'unavailable'} retryHref={retryHref} />
+    const t = result.data.ticket
     supportClosed = t.status === 'closed'
     const messages = t.messages?.length ? t.messages : [
       { id: `${id}:initial`, authorId: t.requesterId, authorRole: 'applicant' as const, body: t.message, createdAt: t.createdAt },
@@ -37,42 +39,20 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
     actions = <SupportTicketActions key={t.updatedAt} id={id} status={t.status} isAdmin={admin} requesterName={t.requesterName} initialMessageId={messages[0]?.id} initialMessages={messages} />
   } else if (prefix === 'form') {
     if (!admin) notFound()
-    const doc = await payload.findByID({ collection: 'form-submissions', id, depth: 1 })
+    const doc = await payload.findByID({ collection: 'form-submissions', id, depth: 1 }).catch((error: { status?: number }) => {
+      if (error?.status === 404) notFound()
+      throw error
+    })
     const title = typeof doc.form === 'object' ? doc.form?.title : undefined
     if (title !== 'فرم تماس با ما' && title !== 'درخواست همکاری') notFound()
     const fields = Object.fromEntries((doc.submissionData ?? []).map((x: { field: string; value: unknown }) => [x.field, x.value]))
     const labels: Record<string, string> = { fullName: 'نام و نام خانوادگی', email: 'ایمیل', phone: 'شماره همراه', subject: 'موضوع', message: 'پیام' }
     mail = { id: raw, title, category: title, senderName: String(fields.fullName || 'فرستنده فرم'), senderRole: String(fields.email || 'فرم وب‌سایت'), datePersian: formatDate(doc.createdAt), dayOfWeek: formatWeekday(doc.createdAt), timeStr: formatTime(doc.createdAt), body: Object.entries(fields).map(([k, v]) => `${labels[k] ?? k}: ${String(v)}`).join('\n') }
   } else {
-    const result = await serverDashboardFetch<{ letter: LetterDto }>(`${admin ? '/admin/letters' : '/letters'}/${encodeURIComponent(id)}`)
-    if (!result?.letter) notFound()
-    if (result.letter.senderId && result.letter.senderId !== String(user?.id)) {
-      replyHref = `/dashboard/letters/new?replyTo=${encodeURIComponent(result.letter.id)}`
-    }
-    let thread: ThreadMessage[] | undefined
-    if (result.letter.requestId) {
-      // The letters API has no case filter yet, so the thread is assembled from
-      // the same recent page the mailbox list shows.
-      const lettersList = await serverDashboardFetch<Paginated<LetterDto>>(`${admin ? '/admin/letters' : '/letters'}?limit=100`)
-      if (lettersList?.items) {
-        const related = lettersList.items
-          .filter((l) => l.requestId === result.letter.requestId && l.id !== result.letter.id)
-          .sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
-        if (related.length > 0) {
-          thread = related.map((l) => ({
-            id: l.id,
-            title: l.title,
-            senderName: l.senderName ?? 'کاربر',
-            senderRole: l.senderRole ?? '',
-            datePersian: formatDate(l.sentAt),
-            dayOfWeek: formatWeekday(l.sentAt),
-            timeStr: formatTime(l.sentAt),
-            body: l.body,
-          }))
-        }
-      }
-    }
-    mail = { ...mapMailData(result.letter), ...(thread ? { thread } : {}) }
+    const result = await serverDashboardFetchResult<{ letter: LetterDto }>(`${admin ? '/admin/letters' : '/letters'}/${encodeURIComponent(id)}`)
+    if (result.kind === 'unavailable' && result.status === 404) notFound()
+    if (result.kind !== 'ok') return <DashboardReadNotice reason={unavailableReasonFor(result) ?? 'unavailable'} retryHref={retryHref} />
+    mail = mapMailData(result.data.letter)
   }
   return (
     <>

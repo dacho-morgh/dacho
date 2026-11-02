@@ -121,17 +121,16 @@ export function pickCompanyFields(
 }
 
 /**
- * The company fields the server actually requires for stage 1.
- *
- * `activityDomain` is deliberately absent for a temporary compatibility
- * window: the current register form does not collect it yet. It is persisted
- * whenever supplied, and FE03 will start sending it before this becomes a
- * required field.
+ * The company fields the server actually requires for stage 1: the legal
+ * name, the national ID and the free-text activity domain. The register form
+ * (FE03) collects all three, so the earlier activity-domain omission window is
+ * closed; the domain is never inferred from the legal form or other fields.
  */
 export function missingCompanyFields(body: SelfSignupBody): string[] {
   const missing: string[] = []
   if (!str(body.companyName)) missing.push('companyName')
   if (!str(body.companyNationalId)) missing.push('companyNationalId')
+  if (!str(body.activityDomain)) missing.push('activityDomain')
   return missing
 }
 

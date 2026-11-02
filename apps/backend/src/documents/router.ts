@@ -16,6 +16,9 @@ import type { CompanyStore } from '../auth/company-store.js'
 import type { UserStore } from '../auth/user-store.js'
 import { AssignmentRepository } from '../dashboard/assignment-repo.js'
 import { actorOf } from '../dashboard/proxy-auth.js'
+import { isReviewerRole, ReviewCaseRepository } from '../dashboard/review-case-repo.js'
+import { FinancialPackageRepository } from '../dashboard/financial-package-repo.js'
+import { parseStatementYear } from '../dashboard/financial-package.js'
 import { RequestRepository } from '../dashboard/request-repo.js'
 import { isUuid } from '../exhibitions/catalogue.js'
 import type { VerificationStore } from '../dashboard/verification-repo.js'
@@ -58,7 +61,9 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
   const router = Router()
   const documents = new DocumentRepository(deps.pool)
   const requests = new RequestRepository(deps.pool)
+  const financialPackages = new FinancialPackageRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
+  const reviewCases = new ReviewCaseRepository(deps.pool)
   const storage = deps.privateDocumentStorage
 
   const upload = multer({
@@ -79,6 +84,28 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     return false
   }
 
+  /**
+   * Case access for one stored file. Reviewers and employers (T23) read only the
+   * proposal files pinned to the revision they review, so a correction the
+   * company is still preparing, or another revision, stays out of reach.
+   */
+  async function isAssignedToRecord(
+    record: PrivateDocumentRecord,
+    actorId: string,
+    role: string,
+    pinnedCache?: Map<string, Set<string> | 'unrestricted' | null>,
+  ): Promise<boolean> {
+    if (!record.requestId) return false
+    if (!isReviewerRole(role)) return isAssignedTo(record.requestId, actorId, role)
+    let pinned = pinnedCache?.get(record.requestId)
+    if (pinned === undefined) {
+      pinned = await reviewCases.reviewableProposalDocumentIds(record.requestId, { id: actorId, role })
+      pinnedCache?.set(record.requestId, pinned)
+    }
+    if (pinned === 'unrestricted') return true
+    return pinned?.has(record.id) === true
+  }
+
   function present(
     record: PrivateDocumentRecord,
     actorId: string,
@@ -95,6 +122,8 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         requestOwnerId: record.requestOwnerId,
         requestCompanyId: record.requestCompanyId,
         assigned,
+        requestFinancialSubmitted: record.requestFinancialSubmitted,
+        supplementaryDelivered: record.supplementaryDelivered,
       },
       actorId,
       companyId,
@@ -109,6 +138,9 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           requestOwnerId: record.requestOwnerId,
           requestCompanyId: record.requestCompanyId,
           requestStatus: record.requestStatus,
+          requestReviewStage: record.requestReviewStage,
+          category: record.category,
+          requestFinancialSubmitted: record.requestFinancialSubmitted,
         },
         actorId,
         companyId,
@@ -125,9 +157,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     role: Parameters<typeof canReadDocument>[0],
     companyId: string | null,
   ): Promise<boolean> {
-    const assigned = record.requestId
-      ? await isAssignedTo(record.requestId, actorId, role)
-      : false
+    const assigned = await isAssignedToRecord(record, actorId, role)
     return canReadDocument(
       role,
       {
@@ -137,13 +167,15 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         requestOwnerId: record.requestOwnerId,
         requestCompanyId: record.requestCompanyId,
         assigned,
+        requestFinancialSubmitted: record.requestFinancialSubmitted,
+        supplementaryDelivered: record.supplementaryDelivered,
       },
       actorId,
       companyId,
     )
   }
 
-  router.get('/documents', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/documents',asyncHandler(async (req: Request, res: Response) => {
     const actor = actorOf(res)
     const companyId = await actorCompanyId(actor.id, actor.operationalRole)
     const requestId = stringField(req.query.requestId)
@@ -162,12 +194,18 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const assigned = await isAssignedTo(requestId, actor.id, actor.operationalRole)
+      const pinnedCache = new Map<string, Set<string> | 'unrestricted' | null>()
       const records = await documents.listForRequest(requestId)
-      const items = records
-        .map((record) => present(record, actor.id, actor.operationalRole, companyId, assigned))
-        .filter((record) => record.allowedActions.length > 0)
-      res.json({ items })
+      const assignedToRequest = isReviewerRole(actor.operationalRole)
+        ? undefined
+        : await isAssignedTo(requestId, actor.id, actor.operationalRole)
+      const items = []
+      for (const record of records) {
+        const assigned = assignedToRequest ??
+          await isAssignedToRecord(record, actor.id, actor.operationalRole, pinnedCache)
+        items.push(present(record, actor.id, actor.operationalRole, companyId, assigned))
+      }
+      res.json({ items: items.filter((record) => record.allowedActions.length > 0) })
       return
     }
 
@@ -254,7 +292,9 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
 
       let requestOwnerId: string | null = null
       let requestStatus: string | null = null
+      let requestReviewStage: string | null = null
       let requestCompanyId: string | null = null
+      let requestFinancialSubmitted = false
       let parentCompanyId: string | null = requestedCompanyId
       if (requestId) {
         if (!isUuid(requestId)) {
@@ -271,7 +311,9 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         }
         requestOwnerId = request.ownerId
         requestStatus = request.status
+        requestReviewStage = request.reviewStage
         requestCompanyId = request.companyId
+        requestFinancialSubmitted = await financialPackages.isSubmitted(requestId)
         parentCompanyId = request.companyId ?? parentCompanyId
         if (!parentCompanyId) {
           const ownerCompany = await deps.companyStore.findByRepresentative(request.ownerId)
@@ -286,7 +328,9 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           companyId: audience === 'company' ? parentCompanyId : null,
           requestOwnerId,
           requestStatus,
+          requestReviewStage,
           requestCompanyId,
+          requestFinancialSubmitted,
         },
         actor.id,
         companyId,
@@ -300,6 +344,13 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const file = req.file
       if (!file) {
         res.status(400).json({ error: 'invalid_file' })
+        return
+      }
+      // A statement names the year it covers. A file without a year is kept but does not count toward the package (T30).
+      const yearField = category === 'financialStatements' ? stringField(req.body?.statementYear) : null
+      const statementYear = yearField === null ? null : parseStatementYear(yearField)
+      if (yearField !== null && statementYear === null) {
+        res.status(422).json({ error: 'invalid_statement_year' })
         return
       }
       const validated = validateDocumentFile({
@@ -327,13 +378,6 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const storageKey = await storage.save(validated.file.body, validated.file.extension)
       let record: PrivateDocumentRecord
       try {
-        if (audience === 'company' && parentCompanyId &&
-            ['articlesOfAssociation', 'establishmentNotices', 'amendmentNotices'].includes(category)) {
-          await deps.verificationStore?.invalidateApproval(
-            parentCompanyId,
-            'تغییر مدارک ثبتی؛ نیازمند احراز مجدد',
-          )
-        }
         const input = {
           storageKey,
           category: validated.file.category,
@@ -341,6 +385,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           mimeType: validated.file.mimeType,
           sizeBytes: validated.file.sizeBytes,
           logicalVersion,
+          statementYear,
           requestId: requestId ?? null,
           companyId: parentCompanyId,
           uploaderId: actor.id,
@@ -349,15 +394,22 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           const client = await deps.pool.connect()
           try {
             await client.query('BEGIN')
-            const locked = await client.query<{ owner_id: string; company_id: string | null; status: string }>(
-              'SELECT owner_id, company_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+            const locked = await client.query<{ owner_id: string; company_id: string | null; status: string; review_stage: string | null }>(
+              'SELECT owner_id, company_id, status::text AS status, review_stage FROM dashboard.requests WHERE id = $1 FOR UPDATE',
               [requestId],
             )
             const current = locked.rows[0]
             const currentPermission = current && canUploadOwnedDocument(
               actor.operationalRole,
               category,
-              { requestOwnerId: current.owner_id, requestStatus: current.status, requestCompanyId: current.company_id },
+              {
+                requestOwnerId: current.owner_id,
+                requestStatus: current.status,
+                requestReviewStage: current.review_stage,
+                requestCompanyId: current.company_id,
+                // Read after the lock: a package that committed while this upload waited blocks it.
+                requestFinancialSubmitted: await financialPackages.isSubmitted(requestId, client),
+              },
               actor.id,
               companyId,
             )
@@ -368,6 +420,25 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
               return
             }
             record = await documents.create({ ...input, companyId: current.company_id }, client)
+            await client.query('COMMIT')
+          } catch (error) {
+            await client.query('ROLLBACK')
+            throw error
+          } finally {
+            client.release()
+          }
+        } else if (audience === 'company' && parentCompanyId && deps.verificationStore &&
+            ['articlesOfAssociation', 'establishmentNotices', 'amendmentNotices'].includes(category)) {
+          // The approval is lost only together with the saved document that changes it.
+          const client = await deps.pool.connect()
+          try {
+            await client.query('BEGIN')
+            await deps.verificationStore.invalidateApproval(
+              parentCompanyId,
+              'تغییر مدارک ثبتی؛ نیازمند احراز مجدد',
+              client,
+            )
+            record = await documents.create(input, client)
             await client.query('COMMIT')
           } catch (error) {
             await client.query('ROLLBACK')
@@ -404,9 +475,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       res.status(404).json({ error: 'not_found' })
       return
     }
-    const assigned = record.requestId
-      ? await isAssignedTo(record.requestId, actor.id, actor.operationalRole)
-      : false
+    const assigned = await isAssignedToRecord(record, actor.id, actor.operationalRole)
     res.json({
       document: present(record, actor.id, actor.operationalRole, companyId, assigned),
     })
@@ -456,8 +525,8 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     let removed: PrivateDocumentRecord | undefined
     try {
       await client.query('BEGIN')
-      const { rows } = await client.query<{ owner_id: string; company_id: string | null; status: string }>(
-        'SELECT owner_id, company_id, status::text AS status FROM dashboard.requests WHERE id = $1 FOR UPDATE',
+      const { rows } = await client.query<{ owner_id: string; company_id: string | null; status: string; review_stage: string | null }>(
+        'SELECT owner_id, company_id, status::text AS status, review_stage FROM dashboard.requests WHERE id = $1 FOR UPDATE',
         [record.requestId],
       )
       const current = rows[0]
@@ -470,13 +539,27 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       if (
         !canDeleteDocument(
           actor.operationalRole,
-          { requestOwnerId: current.owner_id, requestCompanyId: current.company_id, requestStatus: current.status },
+          {
+            requestOwnerId: current.owner_id,
+            requestCompanyId: current.company_id,
+            requestStatus: current.status,
+            requestReviewStage: current.review_stage,
+            category: record.category,
+            requestFinancialSubmitted: await financialPackages.isSubmitted(record.requestId as string, client),
+          },
           actor.id,
           companyId,
         )
       ) {
         await client.query('ROLLBACK')
-        res.status(403).json({ error: 'forbidden' })
+        // Someone who cannot read the file gets what an unknown id gets.
+        if (await authorizeRecord(record, actor.id, actor.operationalRole, companyId)) res.status(403).json({ error: 'forbidden' })
+        else res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (await documents.isPinnedToProposal(record.id, record.requestId, client)) {
+        await client.query('ROLLBACK')
+        res.status(409).json({ error: 'document_pinned' })
         return
       }
       removed = await documents.delete(record.id, client)

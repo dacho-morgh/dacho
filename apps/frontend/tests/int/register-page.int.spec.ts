@@ -276,7 +276,7 @@ describe('signup frontend contract (mocked HTTP, not release evidence)', () => {
           failure === 'network'
             ? 'ارتباط با سامانه'
             : failure === 'server'
-              ? 'خطای سامانه'
+              ? 'ممکن است ثبت‌نام انجام شده باشد'
               : 'پذیرفته نشد',
         )
         await waitFor(() => expect(document.activeElement).toBe(alert))
@@ -310,5 +310,185 @@ describe('signup frontend contract (mocked HTTP, not release evidence)', () => {
     await screen.findByRole('alert')
     await waitFor(() => expect(submit.disabled).toBe(false))
     expect((screen.getByLabelText('رمز عبور') as HTMLInputElement).value).toBe('password123')
+  })
+
+  it('freezes the submitted answers while pending and unlocks them for a retry', async () => {
+    let finish!: (response: Response) => void
+    vi.mocked(fetch).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    render(createElement(RegisterPage))
+    await company()
+    await representative()
+    fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
+    const password = screen.getByLabelText('رمز عبور') as HTMLInputElement
+    // The field set disables its controls, which `:disabled` reports.
+    await waitFor(() => expect(password.matches(':disabled')).toBe(true))
+    expect(screen.getByLabelText('تکرار رمز عبور').matches(':disabled')).toBe(true)
+    expect(screen.getByRole('form').getAttribute('aria-busy')).toBe('true')
+    // The login link stays usable while the submission is pending.
+    expect(screen.getByRole('link', { name: 'وارد شوید' }).getAttribute('href')).toBe(
+      '/login?returnUrl=%2Fdashboard',
+    )
+    finish(
+      new Response(
+        JSON.stringify({ errors: [{ code: 'signup_rejected', message: 'Rejected.' }] }),
+        { status: 400 },
+      ),
+    )
+    await screen.findByRole('alert')
+    await waitFor(() => expect(password.matches(':disabled')).toBe(false))
+    expect(password.value).toBe('password123')
+    expect(screen.getByRole('form').getAttribute('aria-busy')).toBeNull()
+  })
+
+  it('reports a rolled-back server failure as not created, without a recovery prompt', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          errors: [{ code: 'signup_failed', message: 'Registration failed. Please try again.' }],
+        }),
+        { status: 500 },
+      ),
+    )
+    render(createElement(RegisterPage))
+    await company()
+    await representative()
+    fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe(
+      'ثبت‌نام به دلیل خطای سامانه انجام نشد. اطلاعات شما حفظ شده است؛ لطفاً دوباره تلاش کنید.',
+    )
+    expect(document.getElementById('register-recovery')).toBeNull()
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('offers sign-in recovery for a duplicate national ID without claiming a second company', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          errors: [
+            {
+              code: 'duplicate_national_id',
+              field: 'companyNationalId',
+              message: 'This company is already registered.',
+            },
+          ],
+        }),
+        { status: 409 },
+      ),
+    )
+    render(createElement(RegisterPage, { returnUrl: '/dashboard/requests' }))
+    await company()
+    await representative()
+    fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe(
+      'این شرکت قبلاً در سامانه ثبت شده است و شرکت دیگری با این شناسه ملی ایجاد نشد.',
+    )
+    const recovery = document.getElementById('register-recovery')
+    expect(recovery?.textContent).toContain('به‌جای ثبت دوباره وارد شوید')
+    expect(screen.getByRole('link', { name: 'ورود به حساب' }).getAttribute('href')).toBe(
+      '/login?returnUrl=%2Fdashboard%2Frequests',
+    )
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('treats a dropped connection as an unknown outcome and explains a later duplicate as the same signup', async () => {
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            errors: [
+              {
+                code: 'duplicate_national_id',
+                field: 'companyNationalId',
+                message: 'This company is already registered.',
+              },
+            ],
+          }),
+          { status: 409 },
+        ),
+      )
+    render(createElement(RegisterPage))
+    await company()
+    await representative()
+    fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
+    const first = await screen.findByRole('alert')
+    expect(first.textContent).toBe(
+      'ارتباط با سامانه قطع شد و نتیجه ثبت‌نام مشخص نیست. اطلاعات شما حفظ شده است.',
+    )
+    expect(first.textContent).not.toContain('انجام نشد')
+    expect(document.getElementById('register-recovery')?.textContent).toContain(
+      'پیش از ارسال دوباره، با شماره موبایل یا ایمیل خود وارد شوید',
+    )
+
+    const submit = screen.getByRole('button', { name: 'ثبت شرکت' }) as HTMLButtonElement
+    await waitFor(() => expect(submit.disabled).toBe(false))
+    fireEvent.click(submit)
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe(
+        'این شرکت در سامانه ثبت شده است؛ ممکن است ارسال قبلی شما انجام شده باشد. شرکت دیگری ایجاد نشد.',
+      ),
+    )
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('link', { name: 'ورود به حساب' })).toBeTruthy()
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('times out a hung request as an unknown outcome and unlocks retry', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      vi.mocked(fetch).mockImplementation(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            )
+          }),
+      )
+      render(createElement(RegisterPage))
+      await company()
+      await representative()
+      const submit = screen.getByRole('button', { name: 'ثبت شرکت' }) as HTMLButtonElement
+      fireEvent.click(submit)
+      await waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+      expect(submit.disabled).toBe(true)
+      await act(async () => {
+        vi.advanceTimersByTime(30_000)
+      })
+      const alert = await screen.findByRole('alert')
+      expect(alert.textContent).toContain('نتیجه ثبت‌نام مشخص نیست')
+      await waitFor(() => expect(submit.disabled).toBe(false))
+      expect(replace).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('aborts a pending submission on unmount and ignores its late response', async () => {
+    let signal: AbortSignal | undefined
+    let finish!: (response: Response) => void
+    vi.mocked(fetch).mockImplementation((_url, init) => {
+      signal = init?.signal ?? undefined
+      return new Promise((resolve) => {
+        finish = resolve
+      })
+    })
+    const { unmount } = render(createElement(RegisterPage))
+    await company()
+    await representative()
+    fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
+    await waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    unmount()
+    expect(signal?.aborted).toBe(true)
+    await act(async () => {
+      finish(new Response('{}', { status: 201 }))
+    })
+    expect(replace).not.toHaveBeenCalled()
   })
 })

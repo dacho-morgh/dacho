@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/utilities/dashboard-server', () => ({
   isSeniorManagerUser: backend.senior,
-  serverDashboardFetch: backend.fetch,
+  serverDashboardFetchResult: backend.fetch,
 }))
 vi.mock('@/components/dashboard/support-ticket-actions', () => ({
   SupportTicketActions: () => createElement('div', null, 'Support actions'),
@@ -34,7 +34,7 @@ const letter = {
 it.each([true, false])('preserves role-specific fetching and enables real letter actions (admin=%s)', async (admin) => {
   backend.payload.auth.mockResolvedValue({ user: { id: 'user-1' } })
   backend.senior.mockResolvedValue(admin)
-  backend.fetch.mockResolvedValue({ letter })
+  backend.fetch.mockResolvedValue({ kind: 'ok', data: { letter } })
   render(await LetterDetailPage({ params: Promise.resolve({ id: 'letter:letter-1' }) }))
   expect(backend.fetch).toHaveBeenCalledWith(`${admin ? '/admin/letters' : '/letters'}/letter-1`)
   expect(screen.getByRole('button', { name: 'عملیات بیشتر' })).toBeTruthy()
@@ -43,14 +43,27 @@ it.each([true, false])('preserves role-specific fetching and enables real letter
 
 it('keeps missing letters as not-found instead of an endless skeleton', async () => {
   backend.payload.auth.mockResolvedValue({ user: { id: 'user-1' } })
-  backend.fetch.mockResolvedValue(null)
+  backend.fetch.mockResolvedValue({ kind: 'unavailable', status: 404 })
   await expect(LetterDetailPage({ params: Promise.resolve({ id: 'missing' }) })).rejects.toThrow('NOT_FOUND')
+})
+
+it.each([
+  [{ kind: 'unavailable', status: 500 }, 'unavailable'],
+  [{ kind: 'unavailable' }, 'unavailable'],
+  [{ kind: 'denied' }, 'denied'],
+  [{ kind: 'unauthenticated' }, 'expired'],
+])('does not present a failed read %j as a missing letter', async (result, state) => {
+  backend.payload.auth.mockResolvedValue({ user: { id: 'user-1' } })
+  backend.fetch.mockResolvedValue(result)
+  render(await LetterDetailPage({ params: Promise.resolve({ id: 'letter:letter-1' }) }))
+  expect(screen.getByRole('alert').getAttribute('data-state')).toBe(state)
+  expect(screen.queryByRole('heading', { name: 'عنوان نامه' })).toBeNull()
 })
 
 it('keeps support actions separate from letter deletion', async () => {
   backend.payload.auth.mockResolvedValue({ user: { id: 'user-1' } })
   backend.senior.mockResolvedValue(true)
-  backend.fetch.mockResolvedValue({ ticket: { id: 'ticket-1', subject: 'پشتیبانی', message: 'پیام', requesterId: 'user-1', status: 'open' } })
+  backend.fetch.mockResolvedValue({ kind: 'ok', data: { ticket: { id: 'ticket-1', subject: 'پشتیبانی', message: 'پیام', requesterId: 'user-1', status: 'open' } } })
   render(await LetterDetailPage({ params: Promise.resolve({ id: 'support:ticket-1' }) }))
   expect(screen.getByText('Support actions')).toBeTruthy()
   expect(screen.getByText('پیام')).toBeTruthy()

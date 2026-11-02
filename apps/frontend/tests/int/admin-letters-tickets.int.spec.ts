@@ -12,17 +12,17 @@ vi.mock('payload', () => ({ getPayload: async () => ({
 }) }))
 vi.mock('@/utilities/dashboard-server', () => ({
   isSeniorManagerUser: async () => true,
-  serverDashboardFetch: mocks.fetch,
+  serverDashboardFetchResult: mocks.fetch,
 }))
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 it('shows fetched support tickets in the admin letters table with a detail link', async () => {
-  mocks.fetch.mockImplementation(async (path: string) => ({ items: path === '/support?limit=100' ? [{
+  mocks.fetch.mockImplementation(async (path: string) => ({ kind: 'ok', data: { items: path === '/support?limit=100' ? [{
     id: 'ticket-1', requesterId: 'applicant-1', subject: 'پیگیری درخواست پشتیبانی',
     message: 'لطفاً بررسی کنید', status: 'open', response: null,
     createdAt: '2026-09-17T09:00:00Z', updatedAt: '2026-09-17T09:00:00Z',
-  }] : [] }))
-  render(await LettersPage({}))
+  }] : [] } }))
+  render(await LettersPage())
   expect(screen.queryAllByRole('link', { name: 'پیگیری درخواست پشتیبانی' })).toHaveLength(0)
   fireEvent.click(screen.getByRole('button', { name: 'تیکت‌های پشتیبانی' }))
   expect(screen.getAllByRole('link', { name: 'پیگیری درخواست پشتیبانی' }).map((link) => link.getAttribute('href')))

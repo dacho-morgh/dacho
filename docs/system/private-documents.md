@@ -56,9 +56,9 @@ role, ownership and active assignment. A document id or URL is never authority.
 | --- | --- |
 | Company dossier (`articlesOfAssociation`, notices, catalogues, certificates) | owning representative, System Owner, Central Secretariat. Chief/reviewer/employer/investment are denied even when assigned to a case |
 | Case (`proposal`) | owning representative, System Owner, Central Secretariat, and an actively assigned chief/reviewer/employer/investment reviewer |
-| Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner and Central Secretariat. Investment reviewer access requires an authorized persisted handoff; T29/T30 have not delivered that state, so investment access currently fails closed. Chief, ordinary reviewer and employer reviewer are explicitly denied |
-| Correspondence (`correspondenceAttachment`) | owning representative, System Owner and Central Secretariat. Supplementary financial replies retain the financial audience restrictions, including denying investment access until a persisted handoff exists |
-| Future workflow (`rfp`, `supplementaryCaseFiles`, `boothPaymentReceipt`) | denied with `422 unsupported_category` until T18/T33/T50 provide the parent workflow |
+| Financial (`financialStatements`, debts, tax/insurance, contracts, use-of-funds, guarantees) | owning representative, System Owner and Central Secretariat. The investment person reads them only with an active assignment after the [T31 handoff](investment-handoff.md). Chief, ordinary reviewer and employer reviewer are explicitly denied. The company can upload only after the chief advances the case ([T29](financial-invitation.md)) |
+| Correspondence (`correspondenceAttachment`) | owning representative, System Owner and Central Secretariat. Supplementary financial replies retain the financial audience restrictions, and the investment person holding the case reads only files the Secretariat delivered ([T33](secretariat-follow-up.md)) |
+| Future workflow (`rfp`, `supplementaryCaseFiles`, `boothPaymentReceipt`) | denied with `422 unsupported_category` until T18/T50 provide the parent workflow. T33 carries supplementary files as correspondence attachments, so `supplementaryCaseFiles` has no workflow |
 
 Uploads: an active representative may add files to its own draft request or own
 company dossier; System Owner and Central Secretariat may add to an authorized
@@ -90,7 +90,7 @@ invalid entries. Repeated document ids are persisted once.
 | `POST /documents` | multipart `file` + `category` + exactly one parent (`requestId` or `companyId`), optional `logicalVersion`; returns safe metadata |
 | `GET /documents/:id` | authorized metadata only; `allowedActions` may include `download` and, while the request is a draft and the actor owns it, `delete` |
 | `GET /documents/:id/download` | authorized bytes with `Content-Disposition`, `Cache-Control: private, no-store`, `nosniff` and a sandbox CSP |
-| `DELETE /documents/:id` | draft-owner or System Owner request file |
+| `DELETE /documents/:id` | draft-owner or System Owner request file; a file pinned by a submitted proposal snapshot returns `409 document_pinned` |
 
 The same-origin `/api/dashboard/*` proxy forwards multipart bytes without
 corrupting the boundary, preserves the authorized download headers, and never
@@ -120,10 +120,9 @@ rehearsal applied all seven backend migrations on the disposable database.
 ## Deliberately not delivered
 
 - RFP version/download workflow (T18), proposal/revision workflow (T20),
-  financial package completeness/handoff (T30/T31), supplementary result
-  publication (T33) and booth receipt workflow (T50). T35 supports company and
-  Secretariat supplementary replies; investment inspection remains dependent
-  on the persisted handoff.
+  supplementary result publication (T33) and booth receipt workflow (T50). T35
+  supports company and Secretariat supplementary replies; investment inspection
+  of those replies remains closed until T33.
 - Image uploads, OCR, virus scanning, signed URLs, resumable uploads, retention
   automation or a numerical file-count cap.
 - A deployed staging runtime or real-data migration.
@@ -146,5 +145,16 @@ rehearsal applied all seven backend migrations on the disposable database.
 - Integration tests cover submit-versus-upload/delete row-lock ordering,
   participant-only case letters, recipient-only deletion and revocation.
 
+- FE07 correspondence slice: Secretariat/System Owner letters can link a
+  recipient case and attach `correspondenceAttachment` files uploaded in that
+  compose session; sending is blocked while an upload is pending and stale
+  attachments from a previous case are never sent. Letter attachments and
+  supplementary replies download only through the shared authorized control
+  (`/api/dashboard/documents/:id/download` or the letter-scoped
+  `/api/dashboard/letters/:letterId/attachments/:id/download`); any other URL
+  is refused client-side.
+
 UAT05/UAT09/UAT11/UAT22/UAT25/UAT35 remain **Not run**. Issue #71 stays open for
-the RFP, finance-package, correspondence and receipt integrations.
+the RFP and booth-receipt integrations (categories still return
+`422 unsupported_category` until T18/T50) and any financial-package UI beyond
+the existing request-form fields.

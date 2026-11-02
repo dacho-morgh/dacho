@@ -95,11 +95,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
         )}
         dir="rtl"
       >
+        <a
+          href="#dashboard-content"
+          className="sr-only rounded-lg bg-white p-3 text-brand-600 focus:not-sr-only focus:absolute focus:top-2 focus:right-2 focus:z-50"
+        >
+          <Typography as="span" variant="14/semibold" className="text-inherit">
+            پرش به محتوای اصلی
+          </Typography>
+        </a>
         <DashboardSidebar
           user={{ name: user.name, email: user.email }}
           navigation={navigation}
         />
-        <SidebarInset className="flex min-w-0 flex-1 flex-col bg-neutral-50">
+        <SidebarInset id="dashboard-content" tabIndex={-1} className="flex min-w-0 flex-1 flex-col bg-neutral-50 outline-none">
           <SidebarTrigger
             aria-label="باز کردن منو"
             className="absolute top-6 left-6 z-30 size-10 rounded-[10px] text-black md:hidden"

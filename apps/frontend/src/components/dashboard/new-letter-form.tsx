@@ -2,18 +2,14 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography, typographyVariants } from '@/components/ui/typography'
-import { LETTER_TYPE_LABELS, type LetterType } from '@/utilities/dashboard-api'
-import {
-  documentErrorMessage,
-  formatDocumentSize,
-  uploadDocument,
-  validateSelectedFile,
-} from '@/utilities/document-api'
+import { DashboardApiError, describeMutationFailure, LETTER_TYPE_LABELS, type LetterType, type RequestDto } from '@/utilities/dashboard-api'
+import type { PrivateDocumentDto } from '@/utilities/document-api'
 import { cn } from '@/utilities/ui'
 
 export interface LetterRecipient {
@@ -31,6 +27,54 @@ const SUPPORT_PRIORITY_LABELS: Record<string, string> = {
   normal: 'عادی',
   important: 'مهم',
   urgent: 'فوری',
+}
+
+type CaseOption = Pick<RequestDto, 'id' | 'trackingCode' | 'title' | 'ownerId'>
+
+type CasesState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'ready'; items: CaseOption[] }
+  | { kind: 'denied' }
+  | { kind: 'error' }
+
+/**
+ * Correspondence attachments are private request documents, so they need a
+ * case parent. The case list comes from the authorized admin request API and
+ * is narrowed to the selected recipient; the backend re-checks the sender,
+ * recipient and document audience when the letter is sent.
+ */
+function useRecipientCases(recipientId: string, enabled: boolean): CasesState {
+  const [state, setState] = useState<CasesState>({ kind: 'idle' })
+  useEffect(() => {
+    if (!enabled || !recipientId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setState({ kind: 'idle' })
+      return
+    }
+    let active = true
+    setState({ kind: 'loading' })
+    fetch('/api/dashboard/admin/requests?limit=100', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!active) return
+        if (response.status === 401 || response.status === 403) {
+          setState({ kind: 'denied' })
+          return
+        }
+        if (!response.ok) throw new Error('cases_unavailable')
+        const body = (await response.json()) as { items?: CaseOption[] }
+        if (!active) return
+        const items = Array.isArray(body?.items) ? body.items.filter((item) => item.ownerId === recipientId) : []
+        setState({ kind: 'ready', items })
+      })
+      .catch(() => {
+        if (active) setState({ kind: 'error' })
+      })
+    return () => {
+      active = false
+    }
+  }, [enabled, recipientId])
+  return state
 }
 
 export interface NewLetterFormProps {
@@ -60,11 +104,13 @@ export function NewLetterForm({
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [attachments, setAttachments] = useState<Array<{ id: string; name: string; size: string }>>([])
+  const [recipientId, setRecipientId] = useState('')
+  const [caseId, setCaseId] = useState('')
+  const [attachments, setAttachments] = useState<PrivateDocumentDto[]>([])
   const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const isSupport = mode === 'support'
+  const cases = useRecipientCases(recipientId, !isSupport)
 
   async function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -118,12 +164,13 @@ export function NewLetterForm({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ subject, message: body }),
         })
+        if (!response.ok) throw new DashboardApiError(response.status, 'ticket_not_created')
         const result = await response.json()
-        if (!response.ok || !result?.ticket?.id) throw new Error('ticket_not_created')
+        if (!result?.ticket?.id) throw new Error('ticket_not_created')
         router.push('/dashboard/letters')
         router.refresh()
-      } catch {
-        setError('ارسال پیام پشتیبانی انجام نشد. لطفاً دوباره تلاش کنید.')
+      } catch (cause) {
+        setError(describeMutationFailure(cause, 'ارسال پیام پشتیبانی انجام نشد. لطفاً دوباره تلاش کنید.'))
       } finally {
         submitting.current = false
         setSaving(false)
@@ -131,12 +178,20 @@ export function NewLetterForm({
       return
     }
 
-    const recipientId = String(data.get('recipientId') ?? '')
     const type = String(data.get('type') ?? '') as LetterType
     if (!companies.some((company) => company.id === recipientId) || !title || !body || !Object.hasOwn(LETTER_TYPE_LABELS, type)) {
       setError('گیرنده، عنوان، نوع و متن نامه را تکمیل کنید.')
       return
     }
+    if (uploading) {
+      setError('تا پایان بارگذاری پیوست‌ها صبر کنید.')
+      return
+    }
+    // Only attachments uploaded to the currently selected case are sent; a
+    // file left over from a previous case selection is never submitted.
+    const attachmentIds = caseId
+      ? attachments.filter((document) => document.requestId === caseId).map((document) => document.id)
+      : []
     submitting.current = true
     setSaving(true)
     setError(null)
@@ -157,21 +212,22 @@ export function NewLetterForm({
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payloadData),
+        body: JSON.stringify({
+          recipientId,
+          title,
+          type,
+          body,
+          ...(caseId ? { requestId: caseId } : {}),
+          ...(attachmentIds.length ? { attachmentIds } : {}),
+        }),
       })
+      if (!response.ok) throw new DashboardApiError(response.status, 'letter_not_created')
       const result = await response.json()
-      if (!response.ok || !result?.letter?.id) {
-        if (response.status === 403) throw new Error('forbidden')
-        throw new Error('letter_not_created')
-      }
+      if (!result?.letter?.id) throw new Error('letter_not_created')
       router.push('/dashboard/letters')
       router.refresh()
-    } catch (err: unknown) {
-      if (err instanceof Error && err.message === 'forbidden') {
-        setError('شما دسترسی لازم برای ارسال این نامه به گیرنده انتخابی را ندارید.')
-      } else {
-        setError('ارسال نامه انجام نشد. لطفاً دوباره تلاش کنید.')
-      }
+    } catch (cause) {
+      setError(describeMutationFailure(cause, 'ارسال نامه انجام نشد. لطفاً دوباره تلاش کنید.'))
     } finally {
       submitting.current = false
       setSaving(false)
@@ -209,7 +265,7 @@ export function NewLetterForm({
           <Button
             type="submit"
             size="40"
-            disabled={saving || (!isSupport && !companies.length)}
+            disabled={saving || uploading || (!isSupport && !companies.length)}
             className="bg-brand-500 px-4 hover:bg-brand-600"
           >
             <Typography as="span" variant="16/semibold" className="text-inherit">
@@ -248,8 +304,13 @@ export function NewLetterForm({
                 id="letter-recipient"
                 name="recipientId"
                 required
-                defaultValue={initialRecipientId || ''}
-                disabled={saving || !companies.length}
+                value={recipientId}
+                onChange={(event) => {
+                  setRecipientId(event.target.value)
+                  setCaseId('')
+                  setAttachments([])
+                }}
+                disabled={saving || uploading || !companies.length}
                 className={fieldClassName}
               >
                 <option value="" disabled>انتخاب گیرنده</option>
@@ -342,50 +403,74 @@ export function NewLetterForm({
           />
         </div>
 
-        {/* Attachments */}
-        <div className="flex flex-col gap-2">
+        {isSupport ? (
+          /* Support tickets have no attachment contract on the backend. */
           <Input
-            id="letter-attachment"
             label="فایل پیوست"
             type="file"
-            disabled={saving || uploading || !requestId}
-            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            hint={
-              requestId
-                ? uploading
-                  ? 'در حال بارگذاری پیوست...'
-                  : 'فقط PDF یا Word (doc / docx) - حداکثر ۱۰ مگابایت'
-                : 'ارسال فایل پیوست هنوز در سامانه پشتیبانی نمی‌شود.'
-            }
-            onChange={requestId ? handleAttachmentChange : undefined}
+            disabled
+            hint="ارسال فایل پیوست در پیام پشتیبانی پشتیبانی نمی‌شود."
           />
-          {uploadError && (
-            <Typography role="alert" variant="12/regular" className="text-error-600">
-              {uploadError}
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Typography as="label" htmlFor="letter-case" variant="16/semibold" className="text-neutral-700">
+              پرونده مرتبط (اختیاری)
             </Typography>
-          )}
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-1">
-              {attachments.map((att) => (
-                <div
-                  key={att.id}
-                  className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-1 text-sm text-neutral-700"
-                >
-                  <span>{att.name}</span>
-                  <span className="text-neutral-400">({att.size})</span>
-                  <button
-                    type="button"
-                    onClick={() => setAttachments((prev) => prev.filter((a) => a.id !== att.id))}
-                    className="text-neutral-400 hover:text-error-600"
-                    aria-label={`حذف پیوست ${att.name}`}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+            <select
+              id="letter-case"
+              name="requestId"
+              value={caseId}
+              onChange={(event) => {
+                setCaseId(event.target.value)
+                setAttachments([])
+              }}
+              disabled={saving || uploading || cases.kind !== 'ready' || cases.items.length === 0}
+              className={fieldClassName}
+            >
+              <option value="">بدون پرونده</option>
+              {cases.kind === 'ready'
+                ? cases.items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.trackingCode ? `${item.trackingCode} — ${item.title}` : item.title}
+                    </option>
+                  ))
+                : null}
+            </select>
+            {cases.kind === 'idle' ? (
+              <Typography variant="12/regular" className="text-neutral-500">
+                برای افزودن فایل پیوست، ابتدا گیرنده و سپس پرونده مرتبط را انتخاب کنید.
+              </Typography>
+            ) : cases.kind === 'loading' ? (
+              <Typography role="status" variant="12/regular" className="text-neutral-500">
+                در حال دریافت پرونده‌های گیرنده…
+              </Typography>
+            ) : cases.kind === 'denied' ? (
+              <Typography role="status" variant="12/regular" className="text-neutral-500">
+                دسترسی به پرونده‌های این گیرنده برای شما مجاز نیست؛ نامه بدون پیوست ارسال می‌شود.
+              </Typography>
+            ) : cases.kind === 'error' ? (
+              <Typography role="alert" variant="12/regular" className="text-error-600">
+                دریافت پرونده‌های گیرنده انجام نشد. صفحه را دوباره بارگذاری کنید.
+              </Typography>
+            ) : cases.items.length === 0 ? (
+              <Typography role="status" variant="12/regular" className="text-neutral-500">
+                این گیرنده پرونده‌ای ندارد؛ پیوست فایل فقط برای نامه‌های مرتبط با پرونده ممکن است.
+              </Typography>
+            ) : null}
+            {caseId ? (
+              <PrivateDocumentField
+                key={caseId}
+                category="correspondenceAttachment"
+                label="فایل پیوست"
+                requestId={caseId}
+                disabled={saving}
+                sessionOnly
+                onPendingChange={setUploading}
+                onDocumentsChange={setAttachments}
+              />
+            ) : null}
+          </div>
+        )}
 
         {error && (
           <Typography role="alert" variant="14/regular" className="text-error-600">

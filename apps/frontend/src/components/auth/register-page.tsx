@@ -192,6 +192,41 @@ function payloadErrorField(error: PayloadError): keyof FormState | undefined {
   return candidate && candidate in EMPTY_FORM ? (candidate as keyof FormState) : undefined
 }
 
+/**
+ * A response the browser cannot interpret may still follow a committed signup
+ * (a gateway timeout after the server wrote both records, say). The browser
+ * never decides the outcome itself: it tells the person to try signing in
+ * before resubmitting, and a resubmission is answered by the server's own
+ * duplicate rule.
+ */
+const SIGNUP_TIMEOUT_MS = 30_000
+
+type Recovery = 'login' | 'uncertain-login'
+
+type Notice = { message: string; recovery?: Recovery }
+
+const NOTICES = {
+  correctFields: 'لطفاً موارد مشخص‌شده را اصلاح کنید.',
+  rejected: 'اطلاعات ارسالی پذیرفته نشد. موارد واردشده را بررسی و دوباره تلاش کنید.',
+  duplicateIdentity: 'شماره موبایل یا ایمیل واردشده قبلاً ثبت شده است.',
+  duplicateCompany:
+    'این شرکت قبلاً در سامانه ثبت شده است و شرکت دیگری با این شناسه ملی ایجاد نشد.',
+  duplicateAfterUncertain:
+    'این شرکت در سامانه ثبت شده است؛ ممکن است ارسال قبلی شما انجام شده باشد. شرکت دیگری ایجاد نشد.',
+  serverFailure:
+    'ثبت‌نام به دلیل خطای سامانه انجام نشد. اطلاعات شما حفظ شده است؛ لطفاً دوباره تلاش کنید.',
+  uncertainServer:
+    'پاسخ قطعی از سامانه دریافت نشد و ممکن است ثبت‌نام انجام شده باشد. اطلاعات شما حفظ شده است.',
+  uncertainNetwork:
+    'ارتباط با سامانه قطع شد و نتیجه ثبت‌نام مشخص نیست. اطلاعات شما حفظ شده است.',
+} as const
+
+const RECOVERY_HINTS: Record<Recovery, string> = {
+  login: 'اگر پیش‌تر با این اطلاعات حساب ساخته‌اید، به‌جای ثبت دوباره وارد شوید.',
+  'uncertain-login':
+    'پیش از ارسال دوباره، با شماره موبایل یا ایمیل خود وارد شوید. اگر ورود ممکن نبود، دوباره ثبت کنید.',
+}
+
 function isDuplicateError(error: PayloadError): boolean {
   const message = typeof error.message === 'string' ? error.message.toLocaleLowerCase() : ''
   return /unique|duplicate|already|exists|قبلاً|تکراری/.test(message)
@@ -216,13 +251,29 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
   })
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [confirmationVisible, setConfirmationVisible] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNoticeState] = useState<Notice | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const submissionLock = useRef(false)
+  const pendingRequest = useRef<AbortController | null>(null)
+  const mounted = useRef(true)
+  // Set when an earlier attempt ended without a definite server answer, so a
+  // later duplicate response can be explained as possibly the same signup.
+  const outcomeUncertain = useRef(false)
+  const loginUrl = getLoginUrl(safeReturnUrl)
+
+  const setNotice = (message: string | null, recovery?: Recovery) =>
+    setNoticeState(message ? { message, recovery } : null)
 
   // E2E fills only after RHF has attached refs and change handlers.
   useEffect(() => {
+    mounted.current = true
     formRef.current?.setAttribute('data-hydrated', 'true')
+    return () => {
+      // A response for a page the person has left must not navigate or
+      // update this form; the server result stays authoritative.
+      mounted.current = false
+      pendingRequest.current?.abort()
+    }
   }, [])
 
   const clearFieldError = (name: keyof FormState) => {
@@ -272,10 +323,14 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
 
   const submitSignup = async (form: FormState) => {
     setNotice(null)
+    const controller = new AbortController()
+    pendingRequest.current = controller
+    const timeout = setTimeout(() => controller.abort(), SIGNUP_TIMEOUT_MS)
 
     try {
       const response = await fetch('/api/users/self-signup', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: form.email.trim().toLocaleLowerCase(),
@@ -296,8 +351,11 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
         }),
       })
 
+      if (!mounted.current) return
+
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as PayloadErrorBody | null
+        if (!mounted.current) return
         const serverErrors: FormErrors = {}
         const responseErrors = payloadErrors(body)
         const hasAmbiguousIdentityError = responseErrors.some((error) =>
@@ -339,6 +397,9 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
         }
 
         const invalidFields = Object.keys(serverErrors) as Array<keyof FormState>
+        const duplicateCompany = responseErrors.some(
+          (error) => error.code === 'duplicate_national_id',
+        )
         if (invalidFields.length > 0) {
           const firstField = invalidFields.sort(
             (left, right) => fieldStep[left] - fieldStep[right],
@@ -350,30 +411,52 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
             setStep(fieldStep[firstField])
             focusField(firstField)
           }
-          setNotice('لطفاً موارد مشخص‌شده را اصلاح کنید.')
+          if (duplicateCompany) {
+            setNotice(
+              outcomeUncertain.current
+                ? NOTICES.duplicateAfterUncertain
+                : NOTICES.duplicateCompany,
+              'login',
+            )
+          } else {
+            setNotice(NOTICES.correctFields)
+          }
         } else if (responseErrors.some((error) => error.code === 'signup_rejected')) {
-          setNotice('اطلاعات ارسالی پذیرفته نشد. موارد واردشده را بررسی و دوباره تلاش کنید.')
+          // Deliberately generic: the server does not say which account exists.
+          setNotice(NOTICES.rejected, 'login')
           focusNotice()
         } else if (hasAmbiguousIdentityError || response.status === 409) {
           setStep(2)
-          setNotice('شماره موبایل یا ایمیل واردشده قبلاً ثبت شده است.')
+          setNotice(NOTICES.duplicateIdentity, 'login')
           focusField('phone')
+        } else if (responseErrors.some((error) => error.code === 'signup_failed')) {
+          // The server reports a rolled-back transaction: nothing was created.
+          setNotice(NOTICES.serverFailure)
+          focusNotice()
         } else if (response.status >= 500) {
-          setNotice(
-            'ثبت‌نام به دلیل خطای سامانه انجام نشد. اطلاعات شما حفظ شده است؛ لطفاً دوباره تلاش کنید.',
-          )
+          // A gateway or unreadable failure may follow a committed signup.
+          outcomeUncertain.current = true
+          setNotice(NOTICES.uncertainServer, 'uncertain-login')
           focusNotice()
         } else {
-          setNotice('اطلاعات ارسالی پذیرفته نشد. موارد واردشده را بررسی و دوباره تلاش کنید.')
+          setNotice(NOTICES.rejected)
           focusNotice()
         }
         return
       }
 
+      outcomeUncertain.current = false
       router.replace(getLoginUrl(safeReturnUrl, { registered: true }))
     } catch {
-      setNotice('در حال حاضر ارتباط با سامانه برقرار نیست. کمی بعد دوباره تلاش کنید.')
+      if (!mounted.current) return
+      // The request may have reached the server before the connection failed
+      // or the timeout fired, so the outcome is unknown rather than failed.
+      outcomeUncertain.current = true
+      setNotice(NOTICES.uncertainNetwork, 'uncertain-login')
       focusNotice()
+    } finally {
+      clearTimeout(timeout)
+      if (pendingRequest.current === controller) pendingRequest.current = null
     }
   }
 
@@ -386,7 +469,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
           color="neutral-600"
           variant="16/regular"
         >
-          <Link href={getLoginUrl(safeReturnUrl)}>
+          <Link href={loginUrl}>
             <ArrowRight aria-hidden="true" className="size-5 stroke-[1.5]" />
             بازگشت
           </Link>
@@ -451,6 +534,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
 
       <form
         className="flex min-h-0 flex-1 flex-col pt-11"
+        aria-busy={submitting || undefined}
         aria-label="فرم ثبت شرکت"
         ref={formRef}
         onSubmit={(event) => {
@@ -465,8 +549,11 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
           }
         }}
       >
-        <div
-          className="flex flex-col gap-7 ps-0.5 pe-3.5 lg:min-h-0 lg:flex-1 lg:[scrollbar-width:thin] lg:[scrollbar-color:var(--neutral-300)_transparent] lg:overflow-y-auto"
+        {/* The pending submission owns these answers: editing them now would
+            make the visible form disagree with what the server receives. */}
+        <fieldset
+          className="m-0 flex min-w-0 flex-col gap-7 border-0 p-0 ps-0.5 pe-3.5 lg:min-h-0 lg:flex-1 lg:[scrollbar-width:thin] lg:[scrollbar-color:var(--neutral-300)_transparent] lg:overflow-y-auto"
+          disabled={submitting}
           key={step}
         >
           {step === 1 && (
@@ -711,21 +798,30 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
               />
             </>
           )}
-        </div>
+        </fieldset>
 
         {notice && (
-          <Typography
-            aria-live="polite"
-            as="p"
-            className="mt-4 text-center"
-            color="error"
-            id="register-notice"
-            role="alert"
-            tabIndex={-1}
-            variant="12/regular"
-          >
-            {notice}
-          </Typography>
+          <div className="mt-4 flex flex-col items-center gap-1 text-center">
+            <Typography
+              aria-live="polite"
+              as="p"
+              color="error"
+              id="register-notice"
+              role="alert"
+              tabIndex={-1}
+              variant="12/regular"
+            >
+              {notice.message}
+            </Typography>
+            {notice.recovery && (
+              <Typography as="p" color="neutral-600" id="register-recovery" variant="12/regular">
+                {RECOVERY_HINTS[notice.recovery]}{' '}
+                <Link className="text-brand-500 underline-offset-4 hover:underline" href={loginUrl}>
+                  ورود به حساب
+                </Link>
+              </Typography>
+            )}
+          </div>
         )}
 
         <footer
@@ -745,7 +841,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
           )}
 
           {step < 3 ? (
-            <Button onClick={goForward} size="40" type="button">
+            <Button disabled={submitting} onClick={goForward} size="40" type="button">
               ادامه
               <ArrowLeft />
             </Button>
@@ -755,6 +851,20 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
             </Button>
           )}
         </footer>
+
+        <Typography
+          as="p"
+          className="flex min-h-11 shrink-0 flex-wrap items-center justify-center gap-1 pt-4"
+          color="neutral-600"
+          variant="14/regular"
+        >
+          <span>حساب کاربری دارید؟</span>
+          <Link className="inline-flex min-h-11 items-center text-brand-500" href={loginUrl}>
+            <Typography as="span" color="brand" variant="14/semibold">
+              وارد شوید
+            </Typography>
+          </Link>
+        </Typography>
       </form>
     </div>
   )

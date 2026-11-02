@@ -58,6 +58,8 @@ export function AdminListView<T>({
   columns,
   loadState = 'ready',
   onRetry,
+  filterTabs,
+  serverFiltered = false,
 }: {
   title: string
   addLabel: string
@@ -68,6 +70,9 @@ export function AdminListView<T>({
   columns: AdminColumn<T>[]
   loadState?: AdminListLoadState
   onRetry?: () => void
+  filterTabs?: React.ReactNode
+  /** The caller filters through the API: a search over one page would misreport the list. */
+  serverFiltered?: boolean
 }) {
   const [query, setQuery] = useState('')
   const pathname = usePathname()
@@ -82,29 +87,32 @@ export function AdminListView<T>({
       <Typography variant="h3" color="neutral-900">
         {title}
       </Typography>
+      {filterTabs}
       <div className="flex flex-row-reverse flex-wrap items-center justify-between gap-3">
         <Button disabled size="48" icon={<DashboardAddIcon className="size-6" />}>
           <Typography variant="16/regular" color="white">
             {addLabel}
           </Typography>
         </Button>
-        <div className="flex flex-row-reverse gap-2">
-          <Button disabled
-            variant="outline-gray"
-            size="48"
-            icon={<DashboardFilterIcon className="size-6" />}
-            aria-label="فیلتر"
-          />
-          <div className="relative">
-            <DashboardSearchIcon className="absolute right-3 top-3 size-6 text-neutral-400" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="h-12 w-[400px] max-w-[70vw] rounded-xl pr-11"
-              placeholder={searchPlaceholder}
+        {!serverFiltered && (
+          <div className="flex flex-row-reverse gap-2">
+            <Button disabled
+              variant="outline-gray"
+              size="48"
+              icon={<DashboardFilterIcon className="size-6" />}
+              aria-label="فیلتر"
             />
+            <div className="relative">
+              <DashboardSearchIcon className="absolute right-3 top-3 size-6 text-neutral-400" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="h-12 w-[400px] max-w-[70vw] rounded-xl pr-11"
+                placeholder={searchPlaceholder}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <div className="min-w-0 flex-1 overflow-x-auto rounded-xl border border-neutral-200 bg-white lg:min-h-[848px]">
         <table className="w-full min-w-[900px] border-collapse">

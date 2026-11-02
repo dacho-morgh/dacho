@@ -8,7 +8,7 @@ See [`docs/linear/back-end-system-design.md`](docs/linear/back-end-system-design
 
 | Package | Kind | Stack | Role |
 |---|---|---|---|
-| `apps/frontend` | deployable | Next.js 16 + Payload 3 | Fused CMS + public site — admin panel, REST/GraphQL API, and the public site in one app |
+| `apps/frontend` | deployable | Next.js 16 + Payload 3 | Fused CMS + public site — admin panel, REST API, and the public site in one app |
 | `apps/backend` | deployable | Node.js + TypeScript | Express: dashboard domain APIs (requests, letters, activities, support tickets, profile) + application auth (OTP, ES256 JWT, `POST /auth/*` + JWKS — implemented, but no screen uses it) |
 | `packages/cms-core` | library | Payload 3 | **React-free** CMS domain: config, collections, globals, fields, hooks, access control, migrations, and generated `payload-types.ts` |
 
@@ -76,7 +76,6 @@ pnpm dev
 - Public site: `http://localhost:3000`
 - Admin panel: `http://localhost:3000/admin`
 - REST API: `http://localhost:3000/api/*`
-- GraphQL: `http://localhost:3000/api/graphql`
 
 ## Commands
 

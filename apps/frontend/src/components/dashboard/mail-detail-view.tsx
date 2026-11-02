@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
+import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,7 +15,14 @@ import {
   CalendarBulkIcon, ClockBulkIcon, DashboardMessageTextIcon,
   DashboardMoreIcon, DashboardTrashIcon,
 } from '@/components/icons'
-import { deleteLetter } from '@/utilities/dashboard-api'
+import { deleteLetter, describeMutationFailure } from '@/utilities/dashboard-api'
+import { letterAttachmentDownloadPath } from '@/utilities/document-api'
+
+export interface MailAttachment {
+  id: string
+  name: string
+  size: string
+}
 
 export interface ThreadMessage {
   id: string
@@ -26,25 +34,8 @@ export interface ThreadMessage {
   dayOfWeek: string
   timeStr: string
   body: string
-  attachments?: { id?: string; name: string; size: string; ext: string; downloadUrl?: string }[]
-}
-
-export interface MailData {
-  id: string
-  title: string
-  category: string
-  senderId?: string | null
-  senderName: string
-  senderRole: string
-  senderEmail?: string
-  senderAvatar?: string
-  requestId?: string | null
-  datePersian: string
-  dayOfWeek: string
-  timeStr: string
-  body: string
-  attachments?: { id?: string; name: string; size: string; ext: string; downloadUrl?: string }[]
-  thread?: ThreadMessage[]
+  /** Authorized attachment metadata; bytes come only from the letter-scoped download route. */
+  attachments?: MailAttachment[]
 }
 
 interface MailDetailViewProps {
@@ -70,10 +61,10 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
       await deleteLetter(mail.id)
       router.push('/dashboard/letters')
       router.refresh()
-    } catch {
+    } catch (cause) {
       deletingRef.current = false
       setDeleting(false)
-      setNotice('حذف نامه انجام نشد. دوباره تلاش کنید.')
+      setNotice(describeMutationFailure(cause, 'حذف نامه انجام نشد. دوباره تلاش کنید.'))
     }
   }
 
@@ -180,68 +171,17 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
           {!!mail.attachments?.length && (
             <section aria-label="پیوست‌های نامه" className="flex flex-col gap-2">
               <Typography variant="14/semibold" className="text-neutral-600">پیوست‌های نامه</Typography>
-              <div className="flex flex-col gap-2">
-                {mail.attachments.map((attachment, index) => (
-                  <div
-                    key={attachment.id || index}
-                    className="flex items-center justify-between rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Typography as="span" variant="14/regular" className="text-neutral-700">
-                        {attachment.name}
-                      </Typography>
-                      <Typography as="span" variant="14/regular" className="text-neutral-400">
-                        {`(${attachment.size})`}
-                      </Typography>
+              <ul className="flex flex-col gap-2">
+                {mail.attachments.map((attachment) => (
+                  <li key={attachment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-100 px-3 py-2">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <Typography variant="14/semibold" className="break-all text-neutral-700"><bdi dir="auto">{attachment.name}</bdi></Typography>
+                      <Typography variant="12/light" className="text-neutral-400">{attachment.size}</Typography>
                     </div>
-                    {attachment.downloadUrl && (
-                      <Button asChild variant="outline" size="sm" className="h-8 px-3 text-xs">
-                        <a
-                          href={attachment.downloadUrl}
-                          download={attachment.name}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          دانلود
-                        </a>
-                      </Button>
-                    )}
-                  </div>
+                    <PrivateDocumentDownload path={letterAttachmentDownloadPath(mail.id, attachment.id)} filename={attachment.name} />
+                  </li>
                 ))}
-              </div>
-            </section>
-          )}
-          {!!mail.thread?.length && (
-            <section aria-label="تاریخچه مکاتبات پرونده" className="mt-4 flex flex-col gap-4 border-t border-neutral-100 pt-4">
-              <Typography variant="14/semibold" className="text-neutral-600">
-                تاریخچه مکاتبات پرونده
-              </Typography>
-              <div className="flex flex-col gap-4">
-                {mail.thread.map((msg) => (
-                  <div key={msg.id} className="flex flex-col gap-3 rounded-xl border border-neutral-100 bg-neutral-50/50 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Typography as="span" variant="14/semibold" aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600">
-                          {msg.senderName.slice(0, 1)}
-                        </Typography>
-                        <div>
-                          <Typography variant="14/semibold" className="text-neutral-700">{msg.senderName}</Typography>
-                          <Typography variant="12/regular" className="text-neutral-500">{msg.senderRole}</Typography>
-                        </div>
-                      </div>
-                      <Typography variant="12/regular" className="text-neutral-400">
-                        {msg.dayOfWeek} {msg.datePersian} {msg.timeStr ? `ساعت ${msg.timeStr}` : ''}
-                      </Typography>
-                    </div>
-                    {msg.title && (
-                      <Typography variant="14/semibold" className="text-neutral-700">{msg.title}</Typography>
-                    )}
-                    {msg.body && (
-                      <Typography variant="14/regular" className="whitespace-pre-wrap text-neutral-600">{msg.body}</Typography>
-                    )}
-                  </div>
-                ))}
-              </div>
+              </ul>
             </section>
           )}
         </>}

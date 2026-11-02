@@ -10,8 +10,10 @@ import {
   documentAudience,
   requestScopeFor,
   type DocumentCategory,
+  FINANCIAL_CATEGORIES,
 } from '../src/access/policy.js'
 import { operationalRoleOf } from '../src/access/roles.js'
+import { FINANCIAL_CHECKLIST } from '../src/dashboard/financial-invitation.js'
 import { safeOriginalFilename, validateDocumentFile } from '../src/documents/policy.js'
 import { PrivateDocumentStorage } from '../src/documents/storage.js'
 
@@ -85,6 +87,84 @@ describe('server-derived allowedActions', () => {
     ])
     expect(allowedRequestActions('representative', submitted, 'p1')).toEqual(['read'])
     expect(allowedRequestActions('representative', draft, 'other')).toEqual([])
+  })
+
+  it('advertises T21 triage, correction and reopen only where the endpoint will allow them', () => {
+    const triage = { ownerId: 'p1', status: 'in_review', reviewStage: 'chief_triage' }
+    const returned = { ownerId: 'p1', status: 'action_needed', reviewStage: 'chief_triage' }
+    const rejected = { ownerId: 'p1', status: 'rejected', reviewStage: 'chief_triage' }
+
+    expect(allowedRequestActions('chief-reviewer', { ...triage, actorIsResponsibleChief: true }, 'c1')).toEqual([
+      'read', 'triage',
+    ])
+    expect(allowedRequestActions('chief-reviewer', triage, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('chief-reviewer', { ...returned, actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+    // T22: a triaged case offers the review round until one exists for its revision.
+    const triaged = { ...triage, reviewStage: 'triaged' }
+    expect(allowedRequestActions('chief-reviewer', { ...triaged, actorIsResponsibleChief: true }, 'c1')).toEqual(['read', 'startReview'])
+    expect(allowedRequestActions('chief-reviewer', { ...triaged, actorIsResponsibleChief: true, reviewRoundStarted: true }, 'c1')).toEqual(['read', 'replaceReviewer'])
+    expect(allowedRequestActions('chief-reviewer', triaged, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('chief-reviewer', { ...triaged, status: 'rejected', actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+    for (const role of ['system-owner', 'central-secretariat', 'reviewer', 'employer-reviewer', 'investment-reviewer'] as const) {
+      expect(allowedRequestActions(role, { ...triaged, actorIsResponsibleChief: true }, 'x1')).not.toContain('startReview')
+    }
+    expect(allowedRequestActions('representative', triaged, 'p1')).not.toContain('startReview')
+    expect(allowedRequestActions('reviewer', { ...triage, actorIsResponsibleChief: true }, 'r1')).toEqual(['read'])
+
+    expect(allowedRequestActions('representative', returned, 'p1')).toEqual([
+      'read', 'correct', 'uploadDocument', 'deleteDocument',
+    ])
+    expect(allowedRequestActions('representative', { ownerId: 'p1', status: 'action_needed' }, 'p1')).toEqual(['read'])
+    expect(allowedRequestActions('representative', triage, 'p1')).toEqual(['read'])
+    expect(allowedRequestActions('representative', rejected, 'p1')).toEqual(['read'])
+
+    expect(allowedRequestActions('system-owner', rejected, 'o1')).toContain('reopen')
+    expect(allowedRequestActions('system-owner', { ownerId: 'p1', status: 'rejected' }, 'o1')).not.toContain('reopen')
+    expect(allowedRequestActions('system-owner', triage, 'o1')).not.toContain('reopen')
+    expect(allowedRequestActions('central-secretariat', rejected, 's1')).toEqual(['read', 'uploadDocument'])
+  })
+
+  it('advertises T26 replacement only to the actor who may perform it, inside a started round', () => {
+    const triaged = { ownerId: 'p1', status: 'in_review', reviewStage: 'triaged' }
+    const started = { ...triaged, reviewRoundStarted: true }
+
+    // The responsible chief replaces ordinary reviewers; the owner alone replaces the employer.
+    expect(allowedRequestActions('chief-reviewer', { ...started, actorIsResponsibleChief: true }, 'c1')).toEqual(['read', 'replaceReviewer'])
+    expect(allowedRequestActions('chief-reviewer', started, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('system-owner', started, 'o1')).toEqual([
+      'read', 'assign', 'replaceEmployer', 'uploadDocument', 'deleteDocument',
+    ])
+    expect(allowedRequestActions('system-owner', started, 'o1')).not.toContain('replaceReviewer')
+    expect(allowedRequestActions('system-owner', triaged, 'o1')).not.toContain('replaceEmployer')
+    expect(allowedRequestActions('system-owner', { ...started, status: 'rejected' }, 'o1')).not.toContain('replaceEmployer')
+    expect(allowedRequestActions('system-owner', { ...started, reviewStage: 'chief_triage' }, 'o1')).not.toContain('replaceEmployer')
+
+    for (const role of ['central-secretariat', 'reviewer', 'employer-reviewer', 'investment-reviewer'] as const) {
+      const actions = allowedRequestActions(role, { ...started, actorIsResponsibleChief: true }, 'x1')
+      expect(actions, role).not.toContain('replaceReviewer')
+      expect(actions, role).not.toContain('replaceEmployer')
+    }
+    expect(allowedRequestActions('representative', started, 'p1')).toEqual(['read'])
+  })
+
+  it('advertises the T28 decision only to the responsible chief on a complete round', () => {
+    const started = { ownerId: 'p1', status: 'in_review', reviewStage: 'triaged', reviewRoundStarted: true }
+    const complete = { ...started, reviewRoundComplete: true }
+
+    expect(allowedRequestActions('chief-reviewer', { ...complete, actorIsResponsibleChief: true }, 'c1')).toEqual(['read', 'decideReview'])
+    expect(allowedRequestActions('chief-reviewer', { ...started, actorIsResponsibleChief: true }, 'c1')).not.toContain('decideReview')
+    expect(allowedRequestActions('chief-reviewer', complete, 'c1')).toEqual(['read'])
+    // A decided case has nothing left for the chief, whichever way it went.
+    expect(allowedRequestActions('chief-reviewer', { ...complete, reviewStage: 'advanced', actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+    expect(allowedRequestActions('chief-reviewer', { ...complete, status: 'rejected', actorIsResponsibleChief: true }, 'c1')).toEqual(['read'])
+
+    for (const role of ['system-owner', 'central-secretariat', 'reviewer', 'employer-reviewer', 'investment-reviewer'] as const) {
+      expect(allowedRequestActions(role, { ...complete, actorIsResponsibleChief: true }, 'x1'), role).not.toContain('decideReview')
+    }
+    expect(allowedRequestActions('representative', complete, 'p1')).toEqual(['read'])
+    // The owner keeps the employer replacement, which takes completion back (T27).
+    expect(allowedRequestActions('system-owner', complete, 'o1')).toContain('replaceEmployer')
+    expect(allowedRequestActions('system-owner', { ...complete, reviewStage: 'advanced' }, 'o1')).not.toContain('replaceEmployer')
   })
 })
 
@@ -171,6 +251,20 @@ describe('document read authority', () => {
     expect(canReadDocument('representative', financial, 'rep-1', 'company-1')).toBe(true)
   })
 
+  it('opens financial files to the investment person only with an assignment after the handoff (T31)', () => {
+    const handedOff = { ...financial, requestFinancialSubmitted: true }
+    expect(canReadDocument('investment-reviewer', handedOff, 'i1', null)).toBe(true)
+    expect(canReadDocument('investment-reviewer', { ...handedOff, assigned: false }, 'i2', null)).toBe(false)
+    for (const role of ['chief-reviewer', 'reviewer', 'employer-reviewer'] as const) {
+      expect(canReadDocument(role, handedOff, 'x1', null)).toBe(false)
+    }
+    // Company dossier files and correspondence do not follow the handoff.
+    expect(canReadDocument('investment-reviewer', { ...handedOff, category: 'articlesOfAssociation' }, 'i1', null)).toBe(false)
+    expect(canReadDocument('investment-reviewer', { ...handedOff, category: 'correspondenceAttachment', supplementaryDelivered: true }, 'i1', null)).toBe(true)
+    expect(canReadDocument('investment-reviewer', { ...handedOff, assigned: false, category: 'correspondenceAttachment', supplementaryDelivered: true }, 'i1', null)).toBe(false)
+    expect(canReadDocument('investment-reviewer', { ...handedOff, category: 'correspondenceAttachment' }, 'i1', null)).toBe(false)
+  })
+
   it('explicitly excludes chief, reviewer and employer reviewer from financial files', () => {
     for (const role of ['chief-reviewer', 'reviewer', 'employer-reviewer'] as const) {
       expect(canReadDocument(role, financial, 'x1', null)).toBe(false)
@@ -197,5 +291,57 @@ describe('document read authority', () => {
     expect(canUploadOwnedDocument('representative', 'financialStatements', { requestOwnerId: 'rep-1', requestStatus: 'in_review' }, 'rep-1', 'company-1')).toBe(false)
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'draft' }, 'rep-1')).toBe(true)
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'in_review' }, 'rep-1')).toBe(false)
+  })
+
+  it('opens company financial files only after the chief advances the case (T29)', () => {
+    const advanced = { requestOwnerId: 'rep-1', requestStatus: 'in_review', requestReviewStage: 'advanced' }
+    expect(canUploadOwnedDocument('representative', 'financialStatements', advanced, 'rep-1', null)).toBe(true)
+    expect(canUploadOwnedDocument('representative', 'proposal', advanced, 'rep-1', null)).toBe(false)
+    expect(canDeleteDocument('representative', { ...advanced, category: 'financialStatements' }, 'rep-1')).toBe(true)
+    expect(canDeleteDocument('representative', { ...advanced, category: 'proposal' }, 'rep-1')).toBe(false)
+    for (const before of [
+      { requestStatus: 'draft', requestReviewStage: null },
+      { requestStatus: 'in_review', requestReviewStage: 'chief_triage' },
+      { requestStatus: 'in_review', requestReviewStage: 'triaged' },
+      { requestStatus: 'action_needed', requestReviewStage: 'chief_triage' },
+      { requestStatus: 'rejected', requestReviewStage: 'chief_triage' },
+    ]) {
+      for (const category of FINANCIAL_CATEGORIES) {
+        expect(canUploadOwnedDocument('representative', category, { requestOwnerId: 'rep-1', ...before }, 'rep-1', null)).toBe(false)
+      }
+    }
+    expect(canUploadOwnedDocument('representative', 'financialStatements', { ...advanced, requestOwnerId: 'rep-2' }, 'rep-1', null)).toBe(false)
+    expect(allowedRequestActions('representative', { ownerId: 'rep-1', status: 'in_review', reviewStage: 'advanced' }, 'rep-1')).toEqual(['read', 'uploadDocument', 'deleteDocument', 'submitFinancialPackage'])
+    expect(allowedRequestActions('representative', { ownerId: 'rep-1', status: 'in_review', reviewStage: 'triaged' }, 'rep-1')).toEqual(['read'])
+  })
+
+  it('freezes financial files and the package action once the company submits (T30)', () => {
+    const submitted = { requestOwnerId: 'rep-1', requestStatus: 'in_review', requestReviewStage: 'advanced', requestFinancialSubmitted: true }
+    for (const category of FINANCIAL_CATEGORIES) {
+      expect(canUploadOwnedDocument('representative', category, submitted, 'rep-1', null)).toBe(false)
+      expect(canDeleteDocument('representative', { ...submitted, category }, 'rep-1')).toBe(false)
+    }
+    expect(allowedRequestActions('representative', { ownerId: 'rep-1', status: 'in_review', reviewStage: 'advanced', financialPackageSubmitted: true }, 'rep-1')).toEqual(['read'])
+  })
+
+  it('asks for every financial category exactly once (T29)', () => {
+    expect(FINANCIAL_CHECKLIST.map((item) => item.category).sort()).toEqual([...FINANCIAL_CATEGORIES].sort())
+  })
+
+  it('reopens only proposal files when the chief returns an event case for correction (T21)', () => {
+    const returned = { requestOwnerId: 'rep-1', requestStatus: 'action_needed', requestReviewStage: 'chief_triage' }
+    expect(canUploadOwnedDocument('representative', 'proposal', returned, 'rep-1', null)).toBe(true)
+    expect(canUploadOwnedDocument('representative', 'financialStatements', returned, 'rep-1', null)).toBe(false)
+    expect(canDeleteDocument('representative', { ...returned, category: 'proposal' }, 'rep-1')).toBe(true)
+    expect(canDeleteDocument('representative', { ...returned, category: 'financialStatements' }, 'rep-1')).toBe(false)
+    expect(canDeleteDocument('representative', returned, 'rep-1')).toBe(false)
+    // Drafts keep their existing all-category editing.
+    expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'draft', category: 'financialStatements' }, 'rep-1')).toBe(true)
+    // `action_needed` outside the chief correction is not a company edit state.
+    for (const stage of [null, 'triaged']) {
+      const other = { requestOwnerId: 'rep-1', requestStatus: 'action_needed', requestReviewStage: stage }
+      expect(canUploadOwnedDocument('representative', 'proposal', other, 'rep-1', null)).toBe(false)
+      expect(canDeleteDocument('representative', { ...other, category: 'proposal' }, 'rep-1')).toBe(false)
+    }
   })
 })

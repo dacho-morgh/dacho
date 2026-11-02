@@ -16,6 +16,14 @@ afterEach(() => {
 
 const companies = [{ id: 'company-1', companyName: 'شرکت نمونه' }]
 
+// Recipient case lookups are answered separately so `request` only sees sends.
+function stubFetch(request: (...args: unknown[]) => unknown) {
+  vi.stubGlobal('fetch', (input: unknown, init?: unknown) =>
+    String(input).startsWith('/api/dashboard/admin/requests')
+      ? Promise.resolve(new Response(JSON.stringify({ items: [] })))
+      : request(input, init))
+}
+
 function fillLetter() {
   fireEvent.change(screen.getByLabelText('گیرنده'), { target: { value: 'company-1' } })
   fireEvent.change(screen.getByLabelText('عنوان نامه'), { target: { value: 'عنوان' } })
@@ -26,7 +34,7 @@ function fillLetter() {
 describe('NewLetterForm', () => {
   it('cancels without sending', () => {
     const request = vi.fn()
-    vi.stubGlobal('fetch', request)
+    stubFetch(request)
     render(createElement(NewLetterForm, { companies }))
     fireEvent.click(screen.getByRole('button', { name: 'لغو' }))
     expect(navigation.push).toHaveBeenCalledWith('/dashboard/letters')
@@ -35,7 +43,7 @@ describe('NewLetterForm', () => {
 
   it('retains the draft and allows retry after a failed request', async () => {
     const request = vi.fn().mockResolvedValue(new Response('{}', { status: 500 }))
-    vi.stubGlobal('fetch', request)
+    stubFetch(request)
     render(createElement(NewLetterForm, { companies }))
     fillLetter()
     fireEvent.click(screen.getByRole('button', { name: 'ارسال نامه' }))
@@ -49,7 +57,7 @@ describe('NewLetterForm', () => {
 
   it('rejects whitespace-only text without sending', () => {
     const request = vi.fn()
-    vi.stubGlobal('fetch', request)
+    stubFetch(request)
     render(createElement(NewLetterForm, { companies }))
     fillLetter()
     fireEvent.change(screen.getByLabelText('عنوان نامه'), { target: { value: '   ' } })
@@ -61,7 +69,7 @@ describe('NewLetterForm', () => {
   it('blocks duplicate submissions while sending', async () => {
     let finish!: (response: Response) => void
     const request = vi.fn(() => new Promise<Response>((resolve) => { finish = resolve }))
-    vi.stubGlobal('fetch', request)
+    stubFetch(request)
     render(createElement(NewLetterForm, { companies }))
     fillLetter()
     const form = screen.getByRole('form', { name: 'ارسال نامه جدید' })
@@ -72,15 +80,21 @@ describe('NewLetterForm', () => {
     await waitFor(() => expect(navigation.push).toHaveBeenCalled())
   })
 
-  it('makes missing recipients and unsupported attachments explicit', () => {
+  it('makes missing recipients explicit and keeps attachments unavailable without a case', () => {
     render(createElement(NewLetterForm, { companies: [], recipientsError: true }))
     expect(screen.getByRole('alert').textContent).toContain('دریافت گیرندگان انجام نشد')
     expect((screen.getByRole('button', { name: 'ارسال نامه' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByLabelText('پرونده مرتبط (اختیاری)') as HTMLSelectElement).disabled).toBe(true)
+    expect(screen.queryByLabelText('فایل پیوست')).toBeNull()
+  })
+
+  it('keeps support-message attachments explicitly unsupported', () => {
+    render(createElement(NewLetterForm, { mode: 'support' }))
     expect((screen.getByLabelText('فایل پیوست') as HTMLInputElement).disabled).toBe(true)
   })
   it('sends the selected recipient and type with trimmed text, then returns to letters', async () => {
     const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ letter: { id: 'letter-1' } })))
-    vi.stubGlobal('fetch', request)
+    stubFetch(request)
     render(createElement(NewLetterForm, { companies }))
 
     fireEvent.change(screen.getByLabelText('گیرنده'), { target: { value: 'company-1' } })
@@ -111,7 +125,7 @@ describe('NewLetterForm', () => {
 
     it('submits support message with priority and subject to /api/dashboard/support', async () => {
       const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ticket: { id: 'ticket-1' } })))
-      vi.stubGlobal('fetch', request)
+      stubFetch(request)
       render(createElement(NewLetterForm, { mode: 'support' }))
 
       fireEvent.change(screen.getByLabelText('موضوع پیام پشتیبانی'), { target: { value: ' مشکل در ورود ' } })
