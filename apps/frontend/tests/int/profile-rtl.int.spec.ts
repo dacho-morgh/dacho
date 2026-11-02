@@ -57,7 +57,7 @@ function expectHeadingBeforeAction(heading: HTMLElement) {
 describe('company profile view', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
-    render(createElement(CompanyProfileView, { initialProfile: profile, initialDossier: dossier }))
+    render(createElement(CompanyProfileView, { initialProfile: profile, initialDossier: dossier, initialVerification: { status: 'unsubmitted', revision: 0, submittedAt: null, decidedAt: null, reason: null, canRequestVerification: false } }))
   })
 
   afterEach(() => {
@@ -89,6 +89,8 @@ describe('company profile view', () => {
     fetchMock
       .mockResolvedValueOnce(new Response(JSON.stringify(dossier), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(savedProfile), { status: 200 }))
+      // T59: the verification state is re-read after every company save.
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'unsubmitted', revision: 0, submittedAt: null, decidedAt: null, reason: null, canRequestVerification: false }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(dossier), { status: 200 }))
 
     const input = screen.getByRole('textbox', { name: 'نام شرکت' }) as HTMLInputElement
