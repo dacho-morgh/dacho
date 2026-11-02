@@ -21,6 +21,13 @@ interface StatsRow {
   rejected: number
 }
 
+/** Requests submitted on one Tehran calendar day, and how many of those are approved now. */
+export interface RequestTrendDay {
+  day: string
+  submitted: number
+  approved: number
+}
+
 export interface RequestOverview {
   counts: RequestStats
   queues: { key: RequestWorkQueue; count: number }[]
@@ -80,6 +87,29 @@ export class StatsRepository {
       queues: keys.map((key, index) => ({ key, count: queues.rows[0]?.[`q${index}`] ?? 0 })),
       events,
     }
+  }
+
+  /**
+   * Submissions per Tehran calendar day over the last `days` days, inside the actor's row
+   * scope. Days stay Gregorian here; the dashboard buckets them into Jalali months.
+   */
+  async trend(scope: RequestScope, days: number): Promise<RequestTrendDay[]> {
+    const params: unknown[] = []
+    const scopeSql = requestScopeClause(scope, params, 'r')
+    params.push(days)
+    const { rows } = await this.pool.query<RequestTrendDay>(
+      `SELECT to_char(r.submission_date AT TIME ZONE 'Asia/Tehran', 'YYYY-MM-DD') AS day,
+              COUNT(*)::int AS submitted,
+              COUNT(*) FILTER (WHERE r.status = 'approved')::int AS approved
+       FROM dashboard.requests r
+       WHERE ${scopeSql}
+         AND r.submission_date IS NOT NULL
+         AND r.submission_date >= now() - ($${params.length}::int * interval '1 day')
+       GROUP BY 1
+       ORDER BY 1`,
+      params,
+    )
+    return rows.map((row) => ({ day: row.day, submitted: row.submitted, approved: row.approved }))
   }
 
   private async scopedEvents(scope: RequestScope): Promise<RequestOverview['events']> {

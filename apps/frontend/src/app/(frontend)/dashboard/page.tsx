@@ -7,6 +7,7 @@ import React from 'react'
 import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import { CompanyList } from '@/components/dashboard/company-list'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
+import { OwnerOverview } from '@/components/dashboard/owner-overview'
 import { RecentActivities } from '@/components/dashboard/recent-activities'
 import {
   RequestsStatusFilter,
@@ -60,6 +61,18 @@ export default async function DashboardPage({
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })
   const role = dashboardOperationalRole(user)
   const workspace = dashboardWorkspace(role)
+  if (role === 'system-owner') {
+    return (
+      <>
+        {showDeniedNotice && (
+          <div className="px-4 pt-6 sm:px-8">
+            <DeniedNotice />
+          </div>
+        )}
+        <OwnerOverview userName={user?.name} />
+      </>
+    )
+  }
   const overviewResult = await serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview')
   const workQueues = (
     <WorkQueueOverview

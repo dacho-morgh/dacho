@@ -21,6 +21,7 @@ const representativeRoutes = [
   ['delete', `/letters/${id}`],
   ['get', '/stats'],
   ['get', '/stats/overview'],
+  ['get', '/stats/trend'],
   ['get', '/activities'],
 ] as const
 const adminRoutes = [
