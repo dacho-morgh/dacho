@@ -9,6 +9,7 @@ import {
   DashboardTrashIcon,
 } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -610,12 +611,9 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
                     as="label"
                     className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isWebsiteAbsent}
-                      onChange={() => toggleDossierAbsence('website')}
-                      className="size-3.5 rounded border-neutral-300 text-brand-600"
-                    />
+                      onCheckedChange={() => toggleDossierAbsence('website')} />
                     ندارم
                   </Typography>
                 )}
@@ -651,12 +649,9 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
                     as="label"
                     className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isCenterAbsent}
-                      onChange={() => toggleDossierAbsence('centerEstablishment')}
-                      className="size-3.5 rounded border-neutral-300 text-brand-600"
-                    />
+                      onCheckedChange={() => toggleDossierAbsence('centerEstablishment')} />
                     ندارم
                   </Typography>
                 )}
@@ -695,12 +690,9 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
                     as="label"
                     className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isInsuredAbsent}
-                      onChange={() => toggleDossierAbsence('insuredEmployeeCount')}
-                      className="size-3.5 rounded border-neutral-300 text-brand-600"
-                    />
+                      onCheckedChange={() => toggleDossierAbsence('insuredEmployeeCount')} />
                     ندارم
                   </Typography>
                 )}
@@ -761,12 +753,10 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
             <div key={category} className="flex flex-col gap-3">
               {category === 'amendmentNotices' && (
                 <Typography as="label" className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={dossier.notAvailable.includes('amendmentNotices')}
                     disabled={isSavingBasic || isEditingBasic || documentsPending}
-                    onChange={(event) => void setAmendmentsAbsent(event.target.checked)}
-                  />
+                    onCheckedChange={(checked) => void setAmendmentsAbsent(checked === true)} />
                   آگهی تغییرات ندارم
                 </Typography>
               )}

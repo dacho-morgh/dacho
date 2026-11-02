@@ -19,6 +19,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { focusFirstField } from '@/components/ui/dialog-focus'
 import { Typography } from '@/components/ui/typography'
 import {
   createBooth,
@@ -34,6 +36,8 @@ import {
   type ExhibitionCatalogueDto,
   type UpdateBoothInput,
 } from '@/utilities/dashboard-api'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Input } from '@/components/ui/input'
 
 export interface ExhibitionInfo {
   id: string
@@ -295,7 +299,7 @@ export function ExhibitionBoothAdmin({
             >
               سقف مجاز غرفه برای هر شرکت (تعداد)
             </Typography>
-            <input
+            <Input
               id="company-limit-input"
               type="text"
               inputMode="numeric"
@@ -303,7 +307,6 @@ export function ExhibitionBoothAdmin({
               disabled={!canEdit || settingsSaving}
               onChange={(e) => setCompanyLimitInput(e.target.value)}
               placeholder="مثال: ۲"
-              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 transition-colors outline-none focus:border-brand-500"
             />
           </div>
 
@@ -316,14 +319,13 @@ export function ExhibitionBoothAdmin({
             >
               شناسه یا آدرس نقشه راهنمای نمایشگاه
             </Typography>
-            <input
+            <Input
               id="guide-map-input"
               type="text"
               value={guideMapInput}
               disabled={!canEdit || settingsSaving}
               onChange={(e) => setGuideMapInput(e.target.value)}
               placeholder="شناسه فایل یا مرجع نقشه راهنما"
-              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 transition-colors outline-none focus:border-brand-500"
             />
           </div>
 
@@ -399,12 +401,11 @@ export function ExhibitionBoothAdmin({
               placeholder="جستجو در غرفه‌ها..."
               aria-label="جستجو در غرفه‌ها"
             />
-            <select
+            <NativeSelect
               value={statusFilter}
               onChange={(e) =>
                 setStatusFilter(e.target.value as 'all' | 'available' | 'unavailable')
               }
-              className="h-9 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 transition-colors outline-none focus:border-brand-500"
             >
               <Typography as="option" variant="14/regular" value="all">
                 همه وضعیت‌ها
@@ -415,7 +416,7 @@ export function ExhibitionBoothAdmin({
               <Typography as="option" variant="14/regular" value="unavailable">
                 غیرقابل دسترس
               </Typography>
-            </select>
+            </NativeSelect>
           </div>
         </div>
 
@@ -651,12 +652,6 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const submissionLock = useRef(false)
-  const dialogRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null
-    dialogRef.current?.querySelector<HTMLInputElement>('input')?.focus()
-    return () => previous?.focus()
-  }, [])
 
   const {
     register,
@@ -720,37 +715,21 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
   }
 
   return (
-    <div
-      ref={dialogRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 p-4 backdrop-blur-xs"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="booth-modal-title"
-      dir="rtl"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && !submitting) onClose()
-        if (event.key !== 'Tab') return
-        const fields = Array.from(
-          dialogRef.current?.querySelectorAll<HTMLElement>(
-            'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]',
-          ) ?? [],
-        )
-        const first = fields[0]
-        const last = fields.at(-1)
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault()
-          last?.focus()
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault()
-          first?.focus()
-        }
-      }}
-    >
-      <section className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col gap-5 overflow-y-auto rounded-2xl border border-neutral-100 bg-white p-6 shadow-xl">
+    <Dialog open onOpenChange={(open) => !open && !submitting && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        aria-describedby={undefined}
+        onOpenAutoFocus={focusFirstField}
+        onEscapeKeyDown={(event) => submitting && event.preventDefault()}
+        onInteractOutside={(event) => submitting && event.preventDefault()}
+        className="max-w-lg p-6 sm:p-6"
+      >
         <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-          <Typography id="booth-modal-title" as="h3" variant="20/bold" color="neutral-700">
-            {isEditing ? `ویرایش غرفه: ${booth?.identifier}` : 'افزودن غرفه جدید'}
-          </Typography>
+          <DialogTitle asChild>
+            <Typography id="booth-modal-title" as="h3" variant="20/bold" color="neutral-700">
+              {isEditing ? `ویرایش غرفه: ${booth?.identifier}` : 'افزودن غرفه جدید'}
+            </Typography>
+          </DialogTitle>
           <Button
             variant="text-gray"
             size="icon-32"
@@ -799,12 +778,11 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                   *
                 </Typography>
               </Typography>
-              <input
+              <Input
                 id="booth-id-input"
                 type="text"
                 {...register('identifier', { required: 'شناسه غرفه الزامی است' })}
                 placeholder="مثال: A-1 یا B-12"
-                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
               />
               {errors.identifier && (
                 <Typography
@@ -829,12 +807,11 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                   *
                 </Typography>
               </Typography>
-              <input
+              <Input
                 id="booth-spec-input"
                 type="text"
                 {...register('specification', { required: 'ابعاد و مشخصات غرفه الزامی است' })}
                 placeholder="مثال: ۳ متر × ۴ متر، مجهز به اسپیس‌فریم و برق"
-                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
               />
               {errors.specification && (
                 <Typography
@@ -856,12 +833,11 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
               >
                 موقعیت / سالن (اختیاری)
               </Typography>
-              <input
+              <Input
                 id="booth-loc-input"
                 type="text"
                 {...register('location')}
                 placeholder="مثال: سالن خلیج فارس، ردیف اول"
-                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
               />
             </div>
 
@@ -877,13 +853,12 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                   *
                 </Typography>
               </Typography>
-              <input
+              <Input
                 id="booth-price-input"
                 type="text"
                 inputMode="numeric"
                 {...register('priceAmount', { required: 'قیمت غرفه الزامی است' })}
                 placeholder="مثال: ۱۵۰۰۰۰۰۰"
-                className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
               />
               {errors.priceAmount && (
                 <Typography
@@ -906,10 +881,9 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                 >
                   وضعیت کاتالوگ
                 </Typography>
-                <select
+                <NativeSelect
                   id="booth-status-select"
                   {...register('status')}
-                  className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
                 >
                   <Typography as="option" variant="14/regular" value="available">
                     در دسترس
@@ -917,7 +891,7 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                   <Typography as="option" variant="14/regular" value="unavailable">
                     غیرقابل دسترس
                   </Typography>
-                </select>
+                </NativeSelect>
               </div>
 
               <div>
@@ -929,12 +903,11 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                 >
                   وضعیت نمایش
                 </Typography>
-                <select
+                <NativeSelect
                   id="booth-active-select"
                   {...register('active', {
                     setValueAs: (v) => v === 'true' || v === true,
                   })}
-                  className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-800 transition-colors outline-none focus:border-brand-500"
                 >
                   <Typography as="option" variant="14/regular" value="true">
                     فعال در کاتالوگ
@@ -942,7 +915,7 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                   <Typography as="option" variant="14/regular" value="false">
                     غیرفعال (مخفی)
                   </Typography>
-                </select>
+                </NativeSelect>
               </div>
             </div>
 
@@ -962,7 +935,7 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
             </div>
           </fieldset>
         </form>
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

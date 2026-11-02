@@ -15,7 +15,9 @@ import { useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { DashboardAddIcon, DashboardEditIcon, DashboardTrashIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
+import { FileInput } from '@/components/ui/file-input'
 import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
@@ -142,9 +144,6 @@ function Section({
     </section>
   )
 }
-
-const selectClass =
-  'h-10 w-full min-w-0 rounded-lg border border-neutral-100 bg-white px-2 text-right font-sans text-base leading-7 text-neutral-600 outline-none transition-colors hover:border-brand-500 focus:border-brand-500 aria-invalid:border-error-100 disabled:cursor-not-allowed disabled:bg-neutral-50'
 
 export type EmployeeFormMode = 'create' | 'edit' | 'view'
 
@@ -641,9 +640,8 @@ function EmployeeEditor({
               label="نقش در سیستم"
               error={errors.operationalRole?.message}
             >
-              <select
+              <NativeSelect
                 id="operationalRole"
-                className={selectClass}
                 aria-invalid={!!errors.operationalRole}
                 aria-describedby={errors.operationalRole ? 'operationalRole-error' : undefined}
                 {...register('operationalRole')}
@@ -656,18 +654,18 @@ function EmployeeEditor({
                     {OPERATIONAL_ROLE_LABELS[role]}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </FormField>
             {field('age', 'سن', { placeholder: 'مثلا: ۳۲', inputMode: 'numeric' })}
             <FormField id="gender" label="جنسیت" error={errors.gender?.message}>
-              <select id="gender" className={selectClass} {...register('gender')}>
+              <NativeSelect id="gender" {...register('gender')}>
                 <option value="">انتخاب نشده</option>
                 {PERSONNEL_GENDERS.map((gender) => (
                   <option key={gender} value={gender}>
                     {PERSONNEL_GENDER_LABELS[gender]}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </FormField>
             {field('degree', 'مدرک دانشگاهی', {
               placeholder: 'مثلا: کارشناسی ارشد مدیریت بازرگانی',
@@ -684,10 +682,9 @@ function EmployeeEditor({
                       )
                 }
               />
-              <input
+              <FileInput
                 ref={fileInput}
                 id="resume"
-                type="file"
                 multiple
                 accept={Object.values(RESUME_TYPES).join(',')}
                 className="sr-only"

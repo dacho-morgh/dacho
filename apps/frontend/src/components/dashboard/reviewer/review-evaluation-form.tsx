@@ -5,6 +5,8 @@ import { useId, useRef, useState, type ReactNode } from 'react'
 
 import { TickCircleIcon } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -416,17 +418,21 @@ function ScoreField({
     return (
       <div role="group" aria-labelledby={`${id}-label`} data-field={path} className="flex min-w-0 flex-col gap-2">
         {heading}
-        <div className="flex flex-wrap gap-2">
+        <RadioGroup
+          aria-labelledby={`${id}-label`}
+          value={input.tier ?? ''}
+          onValueChange={(tier) => onChange({ tier })}
+          className="flex flex-wrap gap-2"
+        >
           {row.tiers.map((item) => (
             <ChoiceChip
               key={item.key}
-              name={`${id}-tier`}
+              value={item.key}
               checked={input.tier === item.key}
-              onChange={() => onChange({ tier: item.key })}
               label={`${item.label} (${item.min.toLocaleString('fa-IR')}–${item.max.toLocaleString('fa-IR')})`}
             />
           ))}
-        </div>
+        </RadioGroup>
         <Input
           aria-label={`امتیاز: ${row.label}`}
           aria-describedby={described}
@@ -443,19 +449,24 @@ function ScoreField({
 
   if (row.kind === 'binary') {
     return (
-      <div role="radiogroup" aria-labelledby={`${id}-label`} aria-describedby={described} data-field={path} className="flex min-w-0 flex-col gap-2">
+      <div data-field={path} className="flex min-w-0 flex-col gap-2">
         {heading}
-        <div className="flex flex-wrap gap-2">
+        <RadioGroup
+          aria-labelledby={`${id}-label`}
+          aria-describedby={described}
+          value={input.score ?? ''}
+          onValueChange={(score) => onChange({ score })}
+          className="flex flex-wrap gap-2"
+        >
           {[0, row.max].map((value) => (
             <ChoiceChip
               key={value}
-              name={`${id}-binary`}
+              value={String(value)}
               checked={input.score === String(value)}
-              onChange={() => onChange({ score: String(value) })}
               label={`${value.toLocaleString('fa-IR')} امتیاز`}
             />
           ))}
-        </div>
+        </RadioGroup>
         <Typography variant="12/regular" color="neutral-500">فقط ۰ یا {row.max.toLocaleString('fa-IR')} امتیاز</Typography>
         {errorText}
       </div>
@@ -559,19 +570,20 @@ function QualitativeStep({
 
       <div className="flex flex-col gap-3">
         <Typography as="h2" variant="16/bold" color="neutral-900">جمع‌بندی داور</Typography>
-        <div role="radiogroup" aria-label="توصیه کلی" data-field="answers.recommendation" className="flex flex-col gap-2">
+        <div data-field="answers.recommendation" className="flex flex-col gap-2">
           <Typography as="span" variant="14/semibold" color="neutral-700">توصیه کلی</Typography>
-          <div className="flex flex-wrap gap-2">
+          <RadioGroup
+            aria-label="توصیه کلی"
+            value={values.recommendation ?? ''}
+            onValueChange={(next) =>
+              edit((current) => ({ ...current, recommendation: next as typeof current.recommendation }), 'answers.recommendation')
+            }
+            className="flex flex-wrap gap-2"
+          >
             {RECOMMENDATIONS.map((option) => (
-              <ChoiceChip
-                key={option.key}
-                name="recommendation"
-                checked={values.recommendation === option.key}
-                label={option.label}
-                onChange={() => edit((current) => ({ ...current, recommendation: option.key }), 'answers.recommendation')}
-              />
+              <ChoiceChip key={option.key} value={option.key} checked={values.recommendation === option.key} label={option.label} />
             ))}
-          </div>
+          </RadioGroup>
           <FieldError path="answers.recommendation" error={errors['answers.recommendation']} />
         </div>
         <YesNoField
@@ -643,14 +655,14 @@ function SummaryLine({ label, value, strong }: { label: string; value: string; s
   )
 }
 
-function ChoiceChip({ name, checked, label, onChange }: { name: string; checked: boolean; label: string; onChange: () => void }) {
+function ChoiceChip({ value, checked, label }: { value: string; checked: boolean; label: string }) {
   return (
     <label
-      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 has-[:disabled]:cursor-not-allowed has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-500 ${
+      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 has-[:disabled]:cursor-not-allowed ${
         checked ? 'border-brand-500 bg-brand-50' : 'border-neutral-200 bg-white'
       }`}
     >
-      <input type="radio" name={name} checked={checked} onChange={onChange} className="accent-brand-500" />
+      <RadioGroupItem value={value} />
       <Typography as="span" variant="14/regular" color={checked ? 'brand-700' : 'neutral-700'}>{label}</Typography>
     </label>
   )
@@ -659,7 +671,7 @@ function ChoiceChip({ name, checked, label, onChange }: { name: string; checked:
 function CheckLine({ checked, label, onChange }: { checked: boolean; label: string; onChange: (checked: boolean) => void }) {
   return (
     <label className="flex cursor-pointer items-center gap-2">
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="size-4 accent-brand-500" />
+      <Checkbox checked={checked} onCheckedChange={(next) => onChange(next === true)} />
       <Typography as="span" variant="14/regular" color="neutral-700">{label}</Typography>
     </label>
   )
@@ -668,12 +680,17 @@ function CheckLine({ checked, label, onChange }: { checked: boolean; label: stri
 function YesNoField({ path, label, value, error, onChange }: { path: string; label: string; value: YesNo | undefined; error?: string; onChange: (value: YesNo) => void }) {
   const id = useId()
   return (
-    <div role="radiogroup" aria-labelledby={`${id}-label`} data-field={path} className="flex min-w-0 flex-col gap-2 border-b border-neutral-100 pb-3 last:border-b-0">
+    <div data-field={path} className="flex min-w-0 flex-col gap-2 border-b border-neutral-100 pb-3 last:border-b-0">
       <Typography as="span" id={`${id}-label`} variant="14/regular" color="neutral-800" className="break-words">{label}</Typography>
-      <div className="flex gap-2">
-        <ChoiceChip name={id} checked={value === 'yes'} label="بله" onChange={() => onChange('yes')} />
-        <ChoiceChip name={id} checked={value === 'no'} label="خیر" onChange={() => onChange('no')} />
-      </div>
+      <RadioGroup
+        aria-labelledby={`${id}-label`}
+        value={value ?? ''}
+        onValueChange={(next) => onChange(next as YesNo)}
+        className="flex gap-2"
+      >
+        <ChoiceChip value="yes" checked={value === 'yes'} label="بله" />
+        <ChoiceChip value="no" checked={value === 'no'} label="خیر" />
+      </RadioGroup>
       <FieldError path={path} error={error} />
     </div>
   )

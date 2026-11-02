@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
+import { NativeSelect } from '@/components/ui/native-select'
 
 interface Assignment {
   id: string
@@ -146,10 +147,9 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex w-full flex-col gap-1 sm:w-auto sm:min-w-60">
           <Typography variant="12/regular" color="neutral-500">شخص</Typography>
-          <select
+          <NativeSelect
             value={selectedEmployee}
             onChange={(event) => setSelectedEmployee(event.target.value)}
-            className="h-10 rounded-lg border border-neutral-200 bg-white px-2"
           >
             <option value="">انتخاب کنید</option>
             {employees.map((employee) => (
@@ -157,7 +157,7 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
                 {employee.name ?? employee.id} — {assignmentRoleLabel(employee.operationalRole)}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <Button type="button" size="40" disabled={!selectedEmployee || busy} onClick={assign}>
           <Typography variant="14/regular" className="text-inherit">ثبت انتساب</Typography>

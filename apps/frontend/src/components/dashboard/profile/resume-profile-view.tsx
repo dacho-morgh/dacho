@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { DashboardAddIcon, DashboardCloseCircle, DashboardTrashIcon } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -445,12 +446,9 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
           <div className="flex items-center gap-3">
             <Typography as="label" className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={isProjectsAbsent}
-                onChange={() => toggleAbsence('pastProjectsCustomers')}
-                className="size-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-              />
+                onCheckedChange={() => toggleAbsence('pastProjectsCustomers')} />
               <Typography variant="14/regular" color="neutral-500">
                 ندارم
               </Typography>
@@ -527,12 +525,9 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
           <div className="flex items-center gap-3">
             <Typography as="label" className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={isRequestedAbsent}
-                onChange={() => toggleAbsence('requestedServices')}
-                className="size-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-              />
+                onCheckedChange={() => toggleAbsence('requestedServices')} />
               <Typography variant="14/regular" color="neutral-500">
                 ندارم
               </Typography>
@@ -604,12 +599,9 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
           <div className="flex items-center gap-3">
             <Typography as="label" className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={isCertsAbsent}
-                onChange={() => toggleAbsence('certificatesLicenses')}
-                className="size-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-              />
+                onCheckedChange={() => toggleAbsence('certificatesLicenses')} />
               <Typography variant="14/regular" color="neutral-500">
                 ندارم
               </Typography>
@@ -697,12 +689,9 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
             </Typography>
           </div>
           <Typography as="label" className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={isCataloguesAbsent}
-              onChange={() => toggleAbsence('catalogues')}
-              className="size-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-            />
+              onCheckedChange={() => toggleAbsence('catalogues')} />
             <Typography variant="14/regular" color="neutral-500">
               ندارم
             </Typography>
@@ -769,8 +758,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={newProduct}
                 placeholder="عنوان محصول یا خدمت جدید…"
-                onChange={(e) => setNewProduct(e.target.value)}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setNewProduct(e.target.value)} containerClassName="mt-1 bg-white"
               />
             </Typography>
           </div>
@@ -812,8 +800,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={newRequestedService}
                 placeholder="خدمت مورد تقاضای جدید…"
-                onChange={(e) => setNewRequestedService(e.target.value)}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setNewRequestedService(e.target.value)} containerClassName="mt-1 bg-white"
               />
             </Typography>
           </div>
@@ -855,8 +842,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={memberForm.name}
                 placeholder="مثال: علی احمدی"
-                onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -864,8 +850,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={memberForm.role}
                 placeholder="مثال: مدیر فنی، سرپرست تحقیق و توسعه"
-                onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
           </div>
@@ -907,8 +892,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={projectForm.project}
                 placeholder="مثال: طراحی و ساخت سامانه هوشمند پایش"
-                onChange={(e) => setProjectForm({ ...projectForm, project: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setProjectForm({ ...projectForm, project: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -916,8 +900,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={projectForm.customer ?? ''}
                 placeholder="مثال: شرکت پتروشیمی پارس"
-                onChange={(e) => setProjectForm({ ...projectForm, customer: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setProjectForm({ ...projectForm, customer: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -968,8 +951,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={certForm.title}
                 placeholder="مثال: پروانه بهره‌برداری، ایزو ۹۰۰۱"
-                onChange={(e) => setCertForm({ ...certForm, title: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setCertForm({ ...certForm, title: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -977,8 +959,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={certForm.issuer ?? ''}
                 placeholder="مثال: وزارت صمت، سازمان استاندارد"
-                onChange={(e) => setCertForm({ ...certForm, issuer: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setCertForm({ ...certForm, issuer: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -986,8 +967,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={certForm.reference ?? ''}
                 placeholder="مثال: IR-1402-998"
-                onChange={(e) => setCertForm({ ...certForm, reference: e.target.value })}
-                containerClassName="mt-1 bg-white"
+                onChange={(e) => setCertForm({ ...certForm, reference: e.target.value })} containerClassName="mt-1 bg-white"
               />
             </Typography>
           </div>

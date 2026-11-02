@@ -20,6 +20,7 @@ import {
 } from '@/utilities/dashboard-api'
 import { BoothPageHeader } from './booth-page-header'
 import { BoothRequestStageBadge, boothFailure, receiptStatusLabel } from './booth-status'
+import { FileInput } from '@/components/ui/file-input'
 
 export interface BoothExhibitionInfo {
   id: string
@@ -394,12 +395,10 @@ function ReceiptUploadForm({
           <Typography as="span" variant="12/regular" color="neutral-500">
             فایل فیش (PDF یا Word، حداکثر ۱۰ مگابایت)
           </Typography>
-          <input
+          <FileInput
             id={inputId}
-            type="file"
             accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="block w-full rounded-[10px] border border-neutral-200 bg-white p-2 text-sm text-neutral-600 file:me-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1 file:text-neutral-700"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="w-full"
           />
         </label>
         <label className="flex flex-1 flex-col gap-1">

@@ -6,8 +6,7 @@ import { workQueueLabel } from '@/components/dashboard/work-queue-overview'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { REVIEW_STAGE_OPTIONS, requestQueueHref, type RequestQueueFilters, type RequestStatus } from './types'
-
-const selectClass = 'h-10 rounded-lg border border-neutral-100 bg-background px-2 text-sm text-neutral-700'
+import { NativeSelect } from '@/components/ui/native-select'
 
 /**
  * Plain GET form: the filters live in the URL, so back navigation, refresh and
@@ -38,22 +37,22 @@ export function RequestsFilters({
         placeholder="جستجوی عنوان یا کد پیگیری"
         aria-label="جستجوی عنوان یا کد پیگیری"
       />
-      <select name="eventId" defaultValue={filters.eventId ?? ''} aria-label="رویداد" className={selectClass}>
+      <NativeSelect name="eventId" defaultValue={filters.eventId ?? ''} aria-label="رویداد">
         <option value="">همه رویدادها</option>
         {events.map((event) => (
           <option key={event.id} value={event.id}>
             {event.title}
           </option>
         ))}
-      </select>
-      <select name="stage" defaultValue={filters.stage ?? ''} aria-label="مرحله" className={selectClass}>
+      </NativeSelect>
+      <NativeSelect name="stage" defaultValue={filters.stage ?? ''} aria-label="مرحله">
         <option value="">همه مرحله‌ها</option>
         {REVIEW_STAGE_OPTIONS.map((stage) => (
           <option key={stage.value} value={stage.value}>
             {stage.label}
           </option>
         ))}
-      </select>
+      </NativeSelect>
       <Button size="40" type="submit" variant="outline-gray">
         <Typography>اعمال فیلتر</Typography>
       </Button>

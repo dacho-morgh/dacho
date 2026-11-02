@@ -22,6 +22,7 @@ import {
   type ReviewRoundDto,
   type ReviewRoundSlotDto,
 } from '@/utilities/dashboard-api'
+import { NativeSelect } from '@/components/ui/native-select'
 
 /** Each optional read: null when this role has no such read, `failed` when it did not arrive. */
 type Part<T> = T | null | 'failed'
@@ -354,18 +355,17 @@ function PersonSelect({
       <label htmlFor={selectId}>
         <Typography as="span" variant="14/semibold" color="neutral-700">{label}</Typography>
       </label>
-      <select
+      <NativeSelect
         id={selectId}
         value={value}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full min-w-0 rounded-lg border border-neutral-200 bg-white px-2 text-neutral-800"
+        onChange={(event) => onChange(event.target.value)} containerClassName="min-w-0"
       >
         <option value="">انتخاب کنید</option>
         {options.map((person) => (
           <option key={person.id} value={person.id}>{person.name ?? 'بدون نام'}</option>
         ))}
-      </select>
+      </NativeSelect>
     </div>
   )
 }

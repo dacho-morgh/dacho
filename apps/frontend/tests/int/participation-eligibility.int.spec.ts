@@ -292,8 +292,9 @@ describe('EventsView eligibility gate', () => {
   it('restores the returned subtopic selection but keeps registration off while verification is pending', async () => {
     mockEligibility('pending')
     render(createElement(EventsView, { initialEventsList: [event], initialSelectedEventId: EVENT_ID, initialSubtopicIds: ['sub-2', 'gone'] }))
-    const checkbox = (await screen.findByRole('checkbox', { name: /انتخاب زیرعنوان زیرعنوان دوم/ })) as HTMLInputElement
-    await waitFor(() => expect(checkbox.checked).toBe(true))
+    const checkbox = await screen.findByRole('checkbox', { name: /انتخاب زیرعنوان زیرعنوان دوم/ })
+    // The shared Checkbox is a Radix button: its state is aria-checked.
+    await waitFor(() => expect(checkbox.getAttribute('aria-checked')).toBe('true'))
     expect((await screen.findByTestId('eligibility-state')).getAttribute('data-state')).toBe('pending')
     const register = screen.getByRole('button', { name: /ثبت درخواست \(۱ زیرعنوان\)/ }) as HTMLButtonElement
     expect(register.disabled).toBe(true)

@@ -40,6 +40,19 @@ const eslintConfig = defineConfig([
           selector: "JSXOpeningElement[name.name='button']",
           message: 'Use the shared Button from @/components/ui/button.',
         },
+        {
+          selector:
+            "JSXOpeningElement[name.name='input']:not(:has(JSXAttribute[name.name='type'][value.value='hidden']))",
+          message: 'Use Input, FileInput, Checkbox or RadioGroup from @/components/ui.',
+        },
+        {
+          selector: "JSXOpeningElement[name.name='select']",
+          message: 'Use NativeSelect (or Select) from @/components/ui.',
+        },
+        {
+          selector: "JSXOpeningElement[name.name='textarea']",
+          message: 'Use Textarea from @/components/ui/textarea.',
+        },
       ],
     },
   },

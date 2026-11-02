@@ -2,6 +2,7 @@
 
 import { SearchField } from '@/components/dashboard/search-field'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   AlertCircle,
@@ -46,6 +47,8 @@ import {
   type RfpVersionDto,
 } from '@/utilities/dashboard-api'
 import type { Eligibility } from '@/utilities/participation-eligibility'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 export interface EventItem {
   id: string
@@ -181,20 +184,14 @@ function QuickSelectModal({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="quick-select-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs"
-      dir="rtl"
-    >
-      <div className="relative flex w-full max-w-md flex-col gap-5 rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl sm:p-6">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
           <div>
-            <h3 id="quick-select-title" className="font-sans text-[18px] leading-[28px] font-bold text-neutral-800">
+            <DialogTitle id="quick-select-title" className="text-[18px] leading-[28px]">
               انتخاب عنوان
-            </h3>
+            </DialogTitle>
             <p className="mt-1 font-sans text-[13px] leading-[20px] font-normal text-neutral-500">
               برای مشاهده فرم عنوان و زیر عنوان مورد نظر خود را انتخاب کنید.
             </p>
@@ -214,32 +211,30 @@ function QuickSelectModal({
             <label htmlFor="modal-cat-select" className="font-sans text-[14px] leading-[24px] font-semibold text-neutral-700">
               عنوان
             </label>
-            <select
+            <NativeSelect
               id="modal-cat-select"
               aria-label="عنوان"
               value={selectedCatId}
               onChange={(e) => setSelectedCatId(e.target.value)}
-              className="h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 font-sans text-[14px] text-neutral-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             >
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.title}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="modal-sub-select" className="font-sans text-[14px] leading-[24px] font-semibold text-neutral-700">
               زیر عنوان
             </label>
-            <select
+            <NativeSelect
               id="modal-sub-select"
               aria-label="زیر عنوان"
               value={selectedSubId}
               disabled={availableSubtopics.length === 0}
               onChange={(e) => setSelectedSubId(e.target.value)}
-              className="h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 font-sans text-[14px] text-neutral-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-neutral-50 disabled:text-neutral-400"
             >
               {availableSubtopics.length === 0 ? (
                 <option value="">زیرعنوانی یافت نشد</option>
@@ -250,7 +245,7 @@ function QuickSelectModal({
                   </option>
                 ))
               )}
-            </select>
+            </NativeSelect>
           </div>
         </div>
 
@@ -270,8 +265,8 @@ function QuickSelectModal({
             تایید
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -740,13 +735,10 @@ export function EventsView({
                                   {/* Right side: Checkbox + Subtopic title + Employer tag */}
                                   <div className="flex items-start gap-3 flex-1 min-w-[260px]">
                                     <label className="flex items-center gap-2 cursor-pointer pt-0.5">
-                                      <input
-                                        type="checkbox"
+                                      <Checkbox
                                         checked={isChecked}
-                                        onChange={() => toggleSubtopicSelect(sub.id)}
-                                        aria-label={`انتخاب زیرعنوان ${sub.title}`}
-                                        className="size-5 rounded border-neutral-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
-                                      />
+                                        onCheckedChange={() => toggleSubtopicSelect(sub.id)}
+                                        aria-label={`انتخاب زیرعنوان ${sub.title}`} />
                                       <span className="sr-only">انتخاب {sub.title}</span>
                                     </label>
 

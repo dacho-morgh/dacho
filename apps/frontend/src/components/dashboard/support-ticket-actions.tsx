@@ -6,6 +6,7 @@ import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { DashboardApiError, describeMutationFailure, formatDate, formatTime, type SupportMessageDto, type SupportTicketDto } from '@/utilities/dashboard-api'
+import { Textarea } from '@/components/ui/textarea'
 
 interface SupportTicketActionsProps {
   id: string
@@ -82,13 +83,13 @@ export function SupportTicketActions({ id, status, isAdmin, initialMessages, ini
           <label htmlFor="support-reply">
             <Typography as="span" variant="14/semibold" className="text-neutral-700">پاسخ جدید</Typography>
           </label>
-          <textarea
+          <Textarea
             id="support-reply"
             value={response}
             onChange={(event) => setResponse(event.target.value)}
             rows={4}
             placeholder="متن پاسخ خود را بنویسید..."
-            className="w-full rounded-xl border border-neutral-200 bg-white p-3 text-sm text-neutral-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            className="w-full"
           />
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="40" disabled={busy || !response.trim()} onClick={() => act('respond')}>

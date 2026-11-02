@@ -15,6 +15,7 @@ import {
   saveResult,
   type CaseFollowUpDto,
 } from '@/utilities/dashboard-api'
+import { Textarea } from '@/components/ui/textarea'
 
 const ERROR_MESSAGES: Record<string, string> = {
   investment_stage_closed: 'پرونده دیگر در مرحله پیگیری سرمایه‌گذاری نیست و این اقدام انجام نشد.',
@@ -160,12 +161,12 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
           <div className="flex flex-col gap-2">
             <label className="flex flex-col gap-1">
               <Typography variant="12/regular" color="neutral-500">متن درخواست</Typography>
-              <textarea
+              <Textarea
                 value={askBody}
                 onChange={(event) => setAskBody(event.target.value)}
                 maxLength={5000}
                 rows={3}
-                className="rounded-lg border border-neutral-200 bg-white p-3"
+               
               />
             </label>
             <Button
@@ -234,12 +235,12 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
               <Typography variant="12/regular" color="neutral-500">متن جداگانه نتیجه</Typography>
-              <textarea
+              <Textarea
                 value={resultBody}
                 onChange={(event) => setResultBody(event.target.value)}
                 maxLength={20000}
                 rows={6}
-                className="rounded-lg border border-neutral-200 bg-white p-3"
+               
               />
             </label>
             <Button

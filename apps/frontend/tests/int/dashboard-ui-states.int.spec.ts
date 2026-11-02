@@ -220,7 +220,7 @@ describe('dialog keyboard contract', () => {
     expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'نام' }))
   })
 
-  it('traps Tab, closes on Escape and returns focus', () => {
+  it('traps Tab, closes on Escape and returns focus', async () => {
     const opener = openDialog('button')
     const close = screen.getByRole('button', { name: 'بستن پنجره' })
     const save = screen.getByRole('button', { name: 'ذخیره' })
@@ -233,6 +233,7 @@ describe('dialog keyboard contract', () => {
 
     fireEvent.keyDown(close, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(document.activeElement).toBe(opener)
+    // The shared Radix Dialog restores focus to the opener after unmount.
+    await waitFor(() => expect(document.activeElement).toBe(opener))
   })
 })
