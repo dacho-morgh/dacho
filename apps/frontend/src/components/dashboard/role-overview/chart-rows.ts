@@ -6,17 +6,22 @@ export const BOOTH_ROWS: BreakdownRow[] = [
   {
     key: 'attendance_pending',
     label: 'در انتظار تأیید حضور',
+    variant: 'primary',
+    bar: 'bg-brand-600',
+  },
+  { key: 'receipt_due', label: 'در انتظار فیش', variant: 'gray', bar: 'bg-neutral-400' },
+  {
+    key: 'receipt_pending',
+    label: 'فیش در حال بررسی',
     variant: 'secondary',
     bar: 'bg-secondary-600',
   },
-  { key: 'receipt_due', label: 'در انتظار فیش', variant: 'yellow', bar: 'bg-warning-400' },
-  { key: 'receipt_pending', label: 'فیش در حال بررسی', variant: 'primary', bar: 'bg-brand-600' },
   { key: 'confirmed', label: 'پرداخت تأیید شده', variant: 'green', bar: 'bg-success-500' },
   { key: 'rejected', label: 'رد شده', variant: 'red', bar: 'bg-error-500' },
 ]
 
 export const VERIFICATION_ROWS: BreakdownRow[] = [
-  { key: 'pending', label: 'در انتظار بررسی', variant: 'secondary', bar: 'bg-secondary-600' },
+  { key: 'pending', label: 'در انتظار بررسی', variant: 'primary', bar: 'bg-brand-600' },
   { key: 'returned', label: 'برگشت داده شده', variant: 'yellow', bar: 'bg-warning-400' },
   { key: 'approved', label: 'تأیید شده', variant: 'green', bar: 'bg-success-500' },
   { key: 'rejected', label: 'رد شده', variant: 'red', bar: 'bg-error-500' },

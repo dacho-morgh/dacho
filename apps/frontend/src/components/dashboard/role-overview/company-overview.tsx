@@ -140,7 +140,7 @@ export async function CompanyOverview({ userName }: { userName?: string | null }
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <BreakdownCard
-          title="درخواست‌های شرکت به تفکیک وضعیت"
+          title="وضعیت درخواست‌ها"
           subtitle={counts ? `${fa(counts.total)} درخواست` : 'همه درخواست‌های شرکت'}
           rows={REQUEST_ROWS}
           values={counts ? requestValues(counts) : undefined}
