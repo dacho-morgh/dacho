@@ -172,7 +172,11 @@ export class StatsRepository {
     return slices(BOOTH_STATES, rows[0])
   }
 
-  /** Own evaluation state per active assignment in the case's current revision, as the reviewer queue reads it. */
+  /**
+   * Own evaluation state per active assignment, read at the revision of the assignment's round.
+   * A new round revokes the previous round's assignments, so each case counts once, and a case
+   * that moved on after the round still shows the evaluation the person finalized for it.
+   */
   async evaluationStates(actor: { id: string; role: OperationalRole }): Promise<ChartSlice[]> {
     const { rows } = await this.pool.query<Record<string, number>>(
       `SELECT COUNT(*) FILTER (WHERE ev.id IS NULL)::int AS not_started,
@@ -182,9 +186,9 @@ export class StatsRepository {
        JOIN dashboard.requests r ON r.id = a.request_id
        LEFT JOIN dashboard.review_rounds rr ON rr.id = a.round_id
        LEFT JOIN dashboard.evaluations ev
-         ON ev.request_id = r.id AND ev.user_id = a.user_id AND ev.revision = r.revision
-       WHERE a.user_id = $1 AND a.role = $2 AND a.active
-         AND (a.round_id IS NULL OR rr.request_revision = r.revision)`,
+         ON ev.request_id = r.id AND ev.user_id = a.user_id
+         AND ev.revision = COALESCE(rr.request_revision, r.revision)
+       WHERE a.user_id = $1 AND a.role = $2 AND a.active`,
       [actor.id, actor.role],
     )
     return slices(EVALUATION_STATES, rows[0])

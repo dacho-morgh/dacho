@@ -529,6 +529,12 @@ describe('T38: scoped queues, counts and overview (int)', () => {
     expect(await chart('reviewer-2')).toEqual({ not_started: 1, draft: 0, final: 0 })
     expect(await chart('employer-1')).toEqual({ not_started: 1, draft: 0, final: 0 })
     expect(await chart('reviewer-4')).toEqual({ not_started: 0, draft: 0, final: 0 })
+
+    // Once the case moves on, the finalized evaluation still counts as the person's own work.
+    for (const user of ['employer-1', 'reviewer-2', 'reviewer-3']) await finalize(app, id, user, revision)
+    await advance(app, id, revision)
+    expect(await chart('reviewer-1')).toEqual({ not_started: 0, draft: 0, final: 1 })
+    expect(await chart('employer-1')).toEqual({ not_started: 0, draft: 0, final: 1 })
   })
 
   it('counts booth requests for the Secretariat across exhibitions and for a company only its own', async () => {
