@@ -46,8 +46,8 @@ export default async function OwnerExhibitionsPage() {
     hasActionButton: true,
   }))
   return (
-    <main dir="rtl" className="flex min-w-0 flex-1 flex-col gap-5 p-4">
-      <Button asChild variant="outline" className="self-start">
+    <main dir="rtl" className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 p-4">
+      <Button size="40" asChild variant="outline-gray" className="self-start">
         <Link href="/admin/collections/exhibitions">
           <Typography variant="14/regular">مدیریت اطلاعات نمایشگاه در CMS</Typography>
         </Link>

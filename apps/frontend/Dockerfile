@@ -69,7 +69,7 @@ COPY --from=build /repo/apps/frontend/.next ./apps/frontend/.next
 COPY --from=build /repo/apps/frontend/public ./apps/frontend/public
 COPY --from=build /repo/apps/frontend/next.config.ts ./apps/frontend/next.config.ts
 COPY --from=build /repo/apps/frontend/redirects.ts ./apps/frontend/redirects.ts
-RUN mkdir -p /repo/apps/frontend/public/media
+RUN mkdir -p /repo/apps/frontend/public/media /data/personnel-files
 
 # Copy entrypoint from context (not the build stage) so edits to it don't
 # invalidate the cached `next build` layer.
@@ -77,7 +77,7 @@ COPY apps/frontend/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x /repo/docker-entrypoint.sh
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-RUN chown -R nextjs:nodejs /repo
+RUN chown -R nextjs:nodejs /repo /data/personnel-files
 USER nextjs
 EXPOSE 3000
 ENTRYPOINT ["/repo/docker-entrypoint.sh"]

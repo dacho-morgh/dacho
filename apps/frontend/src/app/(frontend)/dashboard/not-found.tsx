@@ -15,7 +15,7 @@ export default function DashboardNotFound() {
       <Typography color="neutral-500">
         ممکن است حذف شده باشد یا نشانی آن درست نباشد.
       </Typography>
-      <Button asChild>
+      <Button size="40" asChild>
         <Link href="/dashboard">
           <Typography as="span" className="text-inherit">
             بازگشت به پیشخوان

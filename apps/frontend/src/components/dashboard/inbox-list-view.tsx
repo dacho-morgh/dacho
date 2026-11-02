@@ -1,5 +1,8 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import Image from 'next/image'
 import Link from 'next/link'
 import React, { useMemo, useState } from 'react'
@@ -8,7 +11,6 @@ import {
   EmptyInboxIllustration,
   FilterIcon,
   MoreOptionsIcon,
-  SearchNormalIcon,
   TrashIcon,
 } from '@/components/icons'
 import {
@@ -263,7 +265,7 @@ export function InboxListView({
   }
 
   return (
-    <div className="flex w-full flex-1 flex-col text-right" dir="rtl">
+    <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
       {/* Toast Alert */}
       {actionNotice && (
         <div
@@ -273,16 +275,15 @@ export function InboxListView({
           <Typography variant="14/regular" className="text-inherit">
             {actionNotice}
           </Typography>
-          <button
+          <Button variant="text-gray" size="icon-32"
             type="button"
             onClick={() => setActionNotice(null)}
-            className="flex size-8 items-center justify-center rounded-lg text-brand-600 hover:bg-brand-100"
             aria-label="بستن پیام"
           >
             <span aria-hidden="true" className="text-xl leading-none">
               ×
             </span>
-          </button>
+          </Button>
         </div>
       )}
 
@@ -304,17 +305,13 @@ export function InboxListView({
           <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Right Side: Search Input + Filter - Figma Frame 84 (53:12430) */}
             <div className="flex h-[48px] w-full items-center gap-[8px] sm:w-[458px]">
-              <div className="flex h-[48px] flex-1 items-center gap-[8px] overflow-hidden rounded-[8px] border border-[#f5f5f5] bg-white px-[12px] py-[8px] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100 sm:w-[400px]">
-                <SearchNormalIcon className="size-[24px] shrink-0 text-[#d4d4d4]" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="درخواست خود را جست و جو کنید"
-                  aria-label="جستجوی نامه‌ها"
-                  className="h-[28px] w-full bg-transparent text-right font-sans text-[16px] leading-[28px] font-normal text-[#525252] outline-none placeholder:text-[#d4d4d4]"
-                />
-              </div>
+              <SearchField
+                className="flex-1 sm:w-[400px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="درخواست خود را جست و جو کنید"
+                aria-label="جستجوی نامه‌ها"
+              />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -354,23 +351,22 @@ export function InboxListView({
               </DropdownMenu>
             </div>
             {showSupport && (
-              <button
+              <Button size="48"
                 type="button"
-                onClick={() => setSupportModalOpen(true)}
-                className="flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[12px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500 sm:w-[199px]"
+                onClick={() => setSupportModalOpen(true)} className="w-full"
               >
                 <span className="font-sans text-[20px] leading-[32px] font-normal">پیام به پشتیبانی</span>
                 <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
-              </button>
+              </Button>
             )}
           </div>
 
       {/* Main Table Card - Figma Frame 6 (33:3926) */}
-      <section className="relative mt-[16px] flex h-fit h-full w-full flex-col rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
+      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
         {isLoading ? (
           <InboxSkeleton />
         ) : (
-          <>
+          <ScrollArea className="min-h-0 flex-1">
             {/* Desktop Table View */}
             <div className="hidden overflow-x-auto lg:block">
               <table className="w-full table-fixed border-collapse text-right">
@@ -484,7 +480,7 @@ export function InboxListView({
 
             {/* Empty State */}
             {isEmpty && <InboxEmptyState />}
-          </>
+          </ScrollArea>
         )}
       </section>
       </>

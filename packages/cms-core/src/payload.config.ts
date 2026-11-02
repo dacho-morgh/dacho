@@ -15,6 +15,7 @@ import { Media } from './collections/Media'
 import { News } from './collections/News'
 import { NewsletterSubscribers } from './collections/NewsletterSubscribers'
 import { Pages } from './collections/Pages'
+import { PersonnelFiles } from './collections/PersonnelFiles'
 import { Posts } from './collections/Posts'
 import { Reviews } from './collections/Reviews'
 import { Services } from './collections/Services'
@@ -177,6 +178,7 @@ export default buildConfig({
     Media,
     Categories,
     Users,
+    PersonnelFiles,
     Companies,
     FAQ,
     Reviews,

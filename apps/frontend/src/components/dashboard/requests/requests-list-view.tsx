@@ -48,7 +48,7 @@ export function RequestsListView({
   const isEmpty = state === 'empty' || (state === 'default' && data.length === 0)
 
   return (
-    <div className="flex w-full flex-1 flex-col text-right" dir="rtl">
+    <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
       <Typography as="h1" variant="24/bold" className="text-neutral-700">
         لیست درخواست ها
       </Typography>

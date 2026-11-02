@@ -60,11 +60,14 @@ services:
       BACKEND_URL: http://backend:4000
       INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET:?INTERNAL_PROXY_SECRET is required}
       PAYLOAD_MEDIA_DIR: /repo/apps/frontend/public/media
+      PAYLOAD_PRIVATE_FILES_DIR: /data/personnel-files
     secrets:
       - payload_secret
     volumes:
       # Uploaded media lives outside the container so image updates don't drop it.
       - media:/repo/apps/frontend/public/media
+      # Personnel resumes: private, served only through Payload's access check.
+      - personnel_files:/data/personnel-files
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,6 +101,7 @@ services:
 volumes:
   pgdata:
   media:
+  personnel_files:
   private_documents:
 
 secrets:

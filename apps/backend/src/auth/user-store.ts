@@ -12,6 +12,9 @@ export interface User {
   email?: string
   /** The representative's job title within the company (سمت). */
   position?: string
+  /** Personnel profile shown in the staff list. */
+  degree?: string
+  activityField?: string
   /** Derived compatibility roles; never accepts public role grants. */
   roles?: UserRole[]
   operationalRole?: string | null

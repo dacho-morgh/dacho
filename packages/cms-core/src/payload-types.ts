@@ -72,6 +72,7 @@ export interface Config {
     media: Media;
     categories: Category;
     users: User;
+    'personnel-files': PersonnelFile;
     companies: Company;
     faq: Faq;
     reviews: Review;
@@ -104,6 +105,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
+    'personnel-files': PersonnelFilesSelect<false> | PersonnelFilesSelect<true>;
     companies: CompaniesSelect<false> | CompaniesSelect<true>;
     faq: FaqSelect<false> | FaqSelect<true>;
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
@@ -590,6 +592,17 @@ export interface User {
     | null;
   roles?: ('admin' | 'editor' | 'representative' | 'referee')[] | null;
   position?: string | null;
+  age?: number | null;
+  gender?: ('male' | 'female') | null;
+  degree?: string | null;
+  activityField?: string | null;
+  resume?: (number | PersonnelFile)[] | null;
+  personnelAddresses?:
+    | {
+        address: string;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
   enableAPIKey?: boolean | null;
@@ -612,6 +625,22 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "personnel-files".
+ */
+export interface PersonnelFile {
+  id: number;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1739,6 +1768,10 @@ export interface PayloadLockedDocument {
         value: number | User;
       } | null)
     | ({
+        relationTo: 'personnel-files';
+        value: number | PersonnelFile;
+      } | null)
+    | ({
         relationTo: 'companies';
         value: number | Company;
       } | null)
@@ -2208,6 +2241,17 @@ export interface UsersSelect<T extends boolean = true> {
   personnelHistory?: T;
   roles?: T;
   position?: T;
+  age?: T;
+  gender?: T;
+  degree?: T;
+  activityField?: T;
+  resume?: T;
+  personnelAddresses?:
+    | T
+    | {
+        address?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   enableAPIKey?: T;
@@ -2228,6 +2272,21 @@ export interface UsersSelect<T extends boolean = true> {
         createdAt?: T;
         expiresAt?: T;
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "personnel-files_select".
+ */
+export interface PersonnelFilesSelect<T extends boolean = true> {
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

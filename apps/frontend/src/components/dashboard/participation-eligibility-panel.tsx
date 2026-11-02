@@ -318,7 +318,7 @@ function ReadyContent({
                   {link.fields.map((field) => field.label).join('، ')}
                 </Typography>
               </div>
-              <Button asChild variant="outline" size="32" className="self-start sm:self-auto">
+              <Button asChild variant="outline-gray" size="32" className="self-start sm:self-auto">
                 <Link href={link.href}>تکمیل {link.section.title}</Link>
               </Button>
             </li>
@@ -327,7 +327,7 @@ function ReadyContent({
       ) : null}
 
       {needsProfileWork && links.length === 0 && !missing ? (
-        <Button asChild variant="outline" size="32" className="self-start">
+        <Button asChild variant="outline-gray" size="32" className="self-start">
           <Link href={profileSectionHref('company-verification', destination)}>مشاهده پرونده شرکت</Link>
         </Button>
       ) : null}

@@ -7,6 +7,10 @@ import {
   isInternalAdmin,
   OPERATIONAL_ROLE_LABELS,
   OPERATIONAL_ROLES,
+  PERSONNEL_GENDER_LABELS,
+  PERSONNEL_GENDERS,
+  PERSONNEL_MAX_AGE,
+  PERSONNEL_MIN_AGE,
   USER_ROLE_LABELS,
   USER_ROLES,
 } from '@cms-core/access/roles'
@@ -200,6 +204,12 @@ export const Users: CollectionConfig = {
           password?: string
           operationalRole?: (typeof OPERATIONAL_ROLES)[number]
           isActive?: boolean
+          age?: number | null
+          gender?: (typeof PERSONNEL_GENDERS)[number] | null
+          degree?: string | null
+          activityField?: string | null
+          resume?: number[]
+          personnelAddresses?: { address: string }[]
         } = {}
         for (const key of ['name', 'phone', 'email', 'password'] as const) {
           if (!(key in body)) continue
@@ -209,6 +219,50 @@ export const Users: CollectionConfig = {
               return Response.json({ error: 'invalid_personnel' }, { status: 400 })
             data[key] = body[key]
           }
+        }
+        for (const key of ['degree', 'activityField'] as const) {
+          if (!(key in body)) continue
+          if (body[key] !== null && typeof body[key] !== 'string')
+            return Response.json({ error: 'invalid_personnel' }, { status: 400 })
+          data[key] = body[key]
+        }
+        if ('age' in body) {
+          if (
+            body.age !== null &&
+            (!Number.isInteger(body.age) ||
+              body.age < PERSONNEL_MIN_AGE ||
+              body.age > PERSONNEL_MAX_AGE)
+          )
+            return Response.json({ error: 'invalid_personnel' }, { status: 400 })
+          data.age = body.age
+        }
+        if ('gender' in body) {
+          if (body.gender !== null && !PERSONNEL_GENDERS.includes(body.gender))
+            return Response.json({ error: 'invalid_personnel' }, { status: 400 })
+          data.gender = body.gender
+        }
+        if ('resume' in body) {
+          if (
+            !Array.isArray(body.resume) ||
+            !body.resume.every((id: unknown) => Number.isSafeInteger(id) && (id as number) > 0)
+          )
+            return Response.json({ error: 'invalid_personnel' }, { status: 400 })
+          data.resume = body.resume
+        }
+        if ('personnelAddresses' in body) {
+          if (
+            !Array.isArray(body.personnelAddresses) ||
+            !body.personnelAddresses.every(
+              (item: unknown) =>
+                !!item &&
+                typeof (item as { address?: unknown }).address === 'string' &&
+                (item as { address: string }).address.trim() !== '',
+            )
+          )
+            return Response.json({ error: 'invalid_personnel' }, { status: 400 })
+          data.personnelAddresses = body.personnelAddresses.map((item: { address: string }) => ({
+            address: item.address.trim(),
+          }))
         }
         if ('operationalRole' in body) {
           if (!OPERATIONAL_ROLES.includes(body.operationalRole))
@@ -262,6 +316,14 @@ export const Users: CollectionConfig = {
             email: updated.email ?? null,
             operationalRole: updated.operationalRole,
             isActive: updated.isActive,
+            age: updated.age ?? null,
+            gender: updated.gender ?? null,
+            degree: updated.degree ?? null,
+            activityField: updated.activityField ?? null,
+            resume: (updated.resume ?? []).map((file) => (typeof file === 'object' ? file.id : file)),
+            personnelAddresses: (updated.personnelAddresses ?? []).map(({ address }) => ({
+              address,
+            })),
             updatedAt: new Date(timestamp.updated_at).toISOString(),
           }
           await commitTransaction(req)
@@ -517,6 +579,53 @@ export const Users: CollectionConfig = {
       name: 'position',
       type: 'text',
       label: 'سمت',
+    },
+    // Personnel profile (Figma "add employee" 31070:14855). Only the owner
+    // records these; a staff member cannot rewrite their own file.
+    {
+      name: 'age',
+      type: 'number',
+      label: 'سن',
+      min: PERSONNEL_MIN_AGE,
+      max: PERSONNEL_MAX_AGE,
+      access: { create: ownerOnlyField, update: ownerOnlyField },
+    },
+    {
+      name: 'gender',
+      type: 'select',
+      label: 'جنسیت',
+      options: PERSONNEL_GENDERS.map((gender) => ({
+        label: PERSONNEL_GENDER_LABELS[gender],
+        value: gender,
+      })),
+      access: { create: ownerOnlyField, update: ownerOnlyField },
+    },
+    {
+      name: 'degree',
+      type: 'text',
+      label: 'مدرک دانشگاهی',
+      access: { create: ownerOnlyField, update: ownerOnlyField },
+    },
+    {
+      name: 'activityField',
+      type: 'text',
+      label: 'زمینه فعالیت',
+      access: { create: ownerOnlyField, update: ownerOnlyField },
+    },
+    {
+      name: 'resume',
+      type: 'upload',
+      label: 'فایل رزومه',
+      relationTo: 'personnel-files',
+      hasMany: true,
+      access: { create: ownerOnlyField, update: ownerOnlyField, read: ownerOnlyField },
+    },
+    {
+      name: 'personnelAddresses',
+      type: 'array',
+      label: 'آدرس ها',
+      access: { create: ownerOnlyField, update: ownerOnlyField },
+      fields: [{ name: 'address', type: 'text', label: 'آدرس', required: true }],
     },
   ],
   timestamps: true,

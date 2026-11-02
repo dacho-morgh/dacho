@@ -1,5 +1,7 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
@@ -19,7 +21,6 @@ import {
   DashboardFilterIcon,
   DashboardMessageTextIcon,
   DashboardMoreIcon,
-  DashboardSearchIcon,
   DashboardTrashIcon,
 } from '@/components/icons'
 import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
@@ -219,11 +220,11 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
   const isEmpty = !isLoading && filteredLetters.length === 0
 
   return (
-    <div className="flex w-full flex-col items-end gap-[16px]" dir="rtl">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-end gap-[16px]" dir="rtl">
       {/* Toolbar — Figma frames 30852:17808 / 30873:18804 */}
       <div className="flex w-full flex-wrap items-center justify-between gap-[8px]">
         {/* Left: نامه جدید button */}
-        <Button asChild size="48" className="bg-brand-500 hover:bg-brand-600">
+        <Button asChild size="48">
           <Link href="/dashboard/letters/new">
             <Typography as="span" variant="20/regular" className="text-inherit">نامه جدید</Typography>
             <DashboardAddIcon className="size-[26px] shrink-0 stroke-white" />
@@ -324,19 +325,12 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
           </DropdownMenu>
 
           {/* Search input — Figma node 30852:17812 */}
-          <div className="flex h-[48px] w-full max-w-[400px] flex-col gap-[8px]">
-            <div className="flex h-full w-full flex-1 items-center gap-[8px] overflow-hidden rounded-[8px] border border-neutral-100 bg-white px-[12px] py-[8px] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="درخواست خود را جست و جو کنید"
-                aria-label="جستجوی نامه‌ها"
-                className="h-[28px] min-w-0 flex-1 bg-transparent text-right text-[16px] font-normal leading-[28px] text-neutral-600 outline-none placeholder:text-neutral-300"
-              />
-              <DashboardSearchIcon className="size-[24px] shrink-0 text-neutral-300" />
-            </div>
-          </div>
+          <SearchField
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="درخواست خود را جست و جو کنید"
+            aria-label="جستجوی نامه‌ها"
+          />
         </div>
       </div>
 
@@ -349,21 +343,22 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
           <Typography variant="14/regular" className="text-inherit">
             {actionNotice}
           </Typography>
-          <button
+          <Button variant="text-gray" size="icon-32"
             type="button"
             onClick={() => setActionNotice(null)}
-            className="flex size-8 items-center justify-center rounded-lg text-brand-600 hover:bg-brand-100"
             aria-label="بستن پیام"
           >
             <span aria-hidden="true" className="text-xl leading-none">
               ×
             </span>
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Table card — Figma frame 30852:17813 */}
-      <div className="relative min-h-[320px] w-full rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4 lg:flex lg:h-[848px] lg:flex-row-reverse lg:items-start lg:justify-end">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4">
+        <ScrollArea className="min-h-0 flex-1">
+        <div className="min-h-[320px] lg:flex lg:flex-row-reverse lg:items-start lg:justify-end">
         {isLoading ? (
           <LettersSkeleton />
         ) : isEmpty ? (
@@ -480,7 +475,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
                     <TypeTag type={item.type} label={item.typeLabel} />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="text-gray" size="icon-sm" className="size-10 shrink-0 rounded-lg hover:bg-neutral-100" aria-label={`عملیات نامه ${item.title}`}>
+                        <Button variant="text-gray" size="icon-40" aria-label={`عملیات نامه ${item.title}`}>
                           <DashboardMoreIcon className="size-5" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -522,6 +517,8 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
             </div>
           </>
         )}
+        </div>
+        </ScrollArea>
       </div>
 
     </div>

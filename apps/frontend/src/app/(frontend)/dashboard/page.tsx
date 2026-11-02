@@ -153,7 +153,7 @@ export default async function DashboardPage({
         ) : (
           <RequestsTable items={recentRequests} showFilterTabs={false} />
         )}
-        <Button asChild variant="outline-gray">
+        <Button size="40" asChild variant="outline-gray">
           <Link href={requestQueueHref('/dashboard/requests', status)}>
             <Typography>مشاهده همه درخواست‌های این صف</Typography>
           </Link>

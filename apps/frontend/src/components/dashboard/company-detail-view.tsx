@@ -649,7 +649,6 @@ export function CompanyDetailView({ id }: { id: string }) {
                     variant="default"
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('approve')}
-                    className="bg-brand-600 hover:bg-brand-700 text-white"
                   >
                     {decisionSubmitting ? 'در حال ثبت...' : 'تأیید مدارک'}
                   </Button>
@@ -658,7 +657,6 @@ export function CompanyDetailView({ id }: { id: string }) {
                     variant="outline-gray"
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('return')}
-                    className="border-amber-400 text-amber-700 hover:bg-amber-50"
                   >
                     برگشت جهت اصلاح
                   </Button>

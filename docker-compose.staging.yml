@@ -31,10 +31,12 @@ services:
       BACKEND_URL: http://backend:4000
       INTERNAL_PROXY_SECRET: ${STAGING_INTERNAL_PROXY_SECRET:?STAGING_INTERNAL_PROXY_SECRET is required}
       PAYLOAD_MEDIA_DIR: /repo/apps/frontend/public/media
+      PAYLOAD_PRIVATE_FILES_DIR: /data/personnel-files
     secrets:
       - staging_payload_secret
     volumes:
       - staging_media:/repo/apps/frontend/public/media
+      - staging_personnel_files:/data/personnel-files
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,6 +70,7 @@ services:
 volumes:
   staging_pgdata:
   staging_media:
+  staging_personnel_files:
   staging_private_documents:
 
 secrets:

@@ -1,5 +1,6 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -12,7 +13,6 @@ import {
   DashboardRequestsIcon as FileText,
   EventsLocationIcon as MapPin,
   DashboardAddIcon as Plus,
-  DashboardSearchIcon as Search,
   DashboardEventsIcon as Store,
   DashboardCloseCircle as X,
 } from '@/components/icons/generated'
@@ -245,10 +245,9 @@ export function ExhibitionBoothAdmin({
           <Button
             type="button"
             variant="default"
-            size="md"
+            size="36"
             onClick={handleOpenAdd}
             disabled={!canEdit}
-            className="flex items-center gap-2"
           >
             <Plus className="size-4" />
             <Typography as="span" variant="14/regular">
@@ -268,7 +267,7 @@ export function ExhibitionBoothAdmin({
             <AlertCircle className="size-5 shrink-0 text-error-600" />
             <Typography variant="14/regular">{error}</Typography>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => void loadCatalogue()}>
+          <Button type="button" variant="outline-gray" size="32" onClick={() => void loadCatalogue()}>
             تلاش مجدد
           </Button>
         </div>
@@ -331,9 +330,8 @@ export function ExhibitionBoothAdmin({
           <Button
             type="submit"
             variant="default"
-            size="md"
+            size="36"
             disabled={!canEdit || settingsSaving}
-            className="flex shrink-0 items-center gap-2"
           >
             {settingsSaving ? (
               <Typography as="span" variant="14/regular">
@@ -394,16 +392,13 @@ export function ExhibitionBoothAdmin({
 
           {/* Search & Status Filter */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-60">
-              <Search className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="جستجو در غرفه‌ها..."
-                className="h-9 w-full rounded-lg border border-neutral-200 bg-white pr-9 pl-3 text-sm text-neutral-700 transition-colors outline-none focus:border-brand-500"
-              />
-            </div>
+            <SearchField
+              className="sm:w-60"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="جستجو در غرفه‌ها..."
+              aria-label="جستجو در غرفه‌ها"
+            />
             <select
               value={statusFilter}
               onChange={(e) =>
@@ -447,7 +442,7 @@ export function ExhibitionBoothAdmin({
                 ? 'می‌توانید فیلترها را تغییر دهید یا غرفه جدیدی ثبت کنید.'
                 : 'با استفاده از دکمه زیر، مشخصات و قیمت نخستین غرفه را ثبت کنید.'}
             </Typography>
-            <Button type="button" variant="default" size="sm" onClick={handleOpenAdd}>
+            <Button type="button" variant="default" size="32" onClick={handleOpenAdd}>
               افزودن غرفه
             </Button>
           </div>
@@ -537,10 +532,9 @@ export function ExhibitionBoothAdmin({
                       <td className="px-4 py-3 text-center">
                         <Button
                           type="button"
-                          variant="ghost"
-                          size="sm"
+                          variant="text-gray"
+                          size="32"
                           onClick={() => handleOpenEdit(booth)}
-                          className="flex items-center gap-1 text-neutral-600 hover:text-brand-600"
                         >
                           <Edit2 className="size-3.5" />
                           <Typography as="span" variant="14/regular">
@@ -604,10 +598,9 @@ export function ExhibitionBoothAdmin({
                     </Typography>
                     <Button
                       type="button"
-                      variant="outline"
-                      size="sm"
+                      variant="outline-gray"
+                      size="32"
                       onClick={() => handleOpenEdit(booth)}
-                      className="flex items-center gap-1 text-xs"
                     >
                       <Edit2 className="size-3" />
                       <Typography as="span" variant="14/regular">
@@ -759,12 +752,11 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
             {isEditing ? `ویرایش غرفه: ${booth?.identifier}` : 'افزودن غرفه جدید'}
           </Typography>
           <Button
-            variant="ghost"
+            variant="text-gray"
             size="icon-32"
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
             aria-label="بستن"
           >
             <X className="size-5" />
@@ -957,14 +949,14 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
             <div className="mt-4 flex items-center justify-end gap-2 border-t border-neutral-100 pt-3">
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
+                variant="outline-gray"
+                size="32"
                 onClick={onClose}
                 disabled={submitting}
               >
                 انصراف
               </Button>
-              <Button type="submit" variant="default" size="sm" disabled={submitting}>
+              <Button type="submit" variant="default" size="32" disabled={submitting}>
                 {submitting ? 'در حال ثبت...' : isEditing ? 'ذخیره تغییرات' : 'ثبت غرفه'}
               </Button>
             </div>

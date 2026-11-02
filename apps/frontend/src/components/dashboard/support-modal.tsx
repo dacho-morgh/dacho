@@ -101,14 +101,13 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
               </Typography>
             </div>
           </div>
-          <button
+          <Button variant="text-gray" size="icon-32"
             type="button"
             onClick={handleReset}
-            className="flex size-8 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 focus-visible:outline-2 focus-visible:outline-brand-500"
             aria-label="بستن پنجره"
           >
             <X className="size-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Modal Content */}
@@ -274,7 +273,6 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                   variant="outline-gray"
                   size="48"
                   onClick={handleReset}
-                  className="rounded-xl px-5"
                 >
                   انصراف
                 </Button>
@@ -283,7 +281,6 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                   variant="primary"
                   size="48"
                   disabled={isSubmitting || !subject.trim() || !message.trim()}
-                  className="rounded-xl px-6"
                 >
                   {isSubmitting ? (
                     'در حال ارسال...'

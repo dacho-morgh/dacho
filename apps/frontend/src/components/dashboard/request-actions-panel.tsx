@@ -206,7 +206,6 @@ export function RequestActionsPanel({
                 type="button"
                 variant={item.variant}
                 size="40"
-                className="px-4"
                 onClick={() => {
                   setNotice(null)
                   setOpen(item)

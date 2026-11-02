@@ -1,5 +1,7 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
@@ -10,7 +12,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -18,7 +19,6 @@ import {
   DashboardFilterIcon,
   DashboardMessageTextIcon,
   DashboardMoreIcon,
-  DashboardSearchIcon,
   DashboardTrashIcon,
   DashboardUserTagIcon,
 } from '@/components/icons'
@@ -179,14 +179,13 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
   const showTable = state === 'default' && filteredLetters.length > 0
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-[16px]" dir="rtl">
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-[16px]" dir="rtl">
       {/* Toolbar — Figma nodes 33:3923 / 53:12430: search right, filter left of it, CTA far left */}
       <div className="flex flex-wrap items-center justify-between gap-[8px]">
         <div className="flex flex-wrap items-center gap-[8px]">
           <Button
             asChild
             size="48"
-            className="gap-[8px] rounded-[12px] bg-brand-500 px-[12px] py-[8px] text-white hover:bg-brand-600"
           >
             <Link href="/dashboard/letters/new?mode=support">
               <Typography as="span" variant="20/regular" className="text-white">
@@ -196,7 +195,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
             </Link>
           </Button>
           {canComposeLetter && (
-            <Button asChild variant="outline" size="48" className="rounded-[12px] px-[12px] py-[8px]">
+            <Button asChild variant="outline-gray" size="48">
               <Link href="/dashboard/letters/new">
                 <Typography as="span" variant="20/regular" className="text-inherit">
                   نامه جدید
@@ -238,23 +237,18 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
               </Typography>
             </button>
           </div>
-          <button
+          <Button variant="white" size="icon-48"
             type="button"
             aria-label="فیلتر"
-            className="flex h-[48px] w-[48px] items-center justify-center rounded-[12px] bg-white text-neutral-500"
           >
             <DashboardFilterIcon className="size-[26px]" />
-          </button>
-          <div className="relative w-[400px] max-w-full">
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="درخواست خود را جست و جو کنید"
-              aria-label="جستجو"
-              className="h-[48px] rounded-[8px] border-neutral-100 pr-[12px] pl-[40px]"
-            />
-            <DashboardSearchIcon className="pointer-events-none absolute left-[12px] top-1/2 size-[24px] -translate-y-1/2 text-neutral-400" />
-          </div>
+          </Button>
+          <SearchField
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="درخواست خود را جست و جو کنید"
+            aria-label="جستجو"
+          />
         </div>
       </div>
 
@@ -265,7 +259,9 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
       )}
 
       {/* Card — Figma node 33:3926: white, grey-200 border, rounded-16, 16px padding, 848px tall */}
-      <div className="relative min-h-[320px] w-full rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4 lg:min-h-[848px]">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4">
+        <ScrollArea className="min-h-0 flex-1">
+        <div className="min-h-[320px]">
         {state === 'loading' ? (
           <LettersSkeleton />
         ) : !showTable ? (
@@ -366,7 +362,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
                   <StatusTag type={item.type} label={item.typeLabel} />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="text-gray" size="icon-sm" className="size-10 shrink-0 rounded-lg hover:bg-neutral-100" aria-label={`عملیات نامه ${item.title}`}>
+                      <Button variant="text-gray" size="icon-40" aria-label={`عملیات نامه ${item.title}`}>
                         <DashboardMoreIcon className="size-5" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -410,6 +406,8 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
           </div>
           </>
         )}
+        </div>
+        </ScrollArea>
       </div>
     </div>
   )

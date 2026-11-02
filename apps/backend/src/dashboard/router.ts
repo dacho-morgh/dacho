@@ -3298,6 +3298,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         name: user.name ?? null,
         operationalRole: role,
         isActive: user.isActive === true,
+        degree: user.degree ?? null,
+        activityField: user.activityField ?? null,
       }]
     })
     res.json({ items })

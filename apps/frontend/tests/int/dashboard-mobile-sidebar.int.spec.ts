@@ -16,6 +16,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next/headers', () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
+  cookies: vi.fn().mockResolvedValue({ get: () => undefined }),
 }))
 
 vi.mock('payload', async (importOriginal) => {

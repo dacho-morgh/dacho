@@ -1,5 +1,7 @@
 'use client'
 
+import { useGSAP } from '@gsap/react'
+import gsap from 'gsap'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -11,6 +13,8 @@ import {
   EventsIcon,
   PeopleIcon,
   MoreOptionsIcon,
+  SidebarCollapseIcon,
+  SidebarExpandIcon,
   type SidebarIconProps,
   BrandSandoqLogomark,
   BrandSandoqLogotype,
@@ -23,6 +27,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
 import { Typography } from '@/components/ui/typography'
@@ -66,11 +71,23 @@ export function AppSidebar({
   ...props
 }: AppSidebarProps) {
   const pathname = usePathname()
-  const { isMobile, setOpenMobile } = useSidebar()
+  const { isMobile, setOpenMobile, state, toggleSidebar } = useSidebar()
+  const rootRef = React.useRef<HTMLDivElement>(null)
+  const isCollapsed = !isMobile && state === 'collapsed'
   const navItems = navigation.destinations.flatMap((href) => {
     const item = knownDestinations[href]
     return item ? [{ ...item, href }] : []
   })
+  useGSAP(
+    () => {
+      gsap.fromTo(
+        '[data-sidebar-anim]',
+        { autoAlpha: 0, x: 8 },
+        { autoAlpha: 1, x: 0, duration: 0.25, ease: 'power2.out', stagger: 0.03, delay: 0.08 },
+      )
+    },
+    { scope: rootRef, dependencies: [isCollapsed] },
+  )
   const displayName = companyName || user?.name || user?.email || 'حساب کاربری'
   const responsibility = navigation.responsibilities[0]
 
@@ -78,21 +95,50 @@ export function AppSidebar({
     <Sidebar
       side="right"
       variant="sidebar"
-      collapsible="offcanvas"
+      collapsible="icon"
       className={`border-l border-neutral-200 bg-white font-sans ${className || ''}`}
       {...props}
     >
-      <div className="flex h-full w-[268px] flex-col justify-between px-4 py-10">
+      <div
+        ref={rootRef}
+        className="flex h-full w-full min-w-0 flex-col justify-between overflow-hidden px-4 py-10 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
         <div className="flex flex-col gap-6">
-          <SidebarHeader className="p-0">
-            <Link
-              href="/dashboard"
-              className="flex items-center justify-start gap-2.5 px-1 transition-opacity hover:opacity-90"
-              title="صفحه اصلی داشبورد"
-            >
-              <BrandSandoqLogomark className="h-10 w-[46px] shrink-0" />
-              <BrandSandoqLogotype className="h-10 w-[113px] shrink-0" />
-            </Link>
+          <SidebarHeader className="flex flex-row items-center justify-between gap-2 p-0 group-data-[collapsible=icon]:justify-center">
+            {isCollapsed ? (
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                aria-label="باز کردن سایدبار"
+                aria-expanded={false}
+                title="باز کردن سایدبار"
+                className="group/logo relative flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-neutral-100"
+              >
+                <BrandSandoqLogomark className="h-8 w-[37px] shrink-0 transition-opacity group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0" />
+                <SidebarExpandIcon
+                  aria-hidden="true"
+                  className="absolute size-6 scale-x-[-1] text-neutral-600 opacity-0 transition-opacity group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100"
+                />
+              </button>
+            ) : (
+              <Link
+                href="/dashboard"
+                className="flex items-center justify-start gap-2 px-1 transition-opacity hover:opacity-90"
+                title="صفحه اصلی داشبورد"
+              >
+                <BrandSandoqLogomark className="h-8 w-[37px] shrink-0" />
+                <BrandSandoqLogotype data-sidebar-anim className="h-8 w-[90px] shrink-0" />
+              </Link>
+            )}
+            {isMobile || isCollapsed ? null : (
+              <SidebarTrigger
+                aria-label="جمع کردن سایدبار"
+                aria-expanded
+                data-sidebar-anim
+                className="size-8 shrink-0 rounded-lg text-neutral-600"
+              >
+                <SidebarCollapseIcon aria-hidden="true" className="size-6 scale-x-[-1]" />
+              </SidebarTrigger>
+            )}
           </SidebarHeader>
 
           <div className="h-px w-full bg-neutral-200" />
@@ -107,31 +153,41 @@ export function AppSidebar({
 
                 return (
                   <SidebarMenuItem key={item.href} className="relative">
-                    <div className="flex w-full items-center gap-2">
+                    <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
                       <span
-                        className={`h-7 w-1 shrink-0 rounded-full ${isActive ? 'bg-brand-500' : 'bg-transparent'}`}
+                        className={`h-7 w-1 shrink-0 group-data-[collapsible=icon]:hidden rounded-full ${isActive ? 'bg-brand-500' : 'bg-transparent'}`}
                         aria-hidden="true"
                       />
                       <SidebarMenuButton
                         asChild
+                        tooltip={item.title}
                         isActive={isActive}
                         onClick={() => {
                           if (isMobile) setOpenMobile(false)
                         }}
-                        className={`group relative flex h-10 w-full flex-1 items-center rounded-xl px-3 py-2 transition-colors ${
+                        className={`group relative flex h-10 w-full flex-1 items-center rounded-xl px-3 py-2 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:rounded-xl transition-colors ${
                           isActive
                             ? 'bg-brand-50 font-normal text-brand-600 hover:bg-brand-100 hover:text-brand-600 active:bg-brand-200'
                             : 'bg-transparent font-normal text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                         }`}
                       >
-                        <Link href={item.href} className="flex w-full items-center gap-2.5">
+                        <Link
+                          href={item.href}
+                          className="flex w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
+                          aria-label={isCollapsed ? item.title : undefined}
+                        >
                           <Icon
                             variant={isActive ? 'bulk' : 'linear'}
                             className={`size-6 shrink-0 transition-colors ${
                               isActive ? 'text-brand-600' : 'text-neutral-600'
                             }`}
                           />
-                          <Typography as="span" variant="16/regular" className="truncate leading-7">
+                          <Typography
+                            as="span"
+                            variant="16/regular"
+                            className="truncate leading-7 group-data-[collapsible=icon]:hidden"
+                            data-sidebar-anim
+                          >
                             {item.title}
                           </Typography>
                         </Link>
@@ -145,7 +201,7 @@ export function AppSidebar({
         </div>
 
         <SidebarFooter className="p-0">
-          <div className="flex min-h-10 w-full items-center justify-between gap-2">
+          <div className="flex min-h-10 w-full items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
             <Link
               href="/dashboard/profile"
               className="flex min-w-0 items-center gap-2.5 overflow-hidden transition-opacity hover:opacity-85"
@@ -161,7 +217,7 @@ export function AppSidebar({
                   onError={(event) => event.currentTarget.remove()}
                 />
               </div>
-              <span className="flex min-w-0 flex-col">
+              <span className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
                 <Typography
                   as="span"
                   variant="14/semibold"
@@ -179,7 +235,7 @@ export function AppSidebar({
 
             <Link
               href="/dashboard/profile"
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 group-data-[collapsible=icon]:hidden transition-colors hover:bg-neutral-100 hover:text-neutral-700"
               title="تنظیمات و گزینه‌ها"
             >
               <MoreOptionsIcon className="size-6 text-neutral-600" />

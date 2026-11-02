@@ -1,5 +1,8 @@
 'use client'
 
+import { SearchField } from '@/components/dashboard/search-field'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   AlertCircle,
   Check,
@@ -20,7 +23,6 @@ import {
   EmptyInboxIllustration,
   FilterIcon,
   LocationBulkIcon,
-  SearchNormalIcon,
   TickSquareIcon,
 } from '@/components/icons'
 import {
@@ -197,14 +199,13 @@ function QuickSelectModal({
               برای مشاهده فرم عنوان و زیر عنوان مورد نظر خود را انتخاب کنید.
             </p>
           </div>
-          <button
+          <Button variant="text-gray" size="icon-36"
             type="button"
             onClick={onClose}
             aria-label="بستن پنجره"
-            className="flex size-9 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
           >
             <X className="size-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Dropdowns */}
@@ -255,21 +256,19 @@ function QuickSelectModal({
 
         {/* Action Buttons */}
         <div className="mt-2 flex items-center justify-end gap-3 pt-2">
-          <button
+          <Button variant="outline-gray" size="40"
             type="button"
             onClick={onClose}
-            className="flex h-10 items-center justify-center rounded-lg border border-neutral-300 px-4 font-sans text-[14px] font-medium text-neutral-700 hover:bg-neutral-50"
           >
             لغو
-          </button>
-          <button
+          </Button>
+          <Button size="40"
             type="button"
             onClick={handleConfirm}
             disabled={!selectedSubId}
-            className="flex h-10 items-center justify-center rounded-lg bg-brand-500 px-5 font-sans text-[14px] font-semibold text-white shadow-xs hover:bg-brand-600 disabled:opacity-50"
           >
             تایید
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -506,7 +505,7 @@ export function EventsView({
     const selectedCount = selectedSubtopicIds.size
 
     return (
-      <div className="flex w-full flex-1 flex-col text-right" dir="rtl">
+      <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
         {/* Breadcrumbs and Top Action Header - Figma Frame 146 (node 31967:73802) */}
         <div className="flex flex-wrap items-center justify-between gap-4 py-2">
           {/* Breadcrumb path */}
@@ -530,11 +529,10 @@ export function EventsView({
 
           {/* Top Registration Action Button */}
           <div className="flex items-center gap-3">
-            <button
+            <Button size="40"
               type="button"
               onClick={handleRegisterSelected}
               disabled={isEnded || selectedCount === 0 || !eligibility?.canParticipate}
-              className="flex h-[40px] items-center justify-center gap-2 rounded-[10px] bg-brand-500 px-4 text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500"
             >
               <span className="font-sans text-[15px] font-semibold">
                 {isEnded
@@ -544,7 +542,7 @@ export function EventsView({
                     : 'ثبت‌نام در رویداد'}
               </span>
               <TickSquareIcon className="size-5 shrink-0 stroke-white" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -641,13 +639,12 @@ export function EventsView({
                 </span>
               )}
               {categories.length > 0 && (
-                <button
+                <Button variant="outline-gray" size="36"
                   type="button"
                   onClick={() => setQuickModalOpen(true)}
-                  className="flex h-9 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 font-sans text-[13px] font-medium text-neutral-700 hover:bg-neutral-50"
                 >
                   <span>انتخاب سریع عنوان</span>
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -674,14 +671,13 @@ export function EventsView({
           ) : detailsError ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
               <p className="font-sans text-[14px] text-red-600">{detailsError}</p>
-              <button
+              <Button variant="outline-gray" size="32"
                 type="button"
                 onClick={loadEventHierarchy}
-                className="flex items-center gap-1.5 rounded-lg border border-neutral-300 px-3.5 py-1.5 text-[13px] font-medium text-neutral-700 hover:bg-neutral-50"
               >
                 <RotateCcw className="size-4" />
                 <span>تلاش دوباره</span>
-              </button>
+              </Button>
             </div>
           ) : categories.length === 0 ? (
             <div className="py-12 text-center font-sans text-[14px] text-neutral-500">
@@ -758,15 +754,14 @@ export function EventsView({
 
                                   {/* Left side: RFP Actions */}
                                   <div className="flex items-center gap-2">
-                                    <button
+                                    <Button variant="outline-gray" size="32"
                                       type="button"
                                       onClick={() => toggleRfpViewer(sub)}
                                       aria-label={`دریافت فایل RFP برای ${sub.title}`}
-                                      className="flex h-8 items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-3 text-[13px] font-medium text-neutral-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
                                     >
                                       <FileText className="size-4" />
                                       <span>مشاهده و دانلود RFP</span>
-                                    </button>
+                                    </Button>
                                   </div>
                                 </div>
 
@@ -870,17 +865,13 @@ export function EventsView({
       {/* Action Bar - Figma Frame 1 (56:13205) */}
       <div className="mt-5 flex items-center justify-start">
         <div className="flex h-[48px] w-full items-center gap-[8px] sm:w-[458px]">
-          <div className="flex h-[48px] flex-1 items-center gap-[8px] overflow-hidden rounded-[8px] border border-[#f5f5f5] bg-white px-[12px] py-[8px] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100 sm:w-[400px]">
-            <SearchNormalIcon className="size-[24px] shrink-0 text-[#d4d4d4]" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="درخواست خود را جست و جو کنید"
-              aria-label="جستجوی رویدادها"
-              className="h-[28px] w-full bg-transparent text-right font-sans text-[16px] leading-[28px] font-normal text-[#525252] outline-none placeholder:text-[#d4d4d4]"
-            />
-          </div>
+          <SearchField
+                className="flex-1 sm:w-[400px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="درخواست خود را جست و جو کنید"
+                aria-label="جستجوی رویدادها"
+              />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -939,11 +930,11 @@ export function EventsView({
       </div>
 
       {/* Main Events Card - Figma Frame 6 (56:13208) */}
-      <section className="relative mt-[16px] flex w-full flex-col gap-[32px] rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
+      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
         {isLoading ? (
           <EventsSkeleton />
         ) : (
-          <>
+          <ScrollArea className="min-h-0 flex-1">
             {!isEmpty && (
               <div className="flex flex-col gap-[32px]">
                 {filteredEvents.map((evt) => (
@@ -1003,7 +994,7 @@ export function EventsView({
                           </div>
 
                           {/* Action Button */}
-                          <button
+                          <Button size="40"
                             type="button"
                             onClick={() => {
                               if (isOwner && evt.serviceKey === 'exhibitions') {
@@ -1020,7 +1011,6 @@ export function EventsView({
                                 )
                               }
                             }}
-                            className="flex h-[40px] items-center justify-center gap-[8px] rounded-[10px] bg-[#3b82f6] px-[12px] py-[8px] text-white shadow-xs transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-brand-500"
                           >
                             <span className="font-sans text-[16px] leading-[28px] font-semibold">
                               {isOwner && evt.serviceKey === 'exhibitions'
@@ -1028,7 +1018,7 @@ export function EventsView({
                                 : evt.actionButtonText || 'ثبت درخواست'}
                             </span>
                             <TickSquareIcon className="size-[24px] shrink-0 stroke-white" />
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         /* Frame 44: Date and Location only */
@@ -1055,7 +1045,7 @@ export function EventsView({
 
             {/* Empty State */}
             {isEmpty && <EventsEmptyState noMatch={state !== 'empty' && events.length > 0} />}
-          </>
+          </ScrollArea>
         )}
       </section>
     </div>

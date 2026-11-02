@@ -155,8 +155,7 @@ export function ReviewAssignmentPanel({
           </Typography>
           <Button
             type="button"
-            size="40"
-            className="w-full px-4 sm:w-fit"
+            size="40" className="w-full sm:w-fit"
             onClick={() => {
               setNotice(null)
               setDialog({ kind: 'start' })
@@ -306,7 +305,7 @@ function SlotRow({
           </Typography>
         ) : null}
         {replaceLabel ? (
-          <Button type="button" variant="outline" size="32" className="px-3" onClick={onReplace} aria-label={`${replaceLabel}: ${name}`}>
+          <Button type="button" variant="outline-gray" size="32" onClick={onReplace} aria-label={`${replaceLabel}: ${name}`}>
             <Typography variant="14/regular" className="text-inherit">{replaceLabel}</Typography>
           </Button>
         ) : null}
@@ -430,7 +429,7 @@ function StartRoundDialog({
           <Button type="button" size="40" disabled={busy || !available || !candidates.data} onClick={() => void submit()}>
             <Typography variant="14/regular" className="text-inherit">{busy ? 'در حال ثبت…' : 'ارجاع'}</Typography>
           </Button>
-          <Button type="button" variant="outline" size="40" disabled={busy} onClick={onClose}>
+          <Button type="button" variant="outline-gray" size="40" disabled={busy} onClick={onClose}>
             <Typography variant="14/regular" className="text-inherit">لغو</Typography>
           </Button>
         </>
@@ -560,7 +559,7 @@ function ReplaceDialog({
           <Button type="button" size="40" disabled={busy || !available || !candidates.data} onClick={() => void submit()}>
             <Typography variant="14/regular" className="text-inherit">{busy ? 'در حال ثبت…' : 'جایگزینی'}</Typography>
           </Button>
-          <Button type="button" variant="outline" size="40" disabled={busy} onClick={onClose}>
+          <Button type="button" variant="outline-gray" size="40" disabled={busy} onClick={onClose}>
             <Typography variant="14/regular" className="text-inherit">لغو</Typography>
           </Button>
         </>
