@@ -170,6 +170,8 @@ export interface CreateLetterInput {
   senderRole?: string | null
   requestId?: string | null
   attachments?: LetterAttachmentDto[]
+  /** Client key for one compose attempt, so a retried send returns the first letter. */
+  idempotencyKey?: string | null
 }
 
 export class LetterRepository {
@@ -178,9 +180,9 @@ export class LetterRepository {
   async create(input: CreateLetterInput): Promise<LetterDto> {
     const attachmentsJson = JSON.stringify(input.attachments ?? [])
     const { rows } = await this.pool.query<LetterRow>(
-      `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, attachments, read)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, false) RETURNING ${LETTER_COLUMNS}`,
-      [input.type, input.title, input.body, input.senderId ?? null, input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId ?? null, attachmentsJson],
+      `INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, attachments, idempotency_key, read)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, false) RETURNING ${LETTER_COLUMNS}`,
+      [input.type, input.title, input.body, input.senderId ?? null, input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId ?? null, attachmentsJson, input.idempotencyKey ?? null],
     )
     if (!rows[0]) throw new Error('INSERT dashboard.letters returned no row')
     return mapRow(rows[0])
@@ -198,7 +200,7 @@ export class LetterRepository {
     if (!input.requestId) return this.create(input)
     const attachmentsJson = JSON.stringify(input.attachments ?? [])
     const params: unknown[] = [input.type, input.title, input.body, input.senderId ?? null,
-      input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId, attachmentsJson]
+      input.senderName ?? null, input.senderRole ?? null, input.recipientId, input.requestId, attachmentsJson, input.idempotencyKey ?? null]
     const scopeClause = (scope: RequestScope): string => {
       if (scope.kind !== 'assigned') return requestScopeClause(scope, params, 'r')
       params.push(scope.userId, scope.role)
@@ -217,8 +219,8 @@ export class LetterRepository {
          SELECT user_id, role FROM dashboard.case_assignments
          WHERE request_id = $8 AND active FOR SHARE
        )
-       INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, attachments, read)
-       SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, false
+       INSERT INTO dashboard.letters (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, attachments, idempotency_key, read)
+       SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, false
        FROM dashboard.requests r
        WHERE r.id = $8 AND (${senderClause}) AND (${recipientClause}) ${chiefClause} ${handoffClause}
        RETURNING ${LETTER_COLUMNS}`,
@@ -227,8 +229,16 @@ export class LetterRepository {
     return rows[0] ? mapRow(rows[0]) : undefined
   }
 
+  async findByIdempotencyKey(senderId: string, key: string): Promise<LetterDto | undefined> {
+    const { rows } = await this.pool.query<LetterRow>(
+      `SELECT ${LETTER_COLUMNS} FROM dashboard.letters WHERE sender_id = $1 AND idempotency_key = $2`,
+      [senderId, key],
+    )
+    return rows[0] ? mapRow(rows[0]) : undefined
+  }
+
   async listAll(options: { page: number; limit: number; recipientId?: string }): Promise<LetterList> {
-    const where = options.recipientId ? 'WHERE recipient_id = $1' : ''
+    const where = options.recipientId ? 'WHERE mailbox_hidden_at IS NULL AND recipient_id = $1' : 'WHERE mailbox_hidden_at IS NULL'
     const params: unknown[] = options.recipientId ? [options.recipientId] : []
     const count = await this.pool.query<{ total: string }>(`SELECT COUNT(*) AS total FROM dashboard.letters ${where}`, params)
     const total = Number(count.rows[0]?.total ?? 0)
@@ -273,10 +283,18 @@ export class LetterRepository {
 
   async listScoped(
     scope: RequestScope,
-    options: { read?: boolean; page: number; limit: number },
+    options: { read?: boolean; page: number; limit: number; actorId: string; requestId?: string },
   ): Promise<LetterList> {
     const params: unknown[] = []
     const where: string[] = [letterScopeClause(scope, params, 'l')]
+    // A case's history keeps letters its recipient hid from their mailbox.
+    if (options.requestId) {
+      params.push(options.requestId)
+      where.push(`l.request_id = $${params.length}`)
+    } else {
+      params.push(options.actorId)
+      where.push(`(l.mailbox_hidden_at IS NULL OR l.recipient_id <> $${params.length})`)
+    }
     if (options.read !== undefined) {
       params.push(options.read)
       where.push(`l.read = $${params.length}`)
@@ -337,12 +355,14 @@ export class LetterRepository {
     return rows[0] ? mapRow(rows[0]) : undefined
   }
 
+  /** Hides the letter from the mailbox; the row stays as the history of the case and its evidence. */
   async deleteScoped(id: string, scope: RequestScope): Promise<boolean> {
     if (!isUuid(id)) return false
     const params: unknown[] = [id]
     const whereSql = letterDeleteScopeClause(scope, params, 'l')
     const result = await this.pool.query(
-      `DELETE FROM dashboard.letters l WHERE l.id = $1 AND ${whereSql}`,
+      `UPDATE dashboard.letters l SET mailbox_hidden_at = now()
+       WHERE l.id = $1 AND l.mailbox_hidden_at IS NULL AND ${whereSql}`,
       params,
     )
     return (result.rowCount ?? 0) > 0

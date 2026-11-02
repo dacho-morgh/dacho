@@ -3,6 +3,8 @@
 // (labels + dates) live here so they are unit-testable; the fetch helpers are
 // thin wrappers over the same-origin proxy (the browser forwards the session).
 
+import { OPERATIONAL_ROLE_LABELS, type OperationalRole } from '@cms-core/access/roles'
+
 import type { LetterItem } from '@/components/dashboard/inbox-list-view'
 import type { MailData } from '@/components/dashboard/mail-detail-view'
 import type { RequestItem } from '@/components/dashboard/requests/types'
@@ -871,6 +873,11 @@ export function mapRequestItem(dto: RequestDto): RequestItem {
   }
 }
 
+/** Letters store the sender's operational role; older rows may hold free text. */
+export function letterSenderRoleLabel(role: string | null): string {
+  return (role && OPERATIONAL_ROLE_LABELS[role as OperationalRole]) || role || ''
+}
+
 export function mapLetterItem(dto: LetterDto): LetterItem {
   return {
     id: dto.id,
@@ -878,42 +885,19 @@ export function mapLetterItem(dto: LetterDto): LetterItem {
     status: dto.type,
     statusLabel: LETTER_TYPE_LABELS[dto.type],
     senderName: dto.senderName ?? 'کارخانه نوآوری',
-    senderRole: dto.senderRole ?? '',
+    senderRole: letterSenderRoleLabel(dto.senderRole),
     sentDate: formatDate(dto.sentAt),
     read: dto.read,
   }
 }
 
 export function mapMailData(dto: LetterDto): MailData {
-  // The API presents only attachments the reader may open, as objects.
-  const rawAttachments = Array.isArray(dto.attachments)
-    ? dto.attachments.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
-    : []
-  const attachments = rawAttachments.map((att) => {
-    const id = typeof att.id === 'string' ? att.id : undefined
-    const name = String(att.name ?? att.filename ?? 'پیوست')
-    const size = typeof att.size === 'string'
-      ? att.size
-      : typeof att.sizeBytes === 'number'
-        ? `${Math.max(1, Math.round(att.sizeBytes / 1024))} KB`
-        : '—'
-    const ext = name.split('.').pop() ?? ''
-    const downloadUrl = typeof att.downloadUrl === 'string'
-      ? att.downloadUrl
-      : id
-        ? `/api/dashboard/letters/${encodeURIComponent(dto.id)}/attachments/${encodeURIComponent(id)}/download`
-        : undefined
-    return { id, name, size, ext, downloadUrl }
-  })
-
   return {
     id: dto.id,
     title: dto.title,
     category: LETTER_TYPE_LABELS[dto.type] ?? 'نامه رسمی',
-    senderId: dto.senderId,
     senderName: dto.senderName ?? 'کارخانه نوآوری',
-    senderRole: dto.senderRole ?? '',
-    requestId: dto.requestId,
+    senderRole: letterSenderRoleLabel(dto.senderRole),
     datePersian: formatDate(dto.sentAt),
     dayOfWeek: formatWeekday(dto.sentAt),
     timeStr: formatTime(dto.sentAt),

@@ -279,6 +279,7 @@ describe('NewLetterForm correspondence attachments', () => {
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/dashboard/letters'))
     expect(send).toHaveBeenCalledTimes(1)
     expect(JSON.parse(String(send.mock.calls[0][1].body))).toEqual({
+      idempotencyKey: expect.any(String),
       recipientId: 'rep-1', title: 'عنوان', type: 'official', body: 'متن', requestId: CASE_ID, attachmentIds: [DOC_ID],
     })
   })
@@ -295,7 +296,8 @@ describe('NewLetterForm correspondence attachments', () => {
     expect(screen.queryByText('reply.pdf')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'ارسال نامه' }))
     await waitFor(() => expect(send).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(String(send.mock.calls[0][1].body))).toEqual({ recipientId: 'rep-1', title: 'عنوان', type: 'official', body: 'متن' })
+    expect(JSON.parse(String(send.mock.calls[0][1].body))).toEqual({
+      idempotencyKey: expect.any(String), recipientId: 'rep-1', title: 'عنوان', type: 'official', body: 'متن' })
   })
 
   it('shows a Persian upload error from the server and keeps the letter unsent', async () => {

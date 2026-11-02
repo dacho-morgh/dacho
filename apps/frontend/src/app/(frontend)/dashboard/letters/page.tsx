@@ -9,12 +9,14 @@ import { Typography } from '@/components/ui/typography'
 import {
   formatDate,
   LETTER_TYPE_LABELS,
+  letterSenderRoleLabel,
   type LetterDto,
   type Paginated,
   type SupportTicketDto,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import {
+  dashboardOperationalRole,
   isSeniorManagerUser,
   serverDashboardFetchResult,
   type DashboardFetchResult,
@@ -39,14 +41,33 @@ function lettersFailure(
   return unavailableReasonFor(letters) ?? (tickets.kind === 'denied' ? undefined : unavailableReasonFor(tickets))
 }
 
-function toAdminLetterItem(dto: LetterDto): AdminLetterItem {
+/** Letter DTOs carry only the recipient id. A failed lookup leaves the generic label. */
+async function recipientNamesOf(payload: Awaited<ReturnType<typeof getPayload>>, letters: LetterDto[]): Promise<Map<string, string>> {
+  const ids = [...new Set(letters.map((dto) => dto.recipientId))]
+  const names = new Map<string, string>()
+  if (!ids.length) return names
+  try {
+    const found = await payload.find({ collection: 'users', where: { id: { in: ids } }, depth: 0, limit: ids.length })
+    for (const recipient of found.docs) {
+      if (recipient.name) names.set(String(recipient.id), recipient.name)
+    }
+  } catch {
+    return names
+  }
+  return names
+}
+
+function toAdminLetterItem(dto: LetterDto, names: Map<string, string>, actorId: string): AdminLetterItem {
+  const received = dto.recipientId === actorId
   return {
     id: dto.id,
     title: dto.title,
     type: dto.type,
     typeLabel: LETTER_TYPE_LABELS[dto.type] ?? 'نامه رسمی',
-    senderName: dto.recipientId,
-    senderRole: 'گیرنده نامه',
+    senderName: received ? (dto.senderName ?? 'کارخانه نوآوری') : (names.get(dto.recipientId) ?? 'گیرنده'),
+    senderRole: received ? letterSenderRoleLabel(dto.senderRole) : 'گیرنده نامه',
+    direction: received ? 'received' : 'sent',
+    read: received ? dto.read : undefined,
     senderAvatar: (dto as unknown as { senderAvatar?: string }).senderAvatar,
     sentDate: formatDate(dto.sentAt),
     source: 'letter',
@@ -75,7 +96,9 @@ export default async function LettersPage() {
       sentDate: formatDate(ticket.createdAt),
       source: 'ticket',
     }))
-    const letters: AdminLetterItem[] = (lettersRes.kind === 'ok' ? lettersRes.data.items : []).map(toAdminLetterItem)
+    const adminLetters = lettersRes.kind === 'ok' ? lettersRes.data.items : []
+    const adminNames = await recipientNamesOf(payload, adminLetters.filter((dto) => dto.recipientId !== String(user?.id)))
+    const letters: AdminLetterItem[] = adminLetters.map((dto) => toAdminLetterItem(dto, adminNames, String(user?.id)))
     const formsResult = await payload.find({
       collection: 'form-submissions',
       limit: 100,
@@ -124,21 +147,9 @@ export default async function LettersPage() {
   const fetchedLetters = lettersRes.kind === 'ok' ? lettersRes.data.items : []
   const fetchedTickets = ticketsRes.kind === 'ok' ? ticketsRes.data.items : []
 
-  const isSentLetter = (dto: LetterDto) => !!user && String(dto.senderId) === String(user.id)
-  // Letter DTOs carry only the recipient id; show the recipient's name in the sent tab.
-  const sentRecipientIds = [...new Set(fetchedLetters.filter(isSentLetter).map((dto) => dto.recipientId))]
-  const recipientNames = new Map<string, string>()
-  if (sentRecipientIds.length) {
-    const recipients = await payload.find({
-      collection: 'users',
-      where: { id: { in: sentRecipientIds } },
-      depth: 0,
-      limit: sentRecipientIds.length,
-    })
-    for (const recipient of recipients.docs) {
-      if (recipient.name) recipientNames.set(String(recipient.id), recipient.name)
-    }
-  }
+  const actorId = String(user?.id)
+  const isSentLetter = (dto: LetterDto) => dto.senderId === actorId
+  const recipientNames = await recipientNamesOf(payload, fetchedLetters.filter(isSentLetter))
 
   const letters: ApplicantLetterItem[] = fetchedLetters.map((dto) => {
     const isSent = isSentLetter(dto)
@@ -147,13 +158,14 @@ export default async function LettersPage() {
       title: dto.title,
       type: dto.type,
       typeLabel: LETTER_TYPE_LABELS[dto.type] ?? 'نامه رسمی',
-      senderName: isSent ? (recipientNames.get(dto.recipientId) ?? 'دبیرخانه') : (dto.senderName ?? 'کارخانه نوآوری'),
-      senderRole: isSent ? 'گیرنده' : (dto.senderRole ?? 'دبیرخانه'),
+      senderName: isSent ? (recipientNames.get(dto.recipientId) ?? 'گیرنده') : (dto.senderName ?? 'کارخانه نوآوری'),
+      senderRole: isSent ? 'گیرنده' : (letterSenderRoleLabel(dto.senderRole) || 'دبیرخانه'),
       sentDate: formatDate(dto.sentAt),
       senderAvatar: (dto as unknown as { senderAvatar?: string }).senderAvatar,
       source: 'letter',
       direction: isSent ? 'sent' : 'received',
-      read: dto.read,
+      // Only a recipient's own letter has a read state to show them.
+      read: dto.recipientId === actorId ? dto.read : undefined,
     }
   })
 
@@ -177,7 +189,7 @@ export default async function LettersPage() {
       >
         کارتابل نامه
       </Typography>
-      <ApplicantLettersView initialLetters={[...letters, ...tickets]} />
+      <ApplicantLettersView canComposeLetter={dashboardOperationalRole(user) !== 'representative'} initialLetters={[...letters, ...tickets]} />
     </div>
   )
 }

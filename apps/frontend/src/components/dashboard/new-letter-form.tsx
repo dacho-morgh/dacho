@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +30,11 @@ const SUPPORT_PRIORITY_LABELS: Record<string, string> = {
 }
 
 type CaseOption = Pick<RequestDto, 'id' | 'trackingCode' | 'title' | 'ownerId'>
+export type LetterCaseOption = Pick<RequestDto, 'id' | 'trackingCode' | 'title'>
+
+function caseLabel(item: LetterCaseOption): string {
+  return item.trackingCode ? `${item.trackingCode} — ${item.title}` : item.title
+}
 
 type CasesState =
   | { kind: 'idle' }
@@ -81,12 +86,16 @@ export interface NewLetterFormProps {
   mode?: 'admin' | 'support' | 'letter'
   companies?: LetterRecipient[]
   recipientsError?: boolean
+  /** The case this letter belongs to; recipients and attachments follow it. */
   requestId?: string
   caseTitle?: string
+  /** Cases the sender may choose from; without it a given case stays fixed. */
+  caseOptions?: LetterCaseOption[]
+  casesError?: boolean
+  /** The backend sends these roles' letters as official whatever the form says. */
+  officialOnly?: boolean
   initialRecipientId?: string
   initialTitle?: string
-  initialType?: LetterType
-  initialBody?: string
 }
 
 export function NewLetterForm({
@@ -95,49 +104,34 @@ export function NewLetterForm({
   recipientsError = false,
   requestId,
   caseTitle,
+  caseOptions,
+  casesError = false,
+  officialOnly = false,
   initialRecipientId,
   initialTitle,
-  initialType,
-  initialBody,
 }: NewLetterFormProps) {
   const router = useRouter()
   const submitting = useRef(false)
+  const sendAttempt = useRef<{ payload: string; key: string | undefined } | null>(null)
+  const [changingCase, startCaseChange] = useTransition()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [recipientId, setRecipientId] = useState('')
+  const [recipientId, setRecipientId] = useState(initialRecipientId ?? '')
   const [caseId, setCaseId] = useState('')
   const [attachments, setAttachments] = useState<PrivateDocumentDto[]>([])
   const [uploading, setUploading] = useState(false)
 
   const isSupport = mode === 'support'
-  const cases = useRecipientCases(recipientId, !isSupport)
+  const cases = useRecipientCases(recipientId, mode === 'admin' && !requestId)
+  const selectedCaseId = requestId ?? caseId
+  const letterTypes = Object.entries(LETTER_TYPE_LABELS).filter(([value]) => !officialOnly || value === 'official')
 
-  async function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file || !requestId) return
-    const localErr = validateSelectedFile(file)
-    if (localErr) {
-      setUploadError(documentErrorMessage(localErr))
-      return
-    }
-    setUploading(true)
-    setUploadError(null)
-    try {
-      const doc = await uploadDocument({
-        file,
-        category: 'correspondenceAttachment',
-        requestId,
-      })
-      setAttachments((prev) => [
-        ...prev,
-        { id: doc.id, name: doc.filename, size: formatDocumentSize(doc.sizeBytes) },
-      ])
-      event.target.value = ''
-    } catch {
-      setUploadError('بارگذاری پیوست انجام نشد. دوباره تلاش کنید.')
-    } finally {
-      setUploading(false)
-    }
+  function chooseCase(nextCaseId: string) {
+    setRecipientId('')
+    setAttachments([])
+    startCaseChange(() => {
+      router.push(nextCaseId ? `/dashboard/letters/new?requestId=${encodeURIComponent(nextCaseId)}` : '/dashboard/letters/new')
+    })
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -189,37 +183,31 @@ export function NewLetterForm({
     }
     // Only attachments uploaded to the currently selected case are sent; a
     // file left over from a previous case selection is never submitted.
-    const attachmentIds = caseId
-      ? attachments.filter((document) => document.requestId === caseId).map((document) => document.id)
+    const attachmentIds = selectedCaseId
+      ? attachments.filter((document) => document.requestId === selectedCaseId).map((document) => document.id)
       : []
+    const payload = JSON.stringify({
+      recipientId,
+      title,
+      type,
+      body,
+      ...(selectedCaseId ? { requestId: selectedCaseId } : {}),
+      ...(attachmentIds.length ? { attachmentIds } : {}),
+    })
+    // A retry of the same letter reuses its key, so a response lost on the way
+    // back cannot send it twice; any edit makes it a new letter.
+    if (sendAttempt.current?.payload !== payload) {
+      sendAttempt.current = { payload, key: globalThis.crypto?.randomUUID?.() }
+    }
+    const idempotencyKey = sendAttempt.current.key
     submitting.current = true
     setSaving(true)
     setError(null)
     try {
-      const endpoint = requestId || mode !== 'admin'
-        ? '/api/dashboard/letters'
-        : '/api/dashboard/admin/letters'
-
-      const payloadData: Record<string, unknown> = {
-        recipientId,
-        title,
-        type,
-        body,
-      }
-      if (requestId) payloadData.requestId = requestId
-      if (attachments.length > 0) payloadData.attachmentIds = attachments.map((a) => a.id)
-
-      const response = await fetch(endpoint, {
+      const response = await fetch(mode === 'admin' ? '/api/dashboard/admin/letters' : '/api/dashboard/letters', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          recipientId,
-          title,
-          type,
-          body,
-          ...(caseId ? { requestId: caseId } : {}),
-          ...(attachmentIds.length ? { attachmentIds } : {}),
-        }),
+        body: JSON.stringify({ ...JSON.parse(payload), ...(idempotencyKey ? { idempotencyKey } : {}) }),
       })
       if (!response.ok) throw new DashboardApiError(response.status, 'letter_not_created')
       const result = await response.json()
@@ -265,7 +253,7 @@ export function NewLetterForm({
           <Button
             type="submit"
             size="40"
-            disabled={saving || uploading || (!isSupport && !companies.length)}
+            disabled={saving || uploading || changingCase || (!isSupport && !companies.length)}
             className="bg-brand-500 px-4 hover:bg-brand-600"
           >
             <Typography as="span" variant="16/semibold" className="text-inherit">
@@ -276,15 +264,6 @@ export function NewLetterForm({
       </header>
 
       <section aria-label={isSupport ? 'اطلاعات پیام' : 'اطلاعات نامه'} className="flex flex-1 flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:min-h-[calc(100svh-112px)]">
-        {requestId && (
-          <div className="flex items-center justify-between rounded-xl border border-brand-100 bg-brand-50/50 p-3 text-sm text-brand-700">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">پرونده مرتبط:</span>
-              <span>{caseTitle || requestId}</span>
-            </div>
-          </div>
-        )}
-
         {/* Recipient field */}
         <div className="flex flex-col gap-2">
           <Typography as="label" htmlFor="letter-recipient" variant="16/semibold" className="text-neutral-700">
@@ -307,10 +286,11 @@ export function NewLetterForm({
                 value={recipientId}
                 onChange={(event) => {
                   setRecipientId(event.target.value)
+                  if (requestId) return
                   setCaseId('')
                   setAttachments([])
                 }}
-                disabled={saving || uploading || !companies.length}
+                disabled={saving || uploading || changingCase || !companies.length}
                 className={fieldClassName}
               >
                 <option value="" disabled>انتخاب گیرنده</option>
@@ -326,7 +306,11 @@ export function NewLetterForm({
                   variant="12/regular"
                   className="text-neutral-500"
                 >
-                  {recipientsError ? 'دریافت گیرندگان انجام نشد. صفحه را دوباره بارگذاری کنید.' : 'گیرنده‌ای برای ارسال نامه وجود ندارد.'}
+                  {recipientsError
+                    ? 'دریافت گیرندگان انجام نشد. صفحه را دوباره بارگذاری کنید.'
+                    : caseOptions && !requestId
+                      ? 'برای نوشتن نامه، ابتدا پرونده مرتبط را انتخاب کنید.'
+                      : 'گیرنده‌ای برای ارسال نامه وجود ندارد.'}
                 </Typography>
               )}
             </>
@@ -344,7 +328,7 @@ export function NewLetterForm({
               name="title"
               required
               disabled={saving}
-              defaultValue={initialTitle || ''}
+              defaultValue={initialTitle}
               placeholder={isSupport ? 'موضوع پیام خود را وارد کنید' : 'متن پلیس هولدر'}
               className="placeholder:font-[150]"
             />
@@ -371,12 +355,12 @@ export function NewLetterForm({
                 id="letter-type"
                 name="type"
                 required
-                defaultValue={initialType || ''}
+                defaultValue={officialOnly ? 'official' : ''}
                 disabled={saving}
                 className={fieldClassName}
               >
-                <option value="" disabled>انتخاب نوع نامه</option>
-                {Object.entries(LETTER_TYPE_LABELS).map(([value, label]) => (
+                {!officialOnly && <option value="" disabled>انتخاب نوع نامه</option>}
+                {letterTypes.map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
@@ -394,7 +378,6 @@ export function NewLetterForm({
             name="body"
             required
             disabled={saving}
-            defaultValue={initialBody || ''}
             placeholder={isSupport ? 'متن پیام یا درخواست پشتیبانی خود را بنویسید...' : 'متن پلیس هولدر'}
             className={cn(
               typographyVariants({ variant: '16/regular', color: 'neutral-600' }),
@@ -414,29 +397,57 @@ export function NewLetterForm({
         ) : (
           <div className="flex flex-col gap-2">
             <Typography as="label" htmlFor="letter-case" variant="16/semibold" className="text-neutral-700">
-              پرونده مرتبط (اختیاری)
+              {requestId && !caseOptions ? 'پرونده مرتبط' : 'پرونده مرتبط (اختیاری)'}
             </Typography>
-            <select
-              id="letter-case"
-              name="requestId"
-              value={caseId}
-              onChange={(event) => {
-                setCaseId(event.target.value)
-                setAttachments([])
-              }}
-              disabled={saving || uploading || cases.kind !== 'ready' || cases.items.length === 0}
-              className={fieldClassName}
-            >
-              <option value="">بدون پرونده</option>
-              {cases.kind === 'ready'
-                ? cases.items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.trackingCode ? `${item.trackingCode} — ${item.title}` : item.title}
-                    </option>
-                  ))
-                : null}
-            </select>
-            {cases.kind === 'idle' ? (
+            {requestId && !caseOptions ? (
+              <input id="letter-case" disabled value={caseTitle ?? 'پرونده این نامه'} className={fieldClassName} />
+            ) : caseOptions ? (
+              <select
+                id="letter-case"
+                name="requestId"
+                value={requestId ?? ''}
+                onChange={(event) => chooseCase(event.target.value)}
+                disabled={saving || uploading || changingCase}
+                className={fieldClassName}
+              >
+                <option value="">بدون پرونده</option>
+                {requestId && !caseOptions.some((item) => item.id === requestId) ? (
+                  <option value={requestId}>{caseTitle ?? 'پرونده انتخاب‌شده'}</option>
+                ) : null}
+                {caseOptions.map((item) => (
+                  <option key={item.id} value={item.id}>{caseLabel(item)}</option>
+                ))}
+              </select>
+            ) : (
+              <select
+                id="letter-case"
+                name="requestId"
+                value={caseId}
+                onChange={(event) => {
+                  setCaseId(event.target.value)
+                  setAttachments([])
+                }}
+                disabled={saving || uploading || cases.kind !== 'ready' || cases.items.length === 0}
+                className={fieldClassName}
+              >
+                <option value="">بدون پرونده</option>
+                {cases.kind === 'ready'
+                  ? cases.items.map((item) => (
+                      <option key={item.id} value={item.id}>{caseLabel(item)}</option>
+                    ))
+                  : null}
+              </select>
+            )}
+            {casesError ? (
+              <Typography role="alert" variant="12/regular" className="text-error-600">
+                دریافت پرونده‌ها انجام نشد. صفحه را دوباره بارگذاری کنید.
+              </Typography>
+            ) : caseOptions && !requestId ? (
+              <Typography role="status" variant="12/regular" className="text-neutral-500">
+                {caseOptions.length ? 'پیوست فایل فقط برای نامه‌های مرتبط با پرونده ممکن است.' : 'پرونده‌ای برای مکاتبه در دسترس شما نیست.'}
+              </Typography>
+            ) : null}
+            {mode !== 'admin' || requestId ? null : cases.kind === 'idle' ? (
               <Typography variant="12/regular" className="text-neutral-500">
                 برای افزودن فایل پیوست، ابتدا گیرنده و سپس پرونده مرتبط را انتخاب کنید.
               </Typography>
@@ -457,12 +468,12 @@ export function NewLetterForm({
                 این گیرنده پرونده‌ای ندارد؛ پیوست فایل فقط برای نامه‌های مرتبط با پرونده ممکن است.
               </Typography>
             ) : null}
-            {caseId ? (
+            {selectedCaseId ? (
               <PrivateDocumentField
-                key={caseId}
+                key={selectedCaseId}
                 category="correspondenceAttachment"
                 label="فایل پیوست"
-                requestId={caseId}
+                requestId={selectedCaseId}
                 disabled={saving}
                 sessionOnly
                 onPendingChange={setUploading}
