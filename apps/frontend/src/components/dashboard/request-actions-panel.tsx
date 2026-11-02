@@ -6,6 +6,7 @@ import { useId, useState } from 'react'
 
 import { DecisionDialog } from '@/components/dashboard/decision-dialog'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -46,6 +47,8 @@ interface Decision {
   confirm: string
   /** Asked for, required and shown to the company or recorded in history. */
   reason?: { label: string; placeholder: string }
+  /** A statement the person must tick before the command can be sent. */
+  acknowledge?: string
   send: (id: string, reason: string, revision?: number) => Promise<unknown>
   done: string
 }
@@ -95,8 +98,9 @@ const REVIEW_DECISION: Decision[] = [
     label: 'انتقال به مرحله مالی',
     variant: 'primary',
     title: 'انتقال به مرحله مالی',
-    effect: 'از شرکت برای ارسال بسته مالی دعوت می‌شود و اقدام دیگری از سردبیر لازم نیست.',
+    effect: 'از شرکت برای ارسال بسته مالی دعوت می‌شود و اقدام دیگری از سردبیر لازم نیست. امتیازها پرونده را خودکار منتقل نمی‌کنند؛ این انتقال فقط با تصمیم شما ثبت می‌شود.',
     confirm: 'انتقال',
+    acknowledge: 'هر چهار ارزیابی نهایی این دور را بررسی کرده‌ام و انتقال به مرحله مالی تصمیم صریح من است.',
     send: (id, _reason, revision) => decideReview(id, 'advance', '', revision),
     done: 'پرونده به مرحله مالی منتقل شد.',
   },
@@ -106,7 +110,7 @@ const REVIEW_DECISION: Decision[] = [
     label: 'درخواست اصلاحیه',
     variant: 'outline',
     title: 'درخواست اصلاحیه پس از داوری',
-    effect: 'پرونده برای اصلاح به شرکت برمی‌گردد و پس از ارسال دوباره، بررسی اولیه و دور داوری تازه‌ای لازم است.',
+    effect: 'پرونده برای اصلاح به شرکت برمی‌گردد. امتیازهای این دور در تاریخچه می‌ماند و در تصمیم بعدی شمرده نمی‌شود؛ پس از ارسال دوباره، بررسی اولیه و دور داوری تازه با چهار ارزیابی جدید لازم است.',
     confirm: 'ارسال',
     reason: { label: 'توضیحات (برای شرکت نمایش داده می‌شود)', placeholder: 'اصلاحات لازم را برای شرکت بنویسید' },
     send: (id, reason, revision) => decideReview(id, 'return', reason, revision),
@@ -255,13 +259,16 @@ function DecisionForm({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
+  const [acknowledged, setAcknowledged] = useState(false)
   const reasonId = useId()
+  const acknowledgeId = useId()
   const trimmed = reason.trim()
   const missingReason = Boolean(decision.reason) && !trimmed
+  const missingAcknowledgement = Boolean(decision.acknowledge) && !acknowledged
 
   const submit = async () => {
     setTouched(true)
-    if (missingReason || busy || !available) return
+    if (missingReason || missingAcknowledgement || busy || !available) return
     setBusy(true)
     setError(null)
     const failure = await onSend(decision.reason ? trimmed : '')
@@ -313,6 +320,26 @@ function DecisionForm({
           />
           {touched && missingReason ? (
             <Typography variant="12/regular" color="error">نوشتن دلیل الزامی است.</Typography>
+          ) : null}
+        </div>
+      ) : null}
+      {decision.acknowledge ? (
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex min-w-0 items-start gap-2">
+            <Checkbox
+              id={acknowledgeId}
+              checked={acknowledged}
+              disabled={busy}
+              onCheckedChange={(value) => setAcknowledged(value === true)}
+              aria-invalid={touched && missingAcknowledgement ? true : undefined}
+              className="mt-1"
+            />
+            <label htmlFor={acknowledgeId} className="min-w-0 cursor-pointer">
+              <Typography as="span" variant="14/regular" color="neutral-700" className="break-words">{decision.acknowledge}</Typography>
+            </label>
+          </div>
+          {touched && missingAcknowledgement ? (
+            <Typography variant="12/regular" color="error">برای ثبت این تصمیم، تأیید بالا را علامت بزنید.</Typography>
           ) : null}
         </div>
       ) : null}

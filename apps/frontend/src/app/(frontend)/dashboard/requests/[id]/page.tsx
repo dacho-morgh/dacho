@@ -19,7 +19,10 @@ import {
   type RequestVerificationDto,
   type ReviewCandidatesDto,
   type ReviewRoundDto,
+  type ReviewRoundHistoryEntry,
+  type ReviewRoundListDto,
 } from '@/utilities/dashboard-api'
+import type { SummaryPart } from '@/components/dashboard/chief-review-summary'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import {
   dashboardOperationalRole,
@@ -58,6 +61,41 @@ async function readPart<T>(path: string): Promise<DossierPart<T>> {
   return result.kind === 'ok' ? result.data : 'failed'
 }
 
+/** Like readPart, but keeps a 403 apart from a failed read. */
+async function readSummaryPart<T>(path: string): Promise<SummaryPart<T>> {
+  const result = await serverDashboardFetchResult<T>(path)
+  if (result.kind === 'ok') return result.data
+  return result.kind === 'denied' ? 'denied' : 'failed'
+}
+
+const evaluationsPath = (path: string, revision: number | undefined) =>
+  revision === undefined ? `${path}/evaluations` : `${path}/evaluations?revision=${encodeURIComponent(String(revision))}`
+
+/** Every round but the latest, each with the evaluations of its own request revision. */
+async function readHistory(
+  path: string,
+  rounds: SummaryPart<ReviewRoundListDto>,
+  latestId: string | null,
+): Promise<SummaryPart<ReviewRoundHistoryEntry[]>> {
+  if (rounds === null || rounds === 'failed' || rounds === 'denied') return rounds
+  const earlier = rounds.items.filter((item) => item.id !== latestId)
+  return Promise.all(
+    earlier.map(async (item) => {
+      const evaluations = await readPart<EvaluationListDto>(evaluationsPath(path, item.requestRevision))
+      return { round: item, evaluations: evaluations && evaluations !== 'failed' ? evaluations : ('failed' as const) }
+    }),
+  )
+}
+
+/** Slot holders and deciders of earlier rounds, as the oversight response returned them. */
+function historyPeople(history: SummaryPart<ReviewRoundHistoryEntry[]>): string[] {
+  if (!history || typeof history !== 'object') return []
+  return history.flatMap(({ round }) => [
+    ...(round.slots ?? []).map((slot) => slot.userId),
+    ...(round.decision?.decidedBy ? [round.decision.decidedBy] : []),
+  ])
+}
+
 /** The pinned profile: a 404 means the case has none, which is not a failed read. */
 async function readProfile(path: string): Promise<DossierPart<RequestVerificationDto>> {
   const result = await serverDashboardFetchResult<RequestVerificationDto>(path)
@@ -73,6 +111,7 @@ function roundPeople(round: DossierPart<{ round: ReviewRoundDto | null }>): stri
     ...(current.employerId ? [current.employerId] : []),
     ...(current.slots ?? []).map((slot) => slot.userId),
     ...(current.replacements ?? []).flatMap((item) => [item.oldUserId, item.newUserId, item.replacedBy]),
+    ...(current.decision?.decidedBy ? [current.decision.decidedBy] : []),
   ]
 }
 
@@ -136,22 +175,36 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   // in the round: these reads are for the chief, the Secretariat and the owner.
   const oversees = role === 'system-owner' || role === 'central-secretariat' || role === 'chief-reviewer'
   const isCompany = role === 'representative'
-  const [proposal, round, evaluations, publishedResult, supplementary, profile] = await Promise.all([
+  const [proposal, round, rounds, publishedResult, supplementary, profile] = await Promise.all([
     readPart<RequestProposalDetail>(`${path}/proposal`),
     oversees ? readPart<{ round: ReviewRoundDto | null }>(`${path}/review-round`) : null,
-    oversees ? readPart<EvaluationListDto>(`${path}/evaluations`) : null,
+    oversees ? readSummaryPart<ReviewRoundListDto>(`${path}/review-rounds`) : null,
     isCompany ? readPart<{ result: PublishedResultDto | null }>(`${path}/result`) : null,
     isCompany ? readPart<{ items: CompanySupplementaryRequestDto[] }>(`${path}/supplementary-requests`) : null,
     // The chief triages the profile as submitted, not the live one the company may have edited since.
     oversees ? readProfile(`${path}/verification`) : null,
   ])
 
+  // The latest round's evaluations are read by that round's revision: a decision moves the
+  // case revision on, and the decided round's four evaluations must stay readable.
+  const latestRound = round && round !== 'failed' ? round.round : null
+  const [evaluations, roundHistory] = oversees
+    ? await Promise.all([
+        readPart<EvaluationListDto>(evaluationsPath(path, latestRound?.requestRevision)),
+        readHistory(path, rounds, latestRound?.id ?? null),
+      ])
+    : [null, null]
+
   // A new round's fixed employer comes from the chief's candidate read; the dialog reads the picks itself.
   const starts = role === 'chief-reviewer' && (result.data.request.allowedActions ?? []).includes('startReview')
   const startCandidates = starts ? await readPart<ReviewCandidatesDto>(`${path}/review-round/candidates`) : null
   const roundEmployerId = startCandidates && startCandidates !== 'failed' ? startCandidates.employerId : null
   const people = oversees
-    ? await peopleNames(payload, [...roundPeople(round), ...(roundEmployerId ? [roundEmployerId] : [])])
+    ? await peopleNames(payload, [
+        ...roundPeople(round),
+        ...historyPeople(roundHistory),
+        ...(roundEmployerId ? [roundEmployerId] : []),
+      ])
     : {}
 
   // The correction form edits the service's fixed answers; an unreadable form leaves the team and files editable.
@@ -167,6 +220,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       proposal={proposal}
       round={round}
       evaluations={evaluations}
+      roundHistory={roundHistory}
       profile={profile}
       people={people}
       roundEmployerId={roundEmployerId}

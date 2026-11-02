@@ -63,3 +63,25 @@ version; 401/403/404 replace the form with the expired, denied or
 no-longer-assigned state. The backend does not return a rubric version yet, so
 the form names its source (`REVIEW_RUBRIC_VERSION`, the 2026-10-23 supplied
 form). Human gates UAT16 and UAT17 are **Not run**.
+
+## Chief four-review summary and decision (FE18 / #97)
+
+Oversight roles (System Owner, Secretariat, the case's chief) see «خلاصه چهار
+ارزیابی» on the dossier. The latest round's evaluations are read with
+`GET /requests/:id/evaluations?revision=<round.requestRevision>`, so a decided
+round keeps its four evaluations visible after the decision moves the case
+revision on. Earlier rounds come from `GET /requests/:id/review-rounds` and are
+shown separately as history, each with its own evaluations and decision; their
+scores are labelled as not counting toward the current round. Only final
+evaluations are listed, with the server's `scoreA/B/C` and `weightedHundredths`
+as returned: no client weighting, maximum, average, ranking or cross-review
+aggregation.
+
+Advancement exists only when the server lists `decideReview` (4/4 final). Until
+then the summary shows the server's n/4 and a refresh that rereads the case.
+«انتقال به مرحله مالی» needs an explicit confirmation tick even at high scores;
+return and reject need a reason. The return dialog states that the round's
+scores stay historical and a new four-review round is required. Refusals
+(`stale_revision`, `invalid_decision_state`, `round_not_ready`, 403) keep the
+typed reason, reread the case and never resend; a pending send cannot be
+clicked twice. Human gates UAT19, UAT20 and UAT21 are **Not run**.
