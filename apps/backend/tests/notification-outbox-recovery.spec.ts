@@ -15,7 +15,7 @@ function singleConnectionPool() {
   let leased = false
   const now = new Date()
   const job: NotificationJobRow = {
-    id: jobId, request_id: requestId, recipient_id: 'person', actor_id: 'person',
+    id: jobId, request_id: requestId, booth_reservation_id: null, recipient_id: 'person', actor_id: 'person',
     action: 'submit', from_state: 'draft', to_state: 'in_review', revision: 2,
     channel: 'in_app', title: 'Submitted', body: 'Submitted', status: 'pending',
     attempts: 0, last_error: null, letter_id: null, next_step: null, created_at: now,

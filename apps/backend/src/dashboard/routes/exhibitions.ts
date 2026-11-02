@@ -7,10 +7,11 @@ import { actorOf } from '../proxy-auth.js'
 import { MAX_DOCUMENT_BYTES, validateDocumentFile } from '../../documents/policy.js'
 import { isUuid, parseBoothCreate, parseBoothUpdate, parseSettingsInput } from '../../exhibitions/catalogue.js'
 import { isCompanyAdministrator } from './route-helpers.js'
+import { notifyBoothStep } from '../next-role.js'
 import type { DashboardContext } from './context.js'
 
 export function registerExhibitionRoutes(router: Router, ctx: DashboardContext): void {
-  const { deps, catalogue, boothReservations, verificationStore, checkExhibition } = ctx
+  const { deps, catalogue, boothReservations, verificationStore, checkExhibition, notificationOutbox } = ctx
 
   router.get('/exhibitions/:exhibitionId/catalogue', async (req, res, next) => {
     try {
@@ -190,7 +191,11 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
         res.status(409).json({ error: result.error })
         return
       }
-      // TODO(#239): call notifyNextRole() for the Secretariat once S1 lands it.
+      if (result.reservation) {
+        await notifyBoothStep(deps.pool, notificationOutbox, {
+          reservationId: result.reservation.id, actorId: actor.id, action: 'booth_request',
+        })
+      }
       res.status(201).json({ reservation: result.reservation })
     } catch (error) { next(error) }
   })
@@ -339,7 +344,10 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
         res.status(409).json({ error: result.error })
         return
       }
-      // TODO(#239): call notifyNextRole() for the company once S1 lands it.
+      await notifyBoothStep(deps.pool, notificationOutbox, {
+        reservationId: reservation.id, actorId: actor.id, reason,
+        action: action === 'approve' ? 'booth_attendance_approve' : 'booth_attendance_reject',
+      })
       res.json({ reservation: result.reservation })
     } catch (error) { next(error) }
   })
@@ -490,7 +498,9 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
             return
           }
 
-          // TODO(#239): call notifyNextRole() for the Secretariat once S1 lands it.
+          await notifyBoothStep(deps.pool, notificationOutbox, {
+            reservationId: reservation.id, actorId: actor.id, action: 'booth_receipt_submit',
+          })
           res.status(201).json({
             receipt: submitResult.receipt,
             reservation: submitResult.reservation,
@@ -604,7 +614,10 @@ export function registerExhibitionRoutes(router: Router, ctx: DashboardContext):
         res.status(status).json({ error: result.error })
         return
       }
-      // TODO(#239): call notifyNextRole() for the company once S1 lands it.
+      await notifyBoothStep(deps.pool, notificationOutbox, {
+        reservationId: reservation.id, actorId: actor.id, reason,
+        action: action === 'confirm' ? 'booth_receipt_confirm' : 'booth_receipt_return',
+      })
       res.json({ receipt: result.receipt, reservation: result.reservation })
     } catch (error) { next(error) }
   })

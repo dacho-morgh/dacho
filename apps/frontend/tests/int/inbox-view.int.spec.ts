@@ -48,6 +48,16 @@ describe('inbox (S1)', () => {
     expect(within(row).getByText('(خوانده نشده)')).toBeTruthy()
   })
 
+  it('links a booth step to its exhibition page', async () => {
+    mocks.fetch.mockResolvedValue(page([letter({
+      requestId: null, boothReservationId: 'res-1', exhibitionId: 'expo-1', nextStep: 'booth_receipt', actionRequired: true,
+    })]))
+    render(await LettersPage(view()))
+    // Desktop table and mobile card both carry it.
+    expect(screen.getAllByRole('link', { name: 'ارسال فیش' }).map((link) => link.getAttribute('href')))
+      .toEqual(['/dashboard/exhibitions/expo-1', '/dashboard/exhibitions/expo-1'])
+  })
+
   it('passes box, search, status and page to the backend and names the recipient of a sent letter', async () => {
     mocks.fetch.mockResolvedValue(page([letter({ senderId: 'chief', recipientId: 'company-user-1', read: true })]))
     render(await LettersPage(view({ box: 'sent', q: 'جلسه', status: 'unread', page: '2' })))

@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 
 import { deliverInApp, type NotificationJobRow, type NotificationOutbox } from './notification-outbox.js'
 import { TRANSITION_TITLES } from './transition-history.js'
@@ -17,6 +17,10 @@ export const NEXT_STEPS = [
   'investment_memo',
   'publish_result',
   'supplementary_upload',
+  // Booth requests (S7)
+  'attendance_decision',
+  'booth_receipt',
+  'receipt_decision',
 ] as const
 export type NextStep = (typeof NEXT_STEPS)[number]
 
@@ -73,6 +77,16 @@ interface CaseRef {
   revision: number
   title: string
   trackingCode: string | null
+}
+
+/** Booth requests (S7): the company asks, Secretariat decides attendance, then the receipt. */
+export const BOOTH_NEXT_ROLE_RULES: Record<string, NextRoleRule> = {
+  booth_request: { notices: [{ to: 'secretariat', step: 'attendance_decision' }] },
+  booth_attendance_approve: { notices: [{ to: 'owner', step: 'booth_receipt' }], clears: ['attendance_decision'] },
+  booth_attendance_reject: { notices: [{ to: 'owner', step: null }], clears: ['attendance_decision'] },
+  booth_receipt_submit: { notices: [{ to: 'secretariat', step: 'receipt_decision' }], clears: ['booth_receipt'] },
+  booth_receipt_confirm: { notices: [{ to: 'owner', step: null }], clears: ['receipt_decision'] },
+  booth_receipt_return: { notices: [{ to: 'owner', step: 'booth_receipt' }], clears: ['receipt_decision'] },
 }
 
 export interface NotifyNextRoleInput {
@@ -227,4 +241,101 @@ export async function notifyNextRole(
     }
   }
   return jobIds
+}
+
+export interface NotifyBoothStepInput {
+  reservationId: string
+  actorId: string
+  action: keyof typeof BOOTH_NEXT_ROLE_RULES
+  reason?: string | null
+}
+
+/**
+ * Next-role notices for a booth request, sent after the booth action committed:
+ * the booth repositories own their transactions, so the notice runs in its own.
+ * A failed notice never undoes or fails the booth action; it is logged and the
+ * inbox simply lacks that item. Returns the job ids.
+ */
+export async function notifyBoothStep(pool: Pool, outbox: NotificationOutbox, input: NotifyBoothStepInput): Promise<string[]> {
+  const rule = BOOTH_NEXT_ROLE_RULES[input.action]
+  if (!rule) return []
+  let client: PoolClient
+  try {
+    client = await pool.connect()
+  } catch (error) {
+    console.error('[next-role] booth notice skipped: no connection', input.action, input.reservationId, error)
+    return []
+  }
+  try {
+    await client.query('BEGIN')
+    const { rows } = await client.query<{ requested_by: string; identifier: string | null; attendance_status: string }>(
+      `SELECT r.requested_by, b.identifier, r.attendance_status
+       FROM dashboard.booth_reservations r
+       LEFT JOIN dashboard.exhibition_booths b ON b.id = r.booth_id
+       WHERE r.id = $1`,
+      [input.reservationId],
+    )
+    const reservation = rows[0]
+    if (!reservation) {
+      await client.query('ROLLBACK')
+      return []
+    }
+    await client.query(
+      `UPDATE dashboard.letters SET next_step_done_at = now(), updated_at = now()
+       WHERE booth_reservation_id = $1 AND next_step IS NOT NULL AND next_step_done_at IS NULL
+         AND (recipient_id = $2 OR next_step = ANY($3::text[]))`,
+      [input.reservationId, input.actorId, [...(rule.clears ?? [])]],
+    )
+    const title = TRANSITION_TITLES[input.action] ?? input.action
+    const booth = reservation.identifier ? ` غرفه ${reservation.identifier}` : ''
+    const body = `${title} —${booth}${input.reason ? `: ${input.reason}` : ''}`
+    const jobIds: string[] = []
+    for (const notice of rule.notices) {
+      const recipients = notice.to === 'owner'
+        ? [reservation.requested_by]
+        : (await client.query<{ id: string }>(
+            `SELECT id::text AS id FROM public.users WHERE operational_role = 'central-secretariat' AND is_active`,
+          )).rows.map((row) => row.id)
+      for (const recipientId of new Set(recipients)) {
+        if (notice.step && recipientId === input.actorId) continue
+        if (notice.step) {
+          const pending = await client.query(
+            `SELECT 1 FROM dashboard.letters
+             WHERE booth_reservation_id = $1 AND recipient_id = $2 AND next_step = $3 AND next_step_done_at IS NULL
+             LIMIT 1`,
+            [input.reservationId, recipientId, notice.step],
+          )
+          if ((pending.rowCount ?? 0) > 0) continue
+        }
+        const job = await outbox.enqueue(client, {
+          requestId: null,
+          boothReservationId: input.reservationId,
+          recipientId,
+          actorId: input.actorId,
+          action: input.action,
+          fromState: reservation.attendance_status,
+          toState: reservation.attendance_status,
+          revision: 0,
+          title,
+          body,
+          nextStep: notice.step,
+        })
+        jobIds.push(job.id)
+        if (outbox.isSimulationFailure()) continue
+        const { rows: jobs } = await client.query<NotificationJobRow>(
+          `SELECT * FROM dashboard.notification_jobs WHERE id = $1 FOR UPDATE`,
+          [job.id],
+        )
+        if (jobs[0]) await deliverInApp(client, jobs[0])
+      }
+    }
+    await client.query('COMMIT')
+    return jobIds
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    console.error('[next-role] booth notice failed', input.action, input.reservationId, error)
+    return []
+  } finally {
+    client.release()
+  }
 }

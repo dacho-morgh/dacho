@@ -26,6 +26,12 @@ export const TRANSITION_TITLES: Record<string, string> = {
   verification_approve: 'تأیید مدارک احراز',
   verification_return: 'برگشت مدارک احراز جهت اصلاح',
   verification_reject: 'رد مدارک احراز',
+  booth_request: 'درخواست غرفه نمایشگاه',
+  booth_attendance_approve: 'تأیید حضور در نمایشگاه',
+  booth_attendance_reject: 'رد حضور در نمایشگاه',
+  booth_receipt_submit: 'ارسال فیش پرداخت غرفه',
+  booth_receipt_confirm: 'تأیید فیش پرداخت غرفه',
+  booth_receipt_return: 'برگشت فیش پرداخت غرفه جهت اصلاح',
 }
 
 export interface TransitionInput {

@@ -5,7 +5,8 @@ export type NotificationJobStatus = 'pending' | 'delivered' | 'failed'
 
 export interface NotificationJobRow {
   id: string
-  request_id: string
+  request_id: string | null
+  booth_reservation_id: string | null
   recipient_id: string
   actor_id: string
   action: string
@@ -27,7 +28,9 @@ export interface NotificationJobRow {
 
 export interface NotificationJobDto {
   id: string
-  requestId: string
+  /** Exactly one of requestId and boothReservationId names the case. */
+  requestId: string | null
+  boothReservationId: string | null
   recipientId: string
   actorId: string
   action: string
@@ -48,7 +51,9 @@ export interface NotificationJobDto {
 }
 
 export interface EnqueueNotificationInput {
-  requestId: string
+  requestId: string | null
+  /** A booth request (S7) instead of a dashboard request. */
+  boothReservationId?: string | null
   recipientId: string
   actorId: string
   action: string
@@ -91,6 +96,7 @@ export function mapNotificationJobRow(row: NotificationJobRow): NotificationJobD
   return {
     id: row.id,
     requestId: row.request_id,
+    boothReservationId: row.booth_reservation_id,
     recipientId: row.recipient_id,
     actorId: row.actor_id,
     action: row.action,
@@ -124,10 +130,12 @@ export async function deliverInApp(client: PoolClient, job: NotificationJobRow):
     // meant for the next role, since mailbox access follows sender and recipient.
     const letterRes = await client.query<{ id: string }>(
       `INSERT INTO dashboard.letters
-         (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, next_step, read)
-       VALUES ('notification', $1, $2, NULL, 'سامانه', 'system', $3, $4, $5, false)
+         (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, next_step,
+          booth_reservation_id, exhibition_id, read)
+       VALUES ('notification', $1, $2, NULL, 'سامانه', 'system', $3, $4, $5,
+               $6, (SELECT exhibition_id FROM dashboard.booth_reservations WHERE id = $6), false)
        RETURNING id`,
-      [job.title, job.body, job.recipient_id, job.request_id, job.next_step],
+      [job.title, job.body, job.recipient_id, job.request_id, job.next_step, job.booth_reservation_id],
     )
     letterId = letterRes.rows[0]?.id ?? null
   }
@@ -157,8 +165,8 @@ export class PostgresNotificationOutbox implements NotificationOutbox {
   async enqueue(client: PoolClient, input: EnqueueNotificationInput): Promise<NotificationJobDto> {
     const { rows } = await client.query<NotificationJobRow>(
       `INSERT INTO dashboard.notification_jobs
-         (request_id, recipient_id, actor_id, action, from_state, to_state, revision, channel, title, body, next_step, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending')
+         (request_id, recipient_id, actor_id, action, from_state, to_state, revision, channel, title, body, next_step, booth_reservation_id, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending')
        ON CONFLICT (request_id, revision, action, recipient_id) DO UPDATE
          SET updated_at = now()
        RETURNING *`,
@@ -174,6 +182,7 @@ export class PostgresNotificationOutbox implements NotificationOutbox {
         input.title,
         input.body,
         input.nextStep ?? null,
+        input.boothReservationId ?? null,
       ],
     )
     const row = rows[0]

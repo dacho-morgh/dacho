@@ -57,6 +57,9 @@ export interface LetterDto {
   nextStep?: string | null
   /** The step is still pending for the recipient. */
   actionRequired?: boolean
+  /** Booth request notices (S7) name the booth request and its exhibition instead of a request. */
+  boothReservationId?: string | null
+  exhibitionId?: string | null
   createdAt: string
   updatedAt: string
 }

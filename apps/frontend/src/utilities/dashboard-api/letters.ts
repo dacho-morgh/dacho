@@ -129,7 +129,7 @@ export function parseInboxQuery(params: Record<string, string | string[] | undef
   }
 }
 
-/** The recipient's next step on the case: its button label and where it is done. */
+/** The recipient's next step on the case: its button label and where it is done (by request id). */
 export const NEXT_STEP_ACTIONS: Record<string, { label: string; path: (requestId: string) => string }> = {
   triage: { label: 'بررسی اولیه', path: (id) => `/dashboard/requests/${id}` },
   correct: { label: 'اصلاح', path: (id) => `/dashboard/requests/${id}` },
@@ -141,11 +141,27 @@ export const NEXT_STEP_ACTIONS: Record<string, { label: string; path: (requestId
   supplementary_upload: { label: 'ارسال مدارک', path: (id) => `/dashboard/requests/${id}` },
 }
 
+/** Booth request steps (S7): the exhibition page shows Secretariat its queue and the company its booking. */
+export const BOOTH_STEP_ACTIONS: Record<string, { label: string; path: (exhibitionId: string) => string }> = {
+  attendance_decision: { label: 'بررسی حضور', path: (id) => `/dashboard/exhibitions/${id}` },
+  booth_receipt: { label: 'ارسال فیش', path: (id) => `/dashboard/exhibitions/${id}` },
+  receipt_decision: { label: 'بررسی فیش', path: (id) => `/dashboard/exhibitions/${id}` },
+}
+
 /** The pending action of a letter, if its recipient still has one to take. */
-export function letterAction(dto: Pick<LetterDto, 'nextStep' | 'actionRequired' | 'requestId'>): { label: string; href: string } | null {
-  if (!dto.actionRequired || !dto.nextStep || !dto.requestId) return null
-  const action = NEXT_STEP_ACTIONS[dto.nextStep]
-  return action ? { label: action.label, href: action.path(encodeURIComponent(dto.requestId)) } : null
+export function letterAction(
+  dto: Pick<LetterDto, 'nextStep' | 'actionRequired' | 'requestId' | 'exhibitionId'>,
+): { label: string; href: string } | null {
+  if (!dto.actionRequired || !dto.nextStep) return null
+  if (dto.requestId) {
+    const action = NEXT_STEP_ACTIONS[dto.nextStep]
+    return action ? { label: action.label, href: action.path(encodeURIComponent(dto.requestId)) } : null
+  }
+  if (dto.exhibitionId) {
+    const action = BOOTH_STEP_ACTIONS[dto.nextStep]
+    return action ? { label: action.label, href: action.path(encodeURIComponent(dto.exhibitionId)) } : null
+  }
+  return null
 }
 
 export function setLetterRead(id: string, read: boolean): Promise<{ letter: LetterDto }> {

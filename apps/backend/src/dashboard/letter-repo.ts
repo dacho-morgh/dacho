@@ -35,6 +35,9 @@ export interface LetterDto {
   nextStep: string | null
   /** The step is still pending: the recipient has not acted and the case has not moved past it. */
   actionRequired: boolean
+  /** A notice about a booth request (S7) names it and its exhibition instead of a request. */
+  boothReservationId: string | null
+  exhibitionId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -54,13 +57,16 @@ interface LetterRow {
   attachments: unknown[]
   next_step: string | null
   next_step_done_at: Date | null
+  booth_reservation_id: string | null
+  exhibition_id: string | null
   created_at: Date
   updated_at: Date
 }
 
 const LETTER_COLUMNS = `
   id, type, title, body, sender_id, sender_name, sender_role, recipient_id,
-  request_id, read, sent_at, attachments, next_step, next_step_done_at, created_at, updated_at
+  request_id, read, sent_at, attachments, next_step, next_step_done_at, booth_reservation_id, exhibition_id,
+  created_at, updated_at
 `
 const ALIASED_LETTER_COLUMNS = LETTER_COLUMNS.trim().split(/,\s*/).map((column) => `l.${column}`).join(', ')
 
@@ -150,6 +156,8 @@ function mapRow(row: LetterRow): LetterDto {
     attachments: row.attachments,
     nextStep: row.next_step,
     actionRequired: row.next_step !== null && row.next_step_done_at === null,
+    boothReservationId: row.booth_reservation_id,
+    exhibitionId: row.exhibition_id,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   }
@@ -356,7 +364,7 @@ export class LetterRepository {
     const offset = (options.page - 1) * options.limit
     const { rows } = await this.pool.query<LetterRow>(
       `SELECT l.id, l.type, l.title, l.body, l.sender_id, l.sender_name, l.sender_role,
-              l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments, l.next_step, l.next_step_done_at,
+              l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments, l.next_step, l.next_step_done_at, l.booth_reservation_id, l.exhibition_id,
               l.created_at, l.updated_at
        FROM dashboard.letters l
        WHERE ${whereSql}
@@ -430,7 +438,7 @@ export class LetterRepository {
     const whereSql = letterScopeClause(scope, params, 'l')
     const { rows } = await this.pool.query<LetterRow>(
       `SELECT l.id, l.type, l.title, l.body, l.sender_id, l.sender_name, l.sender_role,
-              l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments, l.next_step, l.next_step_done_at,
+              l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments, l.next_step, l.next_step_done_at, l.booth_reservation_id, l.exhibition_id,
               l.created_at, l.updated_at
        FROM dashboard.letters l WHERE l.id = $1 AND ${whereSql}`,
       params,
@@ -448,7 +456,7 @@ export class LetterRepository {
       `UPDATE dashboard.letters l SET read = true, updated_at = now()
        WHERE l.id = $1 AND l.recipient_id = $2 AND ${whereSql}
        RETURNING l.id, l.type, l.title, l.body, l.sender_id, l.sender_name, l.sender_role,
-                 l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments, l.next_step, l.next_step_done_at,
+                 l.recipient_id, l.request_id, l.read, l.sent_at, l.attachments, l.next_step, l.next_step_done_at, l.booth_reservation_id, l.exhibition_id,
                  l.created_at, l.updated_at`,
       params,
     )

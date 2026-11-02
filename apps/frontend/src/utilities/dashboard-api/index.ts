@@ -104,6 +104,7 @@ export {
   inboxQueryString,
   parseInboxQuery,
   NEXT_STEP_ACTIONS,
+  BOOTH_STEP_ACTIONS,
   letterAction,
   setLetterRead,
   type InboxBox,
