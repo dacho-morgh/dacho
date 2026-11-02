@@ -9,6 +9,7 @@ import {
   hasOperationalRole,
 } from '@cms-core/access/roles'
 import { companyDirectory } from '@cms-core/endpoints/companyDirectory'
+import { ownerCreateCompany } from '@cms-core/endpoints/ownerCompany'
 import { validateCompanyAbsenceList } from './companyAbsence'
 import { invalidateCompanyVerification } from '../hooks/invalidateCompanyVerification'
 
@@ -22,8 +23,9 @@ import { invalidateCompanyVerification } from '../hooks/invalidateCompanyVerific
  * password and no login of its own.
  */
 /**
- * An internal admin enrolls any company; public self-signup enrolls one through
- * the `/self-signup` endpoint, which owns a transaction and sets the
+ * An internal admin enrolls any company (the System Owner through the atomic
+ * `/owner-create` endpoint, T57); public self-signup enrolls one through the
+ * `/self-signup` endpoint, which owns a transaction and sets the
  * `allowCompanySignup` context flag. Nothing else may create a company.
  */
 const canCreateCompany: Access = ({ req }) => {
@@ -77,7 +79,7 @@ export const Companies: CollectionConfig = {
     // company they represent.
     update: canEditCompany,
   },
-  endpoints: [companyDirectory],
+  endpoints: [companyDirectory, ownerCreateCompany],
   hooks: { beforeChange: [invalidateCompanyVerification] },
   admin: {
     useAsTitle: 'name',

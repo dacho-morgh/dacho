@@ -15,6 +15,7 @@ import { bindRequestScope, requestScopeFor } from '../access/policy.js'
 import type { CompanyStore } from '../auth/company-store.js'
 import type { UserStore } from '../auth/user-store.js'
 import { AssignmentRepository } from '../dashboard/assignment-repo.js'
+import { COMPANY_EDIT_REVERIFICATION_REASON } from '../dashboard/company-edits.js'
 import { actorOf } from '../dashboard/proxy-auth.js'
 import { isReviewerRole, ReviewCaseRepository } from '../dashboard/review-case-repo.js'
 import { FinancialPackageRepository } from '../dashboard/financial-package-repo.js'
@@ -427,15 +428,15 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
           } finally {
             client.release()
           }
-        } else if (audience === 'company' && parentCompanyId && deps.verificationStore &&
-            ['articlesOfAssociation', 'establishmentNotices', 'amendmentNotices'].includes(category)) {
-          // The approval is lost only together with the saved document that changes it.
+        } else if (audience === 'company' && parentCompanyId && deps.verificationStore) {
+          // T59: every new dossier file is a company edit. The approval is lost
+          // only together with the saved document that changes it.
           const client = await deps.pool.connect()
           try {
             await client.query('BEGIN')
             await deps.verificationStore.invalidateApproval(
               parentCompanyId,
-              'تغییر مدارک ثبتی؛ نیازمند احراز مجدد',
+              COMPANY_EDIT_REVERIFICATION_REASON,
               client,
             )
             record = await documents.create(input, client)

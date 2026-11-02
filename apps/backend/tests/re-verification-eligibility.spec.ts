@@ -260,7 +260,7 @@ describe('T15: Re-verification and participation eligibility', () => {
 
       const after = await verificationStore.findCurrentByCompanyId(company.id)
       expect(after?.status).toBe('returned')
-      expect(after?.reason).toContain('تغییر اطلاعات هویتی')
+      expect(after?.reason).toContain('نیازمند احراز مجدد')
     })
 
     it('requires a new revision when identity changes during pending review', async () => {

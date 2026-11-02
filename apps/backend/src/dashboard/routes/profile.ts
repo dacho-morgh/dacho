@@ -2,6 +2,7 @@
 import type { Router } from 'express'
 import type { NextFunction, Request, Response } from 'express'
 import { DossierValidationError, dossierOfCompany, missingDossierItems, mergeDossier, pickDossierUpdate } from '../dossier.js'
+import { changesAddress, changesCompany, COMPANY_EDIT_REVERIFICATION_REASON } from '../company-edits.js'
 import { actorOf } from '../proxy-auth.js'
 import { dashboardSelfProfile } from '../self-profile.js'
 import { isRepresentative } from './route-helpers.js'
@@ -44,32 +45,16 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
       throw error
     }
 
-    let identityChanged = false
-    if (company && typeof company === 'object') {
-      if (
-        (company.name !== undefined && company.name !== initialProfile.company.name) ||
-        (company.registrationNumber !== undefined && company.registrationNumber !== initialProfile.company.registrationNumber) ||
-        (company.type !== undefined && company.type !== initialProfile.company.type)
-      ) {
-        identityChanged = true
-      }
-    }
-    if (dossierUpdate) {
-      if (
-        dossierUpdate.legalEntityType !== undefined &&
-        dossierUpdate.legalEntityType !== initialProfile.dossier.legalEntityType
-      ) {
-        identityChanged = true
-      }
-    }
-
-    // Invalidate before any external write: a later contact/storage failure
-    // must not leave changed identity data eligible under the old approval.
-    if (identityChanged && initialProfile.companyId) {
-      await verificationStore.invalidateApproval(
-        initialProfile.companyId,
-        'تغییر اطلاعات هویتی؛ نیازمند احراز مجدد',
-      )
+    // T59: any real company edit withdraws the approval. Invalidate before any
+    // external write: a later contact/storage failure must not leave the
+    // changed company eligible under the old approval.
+    const companyEdited = changesCompany(initialProfile, {
+      company: company && typeof company === 'object' ? company : undefined,
+      executives: Array.isArray(req.body?.executives) ? req.body.executives : undefined,
+      dossier: dossierUpdate,
+    })
+    if (companyEdited && initialProfile.companyId) {
+      await verificationStore.invalidateApproval(initialProfile.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
     }
     // Write the dossier first: its merge validation is the only 400-producing
     // part of this combined PATCH, so a rejected request must not leave the
@@ -143,18 +128,8 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
       }
       throw error
     }
-    let identityChanged = false
-    if (
-      update.legalEntityType !== undefined &&
-      update.legalEntityType !== currentProfile.dossier.legalEntityType
-    ) {
-      identityChanged = true
-    }
-    if (identityChanged && currentProfile.companyId) {
-      await verificationStore.invalidateApproval(
-        currentProfile.companyId,
-        'تغییر اطلاعات هویتی؛ نیازمند احراز مجدد',
-      )
+    if (changesCompany(currentProfile, { dossier: update }) && currentProfile.companyId) {
+      await verificationStore.invalidateApproval(currentProfile.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
     }
     let profile
     try {
@@ -207,6 +182,8 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
       res.status(400).json({ error: 'invalid_address' })
       return
     }
+    const { companyId } = await profileRepo.getProfile(actor.id)
+    if (companyId) await verificationStore.invalidateApproval(companyId, COMPANY_EDIT_REVERIFICATION_REASON)
     const created = await profileRepo.addAddress(actor.id, {
       title: String(title),
       province: String(province ?? ''),
@@ -220,13 +197,19 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
   router.put('/profile/addresses/:id', async (req, res) => {
     const actor = actorOf(res)
     const { title, province, city, postalCode, address } = req.body ?? {}
-    const updated = await profileRepo.updateAddress(actor.id, req.params.id, {
+    const update = {
       ...(title !== undefined ? { title: String(title) } : {}),
       ...(province !== undefined ? { province: String(province) } : {}),
       ...(city !== undefined ? { city: String(city) } : {}),
       ...(postalCode !== undefined ? { postalCode: String(postalCode) } : {}),
       ...(address !== undefined ? { address: String(address) } : {}),
-    })
+    }
+    const profile = await profileRepo.getProfile(actor.id)
+    const current = profile.addresses.find((item) => item.id === req.params.id)
+    if (current && profile.companyId && changesAddress(current, update)) {
+      await verificationStore.invalidateApproval(profile.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+    }
+    const updated = await profileRepo.updateAddress(actor.id, req.params.id, update)
     if (!updated) {
       res.status(404).json({ error: 'not_found' })
       return
@@ -236,6 +219,10 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
 
   router.delete('/profile/addresses/:id', async (req, res) => {
     const actor = actorOf(res)
+    const profile = await profileRepo.getProfile(actor.id)
+    if (profile.companyId && profile.addresses.some((item) => item.id === req.params.id)) {
+      await verificationStore.invalidateApproval(profile.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+    }
     const success = await profileRepo.deleteAddress(actor.id, req.params.id)
     if (!success) {
       res.status(404).json({ error: 'not_found' })
