@@ -78,7 +78,7 @@ async function readHistory(
   latestId: string | null,
 ): Promise<SummaryPart<ReviewRoundHistoryEntry[]>> {
   if (rounds === null || rounds === 'failed' || rounds === 'denied') return rounds
-  const earlier = rounds.items.filter((item) => item.id !== latestId)
+  const earlier = (rounds.items ?? []).filter((item) => item.id !== latestId)
   return Promise.all(
     earlier.map(async (item) => {
       const evaluations = await readPart<EvaluationListDto>(evaluationsPath(path, item.requestRevision))
