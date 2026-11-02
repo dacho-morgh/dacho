@@ -7,6 +7,8 @@ import React, { useState, useTransition } from 'react'
 
 import {
   DashboardAddIcon,
+  DashboardEyeIcon,
+  DashboardMessageTextIcon,
   DashboardUserTagIcon,
   EmptyInboxIllustration,
   FilterIcon,
@@ -49,6 +51,8 @@ export interface InboxRow {
   /** Only the recipient has a read state. */
   read?: boolean
   received: boolean
+  /** A person wrote it, so the recipient can answer; system notices cannot be answered. */
+  canReply: boolean
   /** The recipient's pending next step on the case, if any. */
   action: { label: string; href: string } | null
 }
@@ -144,39 +148,42 @@ function RowMenu({
   // Read state and hiding are the recipient's own mailbox actions.
   if (!row.received) return null
   return (
-    <DropdownMenu>
+    <DropdownMenu dir="rtl">
       <DropdownMenuTrigger asChild>
         <Button variant="text-gray" size="icon-32" type="button" aria-label={`منوی عملیات «${row.title}»`}>
           <MoreOptionsIcon className="size-5" />
         </Button>
       </DropdownMenuTrigger>
-      {/* Figma 30865:18777 */}
+      {/* Figma 30865:18777: icon first, then the label, in reading order */}
       <DropdownMenuContent
         align="start"
         sideOffset={6}
-        className="flex w-[164px] min-w-[164px] flex-col gap-1 rounded-xl border border-neutral-100 bg-white p-1 shadow-xs"
+        className="flex w-[180px] min-w-[180px] flex-col gap-1 rounded-xl border border-neutral-100 bg-white p-1 shadow-xs"
       >
-        <DropdownMenuItem
-          onClick={() => onToggleRead(row)}
-          className="flex h-8 cursor-pointer items-center justify-end gap-2 rounded-[10px] px-1.5 text-neutral-700"
-        >
+        {row.canReply && (
+          <DropdownMenuItem asChild className={menuItemClass}>
+            <Link href={`/dashboard/letters/new?replyTo=${encodeURIComponent(row.id)}`}>
+              <DashboardMessageTextIcon aria-hidden="true" className="size-5 shrink-0" />
+              <Typography as="span" variant="14/regular" className="text-inherit">ثبت بازخورد</Typography>
+            </Link>
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => onToggleRead(row)} className={menuItemClass}>
+          <DashboardEyeIcon aria-hidden="true" className="size-5 shrink-0" />
           <Typography as="span" variant="14/regular" className="text-inherit">
             {row.read ? 'علامت خوانده‌نشده' : 'علامت خوانده‌شده'}
           </Typography>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => onHide(row)}
-          className="flex h-8 cursor-pointer items-center justify-end gap-2 rounded-[10px] px-1.5 text-neutral-700"
-        >
-          <Typography as="span" variant="14/regular" className="text-inherit">
-            پاک کردن
-          </Typography>
-          <TrashIcon className="size-5 shrink-0" />
+        <DropdownMenuItem onClick={() => onHide(row)} className={menuItemClass}>
+          <TrashIcon aria-hidden="true" className="size-5 shrink-0" />
+          <Typography as="span" variant="14/regular" className="text-inherit">پاک کردن</Typography>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
+
+const menuItemClass = 'flex h-8 cursor-pointer items-center justify-start gap-2 rounded-[10px] px-1.5 text-neutral-700'
 
 function ActionLink({ row }: { row: InboxRow }) {
   if (!row.action) return null
@@ -207,15 +214,15 @@ function InboxSkeleton() {
 }
 
 // Figma 30851:15880 (empty)
-function InboxEmpty({ filtered }: { filtered: boolean }) {
+function InboxEmpty({ filtered, sent }: { filtered: boolean; sent: boolean }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-1 py-20 text-center">
       <EmptyInboxIllustration className="size-20" />
       <Typography variant="14/semibold" className="mt-1 text-neutral-600">
-        {filtered ? 'نامه‌ای با این جستجو یا فیلتر پیدا نشد' : 'صندوق نامه‌های شما خالیست'}
+        {filtered ? 'نامه‌ای با این جستجو یا فیلتر پیدا نشد' : sent ? 'نامه ارسالی ندارید' : 'صندوق نامه‌های شما خالیست'}
       </Typography>
       <Typography variant="12/regular" className="text-neutral-500">
-        {filtered ? 'عبارت جستجو یا فیلتر را تغییر دهید' : 'تا کنون نامه یا پیامی برای شما ارسال نشده است'}
+        {filtered ? 'عبارت جستجو یا فیلتر را تغییر دهید' : sent ? 'هنوز نامه‌ای از کارتابل شما ارسال نشده است' : 'تا کنون نامه یا پیامی برای شما ارسال نشده است'}
       </Typography>
     </div>
   )
@@ -417,8 +424,6 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
       <section className="relative mt-4 flex min-h-0 w-full flex-1 flex-col overflow-auto rounded-2xl border border-neutral-200 bg-white p-4">
         {pending ? (
           <InboxSkeleton />
-        ) : rows.length === 0 ? (
-          <InboxEmpty filtered={filtered} />
         ) : (
           <>
             <table className="hidden w-full table-fixed border-collapse text-right lg:table">
@@ -464,6 +469,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
                 ))}
               </tbody>
             </table>
+            {rows.length === 0 && <InboxEmpty filtered={filtered} sent={query.box === 'sent'} />}
 
             <ul className="space-y-3 lg:hidden">
               {rows.map((row) => (

@@ -91,6 +91,7 @@ function toInboxRow(dto: LetterDto, names: Map<string, string>, actorId: string)
     sentDate: formatDate(dto.sentAt),
     read: received ? dto.read : undefined,
     received,
+    canReply: received && dto.senderId !== null,
     action: received ? letterAction(dto) : null,
   }
 }
