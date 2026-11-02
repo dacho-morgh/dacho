@@ -320,3 +320,168 @@ describe('RoleOverview', () => {
     expect(screen.queryByRole('table')).toBeNull()
   })
 })
+
+describe('RoleOverview charts and next tasks (S3)', () => {
+  const booths = (slices: Record<string, number>) => ({
+    key: 'booth_requests',
+    slices: Object.entries(slices).map(([key, count]) => ({ key, count })),
+  })
+
+  it('gives the Secretariat booth work from the server, as a KPI, a chart and linked next tasks', async () => {
+    serve({
+      '/stats/overview': ok({
+        counts,
+        events: [],
+        queues: [
+          { key: 'follow_up_unpublished', count: 0 },
+          { key: 'supplementary_undelivered', count: 0 },
+          { key: 'verification_pending', count: 2 },
+          { key: 'support_open', count: 0 },
+          { key: 'booth_attendance_pending', count: 4 },
+          { key: 'booth_receipt_pending', count: 9 },
+        ],
+        charts: [
+          {
+            key: 'company_verification',
+            slices: [
+              { key: 'pending', count: 2 },
+              { key: 'approved', count: 5 },
+            ],
+          },
+          booths({
+            attendance_pending: 4,
+            receipt_due: 1,
+            receipt_pending: 9,
+            confirmed: 3,
+            rejected: 0,
+          }),
+        ],
+        unavailable: [],
+      }),
+      '/activities?limit=4': feed,
+      '/admin/companies?verificationStatus=pending': ok({ items: [] }),
+    })
+    await renderRole({ role: 'central-secretariat', userName: null })
+
+    expect(kpi().getByText(fa(9))).toBeTruthy()
+    expect(kpi().getByText(`${fa(4)} درخواست غرفه در انتظار تأیید حضور`)).toBeTruthy()
+    expect(
+      screen.getByRole('progressbar', { name: `فیش در حال بررسی: ${fa(9)} از ${fa(17)}` }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('progressbar', { name: `تأیید شده: ${fa(5)} از ${fa(7)}` }),
+    ).toBeTruthy()
+    const receipts = screen.getByRole('link', { name: /فیش‌های غرفه در انتظار بررسی/ })
+    expect(receipts.getAttribute('href')).toBe('/dashboard/exhibitions')
+    // Empty queues are not listed as tasks.
+    expect(screen.queryByRole('link', { name: /تیکت‌های پشتیبانی/ })).toBeNull()
+  })
+
+  it('shows a failed booth section as unavailable, never as zero', async () => {
+    serve({
+      '/stats/overview': ok({
+        counts,
+        events: [],
+        queues: [{ key: 'verification_pending', count: 2 }],
+        charts: [{ key: 'company_verification', slices: [{ key: 'pending', count: 2 }] }],
+        unavailable: ['booth_requests'],
+      }),
+      '/activities?limit=4': feed,
+      '/admin/companies?verificationStatus=pending': ok({ items: [] }),
+    })
+    await renderRole({ role: 'central-secretariat', userName: null })
+
+    expect(kpi().getByText('دریافت اطلاعات انجام نشد')).toBeTruthy()
+    expect(kpi().getByText('—')).toBeTruthy()
+    const booth = screen.getByRole('heading', {
+      name: 'درخواست‌های غرفه نمایشگاه‌ها',
+    }).parentElement!
+    expect(within(booth).getByRole('alert')).toBeTruthy()
+    expect(within(booth).queryByRole('progressbar')).toBeNull()
+  })
+
+  it("charts a reviewer's own evaluations and links the open ones", async () => {
+    serve({
+      '/review/queue?view=all&page=1&limit=100': ok({
+        items: [],
+        counts: { all: 0, open: 0, closed: 0 },
+      }),
+      '/stats/overview': ok({
+        counts,
+        events: [],
+        queues: [{ key: 'evaluation_pending', count: 2 }],
+        charts: [
+          {
+            key: 'own_evaluations',
+            slices: [
+              { key: 'not_started', count: 1 },
+              { key: 'draft', count: 1 },
+              { key: 'final', count: 3 },
+            ],
+          },
+        ],
+        unavailable: [],
+      }),
+      '/activities?limit=4': feed,
+    })
+    await renderRole({ role: 'reviewer', userName: null })
+
+    expect(screen.getByRole('progressbar', { name: `نهایی: ${fa(3)} از ${fa(5)}` })).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: /ارزیابی‌های در انتظار ثبت نهایی/ }).getAttribute('href'),
+    ).toContain('queue=evaluation_pending')
+  })
+
+  it("charts a company's requests and booths, and lists the receipt it owes", async () => {
+    serve({
+      '/stats/overview': ok({
+        counts: { total: 6, in_review: 2, approved: 1, action_needed: 1, rejected: 0 },
+        events: [],
+        queues: [
+          { key: 'company_draft', count: 2 },
+          { key: 'company_correction', count: 1 },
+          { key: 'company_financial_package', count: 0 },
+          { key: 'company_supplementary', count: 0 },
+          { key: 'booth_receipt_due', count: 1 },
+        ],
+        charts: [
+          booths({
+            attendance_pending: 0,
+            receipt_due: 1,
+            receipt_pending: 0,
+            confirmed: 0,
+            rejected: 0,
+          }),
+        ],
+        unavailable: [],
+      }),
+      '/requests?limit=5&page=1': ok({ items: [], total: 0, page: 1, totalPages: 1 }),
+      '/activities?limit=4': feed,
+      '/letters?read=false&limit=1': ok({ total: 0 }),
+      '/profile/verification': ok({ status: 'approved' }),
+    })
+    await renderRole({ role: 'representative', userName: null })
+
+    expect(screen.getByRole('progressbar', { name: `پیش‌نویس: ${fa(2)} از ${fa(6)}` })).toBeTruthy()
+    expect(
+      screen.getByRole('progressbar', { name: `در انتظار فیش: ${fa(1)} از ${fa(1)}` }),
+    ).toBeTruthy()
+    expect(
+      screen
+        .getByRole('link', { name: /غرفه‌های تأییدشده در انتظار ارسال فیش/ })
+        .getAttribute('href'),
+    ).toBe('/dashboard/exhibitions')
+  })
+
+  it('keeps the chief funnel in place with a notice when its counts cannot be read', async () => {
+    serve({
+      '/stats/overview': ok({ counts, events: [], queues: [{ key: 'chief_triage', count: 1 }] }),
+      '/activities?limit=4': feed,
+    })
+    await renderRole({ role: 'chief-reviewer', userName: null })
+
+    const funnel = screen.getByRole('heading', { name: 'مسیر درخواست‌ها در رویداد' }).parentElement!
+    expect(within(funnel).getByRole('alert')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /در انتظار بررسی اولیه/ })).toBeTruthy()
+  })
+})

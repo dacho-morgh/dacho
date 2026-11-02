@@ -29,13 +29,19 @@ const OTHER_QUEUES: Record<string, { label: string; href?: string }> = {
     label: 'احراز هویت شرکت نیازمند اصلاح',
     href: '/dashboard/profile/company',
   },
+  booth_attendance_pending: {
+    label: 'درخواست‌های غرفه در انتظار تأیید حضور',
+    href: '/dashboard/exhibitions',
+  },
+  booth_receipt_pending: { label: 'فیش‌های غرفه در انتظار بررسی', href: '/dashboard/exhibitions' },
+  booth_receipt_due: { label: 'غرفه‌های تأییدشده در انتظار ارسال فیش', href: '/dashboard/exhibitions' },
 }
 
 export function workQueueLabel(key: string): string | undefined {
   return REQUEST_QUEUE_LABELS[key] ?? OTHER_QUEUES[key]?.label
 }
 
-function hrefOf(key: string): string | undefined {
+export function workQueueHref(key: string): string | undefined {
   if (REQUEST_QUEUE_LABELS[key]) return requestQueueHref('/dashboard/requests', undefined, 1, { queue: key })
   return OTHER_QUEUES[key]?.href
 }
@@ -62,7 +68,7 @@ export function WorkQueueOverview({
       {pending.length ? (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {pending.map((queue) => {
-            const href = hrefOf(queue.key)
+            const href = workQueueHref(queue.key)
             const content = (
               <>
                 <Typography variant="14/regular" color="secondary">

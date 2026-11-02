@@ -18,6 +18,7 @@ import { monthlyTrend, type TrendDayDto } from '@/utilities/dashboard-trend'
 import { STATUS_VARIANT, STAGE_LABELS, type CaseListItem } from './case-list'
 import { CaseCell, DataTableCard, RowAction } from './data-table-card'
 import { FunnelCard } from './funnel-card'
+import { NextTasksCard } from './next-tasks-card'
 import { KpiGrid, OverviewShell } from './overview-shell'
 import { READ_FAILED, countText, fa, greeting, queueCount } from './shared'
 
@@ -81,22 +82,26 @@ export async function ChiefOverview({ userName }: { userName?: string | null }) 
       </KpiGrid>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        {funnelReady ? (
-          <FunnelCard
-            title="مسیر درخواست‌ها در رویداد"
-            subtitle="تعداد پرونده‌هایی که به هر مرحله رسیده‌اند"
-            steps={[
-              { label: 'ثبت‌شده', value: submitted },
-              { label: 'پذیرفته در بررسی اولیه', value: triaged.data.total },
-              { label: 'تصمیم به پیشروی', value: advanced.data.total },
-            ]}
-          />
-        ) : null}
-        <ActivityCard
-          items={activities.kind === 'ok' ? activities.data.items : undefined}
-          notice={unavailableReasonFor(activities)}
+        <FunnelCard
+          title="مسیر درخواست‌ها در رویداد"
+          subtitle="تعداد پرونده‌هایی که به هر مرحله رسیده‌اند"
+          steps={
+            funnelReady
+              ? [
+                  { label: 'ثبت‌شده', value: submitted },
+                  { label: 'پذیرفته در بررسی اولیه', value: triaged.data.total },
+                  { label: 'تصمیم به پیشروی', value: advanced.data.total },
+                ]
+              : undefined
+          }
         />
+        <NextTasksCard queues={queues} notice={unavailableReasonFor(overview)} />
       </div>
+
+      <ActivityCard
+        items={activities.kind === 'ok' ? activities.data.items : undefined}
+        notice={unavailableReasonFor(activities)}
+      />
 
       <DataTableCard
         title="لیست درخواست‌های در جریان"

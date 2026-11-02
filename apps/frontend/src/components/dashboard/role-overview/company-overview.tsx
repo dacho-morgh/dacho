@@ -14,16 +14,26 @@ import {
   REQUEST_STATUS_LABELS,
   formatDate,
   type ActivityDto,
-  type DashboardOverviewDto,
   type Paginated,
   type RequestDto,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import { BreakdownCard } from './breakdown-card'
 import { STATUS_VARIANT } from './case-list'
+import { BOOTH_ROWS, REQUEST_ROWS, requestValues } from './chart-rows'
 import { CaseCell, DataTableCard, RowAction } from './data-table-card'
+import { NextTasksCard } from './next-tasks-card'
 import { KpiGrid, OverviewShell } from './overview-shell'
-import { READ_FAILED, countText, fa, greeting, queueCount } from './shared'
+import {
+  READ_FAILED,
+  chartOf,
+  countText,
+  fa,
+  greeting,
+  queueCount,
+  type RoleOverviewDto,
+} from './shared'
 import { StepperCard } from './stepper-card'
 
 type VerificationStatus = 'unsubmitted' | 'pending' | 'approved' | 'returned' | 'rejected'
@@ -66,7 +76,7 @@ function nextAction(item: RequestDto): { label: string; primary: boolean } {
 export async function CompanyOverview({ userName }: { userName?: string | null }) {
   const now = new Date()
   const [overview, requests, activities, letters, verification] = await Promise.all([
-    serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview'),
+    serverDashboardFetchResult<RoleOverviewDto>('/stats/overview'),
     serverDashboardFetchResult<Paginated<RequestDto>>('/requests?limit=5&page=1'),
     serverDashboardFetchResult<Paginated<ActivityDto>>('/activities?limit=4'),
     serverDashboardFetchResult<{ total: number }>('/letters?read=false&limit=1'),
@@ -127,6 +137,30 @@ export async function CompanyOverview({ userName }: { userName?: string | null }
           meta={letters.kind === 'ok' ? 'از دبیرخانه مرکزی' : READ_FAILED}
         />
       </KpiGrid>
+
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <BreakdownCard
+          title="درخواست‌های شرکت به تفکیک وضعیت"
+          subtitle={counts ? `${fa(counts.total)} درخواست` : 'همه درخواست‌های شرکت'}
+          rows={REQUEST_ROWS}
+          values={counts ? requestValues(counts) : undefined}
+          notice={unavailableReasonFor(overview)}
+          emptyText="هنوز درخواستی ثبت نکرده‌اید."
+        />
+        <BreakdownCard
+          title="درخواست‌های غرفه شما"
+          subtitle="همه نمایشگاه‌ها، به تفکیک مرحله"
+          rows={BOOTH_ROWS}
+          values={chartOf(overview.kind === 'ok' ? overview.data : undefined, 'booth_requests')}
+          notice={unavailableReasonFor(overview)}
+          emptyText="هنوز غرفه‌ای درخواست نکرده‌اید."
+        />
+        <NextTasksCard
+          queues={queues}
+          notice={unavailableReasonFor(overview)}
+          failed={overview.kind === 'ok' ? overview.data.unavailable : undefined}
+        />
+      </div>
 
       <ActivityCard
         items={activities.kind === 'ok' ? activities.data.items : undefined}

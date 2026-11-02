@@ -9,6 +9,7 @@ import type {
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
 import { monthlyTrend, percentChange, type TrendDayDto } from '@/utilities/dashboard-trend'
+import { BreakdownCard } from '@/components/dashboard/role-overview/breakdown-card'
 import { ActivityCard } from './activity-card'
 import {
   activeEmployees,
@@ -164,18 +165,36 @@ export async function OwnerOverview({ userName }: { userName?: string | null }) 
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        {months ? <TrendChart points={months} /> : null}
+        {months ? (
+          <TrendChart points={months} />
+        ) : (
+          <BreakdownCard
+            title="درخواست‌های ثبت‌شده و تأییدشده"
+            subtitle="شش ماه اخیر، همه رویدادها"
+            rows={[]}
+            notice={unavailableReasonFor(trend) ?? 'unavailable'}
+            emptyText=""
+          />
+        )}
         <ActivityCard
           items={activities.kind === 'ok' ? activities.data.items : undefined}
           notice={unavailableReasonFor(activities)}
         />
       </div>
 
-      {counts ? (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
+        {counts ? (
           <StatusBreakdown counts={counts} />
-        </div>
-      ) : null}
+        ) : (
+          <BreakdownCard
+            title="وضعیت درخواست‌ها"
+            subtitle="همه رویدادها"
+            rows={[]}
+            notice={unavailableReasonFor(overview) ?? 'unavailable'}
+            emptyText=""
+          />
+        )}
+      </div>
 
       <RecentRequestsCard rows={rows} notice={unavailableReasonFor(requests)} />
     </div>

@@ -11,9 +11,12 @@ import {
   type ReviewQueueDto,
   type ReviewQueueItemDto,
 } from '@/utilities/reviewer-case'
+import { BreakdownCard } from './breakdown-card'
+import { EVALUATION_ROWS } from './chart-rows'
 import { CaseCell, DataTableCard, RowAction } from './data-table-card'
+import { NextTasksCard } from './next-tasks-card'
 import { KpiGrid, OverviewShell } from './overview-shell'
-import { READ_FAILED, fa, greeting } from './shared'
+import { READ_FAILED, chartOf, fa, greeting, type RoleOverviewDto } from './shared'
 
 function evaluationBadge(item: ReviewQueueItemDto): {
   label: string
@@ -40,8 +43,9 @@ export async function ReviewerOverview({
   role: 'reviewer' | 'employer-reviewer'
 }) {
   const now = new Date()
-  const [queue, activities] = await Promise.all([
+  const [queue, overview, activities] = await Promise.all([
     serverDashboardFetchResult<ReviewQueueDto>('/review/queue?view=all&page=1&limit=100'),
+    serverDashboardFetchResult<RoleOverviewDto>('/stats/overview'),
     serverDashboardFetchResult<Paginated<ActivityDto>>('/activities?limit=4'),
   ])
   const items = queue.kind === 'ok' ? queue.data.items : undefined
@@ -94,10 +98,24 @@ export async function ReviewerOverview({
         />
       </KpiGrid>
 
-      <ActivityCard
-        items={activities.kind === 'ok' ? activities.data.items : undefined}
-        notice={unavailableReasonFor(activities)}
-      />
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <BreakdownCard
+          title="پیشرفت ارزیابی‌های شما"
+          subtitle="دور جاری هر پرونده ارجاع‌شده"
+          rows={EVALUATION_ROWS}
+          values={chartOf(overview.kind === 'ok' ? overview.data : undefined, 'own_evaluations')}
+          notice={unavailableReasonFor(overview)}
+          emptyText="هنوز پرونده‌ای به شما ارجاع نشده است."
+        />
+        <NextTasksCard
+          queues={overview.kind === 'ok' ? overview.data.queues : undefined}
+          notice={unavailableReasonFor(overview)}
+        />
+        <ActivityCard
+          items={activities.kind === 'ok' ? activities.data.items : undefined}
+          notice={unavailableReasonFor(activities)}
+        />
+      </div>
 
       <DataTableCard
         title="درخواست‌های ارجاع‌شده به شما"

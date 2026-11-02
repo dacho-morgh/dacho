@@ -1,3 +1,4 @@
+import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Typography } from '@/components/ui/typography'
@@ -8,7 +9,7 @@ export interface FunnelStep {
   value: number
 }
 
-/** Cumulative stage counts, each bar sized against the first step. */
+/** Cumulative stage counts, each bar sized against the first step. Without steps the read failed. */
 export function FunnelCard({
   title,
   subtitle,
@@ -16,8 +17,21 @@ export function FunnelCard({
 }: {
   title: string
   subtitle: string
-  steps: FunnelStep[]
+  steps?: FunnelStep[]
 }) {
+  if (!steps) {
+    return (
+      <Card className="rounded-[10px] border-neutral-200 bg-white px-6 py-5 shadow-none">
+        <Typography as="h2" variant="title" color="neutral-800">
+          {title}
+        </Typography>
+        <Typography as="p" variant="12/regular" color="neutral-500" className="mb-4">
+          {subtitle}
+        </Typography>
+        <OfflineNotice reason="unavailable" retryHref="/dashboard" />
+      </Card>
+    )
+  }
   const base = Math.max(steps[0]?.value ?? 0, 1)
   return (
     <Card className="rounded-[10px] border-neutral-200 bg-white px-6 py-5 shadow-none">
