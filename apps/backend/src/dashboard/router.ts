@@ -2718,6 +2718,15 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
+  /** Submissions per day for the dashboard's six-month chart, inside the actor's row scope. */
+  router.get('/stats/trend', async (_req, res, next) => {
+    try {
+    const actor = actorOf(res)
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
+    res.set('Cache-Control', 'private, no-store, max-age=0').json({ days: await stats.trend(scope, 200) })
+    } catch (error) { next(error) }
+  })
+
   router.get('/activities', async (req, res, next) => {
     try {
     const actor = actorOf(res)
