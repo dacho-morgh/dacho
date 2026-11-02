@@ -120,7 +120,7 @@ describe('T35 - Case-linked letters and private attachments integration', () => 
   it('rejects attachment sends to unauthorized recipients and detached or mismatched cases', async () => {
     const requestId = await createRequest()
     const otherRequestId = await createRequest(people.repB.id)
-    const upload = await request(payload).post('/documents').set(headers(people.repA.id))
+    const upload = await request(payload).post('/documents').set(headers(people.owner.id))
       .field('category', 'financialStatements').field('requestId', requestId)
       .attach('file', pdf(), { filename: 'private-finance.pdf', contentType: 'application/pdf' }).expect(201)
     const documentId = upload.body.document.id as string
@@ -144,7 +144,7 @@ describe('T35 - Case-linked letters and private attachments integration', () => 
 
   it('does not expose legacy financial attachments through mailbox metadata or either download route', async () => {
     const requestId = await createRequest()
-    const upload = await request(payload).post('/documents').set(headers(people.repA.id))
+    const upload = await request(payload).post('/documents').set(headers(people.owner.id))
       .field('category', 'financialStatements').field('requestId', requestId)
       .attach('file', pdf(), { filename: 'secret-finance.pdf', contentType: 'application/pdf' }).expect(201)
     const documentId = upload.body.document.id as string

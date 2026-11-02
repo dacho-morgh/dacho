@@ -1,15 +1,17 @@
 # Evaluation persistence (T25 / #41)
 
 The evaluation API supports reviewer-owned drafts and immutable final evaluations
-using the fixed T24 rubric. It does not implement review-round creation, the four
-distinct review slots, replacements, or the chief's advancement decision. Those
+using the fixed T24 rubric. Review-round creation and the four distinct review
+slots are covered by [review rounds (T22)](review-rounds.md) and reviewer/employer
+replacement by [review replacement (T26)](review-replacement.md). It does not
+implement the chief's advancement decision. Those
 workflow dependencies remain separate; a numeric completion count never advances
 a request automatically. Human acceptance has not been run.
 
 `GET /requests/:id/evaluation` requires a current assignment matching the actor's
-reviewer or employer-reviewer role. It returns only that person's evaluation,
-the current request `revision`, and a completion count for final evaluations on
-that revision with active matching assignments.
+reviewer or employer-reviewer role. It returns only that person's evaluation and
+the current request `revision`. Progress across the panel is oversight-only; see
+[four-of-four completion (T27)](review-completion.md).
 
 `PUT /requests/:id/evaluation` and
 `POST /requests/:id/evaluation/finalize` require that returned `revision` in the
@@ -39,3 +41,25 @@ revision, revocation, required forms and locking. Guarded Postgres regressions
 cover persistence, competing finalizations, immutable answers, stale contexts
 and concurrent assignment revocation. Local Docker was unavailable during this
 review; execution of those database regressions is delegated to required CI.
+
+## Frontend form (FE17 / #96)
+
+`/dashboard/requests/:id/evaluation` renders the fixed ordinary or employer
+form for the assigned reviewer or employer in five steps (Figma 31881:33737,
+summary 31881:34265): sections A, B and C with their tiers and ranges plus an
+optional per-row comment (`answers.comments`, never scored); the qualitative
+questions or employer risk checklist with the recommendation and top-five
+answer; and a summary. Drafts are saved with `PUT` and reopened from `GET`; the
+returned `revision` is sent back on every write. Final submission needs every
+required entry and an explicit confirmation before `POST .../finalize`; a final
+or closed assignment opens read-only.
+
+The browser never calculates a score. The summary shows the server's
+`scoreA/B/C` and `weightedHundredths` from the last save (out of 55.05, no
+normalization to 100, no automatic advancement). Server field errors appear on
+their fields. `409 stale_evaluation` and `400 invalid_revision` stop further
+writes and ask for a reload; `409 evaluation_locked` reloads the persisted final
+version; 401/403/404 replace the form with the expired, denied or
+no-longer-assigned state. The backend does not return a rubric version yet, so
+the form names its source (`REVIEW_RUBRIC_VERSION`, the 2026-10-23 supplied
+form). Human gates UAT16 and UAT17 are **Not run**.

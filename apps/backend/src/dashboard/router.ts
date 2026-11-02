@@ -12,10 +12,13 @@ import {
   bindRequestScope,
   canReadDocument,
   canRequestAction,
+  isChiefCorrectionStatus,
+  isFinancialStageOpen,
   requestScopeFor,
   type RequestScope,
 } from '../access/policy.js'
 import {
+  OPERATIONAL_ROLES,
   isCaseAssignmentRole,
   isInternalOperationalRole,
   isOperationalRole,
@@ -26,6 +29,16 @@ import {
 import type { ServiceCatalog, ServiceDefinition } from '../catalog/service-catalog.js'
 import { ActivityRepository } from './activity-repo.js'
 import { AssignmentRepository } from './assignment-repo.js'
+import { ReviewRoundRepository, type ReplaceSlotResult, type RoundStartContext } from './review-round-repo.js'
+import {
+  isReviewerRole,
+  necessaryCompanyProfile,
+  parseQueueView,
+  ReviewCaseRepository,
+  reviewerActivityView,
+  reviewerRequestView,
+  type ReviewCaseFile,
+} from './review-case-repo.js'
 import {
   DossierValidationError,
   dossierOfCompany,
@@ -49,10 +62,24 @@ import {
 import { LetterRepository, type CreateLetterInput, type LetterAttachmentDto, type LetterDto } from './letter-repo.js'
 import { DocumentRepository, type PrivateDocumentRecord } from '../documents/repo.js'
 import { canSendLetter } from './letter-policy.js'
+import { FinancialPackageRepository } from './financial-package-repo.js'
+import { InvestmentCaseRepository } from './investment-case-repo.js'
+import { InvestmentMemoRepository, MAX_MEMO_LENGTH, type InvestmentMemoDto } from './investment-memo-repo.js'
+import { statementYearPlan } from './financial-package.js'
+import { MAX_RESULT_LENGTH, MAX_SUPPLEMENTARY_REQUEST_LENGTH, SecretariatFollowUpRepository } from './secretariat-follow-up-repo.js'
 import { ProfileRepository } from './profile-repo.js'
 import { actorOf, requireProxyAuth } from './proxy-auth.js'
-import { RequestRepository } from './request-repo.js'
+import {
+  AGREEMENT_TEXTS_APPROVED,
+  CURRENT_EVENT_RULES_VERSION,
+  CURRENT_NON_COMPETE_VERSION,
+  RequestRepository,
+  parseApplicationTeam,
+  type RequestFilters,
+  type ReviewStage,
+} from './request-repo.js'
 import { StatsRepository } from './stats-repo.js'
+import { isRequestWorkQueueOf } from './work-queues.js'
 import type { CompanyStore } from '../auth/company-store.js'
 import type { User, UserStore } from '../auth/user-store.js'
 import { SupportRepository } from './support-repo.js'
@@ -82,6 +109,7 @@ import {
   type EvaluationDto,
   type EvaluationStore,
 } from '../reviews/evaluation-repo.js'
+import { ROUND_REQUIRED_EVALUATIONS } from '../reviews/round-completion.js'
 import { validateAndScoreReview } from '../reviews/scoring.js'
 import {
   PostgresNotificationOutbox,
@@ -114,12 +142,12 @@ const dashboardRoles = {
   'system-owner': {
     label: 'صاحب سیستم',
     responsibilities: ['مدیریت دسترسی‌های سامانه', 'پیگیری همه درخواست‌ها و نامه‌ها'],
-    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/letters', '/dashboard/events', '/dashboard/exhibitions', '/dashboard/profile'],
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/follow-ups', '/dashboard/letters', '/dashboard/events', '/dashboard/exhibitions', '/dashboard/profile'],
   },
   'central-secretariat': {
     label: 'دبیرخانه مرکزی',
     responsibilities: ['پیگیری درخواست‌های ارجاع‌شده در محدوده دبیرخانه', 'مدیریت اطلاعات شرکت‌ها'],
-    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/letters', '/dashboard/profile'],
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/follow-ups', '/dashboard/letters', '/dashboard/profile'],
   },
   'chief-reviewer': {
     label: 'سردبیر داوری',
@@ -148,11 +176,53 @@ const dashboardRoles = {
   },
 } as const
 
+const MAX_REQUEST_SEARCH_LENGTH = 100
+const REVIEW_STAGES: readonly unknown[] = ['chief_triage', 'triaged', 'advanced']
+
+/** The list and count filters, or the error code of the first invalid one. A queue of another role is invalid. */
+function parseRequestFilters(
+  query: Record<string, unknown>,
+  actor: { id: string; operationalRole: OperationalRole },
+): RequestFilters | string {
+  const filters: RequestFilters = {}
+  if (query.search !== undefined) {
+    const search = typeof query.search === 'string' ? query.search.trim() : null
+    if (search === null || search.length > MAX_REQUEST_SEARCH_LENGTH) return 'invalid_search'
+    if (search) filters.search = search
+  }
+  if (query.eventId !== undefined) {
+    if (typeof query.eventId !== 'string' || !isUuid(query.eventId)) return 'invalid_event_id'
+    filters.eventId = query.eventId
+  }
+  if (query.stage !== undefined) {
+    if (!REVIEW_STAGES.includes(query.stage)) return 'invalid_stage'
+    filters.reviewStage = query.stage as ReviewStage
+  }
+  if (query.queue !== undefined) {
+    if (!isRequestWorkQueueOf(actor.operationalRole, query.queue)) return 'invalid_queue'
+    filters.queue = { key: query.queue, actorId: actor.id, role: actor.operationalRole }
+  }
+  return filters
+}
+
 function parsePositiveInt(value: unknown, fallback: number): number {
   if (typeof value !== 'string') return fallback
   const n = Number.parseInt(value, 10)
   if (!Number.isFinite(n) || n < 1) return fallback
   return n
+}
+
+/** Nine digits at most, so the value always fits the integer revision column. */
+function parseRevisionQuery(value: unknown): number | null {
+  if (typeof value !== 'string' || !/^[1-9]\d{0,8}$/.test(value)) return null
+  return Number(value)
+}
+
+/** Consent counts only when the submit itself accepts the exact current text. */
+function acceptsAgreementVersion(value: unknown, currentVersion: string): boolean {
+  if (!value || typeof value !== 'object') return false
+  const { accepted, textVersionId } = value as { accepted?: unknown; textVersionId?: unknown }
+  return accepted === true && textVersionId === currentVersion
 }
 
 function parseBoolean(value: unknown): boolean | undefined {
@@ -196,17 +266,66 @@ function safeOwner(user: User | undefined | null) {
   return user ? { id: user.id, name: user.name ?? null } : null
 }
 
+/** Adds the download routes to a case file's proposal and RFP; each route still authorizes its reader. */
+function withDownloadUrls(requestId: string, found: Pick<ReviewCaseFile, 'proposal' | 'rfp'>) {
+  return {
+    proposal: found.proposal && {
+      ...found.proposal,
+      documents: found.proposal.documents.map((document) => ({
+        ...document,
+        downloadUrl: `/api/dashboard/documents/${document.id}/download`,
+      })),
+    },
+    rfp: found.rfp && {
+      ...found.rfp,
+      files: found.rfp.files.map((file) => ({
+        ...file,
+        downloadUrl: `/api/dashboard/requests/${requestId}/rfp/files/${file.id}`,
+      })),
+    },
+  }
+}
+
 function requestWithActions(
   role: Parameters<typeof allowedRequestActions>[0],
   actorId: string,
   request: Awaited<ReturnType<RequestRepository['findByIdAny']>>,
   companyId?: string | null,
+  actorIsResponsibleChief = false,
+  reviewRoundStarted = false,
+  reviewRoundComplete = false,
+  financialPackageSubmitted = false,
 ) {
   if (!request) return request
   return {
     ...request,
-    allowedActions: allowedRequestActions(role, request, actorId, companyId),
+    allowedActions: allowedRequestActions(
+      role,
+      { ...request, actorIsResponsibleChief, reviewRoundStarted, reviewRoundComplete, financialPackageSubmitted },
+      actorId,
+      companyId,
+    ),
   }
+}
+
+function parseExpectedRevision(value: unknown): number | undefined | null {
+  if (value === undefined) return undefined
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 ? value : null
+}
+
+/** Optional free-text reason: undefined/blank -> null, a non-string or over-long value -> false. */
+function parseOptionalReason(value: unknown): string | null | false {
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'string') return false
+  const trimmed = value.trim()
+  if (trimmed.length > 1000) return false
+  return trimmed ? trimmed : null
+}
+
+function parseDecisionReason(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
 }
 
 type EventValidation =
@@ -349,6 +468,12 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
   const dossierDocuments = deps.dossierDocuments ?? new SqlDossierDocumentSource(deps.pool)
   const support = new SupportRepository(deps.pool)
   const assignments = new AssignmentRepository(deps.pool)
+  const rounds = new ReviewRoundRepository(deps.pool)
+  const financialPackages = new FinancialPackageRepository(deps.pool)
+  const investmentCases = new InvestmentCaseRepository(deps.pool)
+  const investmentMemos = new InvestmentMemoRepository(deps.pool)
+  const followUps = new SecretariatFollowUpRepository(deps.pool, notificationOutbox)
+  const reviewCases = new ReviewCaseRepository(deps.pool)
   const evaluations =
     deps.evaluationStore ?? new PostgresEvaluationRepository(deps.pool)
   const eventStore = deps.eventStore ?? new EventRepository(deps.pool)
@@ -378,17 +503,84 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     return company?.id ?? null
   }
 
+  /** Adds server-derived actions; chiefs also need event-level responsibility per case. */
+  const presentRequests = async <T extends NonNullable<Awaited<ReturnType<RequestRepository['findByIdAny']>>>>(
+    actor: { id: string; operationalRole: OperationalRole },
+    items: T[],
+    companyId?: string | null,
+  ) => {
+    const reviewable = (item: T) =>
+      item.status === 'in_review' && (item.reviewStage === 'chief_triage' || item.reviewStage === 'triaged')
+    const chiefCases =
+      actor.operationalRole === 'chief-reviewer'
+        ? await repo.requestsOfResponsibleChief(items.filter(reviewable).map((item) => item.id), actor.id)
+        : new Set<string>()
+    // Chiefs act on their own cases; the owner may replace the employer on any triaged case.
+    const roundCases = items.filter(
+      (item) =>
+        item.reviewStage === 'triaged' &&
+        (actor.operationalRole === 'system-owner' ? item.status === 'in_review' : chiefCases.has(item.id)),
+    )
+    const currentRounds = await rounds.currentRoundsOf(roundCases.map((item) => item.id))
+    const packaged = await financialPackages.submittedRequestIds(
+      items.filter((item) => isFinancialStageOpen(item.status, item.reviewStage)).map((item) => item.id),
+    )
+    return items.map((item) =>
+      requestWithActions(
+        actor.operationalRole, actor.id, item, companyId, chiefCases.has(item.id),
+        currentRounds.has(item.id), currentRounds.get(item.id) === true, packaged.has(item.id),
+      )!,
+    )
+  }
+
+  /** Reviewers and employers get the minimal case view from the generic request routes (T23). */
+  const limitRequest = async <T extends NonNullable<Awaited<ReturnType<RequestRepository['findByIdAny']>>>>(
+    actor: { id: string; operationalRole: OperationalRole },
+    item: T,
+    withAnswers: boolean,
+  ) => {
+    if (!isReviewerRole(actor.operationalRole)) return item
+    let answers: Record<string, unknown> = {}
+    if (withAnswers) {
+      // Event applications show the reviewed revision; requests with nothing pinned keep their own answers.
+      const reviewed = await reviewCases.reviewedProposalRevision(item.id, { id: actor.id, role: actor.operationalRole })
+      const proposal = reviewed === null ? null : await repo.findRequestProposal(item.id, reviewed)
+      answers = proposal ? (proposal.answers ?? {}) : item.answers
+    }
+    return reviewerRequestView(item, answers) as unknown as T
+  }
+
+  const limitActivities = <A extends Parameters<typeof reviewerActivityView>[0]>(
+    actor: { operationalRole: OperationalRole },
+    items: A[],
+  ) => (isReviewerRole(actor.operationalRole) ? items.map(reviewerActivityView) : items)
+
   const resolveScope = async (actorId: string, role: OperationalRole): Promise<{ scope: RequestScope; companyId: string | null }> => {
     const companyId = await actorCompanyId(actorId, role)
     const scope = bindRequestScope(requestScopeFor(role), actorId, companyId)
     return { scope, companyId }
   }
 
+  /** Refuses a command: someone who cannot read the case gets what an unknown id gets, so a guess confirms nothing. */
+  const refuseCommand = async (res: Response, actor: { id: string; operationalRole: OperationalRole }, requestId: string) => {
+    const { scope } = await resolveScope(actor.id, actor.operationalRole)
+    if (await repo.findByIdScoped(requestId, scope)) res.status(403).json({ error: 'forbidden' })
+    else res.status(404).json({ error: 'not_found' })
+  }
+
   // Mailbox visibility never expands the underlying document audience.
   const canReadAttachment = async (doc: PrivateDocumentRecord, actorId: string, role: OperationalRole): Promise<boolean> => {
     const companyId = await actorCompanyId(actorId, role)
-    const assigned = doc.requestId && isCaseAssignmentRole(role)
-      ? await assignments.activeFor(doc.requestId, actorId, role) : false
+    let assigned = false
+    if (doc.requestId && isCaseAssignmentRole(role)) {
+      if (isReviewerRole(role)) {
+        // Reviewers see only the proposal files pinned to the revision they review (T23).
+        const pinned = await reviewCases.reviewableProposalDocumentIds(doc.requestId, { id: actorId, role })
+        assigned = pinned === 'unrestricted' || pinned?.has(doc.id) === true
+      } else {
+        assigned = await assignments.activeFor(doc.requestId, actorId, role)
+      }
+    }
     return canReadDocument(role, { ...doc, assigned }, actorId, companyId)
   }
 
@@ -565,17 +757,77 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
   })
 
+  router.get('/agreements', (_req, res) => {
+    res.json({
+      agreements: [
+        {
+          type: 'non_compete',
+          version: CURRENT_NON_COMPETE_VERSION,
+          title: 'قرارداد عدم رقابت',
+          approved: AGREEMENT_TEXTS_APPROVED,
+        },
+        {
+          type: 'event_rules',
+          version: CURRENT_EVENT_RULES_VERSION,
+          title: 'قوانین رویداد',
+          approved: AGREEMENT_TEXTS_APPROVED,
+        },
+      ],
+    })
+  })
+
+  router.patch('/requests/:id', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isRepresentative(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { title, answers } = req.body ?? {}
+      if (title !== undefined) {
+        if (typeof title !== 'string' || title.trim() === '') {
+          res.status(400).json({ error: 'invalid_title' })
+          return
+        }
+      }
+      if (answers !== undefined) {
+        if (typeof answers !== 'object' || answers === null || Array.isArray(answers)) {
+          res.status(400).json({ error: 'invalid_answers' })
+          return
+        }
+      }
+      const companyId = await actorCompanyId(actor.id, actor.operationalRole)
+      const result = await repo.updateDraft(req.params.id, actor.id, companyId, {
+        title,
+        answers,
+      })
+      if (result === 'not_found') {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (result === 'not_draft') {
+        res.status(409).json({ error: 'request_not_draft' })
+        return
+      }
+      res.json({ request: requestWithActions(actor.operationalRole, actor.id, result, companyId) })
+    } catch (error) { next(error) }
+  })
+
   router.get('/requests', async (req, res, next) => {
     try {
     const actor = actorOf(res)
     const status = typeof req.query.status === 'string' ? req.query.status : undefined
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
+    const filters = parseRequestFilters(req.query, actor)
+    if (typeof filters === 'string') { res.status(400).json({ error: filters }); return }
     const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
-    const result = await repo.listScoped(scope, { status, page, limit })
+    const result = await repo.listScoped(scope, { ...filters, status, page, limit })
     res.json({
       ...result,
-      items: result.items.map((item) => requestWithActions(actor.operationalRole, actor.id, item, companyId)),
+      items: await Promise.all(
+        (await presentRequests(actor, result.items, companyId)).map((item) => limitRequest(actor, item, false)),
+      ),
     })
     } catch (error) { next(error) }
   })
@@ -588,16 +840,20 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
     const status = typeof req.query.status === 'string' ? req.query.status : undefined
+    const filters = parseRequestFilters(req.query, actor)
+    if (typeof filters === 'string') { res.status(400).json({ error: filters }); return }
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const result = await repo.listScoped(scope, {
+      ...filters,
       status,
       page: parsePositiveInt(req.query.page, 1),
       limit: parsePositiveInt(req.query.limit, 25),
     })
+    const presented = await presentRequests(actor, result.items)
     const items = await Promise.all(
-      result.items.map(async (item) => ({
-        ...requestWithActions(actor.operationalRole, actor.id, item),
-        owner: safeOwner(await deps.userStore.findById(item.ownerId)),
+      presented.map(async (item) => ({
+        ...(await limitRequest(actor, item, false)),
+        owner: isReviewerRole(actor.operationalRole) ? null : safeOwner(await deps.userStore.findById(item.ownerId)),
       })),
     )
     res.json({ ...result, items })
@@ -616,9 +872,9 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     const service = await deps.serviceCatalog.findById(request.serviceId)
     res.json({
-      request: requestWithActions(actor.operationalRole, actor.id, request),
-      owner: safeOwner(await deps.userStore.findById(request.ownerId)),
-      timeline: await activities.listForRequestScoped(request.id, scope),
+      request: await limitRequest(actor, (await presentRequests(actor, [request]))[0]!, true),
+      owner: isReviewerRole(actor.operationalRole) ? null : safeOwner(await deps.userStore.findById(request.ownerId)),
+      timeline: limitActivities(actor, await activities.listForRequestScoped(request.id, scope)),
       workflow: service?.workflow ?? [],
     })
     } catch (error) { next(error) }
@@ -635,12 +891,12 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     }
 
     const service = await deps.serviceCatalog.findById(request.serviceId)
-    const timeline = await activities.listForRequestScoped(request.id, scope)
+    const timeline = limitActivities(actor, await activities.listForRequestScoped(request.id, scope))
     res.json({
-      request: requestWithActions(actor.operationalRole, actor.id, request, companyId),
+      request: await limitRequest(actor, (await presentRequests(actor, [request], companyId))[0]!, true),
       timeline,
       workflow: service?.workflow ?? [],
-      owner: safeOwner(await deps.userStore.findById(request.ownerId)),
+      owner: isReviewerRole(actor.operationalRole) ? null : safeOwner(await deps.userStore.findById(request.ownerId)),
     })
     } catch (error) { next(error) }
   })
@@ -654,7 +910,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       res.status(404).json({ error: 'not_found' })
       return
     }
-    res.json({ items: await activities.listForRequestScoped(request.id, scope) })
+    res.json({ items: limitActivities(actor, await activities.listForRequestScoped(request.id, scope)) })
     } catch (error) { next(error) }
   })
 
@@ -692,14 +948,53 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       return
     }
 
+    const rfpEntry = await deps.pool.query<{ version_id: string; current_rfp_version_id: string | null }>(
+      `SELECT c.version_id, s.current_rfp_version_id
+       FROM dashboard.request_rfps c
+       JOIN dashboard.event_subtopics s ON s.id = c.subtopic_id
+       WHERE c.request_id = $1`,
+      [request.id],
+    )
+    if (rfpEntry.rows[0] && rfpEntry.rows[0].version_id !== rfpEntry.rows[0].current_rfp_version_id) {
+      res.status(409).json({ error: 'stale_rfp' })
+      return
+    }
+    const isEventRequest = rfpEntry.rows.length > 0
+
     // Validate answers against the service's form schema (required fields present).
     const service = await deps.serviceCatalog.findById(request.serviceId)
+    const missing: string[] = []
     if (service) {
-      const missing = missingRequiredFields(service, request.answers)
-      if (missing) {
-        res.status(400).json({ error: 'invalid_answers', missingFields: missing })
-        return
+      const serviceMissing = missingRequiredFields(service, request.answers)
+      if (serviceMissing) {
+        missing.push(...serviceMissing)
       }
+    }
+
+    if (isEventRequest) {
+      if (!parseApplicationTeam(request.answers?.applicationTeam)) {
+        missing.push('applicationTeam')
+      }
+
+      const proposalDocs = await deps.pool.query(
+        `SELECT 1 FROM dashboard.private_documents WHERE request_id = $1 AND category = 'proposal'`,
+        [request.id],
+      )
+      if ((proposalDocs.rowCount ?? 0) === 0) {
+        missing.push('proposalDocuments')
+      }
+
+      if (!acceptsAgreementVersion(req.body?.nonCompeteAcceptance, CURRENT_NON_COMPETE_VERSION)) {
+        missing.push('nonCompeteAcceptance')
+      }
+      if (!acceptsAgreementVersion(req.body?.eventRulesAcceptance, CURRENT_EVENT_RULES_VERSION)) {
+        missing.push('eventRulesAcceptance')
+      }
+    }
+
+    if (missing.length > 0) {
+      res.status(400).json({ error: 'invalid_answers', missingFields: missing })
+      return
     }
 
     const firstStep = service?.workflow[0]
@@ -709,7 +1004,14 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       firstStep ? { assignedRole: firstStep.roleName, currentStep: firstStep.title } : undefined,
       companyId,
       true,
+      isEventRequest
+        ? { nonCompeteVersion: CURRENT_NON_COMPETE_VERSION, eventRulesVersion: CURRENT_EVENT_RULES_VERSION }
+        : undefined,
     )
+    if (typeof result === 'object' && 'missingFields' in result) {
+      res.status(400).json({ error: 'invalid_answers', missingFields: result.missingFields })
+      return
+    }
     if (result === 'company_not_verified') {
       res.status(403).json({ error: 'company_not_verified' })
       return
@@ -747,16 +1049,986 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       if (!isCompanyAdministrator(actor.operationalRole) && !isRepresentative(actor.operationalRole)) {
         // Case assignment permits only the profile fields needed for review;
         // it never grants access to the private verification dossier or files.
-        const company = (pinned.snapshot.company ?? {}) as Record<string, unknown>
-        const dossier = (pinned.snapshot.dossier ?? {}) as Record<string, unknown>
-        pinned.snapshot = {
-          company: { name: company.name, nationalId: company.nationalId, type: company.type,
-            province: company.province, city: company.city },
-          dossier: { legalEntityType: dossier.legalEntityType, classification: dossier.classification,
-            activityDomain: dossier.activityDomain, productsServices: dossier.productsServices },
-        }
+        pinned.snapshot = { ...necessaryCompanyProfile(pinned.snapshot) }
       }
       res.json({ verification: pinned })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/requests/:id/proposal', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const { scope } = await resolveScope(actor.id, actor.operationalRole)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const revision = req.query.revision === undefined ? undefined : parseRevisionQuery(req.query.revision)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      if (isReviewerRole(actor.operationalRole)) {
+        // A reviewer sees only the proposal revision the assignment covers, never
+        // other revisions of the same case or the company's later corrections.
+        const reviewed = await reviewCases.reviewedProposalRevision(
+          request.id, { id: actor.id, role: actor.operationalRole },
+        )
+        if (reviewed === null) {
+          // Nothing pinned to review (for example a request of another service).
+          res.json({ proposal: null, agreements: [], revisions: [] })
+          return
+        }
+        if (revision !== undefined && revision !== reviewed) {
+          res.status(404).json({ error: 'not_found' })
+          return
+        }
+        const proposal = await repo.findRequestProposal(request.id, reviewed)
+        // The accepting representative's id is not the reviewer's business.
+        const agreements = proposal ? await repo.listRequestAgreements(request.id, proposal.revision) : []
+        res.json({
+          proposal,
+          agreements: agreements.map(({ acceptedBy: _acceptedBy, ...agreement }) => agreement),
+          revisions: [reviewed],
+        })
+        return
+      }
+      const proposal = await repo.findRequestProposal(request.id, revision)
+      const agreements = proposal ? await repo.listRequestAgreements(request.id, proposal.revision) : []
+      res.json({ proposal, agreements, revisions: await repo.listProposalRevisions(request.id) })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/requests/:id/triage', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { action, reason, expectedRevision } = req.body ?? {}
+      if (action !== 'accept' && action !== 'return' && action !== 'reject') {
+        res.status(400).json({ error: 'invalid_action' })
+        return
+      }
+      const trimmedReason = parseDecisionReason(reason)
+      if (action !== 'accept' && !trimmedReason) {
+        res.status(400).json({ error: 'reason_required' })
+        return
+      }
+      const revision = parseExpectedRevision(expectedRevision)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      const result = await repo.decideTriage({
+        requestId: req.params.id,
+        actorId: actor.id,
+        action,
+        reason: action === 'accept' ? null : trimmedReason,
+        expectedRevision: revision,
+      })
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'forbidden') { await refuseCommand(res, actor, req.params.id); return }
+      if (result === 'invalid_state') { res.status(409).json({ error: 'invalid_triage_state' }); return }
+      if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
+      res.json({ request: (await presentRequests(actor, [result.request]))[0] })
+    } catch (error) { next(error) }
+  })
+
+  /** The responsible chief's explicit decision once a round holds its four final evaluations (T28). */
+  router.post('/requests/:id/review-decision', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { action, reason, expectedRevision } = req.body ?? {}
+      if (action !== 'advance' && action !== 'return' && action !== 'reject') {
+        res.status(400).json({ error: 'invalid_action' })
+        return
+      }
+      const trimmedReason = parseDecisionReason(reason)
+      if (action !== 'advance' && !trimmedReason) {
+        res.status(400).json({ error: 'reason_required' })
+        return
+      }
+      const revision = parseExpectedRevision(expectedRevision)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      const result = await repo.decideReview({
+        requestId: req.params.id,
+        actorId: actor.id,
+        action,
+        reason: action === 'advance' ? null : trimmedReason,
+        expectedRevision: revision,
+      })
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'forbidden') { await refuseCommand(res, actor, req.params.id); return }
+      if (result === 'invalid_state') { res.status(409).json({ error: 'invalid_decision_state' }); return }
+      if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
+      if (result === 'round_not_ready') { res.status(409).json({ error: 'round_not_ready' }); return }
+      res.json({ request: (await presentRequests(actor, [result.request]))[0] })
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * The financial package invitation (T29) for the owning company, Secretariat and
+   * the owner. Chiefs and reviewers are outside the financial audience, and the
+   * investment person reads the package through the case dossier (T31).
+   */
+  router.get('/requests/:id/financial-invitation', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role !== 'representative' && role !== 'central-secretariat' && role !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const invitation = request.reviewStage === 'advanced' ? await repo.findFinancialInvitation(request.id) : null
+      if (!invitation) {
+        res.status(409).json({ error: 'financial_stage_not_open' })
+        return
+      }
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ invitation })
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * The company submits its financial package (T30). Every checklist category and
+   * every statement year the founding date requires must have a file; otherwise
+   * nothing is stored and the response names the gaps. A complete package freezes
+   * the financial files and hands the case to the event's investment person (T31).
+   * It does not advance the case. A repeated submit returns the stored package.
+   */
+  router.post('/requests/:id/financial-package', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'representative') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request || !allowedRequestActions(actor.operationalRole, request, actor.id, companyId).includes('read')) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!isFinancialStageOpen(request.status, request.reviewStage)) {
+        res.status(409).json({ error: 'financial_stage_not_open' })
+        return
+      }
+      const company = request.companyId
+        ? await deps.companyStore.findById(request.companyId).catch(() => undefined)
+        : await deps.companyStore.findByRepresentative(request.ownerId)
+      const plan = statementYearPlan(company?.establishmentDate)
+      if (!plan.ok) {
+        res.status(422).json({ error: plan.error })
+        return
+      }
+      const result = await financialPackages.submit({
+        requestId: request.id,
+        actorId: actor.id,
+        expectedYears: plan.years,
+      })
+      switch (result.status) {
+        case 'submitted':
+          res.status(201).json({ package: result.package })
+          return
+        case 'already_submitted':
+          res.json({ package: result.package })
+          return
+        case 'incomplete':
+          res.status(422).json({
+            error: 'financial_package_incomplete',
+            missingCategories: result.gaps.missingCategories,
+            missingStatementYears: result.gaps.missingStatementYears,
+          })
+          return
+        case 'stage_closed':
+          res.status(409).json({ error: 'financial_stage_not_open' })
+          return
+        case 'not_found':
+          res.status(404).json({ error: 'not_found' })
+          return
+      }
+    } catch (error) { next(error) }
+  })
+
+  /** The company's latest submitted financial package, for the owning company, Secretariat and the owner. */
+  router.get('/requests/:id/financial-package', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role !== 'representative' && role !== 'central-secretariat' && role !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      const pkg = request ? await financialPackages.findLatest(request.id) : null
+      if (!pkg) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ package: pkg })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Assigned reviewer queue and case file (T23) ───────────────────── */
+
+  /** Reviewer and employer inbox, fed only by the actor's active server-side assignments. */
+  router.get('/review/queue', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isReviewerRole(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const view = parseQueueView(req.query.view)
+      if (!view) {
+        res.status(400).json({ error: 'invalid_view' })
+        return
+      }
+      const queue = await reviewCases.listQueue(
+        { id: actor.id, role: actor.operationalRole },
+        { view, page: Math.min(parsePositiveInt(req.query.page, 1), 1_000_000), limit: Math.min(parsePositiveInt(req.query.limit, 25), 100) },
+      )
+      res.set('Cache-Control', 'private, no-store, max-age=0').json(queue)
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * The assigned case file: the reviewed proposal revision with its pinned files,
+   * the pinned RFP and the necessary company profile. Another reviewer's work, the
+   * round roster, financial files and the private dossier are not part of it.
+   */
+  router.get('/review/cases/:id', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isReviewerRole(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const found = await reviewCases.findCase({ id: actor.id, role: actor.operationalRole }, req.params.id)
+      if (!found) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({
+        ...found,
+        ...withDownloadUrls(found.case.requestId, found),
+      })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Investment queue and dossier (T31) ────────────────────────────── */
+
+  /** The investment person's inbox: only cases whose package reached them. */
+  router.get('/investment/queue', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const queue = await investmentCases.listQueue(actor.id, {
+        page: Math.min(parsePositiveInt(req.query.page, 1), 1_000_000),
+        limit: Math.min(parsePositiveInt(req.query.limit, 25), 100),
+      })
+      res.set('Cache-Control', 'private, no-store, max-age=0').json(queue)
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * The dossier of a handed-off case: the advanced proposal and RFP, the necessary
+   * company profile, the frozen package and the round's final evaluations. Drafts and
+   * evaluations of people who left their slot stay out, as they do from the count, and
+   * authors stay unnamed. The private verification dossier is not part of it.
+   */
+  router.get('/investment/cases/:id', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const found = await investmentCases.findCase(actor.id, req.params.id)
+      if (!found) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const { packageDetail, ...summary } = found
+      const materials = await reviewCases.caseMaterials(found.requestId, found.proposalRevision)
+      const round = await rounds.findByRevision(found.requestId, found.reviewedRevision)
+      const counted = (round?.slots ?? []).filter((slot) => slot.active)
+      const reviews = (await evaluations.listForRequest(found.requestId, found.reviewedRevision))
+        .filter((item) => item.state === 'final' && counted.some((slot) => slot.userId === item.userId && slot.role === item.role))
+        .map(({ userId: _userId, ...item }) => item)
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({
+        case: summary,
+        ...materials,
+        ...withDownloadUrls(found.requestId, materials),
+        package: {
+          ...found.package,
+          ...packageDetail,
+          documents: packageDetail.documents.map((document) => ({
+            ...document,
+            downloadUrl: `/api/dashboard/documents/${document.id}/download`,
+          })),
+        },
+        evaluations: reviews,
+        memos: await investmentMemos.listForHolder(actor.id, found.requestId),
+        supplementaryFiles: await followUps.listDeliveredFiles(found.requestId),
+      })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Investment memo (T32) ─────────────────────────────────────────── */
+
+  const withAuthorNames = async <T extends InvestmentMemoDto>(memos: T[]) => {
+    const names = await resolveRequesterNames(deps.userStore, memos.map((memo) => memo.authorId))
+    return memos.map((memo) => ({ ...memo, authorName: names.get(memo.authorId) ?? null }))
+  }
+
+  /** The person holding the case saves a new version of the memo. Nothing here decides the case. */
+  router.post('/investment/cases/:id/memo', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
+      if (!body || body.length > MAX_MEMO_LENGTH) {
+        res.status(400).json({ error: 'invalid_memo', maxLength: MAX_MEMO_LENGTH })
+        return
+      }
+      const result = await investmentMemos.save({ requestId: req.params.id, actorId: actor.id, body })
+      switch (result.status) {
+        case 'saved':
+          res.status(201).json({ memo: result.memo })
+          return
+        case 'unchanged':
+          res.json({ memo: result.memo })
+          return
+        case 'stage_closed':
+          res.status(409).json({ error: 'investment_stage_closed' })
+          return
+        case 'not_found':
+          res.status(404).json({ error: 'not_found' })
+          return
+      }
+    } catch (error) { next(error) }
+  })
+
+  /** Sends the holder's latest version to the Secretariat. A repeated send returns the version already sent. */
+  router.post('/investment/cases/:id/memo/send', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const version = req.body?.version
+      if (!Number.isSafeInteger(version) || version < 1) {
+        res.status(400).json({ error: 'invalid_memo_version' })
+        return
+      }
+      const result = await investmentMemos.send({ requestId: req.params.id, actorId: actor.id, version })
+      switch (result.status) {
+        case 'sent':
+        case 'already_sent':
+          res.json({ memo: result.memo })
+          return
+        case 'stale_version':
+          res.status(409).json({ error: 'memo_version_stale' })
+          return
+        case 'stage_closed':
+          res.status(409).json({ error: 'investment_stage_closed' })
+          return
+        case 'not_found':
+          res.status(404).json({ error: 'not_found' })
+          return
+      }
+    } catch (error) { next(error) }
+  })
+
+  /** The Secretariat's inbox of sent memos, also open to the owner. */
+  router.get('/investment/memos', async (req, res, next) => {
+    try {
+      const role = actorOf(res).operationalRole
+      if (role !== 'central-secretariat' && role !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const list = await investmentMemos.listSent({
+        page: Math.min(parsePositiveInt(req.query.page, 1), 1_000_000),
+        limit: Math.min(parsePositiveInt(req.query.limit, 25), 100),
+      })
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ ...list, items: await withAuthorNames(list.items) })
+    } catch (error) { next(error) }
+  })
+
+  /** One case's memos: sent versions for the Secretariat, every version for the owner. */
+  router.get('/requests/:id/investment-memos', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role !== 'central-secretariat' && role !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const memos = await investmentMemos.listForRequest(request.id, { includeDrafts: role === 'system-owner' })
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ items: await withAuthorNames(memos) })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Secretariat follow-up and result publication (T33) ─────────────── */
+
+  const isFollowUpReader = (role: OperationalRole) => role === 'central-secretariat' || role === 'system-owner'
+
+  /** Answers a closed command, so each route only handles its own success statuses. */
+  const respondClosed = (res: Response, status: 'not_found' | 'stage_closed' | 'memo_not_sent' | 'stale_version') => {
+    if (status === 'not_found') res.status(404).json({ error: 'not_found' })
+    else if (status === 'stage_closed') res.status(409).json({ error: 'investment_stage_closed' })
+    else if (status === 'memo_not_sent') res.status(409).json({ error: 'memo_not_sent' })
+    else res.status(409).json({ error: 'result_version_stale' })
+  }
+
+  /** The Secretariat's queue: cases with a sent memo, those without a published result first. */
+  router.get('/investment/follow-ups', async (req, res, next) => {
+    try {
+      if (!isFollowUpReader(actorOf(res).operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const list = await followUps.listFollowUps({
+        page: Math.min(parsePositiveInt(req.query.page, 1), 1_000_000),
+        limit: Math.min(parsePositiveInt(req.query.limit, 25), 100),
+      })
+      res.set('Cache-Control', 'private, no-store, max-age=0').json(list)
+    } catch (error) { next(error) }
+  })
+
+  /** Everything the Secretariat works from on one case. Only the Secretariat may act on it. */
+  router.get('/requests/:id/follow-up', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (!isFollowUpReader(role)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const found = await repo.findByIdScoped(req.params.id, scope)
+      if (!found) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const [memos, requests, files, results, published] = await Promise.all([
+        investmentMemos.listForRequest(found.id, { includeDrafts: role === 'system-owner' }),
+        followUps.listSupplementaryRequests(found.id),
+        followUps.listCaseFiles(found.id),
+        followUps.listResultVersions(found.id),
+        followUps.findPublished(found.id),
+      ])
+      const names = await resolveRequesterNames(deps.userStore, results.flatMap((item) => [item.authorId, item.publishedBy ?? item.authorId]))
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({
+        stageOpen: isFinancialStageOpen(found.status, found.reviewStage),
+        canAct: role === 'central-secretariat',
+        memos: await withAuthorNames(memos),
+        supplementaryRequests: requests,
+        files,
+        results: results.map((item) => ({
+          ...item,
+          authorName: names.get(item.authorId) ?? null,
+          publishedByName: item.publishedBy ? names.get(item.publishedBy) ?? null : null,
+        })),
+        published,
+      })
+    } catch (error) { next(error) }
+  })
+
+  /** Asks the company for more documents. This is correspondence and publishes nothing. */
+  router.post('/requests/:id/supplementary-requests', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'central-secretariat') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
+      if (!body || body.length > MAX_SUPPLEMENTARY_REQUEST_LENGTH) {
+        res.status(400).json({ error: 'invalid_supplementary_request', maxLength: MAX_SUPPLEMENTARY_REQUEST_LENGTH })
+        return
+      }
+      const result = await followUps.requestDocuments({
+        requestId: req.params.id,
+        actorId: actor.id,
+        actorName: actor.user.name ?? null,
+        actorRole: actor.operationalRole,
+        body,
+      })
+      if (result.status === 'created' || result.status === 'unchanged') {
+        res.status(result.status === 'created' ? 201 : 200).json({ supplementaryRequest: result.request })
+        return
+      }
+      respondClosed(res, result.status)
+    } catch (error) { next(error) }
+  })
+
+  /** What was asked of the company on its own case; also open to the Secretariat and the owner. */
+  router.get('/requests/:id/supplementary-requests', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (!isFollowUpReader(role) && role !== 'representative') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const found = await repo.findByIdScoped(req.params.id, scope)
+      if (!found) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const items = await followUps.listSupplementaryRequests(found.id)
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({
+        items: items.map(({ id, body, createdAt }) => ({ id, body, createdAt })),
+      })
+    } catch (error) { next(error) }
+  })
+
+  /** Opens one of the case's correspondence files to the investment person holding the case. */
+  router.post('/requests/:id/supplementary-files', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'central-secretariat') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const documentId = typeof req.body?.documentId === 'string' ? req.body.documentId : ''
+      if (!isUuid(documentId)) {
+        res.status(400).json({ error: 'invalid_document_id' })
+        return
+      }
+      const result = await followUps.deliverFile({ requestId: req.params.id, actorId: actor.id, documentId })
+      if (result.status === 'delivered' || result.status === 'already_delivered') {
+        res.status(result.status === 'delivered' ? 201 : 200).json({ file: result.file })
+        return
+      }
+      respondClosed(res, result.status)
+    } catch (error) { next(error) }
+  })
+
+  /** Saves the company-facing text as a new version. Nothing reaches the company here. */
+  router.post('/requests/:id/result', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'central-secretariat') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
+      if (!body || body.length > MAX_RESULT_LENGTH) {
+        res.status(400).json({ error: 'invalid_result', maxLength: MAX_RESULT_LENGTH })
+        return
+      }
+      const result = await followUps.saveResult({ requestId: req.params.id, actorId: actor.id, body })
+      if (result.status === 'saved' || result.status === 'unchanged') {
+        res.status(result.status === 'saved' ? 201 : 200).json({ result: result.result })
+        return
+      }
+      respondClosed(res, result.status)
+    } catch (error) { next(error) }
+  })
+
+  /** The explicit publication. A repeated publish returns the version already published. */
+  router.post('/requests/:id/result/publish', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'central-secretariat') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const version = req.body?.version
+      if (!Number.isSafeInteger(version) || version < 1) {
+        res.status(400).json({ error: 'invalid_result_version' })
+        return
+      }
+      const result = await followUps.publishResult({ requestId: req.params.id, actorId: actor.id, version })
+      if (result.status === 'published' || result.status === 'already_published') {
+        res.json({ result: result.result })
+        return
+      }
+      respondClosed(res, result.status)
+    } catch (error) { next(error) }
+  })
+
+  /** The published text for anyone who can read the case. Drafts and the memo are never here. */
+  router.get('/requests/:id/result', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const { scope } = await resolveScope(actor.id, actor.operationalRole)
+      const found = await repo.findByIdScoped(req.params.id, scope)
+      if (!found) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ result: await followUps.findPublished(found.id) })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Review round and the four assignments (T22) ───────────────────── */
+
+  /**
+   * The employer for this case: the owner's last substitute (T26) while that
+   * person is still a usable employer-reviewer, otherwise the subtopic's own.
+   */
+  const roundEmployerOf = async (context: RoundStartContext): Promise<string | null> => {
+    for (const id of [context.replacementEmployerId, context.employerId]) {
+      if (!id) continue
+      const user = await deps.userStore.findById(id).catch(() => undefined)
+      if (user && operationalRoleOf(user) === 'employer-reviewer') return id
+    }
+    return null
+  }
+
+  const replaceSlotResponse = (res: Response, result: ReplaceSlotResult) => {
+    if (typeof result === 'object') { res.json({ round: result.round }); return }
+    const rejected: Record<Exclude<ReplaceSlotResult, { round: unknown }>, [number, string]> = {
+      not_found: [404, 'not_found'],
+      forbidden: [403, 'forbidden'],
+      invalid_state: [409, 'invalid_round_state'],
+      stale_revision: [409, 'stale_revision'],
+      no_round: [409, 'round_not_started'],
+      not_assigned: [404, 'not_assigned'],
+      evaluation_final: [409, 'evaluation_final'],
+      already_assigned: [409, 'already_assigned'],
+      previously_assigned: [409, 'previously_assigned'],
+    }
+    const [status, error] = rejected[result]
+    res.status(status).json({ error })
+  }
+
+  /** Reviewers the responsible chief may pick: active ordinary reviewers, never other roles. */
+  router.get('/requests/:id/review-round/candidates', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const context = await rounds.findStartContext(req.params.id)
+      if (!context) { res.status(404).json({ error: 'not_found' }); return }
+      if (context.responsibleChiefId !== actor.id) { await refuseCommand(res, actor, req.params.id); return }
+      const users = await deps.userStore.list({ operationalRole: 'reviewer' })
+      // Once a round exists for the current revision the list serves replacement:
+      // nobody who already held a slot of it returns. An earlier revision's round
+      // does not narrow the pick for a new round.
+      const latest = await rounds.findLatest(req.params.id)
+      const current = latest && latest.requestRevision === context.revision ? latest : null
+      const seen = new Set(current?.slots.map((slot) => slot.userId) ?? [])
+      const employerId = current?.employerId ?? (await roundEmployerOf(context)) ?? context.employerId
+      const items = users
+        .filter((user) => operationalRoleOf(user) === 'reviewer' && user.id !== employerId && !seen.has(user.id))
+        .map((user) => ({ id: user.id, name: user.name ?? null }))
+      res.json({ items, employerId })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/requests/:id/review-round', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const revision = parseExpectedRevision(req.body?.expectedRevision)
+      if (revision === null) { res.status(400).json({ error: 'invalid_revision' }); return }
+      const rawReviewers: unknown = req.body?.reviewerIds
+      const reviewerIds = Array.isArray(rawReviewers)
+        ? rawReviewers.map((value) => (typeof value === 'string' ? value.trim() : ''))
+        : []
+      if (reviewerIds.length !== 3 || reviewerIds.some((id) => !id)) {
+        res.status(400).json({ error: 'three_reviewers_required' })
+        return
+      }
+
+      const context = await rounds.findStartContext(req.params.id)
+      if (!context) { res.status(404).json({ error: 'not_found' }); return }
+      if (context.responsibleChiefId !== actor.id) { await refuseCommand(res, actor, req.params.id); return }
+
+      // Four distinct active people: the case's employer plus three other reviewers.
+      const employerId = await roundEmployerOf(context)
+      if (!employerId) {
+        res.status(409).json({ error: 'employer_unavailable' })
+        return
+      }
+      if (new Set([...reviewerIds, employerId]).size !== 4) {
+        res.status(400).json({ error: 'duplicate_people' })
+        return
+      }
+      for (const reviewerId of reviewerIds) {
+        const reviewer = await deps.userStore.findById(reviewerId).catch(() => undefined)
+        if (!reviewer || operationalRoleOf(reviewer) !== 'reviewer') {
+          res.status(400).json({ error: 'reviewer_not_eligible', userId: reviewerId })
+          return
+        }
+      }
+
+      const result = await rounds.start({
+        requestId: req.params.id,
+        actorId: actor.id,
+        employerId,
+        reviewerIds,
+        expectedRevision: revision,
+      })
+      if (typeof result === 'object') { res.status(201).json({ round: result.round }); return }
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'forbidden') { res.status(403).json({ error: 'forbidden' }); return }
+      if (result === 'invalid_state') { res.status(409).json({ error: 'invalid_round_state' }); return }
+      if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
+      if (result === 'round_exists') { res.status(409).json({ error: 'round_already_started' }); return }
+      res.status(409).json({ error: result })
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * Oversight (owner, Secretariat, the case's chief) sees all four slots; an
+   * assigned reviewer or employer sees only their own slot, never who else was
+   * picked. Companies and investment people have no part in a review round.
+   */
+  router.get('/requests/:id/review-round', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role === 'representative' || role === 'investment-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) { res.status(404).json({ error: 'not_found' }); return }
+      const round = await rounds.findLatest(request.id)
+      if (!round) { res.json({ round: null }); return }
+      if (role === 'reviewer' || role === 'employer-reviewer') {
+        const mine = round.slots.find((slot) => slot.userId === actor.id && slot.active)
+        if (!mine) { res.status(404).json({ error: 'not_found' }); return }
+        const { id, requestId, requestRevision, proposalRevision, startedAt } = round
+        res.json({ round: { id, requestId, requestRevision, proposalRevision, startedAt, slots: [mine] } })
+        return
+      }
+      res.json({ round })
+    } catch (error) { next(error) }
+  })
+
+  /** Every round of the case with its decision, for the people who oversee it. */
+  router.get('/requests/:id/review-rounds', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const role = actor.operationalRole
+      if (role !== 'system-owner' && role !== 'central-secretariat' && role !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, role)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) { res.status(404).json({ error: 'not_found' }); return }
+      res.json({ items: await rounds.listForRequest(request.id) })
+    } catch (error) { next(error) }
+  })
+
+  /* ── Replacing a round slot (T26) ───────────────────────────────────── */
+
+  /** The responsible chief replaces an ordinary reviewer who has not finalized. */
+  router.post('/requests/:id/review-round/reviewers/:userId/replace', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'chief-reviewer') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const revision = parseExpectedRevision(req.body?.expectedRevision)
+      if (revision === null) { res.status(400).json({ error: 'invalid_revision' }); return }
+      const replacementId = typeof req.body?.replacementId === 'string' ? req.body.replacementId.trim() : ''
+      if (!replacementId) { res.status(400).json({ error: 'replacement_required' }); return }
+      const reason = parseOptionalReason(req.body?.reason)
+      if (reason === false) { res.status(400).json({ error: 'invalid_reason' }); return }
+
+      const context = await rounds.findStartContext(req.params.id)
+      if (!context) { res.status(404).json({ error: 'not_found' }); return }
+      if (context.responsibleChiefId !== actor.id) { await refuseCommand(res, actor, req.params.id); return }
+      if (replacementId === req.params.userId) { res.status(400).json({ error: 'duplicate_people' }); return }
+      const incoming = await deps.userStore.findById(replacementId).catch(() => undefined)
+      if (!incoming || operationalRoleOf(incoming) !== 'reviewer') {
+        res.status(400).json({ error: 'reviewer_not_eligible', userId: replacementId })
+        return
+      }
+      replaceSlotResponse(res, await rounds.replaceSlot({
+        requestId: req.params.id,
+        actorId: actor.id,
+        slot: 'ordinary',
+        outgoingUserId: req.params.userId,
+        incomingUserId: replacementId,
+        reason,
+        expectedRevision: revision,
+        authority: 'chief',
+      }))
+    } catch (error) { next(error) }
+  })
+
+  /** Employers the owner may put in place of the case's current one. */
+  router.get('/requests/:id/review-round/employer-candidates', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const round = await rounds.findLatest(req.params.id)
+      if (!round) { res.status(404).json({ error: 'not_found' }); return }
+      const seen = new Set(round.slots.map((slot) => slot.userId))
+      const users = await deps.userStore.list({ operationalRole: 'employer-reviewer' })
+      const items = users
+        .filter((user) => operationalRoleOf(user) === 'employer-reviewer' && !seen.has(user.id))
+        .map((user) => ({ id: user.id, name: user.name ?? null }))
+      res.json({ items, employerId: round.employerId })
+    } catch (error) { next(error) }
+  })
+
+  /** Only the system owner changes a case's employer, and always with a reason. */
+  router.post('/requests/:id/review-round/employer/replace', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const revision = parseExpectedRevision(req.body?.expectedRevision)
+      if (revision === null) { res.status(400).json({ error: 'invalid_revision' }); return }
+      const employerId = typeof req.body?.employerId === 'string' ? req.body.employerId.trim() : ''
+      if (!employerId) { res.status(400).json({ error: 'replacement_required' }); return }
+      const reason = parseOptionalReason(req.body?.reason)
+      if (reason === false) { res.status(400).json({ error: 'invalid_reason' }); return }
+      if (reason === null) { res.status(400).json({ error: 'reason_required' }); return }
+
+      const context = await rounds.findStartContext(req.params.id)
+      if (!context) { res.status(404).json({ error: 'not_found' }); return }
+      const incoming = await deps.userStore.findById(employerId).catch(() => undefined)
+      if (!incoming || operationalRoleOf(incoming) !== 'employer-reviewer') {
+        res.status(400).json({ error: 'employer_not_eligible', userId: employerId })
+        return
+      }
+      replaceSlotResponse(res, await rounds.replaceSlot({
+        requestId: req.params.id,
+        actorId: actor.id,
+        slot: 'employer',
+        incomingUserId: employerId,
+        reason,
+        expectedRevision: revision,
+        authority: 'owner',
+      }))
+    } catch (error) { next(error) }
+  })
+
+  router.post('/requests/:id/resubmit', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isRepresentative(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (!isChiefCorrectionStatus(request.status, request.reviewStage)) {
+        res.status(409).json({ error: 'not_correctable' })
+        return
+      }
+
+      const missing: string[] = []
+      const service = await deps.serviceCatalog.findById(request.serviceId)
+      if (service) missing.push(...(missingRequiredFields(service, request.answers) ?? []))
+      if (!parseApplicationTeam(request.answers?.applicationTeam)) missing.push('applicationTeam')
+      const proposalDocs = await deps.pool.query(
+        `SELECT 1 FROM dashboard.private_documents WHERE request_id = $1 AND category = 'proposal'`,
+        [request.id],
+      )
+      if ((proposalDocs.rowCount ?? 0) === 0) missing.push('proposalDocuments')
+      if (!acceptsAgreementVersion(req.body?.nonCompeteAcceptance, CURRENT_NON_COMPETE_VERSION)) {
+        missing.push('nonCompeteAcceptance')
+      }
+      if (!acceptsAgreementVersion(req.body?.eventRulesAcceptance, CURRENT_EVENT_RULES_VERSION)) {
+        missing.push('eventRulesAcceptance')
+      }
+      if (missing.length > 0) {
+        res.status(400).json({ error: 'invalid_answers', missingFields: missing })
+        return
+      }
+
+      const result = await repo.resubmitCorrection(request.id, actor.id, companyId, {
+        nonCompeteVersion: CURRENT_NON_COMPETE_VERSION,
+        eventRulesVersion: CURRENT_EVENT_RULES_VERSION,
+      })
+      if (typeof result === 'object' && 'missingFields' in result) {
+        res.status(400).json({ error: 'invalid_answers', missingFields: result.missingFields })
+        return
+      }
+      if (result === 'company_not_verified') { res.status(403).json({ error: 'company_not_verified' }); return }
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'not_correctable') { res.status(409).json({ error: 'not_correctable' }); return }
+      res.json({ request: requestWithActions(actor.operationalRole, actor.id, result, companyId) })
+    } catch (error) { next(error) }
+  })
+
+  router.post('/admin/requests/:id/reopen', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const reason = parseDecisionReason(req.body?.reason)
+      if (!reason) {
+        res.status(400).json({ error: 'reason_required' })
+        return
+      }
+      const revision = parseExpectedRevision(req.body?.expectedRevision)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      const result = await repo.reopenRejected({
+        requestId: req.params.id,
+        actorId: actor.id,
+        reason,
+        expectedRevision: revision,
+      })
+      if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }
+      if (result === 'not_rejected') { res.status(409).json({ error: 'invalid_reopen_state' }); return }
+      if (result === 'stale_revision') { res.status(409).json({ error: 'stale_revision' }); return }
+      res.json({ request: (await presentRequests(actor, [result]))[0] })
     } catch (error) { next(error) }
   })
 
@@ -807,7 +2079,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       assignedBy: actor.id,
     })
     if (!created.ok) {
-      res.status(409).json({ error: 'already_assigned' })
+      // The four slots belong to the review round; replacement is its own command.
+      res.status(409).json({ error: created.reason })
       return
     }
     res.status(201).json({ assignment: created.assignment })
@@ -823,6 +2096,13 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
     if (!canRequestAction(actor.operationalRole, request, actor.id, 'assign')) {
       res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    const held = (await assignments.listForRequest(request.id)).find(
+      (item) => item.active && item.userId === req.params.userId,
+    )
+    if (held?.roundId) {
+      res.status(409).json({ error: 'managed_by_review_round' })
       return
     }
     const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : null
@@ -865,13 +2145,16 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
-        res.status(403).json({ error: 'forbidden' })
+        res.status(404).json({ error: 'not_found' })
         return
       }
-      const revision = request.revision
+      // The revision this person's round reviews: a decided case has moved past it.
+      const revision = await reviewCases.reviewedRequestRevision(
+        request.id, { id: actor.id, role: actor.operationalRole },
+      ) ?? request.revision
+      // Own evaluation only: how far the other three are is not a reviewer's to see.
       const evaluation = await evaluations.findByRequestAndUser(request.id, actor.id, revision)
-      const completedCount = await currentCompletion(request.id, await evaluations.listForRequest(request.id, revision))
-      res.json({ evaluation, revision, completedEvaluationsCount: completedCount })
+      res.json({ evaluation, revision })
     } catch (error) { next(error) }
   })
 
@@ -888,7 +2171,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
-        res.status(403).json({ error: 'forbidden' })
+        await refuseCommand(res, actor, request.id)
         return
       }
       if (!Number.isSafeInteger(req.body?.revision) || req.body.revision < 1) {
@@ -950,7 +2233,7 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         return
       }
       if (!await assignments.activeFor(request.id, actor.id, actor.operationalRole)) {
-        res.status(403).json({ error: 'forbidden' })
+        await refuseCommand(res, actor, request.id)
         return
       }
       if (!Number.isSafeInteger(req.body?.revision) || req.body.revision < 1) {
@@ -1017,10 +2300,24 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const revision = request.revision
-      const items = await evaluations.listForRequest(request.id, revision)
-      const completedCount = await currentCompletion(request.id, items)
-      res.json({ items: items.map(oversightEvaluation), revision, completedCount })
+      // The current revision by default; `revision` reads the evaluations of a past round.
+      const requested = req.query.revision === undefined ? request.revision : parseRevisionQuery(req.query.revision)
+      if (requested === null) {
+        res.status(400).json({ error: 'invalid_revision' })
+        return
+      }
+      const items = await evaluations.listForRequest(request.id, requested)
+      const round = await rounds.findByRevision(request.id, requested)
+      const completedCount = requested === request.revision
+        ? await currentCompletion(request.id, items)
+        : round?.completion.finalized ?? 0
+      res.json({
+        items: items.map(oversightEvaluation),
+        revision: requested,
+        completedCount,
+        requiredCount: ROUND_REQUIRED_EVALUATIONS,
+        readyForChiefDecision: round?.completion.ready ?? false,
+      })
     } catch (error) { next(error) }
   })
 
@@ -1322,6 +2619,55 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
+  // Who the actor may write to now. Sending re-checks every rule when the letter is written.
+  router.get('/letters/recipients', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      const { requestId } = req.query
+      const caseLinked = requestId !== undefined
+      const allowedRoles = OPERATIONAL_ROLES.filter((role) => canSendLetter(actor.operationalRole, role, caseLinked))
+      const listRoles = (roles: OperationalRole[], search?: string) =>
+        Promise.all(roles.map((operationalRole) => deps.userStore.list({ operationalRole, search })))
+      const present = (users: (User | undefined)[], eligible: (user: User, role: OperationalRole) => boolean) => {
+        const items = new Map<string, { id: string; name: string | null; operationalRole: OperationalRole }>()
+        for (const user of users) {
+          const role = operationalRoleOf(user)
+          if (!user || !role || user.id === actor.id || !allowedRoles.includes(role) || !eligible(user, role)) continue
+          items.set(user.id, { id: user.id, name: user.name ?? null, operationalRole: role })
+        }
+        return [...items.values()]
+      }
+
+      if (!caseLinked) {
+        const search = typeof req.query.search === 'string' ? req.query.search.trim() || undefined : undefined
+        res.json({ items: present((await listRoles(allowedRoles, search)).flat(), () => true) })
+        return
+      }
+      if (typeof requestId !== 'string' || !isUuid(requestId)) { res.status(400).json({ error: 'invalid_request_id' }); return }
+      const { scope } = await resolveScope(actor.id, actor.operationalRole)
+      const item = await repo.findByIdScoped(requestId, scope)
+      if (!item) { res.status(404).json({ error: 'not_found' }); return }
+
+      const handedOff = await financialPackages.isSubmitted(requestId)
+      if (actor.operationalRole === 'investment-reviewer' && !handedOff) { res.json({ items: [] }); return }
+      const active = (await assignments.listForRequest(requestId)).filter((assignment) => assignment.active)
+      const chiefs = active.filter((assignment) => assignment.role === 'chief-reviewer')
+      const staffRoles = allowedRoles.filter((role) => role === 'system-owner' || role === 'central-secretariat')
+      const candidates = [
+        ...(await listRoles(staffRoles)).flat(),
+        ...(await Promise.all([...active.map((assignment) => assignment.userId), item.ownerId].map((id) => deps.userStore.findById(id)))),
+      ]
+      res.json({
+        items: present(candidates, (user, role) => {
+          if (!isCaseAssignmentRole(role)) return true
+          if (!active.some((assignment) => assignment.userId === user.id && assignment.role === role)) return false
+          if (role === 'investment-reviewer') return handedOff
+          return !isReviewerRole(actor.operationalRole) || chiefs.length === 1
+        }),
+      })
+    } catch (error) { next(error) }
+  })
+
   router.get('/letters/:id', async (req, res, next) => {
     try {
     const actor = actorOf(res)
@@ -1335,19 +2681,38 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     } catch (error) { next(error) }
   })
 
-  router.get('/stats', async (_req, res, next) => {
+  router.get('/stats', async (req, res, next) => {
     try {
     const actor = actorOf(res)
+    const filters = parseRequestFilters(req.query, actor)
+    if (typeof filters === 'string') { res.status(400).json({ error: filters }); return }
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
-    res.json(await stats.forScope(scope))
+    res.json(await stats.forScope(scope, filters))
     } catch (error) { next(error) }
   })
 
+  /** The role's overview: status counts, its work queues and the options of the event filter. */
   router.get('/stats/overview', async (_req, res, next) => {
     try {
     const actor = actorOf(res)
-    const { scope } = await resolveScope(actor.id, actor.operationalRole)
-    res.json(await stats.forScope(scope))
+    const role = actor.operationalRole
+    const { scope, companyId } = await resolveScope(actor.id, role)
+    const overview = await stats.overview(scope, { id: actor.id, role })
+    // Work outside the request table. Each count is read from the list its role already has.
+    const other: { key: string; count: number }[] = []
+    if (role === 'central-secretariat') {
+      other.push({ key: 'verification_pending', count: (await verificationStore.listQueue({ status: 'pending' })).length })
+    }
+    if (isCompanyAdministrator(role)) {
+      other.push({ key: 'support_open', count: (await support.list({ status: 'open', page: 1, limit: 1 })).total })
+    }
+    if (companyId) {
+      const verification = await verificationStore.findCurrentByCompanyId(companyId)
+      if (verification?.status === 'returned' || verification?.status === 'rejected') {
+        other.push({ key: 'company_verification_returned', count: 1 })
+      }
+    }
+    res.set('Cache-Control', 'private, no-store, max-age=0').json({ ...overview, queues: [...overview.queues, ...other] })
     } catch (error) { next(error) }
   })
 
@@ -1357,7 +2722,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
     const page = parsePositiveInt(req.query.page, 1)
     const limit = parsePositiveInt(req.query.limit, 10)
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
-    res.json(await activities.listScoped(scope, page, limit))
+    const feed = await activities.listScoped(scope, page, limit)
+    res.json({ ...feed, items: limitActivities(actor, feed.items) })
     } catch (error) { next(error) }
   })
 
@@ -2026,7 +3392,8 @@ export function createDashboardRouter(deps: DashboardDeps): Router {
       const senderScope = await resolveScope(actor.id, actor.operationalRole)
       const recipientScope = await resolveScope(trimmedRecipientId, recipientRole)
       letter = await letters.createScoped(input, senderScope.scope, recipientScope.scope,
-        actor.operationalRole === 'reviewer' || actor.operationalRole === 'employer-reviewer')
+        actor.operationalRole === 'reviewer' || actor.operationalRole === 'employer-reviewer',
+        actor.operationalRole === 'investment-reviewer' || recipientRole === 'investment-reviewer')
       if (!letter) { res.status(403).json({ error: 'forbidden' }); return }
     } else {
       letter = await letters.create(input)

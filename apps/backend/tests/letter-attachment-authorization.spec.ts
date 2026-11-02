@@ -135,7 +135,7 @@ describe('letter attachment authorization at HTTP boundaries', () => {
       recipientId: 'sec', requestId, attachmentIds: [documentId] }).expect(201)
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ attachments: [expect.objectContaining({
       id: documentId, filename: doc.filename, size: '1 KB',
-    })] }), { kind: 'company', userId: 'rep', companyId: '1' }, { kind: 'all' }, false)
+    })] }), { kind: 'company', userId: 'rep', companyId: '1' }, { kind: 'all' }, false, false)
   })
   it('allows Secretariat to send financial files to their owning company', async () => {
     const { app } = setup()

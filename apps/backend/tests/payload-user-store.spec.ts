@@ -186,4 +186,13 @@ describe('PayloadUserStore', () => {
       'where[roles][contains]=representative',
     )
   })
+
+  it('lists by operational role with an equality query', async () => {
+    const { fetcher, calls } = mockFetcher(() => ({ status: 200, body: { docs: [] } }))
+    const store = new PayloadUserStore({ baseUrl: 'http://cms:3000', apiKey: 'KEY', fetcher })
+
+    await store.list({ operationalRole: 'reviewer' })
+
+    expect(decodeURIComponent(calls[0]?.url ?? '')).toContain('where[operationalRole][equals]=reviewer')
+  })
 })

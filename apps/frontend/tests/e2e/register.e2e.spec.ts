@@ -81,7 +81,10 @@ test.describe('Register', () => {
       await route.fulfill({
         status: 500,
         contentType: 'application/json',
-        body: JSON.stringify({ errors: [{ message: 'Something went wrong.' }] }),
+        // The server's own rolled-back-transaction code: a definite failure.
+        body: JSON.stringify({
+          errors: [{ code: 'signup_failed', message: 'Registration failed. Please try again.' }],
+        }),
       })
     })
 
@@ -132,6 +135,132 @@ test.describe('Register', () => {
     await expect(page.locator('#register-phone')).toHaveValue('09129999148')
     await expect(page.locator('#register-email')).toHaveValue('register-ux@example.invalid')
     await expect(page.getByText('شماره موبایل یا ایمیل واردشده قبلاً ثبت شده است.')).toBeVisible()
+  })
+
+  test('recovers from a duplicate national id against the real API without a second company', async ({
+    page,
+  }) => {
+    const suffix = `${Date.now()}`.slice(-9)
+    const nationalId = `3${suffix}`
+    const first = await page.request.post('http://localhost:3000/api/users/self-signup', {
+      headers: cookieRequestHeaders,
+      data: {
+        email: `dup-owner-${suffix}@example.invalid`,
+        phone: `09${suffix}`,
+        password: 'password123',
+        name: 'Original representative',
+        position: 'CEO',
+        companyName: 'Original duplicate test company',
+        companyNationalId: nationalId,
+        activityDomain: 'Energy',
+      },
+    })
+    expect(first.status()).toBe(201)
+    const firstBody = await first.json()
+    registeredUserIds.push(firstBody.user.id)
+    registeredCompanyIds.push(firstBody.company.id)
+
+    const secondPhone = `09${(Number(suffix) + 1).toString().padStart(9, '0').slice(-9)}`
+    const secondEmail = `dup-second-${suffix}@example.invalid`
+    await page.goto(registerUrl)
+    await page.waitForFunction(() => document.querySelector('form[data-hydrated="true"]') !== null)
+    await page.locator('#register-companyName').fill('شرکت تکراری')
+    // Persian digits normalize to the same stored national ID.
+    await page
+      .locator('#register-companyNationalId')
+      .fill(nationalId.replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]))
+    await page.locator('#register-activityDomain').fill('انرژی')
+    await page.getByRole('button', { name: 'ادامه' }).click()
+    await fillRepresentativeStep(page, secondPhone, secondEmail)
+    await fillSecurityStep(page)
+    const [response] = await Promise.all([
+      page.waitForResponse((candidate) => candidate.url().endsWith('/api/users/self-signup')),
+      page.getByRole('button', { name: 'ثبت شرکت' }).click(),
+    ])
+    expect(response.status()).toBe(409)
+
+    await expect(page.locator('#register-notice')).toHaveText(
+      'این شرکت قبلاً در سامانه ثبت شده است و شرکت دیگری با این شناسه ملی ایجاد نشد.',
+    )
+    await expect(page.locator('#register-companyNationalId')).toBeFocused()
+    await expect(page.getByText(/هر شرکت تنها یک نماینده دارد/)).toBeVisible()
+    await expect(page.getByRole('link', { name: 'ورود به حساب' })).toHaveAttribute(
+      'href',
+      '/login?returnUrl=%2Fdashboard',
+    )
+
+    // Server state, not the page, proves atomicity: one company and no stray person.
+    const companies = await payload.count({
+      collection: 'companies',
+      where: { nationalId: { equals: nationalId } },
+      overrideAccess: true,
+    })
+    expect(companies.totalDocs).toBe(1)
+    const strayUsers = await payload.count({
+      collection: 'users',
+      where: { email: { equals: secondEmail } },
+      overrideAccess: true,
+    })
+    expect(strayUsers.totalDocs).toBe(0)
+
+    await page.getByRole('link', { name: 'ورود به حساب' }).click()
+    await page.waitForURL('**/login?returnUrl=%2Fdashboard')
+  })
+
+  test('reports a dropped connection as an unknown outcome and keeps login reachable on mobile', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.route('**/api/users/self-signup', (route) =>
+      route.request().method() === 'POST' ? route.abort('connectionreset') : route.continue(),
+    )
+    await page.goto(registerUrl)
+    await page.waitForFunction(() => document.querySelector('form[data-hydrated="true"]') !== null)
+    await fillCompanyStep(page)
+    await fillRepresentativeStep(page)
+    await fillSecurityStep(page)
+    await page.getByRole('button', { name: 'ثبت شرکت' }).click()
+
+    await expect(page.locator('#register-notice')).toHaveText(
+      'ارتباط با سامانه قطع شد و نتیجه ثبت‌نام مشخص نیست. اطلاعات شما حفظ شده است.',
+    )
+    await expect(page.locator('#register-recovery')).toContainText('پیش از ارسال دوباره')
+    await expect(page.getByRole('button', { name: 'ثبت شرکت' })).toBeEnabled()
+    await expect(page.locator('#register-password')).toHaveValue('password123')
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(0)
+    await page.getByRole('link', { name: 'وارد شوید' }).click()
+    await page.waitForURL('**/login?returnUrl=%2Fdashboard')
+  })
+
+  test('the real API requires the activity domain before any write', async ({ page }) => {
+    const suffix = `${Date.now()}`.slice(-9)
+    const email = `no-domain-${suffix}@example.invalid`
+    const response = await page.request.post('http://localhost:3000/api/users/self-signup', {
+      headers: cookieRequestHeaders,
+      data: {
+        email,
+        phone: `09${suffix}`,
+        password: 'password123',
+        name: 'No domain',
+        position: 'CEO',
+        companyName: 'No domain company',
+        companyNationalId: `4${suffix}`,
+        activityDomain: '   ',
+      },
+    })
+    expect(response.status()).toBe(400)
+    expect((await response.json()).errors).toEqual([
+      expect.objectContaining({ code: 'missing_field', field: 'activityDomain' }),
+    ])
+    const users = await payload.count({
+      collection: 'users',
+      where: { email: { equals: email } },
+      overrideAccess: true,
+    })
+    expect(users.totalDocs).toBe(0)
   })
 
   test('validates national id and Iranian mobile format before advancing', async ({ page }) => {
@@ -226,6 +355,14 @@ test.describe('Register', () => {
       id: registrationBody.user.id,
       operationalRole: 'representative', isActive: true,
     })
+
+    // Dashboard access is granted, but the new company is not verified: the
+    // server reports no submitted verification, so participation stays gated.
+    const verification = await page.request.get(
+      'http://localhost:3000/api/dashboard/profile/verification',
+    )
+    expect(verification.status()).toBe(200)
+    expect(await verification.json()).toMatchObject({ status: 'unsubmitted', revision: 0 })
 
     const emailLogin = await page.request.post('http://localhost:3000/api/users/login', {
       headers: cookieRequestHeaders,

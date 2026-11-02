@@ -2,11 +2,17 @@ import type { Pool, PoolClient } from 'pg'
 
 import type { RequestScope } from '../access/policy.js'
 import { isUuid } from '../db/uuid.js'
+import { countRoundFinals, ROUND_REQUIRED_EVALUATIONS } from '../reviews/round-completion.js'
+import { FINANCIAL_CHECKLIST, FINANCIAL_CHECKLIST_VERSION, type FinancialChecklistItem, type FinancialInvitationDto } from './financial-invitation.js'
 import { appendTransition } from './transition-history.js'
 import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 import { lockApprovedVerification } from './verification-repo.js'
+import { requestWorkQueueClause, type RequestWorkQueueFilter } from './work-queues.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
+
+/** Event applications only: chief triage precedes the review round (T22); `advanced` follows the chief's decision (T28). */
+export type ReviewStage = 'chief_triage' | 'triaged' | 'advanced'
 
 export interface RequestDto {
   id: string
@@ -19,6 +25,7 @@ export interface RequestDto {
   ownerId: string
   companyId: string | null
   status: RequestStatus
+  reviewStage: ReviewStage | null
   currentStepIndex: number
   assignedRole: string | null
   currentStep: string | null
@@ -39,6 +46,69 @@ export interface RequestVerificationDto {
   createdAt: string
 }
 
+/*
+ * Product has not approved the agreement texts yet. These IDs name no published
+ * text, so an acceptance recorded against them is not final consent and must be
+ * collected again once real versions replace them.
+ */
+export const CURRENT_NON_COMPETE_VERSION = 'non-compete-unapproved-placeholder'
+export const CURRENT_EVENT_RULES_VERSION = 'event-rules-unapproved-placeholder'
+export const AGREEMENT_TEXTS_APPROVED = false
+export const APPLICATION_FORM_VERSION = 'event-application-2026-v1'
+
+export type AgreementType = 'non_compete' | 'event_rules'
+
+export interface ApplicationTeamMember {
+  name: string
+  role: string
+  relation?: string
+}
+
+/** The trimmed team, or null unless it is a nonempty list of named members. */
+export function parseApplicationTeam(value: unknown): ApplicationTeamMember[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+  const team: ApplicationTeamMember[] = []
+  for (const member of value) {
+    if (!member || typeof member !== 'object') return null
+    const { name, role, relation } = member as Record<string, unknown>
+    if (typeof name !== 'string' || !name.trim() || typeof role !== 'string' || !role.trim()) return null
+    if (relation !== undefined && typeof relation !== 'string') return null
+    const trimmedRelation = typeof relation === 'string' ? relation.trim() : ''
+    team.push({ name: name.trim(), role: role.trim(), ...(trimmedRelation ? { relation: trimmedRelation } : {}) })
+  }
+  return team
+}
+
+export interface RequestAgreementDto {
+  id: string
+  requestId: string
+  revision: number
+  agreementType: AgreementType
+  textVersionId: string
+  acceptedBy: string
+  acceptedAt: string
+}
+
+export interface PinnedProposalDocument {
+  id: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  logicalVersion: number
+  createdAt: string
+}
+
+export interface RequestProposalDto {
+  requestId: string
+  revision: number
+  formVersion: string
+  applicationTeam: ApplicationTeamMember[]
+  proposalDocuments: PinnedProposalDocument[]
+  /** Answers as submitted for this revision; null for revisions that predate the snapshot. */
+  answers: Record<string, unknown> | null
+  createdAt: string
+}
+
 export interface RequestRow {
   id: string
   revision: number
@@ -50,6 +120,7 @@ export interface RequestRow {
   owner_id: string
   company_id: string | null
   status: RequestStatus
+  review_stage?: ReviewStage | null
   current_step_index: number
   assigned_role: string | null
   current_step: string | null
@@ -64,13 +135,13 @@ export interface RequestRow {
 export const REQUEST_COLUMNS = `
   id, tracking_code, title, service_id, service_key, service_name, owner_id, company_id, status,
   current_step_index, assigned_role, current_step, answers, submission_date, due_date,
-  created_at, updated_at, revision, submitted_by
+  created_at, updated_at, revision, submitted_by, review_stage
 `
 
 const REQUEST_COLUMNS_ALIASED = `
   r.id, r.tracking_code, r.title, r.service_id, r.service_key, r.service_name, r.owner_id,
   r.company_id, r.status, r.current_step_index, r.assigned_role, r.current_step, r.answers,
-  r.submission_date, r.due_date, r.created_at, r.updated_at, r.revision, r.submitted_by
+  r.submission_date, r.due_date, r.created_at, r.updated_at, r.revision, r.submitted_by, r.review_stage
 `
 
 export function mapRequestRow(row: RequestRow): RequestDto {
@@ -85,6 +156,7 @@ export function mapRequestRow(row: RequestRow): RequestDto {
     ownerId: row.owner_id,
     companyId: row.company_id ?? null,
     status: row.status,
+    reviewStage: row.review_stage ?? null,
     currentStepIndex: row.current_step_index,
     assignedRole: row.assigned_role,
     currentStep: row.current_step,
@@ -172,6 +244,214 @@ export function requestScopeClause(scope: RequestScope, params: unknown[], alias
   }
 }
 
+/** Narrowing filters of a scoped list and its counts. None of them can reach outside the row scope. */
+export interface RequestFilters {
+  /** Matches the title and tracking code only, which every reader of the row already sees. */
+  search?: string
+  eventId?: string
+  reviewStage?: ReviewStage
+  queue?: RequestWorkQueueFilter
+}
+
+export function requestFilterClauses(filters: RequestFilters, params: unknown[]): string[] {
+  const clauses: string[] = []
+  if (filters.search) {
+    params.push(`%${filters.search.replace(/[\\%_]/g, '\\$&')}%`)
+    clauses.push(`(r.title ILIKE $${params.length} OR r.tracking_code ILIKE $${params.length})`)
+  }
+  if (filters.eventId) {
+    params.push(filters.eventId)
+    clauses.push(`EXISTS (SELECT 1 FROM dashboard.request_rfps f WHERE f.request_id = r.id AND f.event_id = $${params.length})`)
+  }
+  if (filters.reviewStage) {
+    params.push(filters.reviewStage)
+    clauses.push(`r.review_stage = $${params.length}`)
+  }
+  if (filters.queue) clauses.push(requestWorkQueueClause(filters.queue, params))
+  return clauses
+}
+
+/**
+ * Pins the current team, proposal files, answers and agreement acceptance as the
+ * immutable snapshot for `request.revision`. Returns the missing fields instead
+ * of a snapshot when the application is incomplete.
+ */
+async function pinEventSubmission(
+  client: PoolClient,
+  request: RequestRow,
+  actorId: string,
+  eventSubmission?: { nonCompeteVersion: string; eventRulesVersion: string },
+): Promise<{ missingFields: string[] } | null> {
+  const { rows: docRows } = await client.query<{
+    id: string
+    original_filename: string
+    mime_type: string
+    size_bytes: number
+    logical_version: number
+    created_at: Date
+  }>(
+    `SELECT id, original_filename, mime_type, size_bytes, logical_version, created_at
+     FROM dashboard.private_documents
+     WHERE request_id = $1 AND category = 'proposal'
+     ORDER BY created_at ASC`,
+    [request.id],
+  )
+  const team = parseApplicationTeam(request.answers?.applicationTeam)
+  if (!team || docRows.length === 0 || !eventSubmission) {
+    return {
+      missingFields: [
+        ...(team ? [] : ['applicationTeam']),
+        ...(docRows.length > 0 ? [] : ['proposalDocuments']),
+        ...(eventSubmission ? [] : ['nonCompeteAcceptance', 'eventRulesAcceptance']),
+      ],
+    }
+  }
+  const proposalDocs: PinnedProposalDocument[] = docRows.map((doc) => ({
+    id: doc.id,
+    filename: doc.original_filename,
+    mimeType: doc.mime_type,
+    sizeBytes: doc.size_bytes,
+    logicalVersion: doc.logical_version,
+    createdAt: doc.created_at.toISOString(),
+  }))
+  await client.query(
+    `INSERT INTO dashboard.request_proposals
+       (request_id, revision, form_version, application_team, proposal_documents, answers)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      request.id,
+      request.revision,
+      APPLICATION_FORM_VERSION,
+      JSON.stringify(team),
+      JSON.stringify(proposalDocs),
+      JSON.stringify(request.answers ?? {}),
+    ],
+  )
+  await client.query(
+    `INSERT INTO dashboard.request_agreements
+       (request_id, revision, agreement_type, text_version_id, accepted_by)
+     VALUES
+       ($1, $2, 'non_compete', $3, $4),
+       ($1, $2, 'event_rules', $5, $4)`,
+    [request.id, request.revision, eventSubmission.nonCompeteVersion, actorId, eventSubmission.eventRulesVersion],
+  )
+  return null
+}
+
+/**
+ * Gives the event's current responsible chief an active assignment so the case
+ * appears in the same scoped queue the chief reads. Idempotent.
+ *
+ * The chief is read under the event row lock that a chief change takes, so a
+ * concurrent handover cannot leave the case assigned to the outgoing chief.
+ * Callers hold the request with a NO KEY UPDATE lock (plain UPDATE), which the
+ * handover's assignment inserts (FK KEY SHARE) do not wait on, so the
+ * request → event order here cannot deadlock with event → request there.
+ */
+async function ensureChiefAssignment(client: PoolClient, requestId: string): Promise<string | null> {
+  const { rows } = await client.query<{ chief_id: string }>(
+    `SELECT e.responsible_chief_id AS chief_id
+     FROM dashboard.request_rfps rfp
+     JOIN dashboard.events e ON e.id = rfp.event_id
+     WHERE rfp.request_id = $1
+     FOR SHARE OF e`,
+    [requestId],
+  )
+  const chiefId = rows[0]?.chief_id
+  if (!chiefId) return null
+  await client.query(
+    `INSERT INTO dashboard.case_assignments (request_id, user_id, role, assigned_by)
+     VALUES ($1, $2, 'chief-reviewer', 'system')
+     ON CONFLICT (request_id, user_id, role) WHERE active DO NOTHING`,
+    [requestId, chiefId],
+  )
+  return chiefId
+}
+
+export type TriageAction = 'accept' | 'return' | 'reject'
+
+interface ChiefTransition {
+  history: string
+  toStatus: RequestStatus
+  toStage: ReviewStage
+  title: string
+  body: (request: RequestRow, reason: string | null) => string
+}
+
+const TRIAGE_TRANSITIONS: Record<TriageAction, ChiefTransition> = {
+  accept: {
+    history: 'chief_accept',
+    toStatus: 'in_review',
+    toStage: 'triaged',
+    title: 'تأیید اولیه درخواست',
+    body: (r) => `درخواست ${r.title} با کد رهگیری ${r.tracking_code} در بررسی اولیه سردبیر تأیید شد.`,
+  },
+  return: {
+    history: 'chief_return',
+    toStatus: 'action_needed',
+    toStage: 'chief_triage',
+    title: 'برگشت درخواست جهت اصلاح',
+    body: (r, reason) => `درخواست ${r.title} با کد رهگیری ${r.tracking_code} برای اصلاح برگردانده شد: ${reason}`,
+  },
+  reject: {
+    history: 'chief_reject',
+    toStatus: 'rejected',
+    toStage: 'chief_triage',
+    title: 'رد درخواست',
+    body: (r, reason) => `درخواست ${r.title} با کد رهگیری ${r.tracking_code} رد شد: ${reason}`,
+  },
+}
+
+export type TriageResult =
+  | { request: RequestDto }
+  | 'not_found'
+  | 'forbidden'
+  | 'invalid_state'
+  | 'stale_revision'
+
+export type ReviewDecisionAction = 'advance' | 'return' | 'reject'
+
+/**
+ * A returned or rejected case goes back to the same states as at triage, so
+ * correction, resubmission and the owner's reopen work as they do there, and the
+ * corrected revision passes through the chief again before its new round.
+ */
+const REVIEW_DECISION_TRANSITIONS: Record<ReviewDecisionAction, ChiefTransition> = {
+  advance: {
+    history: 'chief_review_advance',
+    toStatus: 'in_review',
+    toStage: 'advanced',
+    title: 'دعوت به ارسال بسته مالی',
+    body: (r) =>
+      `درخواست ${r.title} با کد رهگیری ${r.tracking_code} مرحله داوری را با تأیید سردبیر پشت سر گذاشت. لطفاً مدارک مالی زیر را برای این پرونده ارسال کنید: ${FINANCIAL_CHECKLIST.map((item) => item.title).join('، ')}.`,
+  },
+  return: {
+    history: 'chief_review_return',
+    toStatus: 'action_needed',
+    toStage: 'chief_triage',
+    title: 'برگشت پروپوزال جهت اصلاح پس از داوری',
+    body: (r, reason) => `پروپوزال درخواست ${r.title} با کد رهگیری ${r.tracking_code} پس از داوری برای اصلاح برگردانده شد: ${reason}`,
+  },
+  reject: {
+    history: 'chief_review_reject',
+    toStatus: 'rejected',
+    toStage: 'chief_triage',
+    title: 'رد درخواست پس از داوری',
+    body: (r, reason) => `درخواست ${r.title} با کد رهگیری ${r.tracking_code} پس از داوری رد شد: ${reason}`,
+  },
+}
+
+export type ReviewDecisionResult = TriageResult | 'round_not_ready'
+
+export type ResubmitResult =
+  | RequestDto
+  | 'not_found'
+  | 'not_correctable'
+  | 'company_not_verified'
+  | { missingFields: string[] }
+
+export type ReopenResult = RequestDto | 'not_found' | 'not_rejected' | 'stale_revision'
+
 export class RequestRepository {
   private readonly notificationOutbox: NotificationOutbox
 
@@ -184,7 +464,7 @@ export class RequestRepository {
 
   async listScoped(
     scope: RequestScope,
-    options: { status?: string; page: number; limit: number },
+    options: RequestFilters & { status?: string; page: number; limit: number },
   ): Promise<RequestList> {
     const where: string[] = []
     const params: unknown[] = []
@@ -194,6 +474,7 @@ export class RequestRepository {
       params.push(options.status)
       where.push(`r.status = $${params.length}`)
     }
+    where.push(...requestFilterClauses(options, params))
     const whereSql = where.join(' AND ')
     const count = await this.pool.query<{ total: string }>(
       `SELECT COUNT(*) AS total FROM dashboard.requests r WHERE ${whereSql}`,
@@ -346,6 +627,48 @@ export class RequestRepository {
     return rows[0] ? mapRequestRow(rows[0]) : undefined
   }
 
+  async updateDraft(
+    id: string,
+    ownerId: string,
+    companyId: string | null,
+    input: { title?: string; answers?: Record<string, unknown> },
+  ): Promise<RequestDto | 'not_found' | 'not_draft'> {
+    if (!isUuid(id)) return 'not_found'
+    const ownership = companyId
+      ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
+      : '(company_id IS NULL AND owner_id = $2)'
+    const client = await this.pool.connect()
+    try {
+      const { rows } = await client.query<RequestRow>(
+        `UPDATE dashboard.requests
+         SET title = COALESCE($3, title),
+             answers = CASE WHEN $4::text IS NOT NULL THEN $4::jsonb ELSE answers END,
+             updated_at = now()
+         WHERE id = $1 AND ${ownership}
+           AND (status = 'draft' OR (status = 'action_needed' AND review_stage = 'chief_triage'))
+         RETURNING ${REQUEST_COLUMNS}`,
+        [
+          id,
+          ownerId,
+          input.title !== undefined ? input.title.trim() : null,
+          input.answers !== undefined ? JSON.stringify(input.answers) : null,
+          ...(companyId ? [companyId] : []),
+        ],
+      )
+      const updated = rows[0]
+      if (updated) return mapRequestRow(updated)
+
+      const existing = await client.query<RequestRow>(
+        `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests
+         WHERE id = $1 AND ${companyId ? '(company_id = $3 OR (company_id IS NULL AND owner_id = $2))' : '(company_id IS NULL AND owner_id = $2)'}`,
+        [id, ownerId, ...(companyId ? [companyId] : [])],
+      )
+      return existing.rows[0] ? 'not_draft' : 'not_found'
+    } finally {
+      client.release()
+    }
+  }
+
   /** Draft → in_review, stamping submissionDate + the first workflow step. */
   async submit(
     id: string,
@@ -353,7 +676,8 @@ export class RequestRepository {
     step?: { assignedRole: string; currentStep: string },
     companyId?: string | null,
     requireVerification = false,
-  ): Promise<RequestDto | 'not_found' | 'already_submitted' | 'stale_rfp' | 'company_not_verified'> {
+    eventSubmission?: { nonCompeteVersion: string; eventRulesVersion: string },
+  ): Promise<RequestDto | 'not_found' | 'already_submitted' | 'stale_rfp' | 'company_not_verified' | { missingFields: string[] }> {
     if (!isUuid(id)) return 'not_found'
     const ownership = companyId
       ? '(company_id = $5 OR (company_id IS NULL AND owner_id = $2))'
@@ -414,6 +738,18 @@ export class RequestRepository {
             JSON.stringify(verification.snapshot)],
         )
       }
+      if (context) {
+        // The UPDATE above holds the row lock that draft edits and document
+        // uploads/deletes take, so the pinned snapshot sees exactly what gets saved.
+        const missing = await pinEventSubmission(client, updated, ownerId, eventSubmission)
+        if (missing) {
+          await client.query('ROLLBACK')
+          return missing
+        }
+        await client.query(`UPDATE dashboard.requests SET review_stage = 'chief_triage' WHERE id = $1`, [updated.id])
+        updated.review_stage = 'chief_triage'
+        await ensureChiefAssignment(client, updated.id)
+      }
       await appendTransition(client, {
         requestId: updated.id,
         ownerId: updated.owner_id,
@@ -454,6 +790,387 @@ export class RequestRepository {
     return submittedRequest
   }
 
+  /**
+   * The responsible chief's triage decision on an event application. Authority is
+   * the event's current responsible chief, re-read under lock, never a cached
+   * assignment. Every outcome commits the state, revision, history row and
+   * notification job together.
+   */
+  async decideTriage(input: {
+    requestId: string
+    actorId: string
+    action: TriageAction
+    reason: string | null
+    expectedRevision?: number
+  }): Promise<TriageResult> {
+    return this.applyChiefDecision<never>(input, TRIAGE_TRANSITIONS[input.action], 'chief_triage')
+  }
+
+  /**
+   * The responsible chief's decision on a complete review round. The request lock
+   * is the one finalizations and the owner's employer replacement also take, so
+   * readiness read under it cannot change before this commits, and a racing second
+   * decision finds the case already moved. The revision moves on with the case:
+   * the round stops being current and its slots can write nothing more. An
+   * advance opens the financial stage (T29) in the same transaction, so a case
+   * never advances without its invitation.
+   */
+  async decideReview(input: {
+    requestId: string
+    actorId: string
+    action: ReviewDecisionAction
+    reason: string | null
+    expectedRevision?: number
+  }): Promise<ReviewDecisionResult> {
+    return this.applyChiefDecision(
+      input,
+      REVIEW_DECISION_TRANSITIONS[input.action],
+      'triaged',
+      async (client, current): Promise<'round_not_ready' | undefined> => {
+        const { rows } = await client.query<{ id: string; proposal_revision: number; completed_at: Date | null }>(
+          `SELECT id, proposal_revision, completed_at FROM dashboard.review_rounds
+           WHERE request_id = $1 AND request_revision = $2
+           FOR NO KEY UPDATE`,
+          [current.id, current.revision],
+        )
+        const round = rows[0]
+        if (!round?.completed_at) return 'round_not_ready'
+        const finalized = await countRoundFinals(client, { id: round.id, requestRevision: current.revision })
+        if (finalized < ROUND_REQUIRED_EVALUATIONS) return 'round_not_ready'
+        await client.query(
+          `UPDATE dashboard.review_rounds
+           SET decision = $2, decided_by = $3, decided_at = now(), decision_reason = $4
+           WHERE id = $1`,
+          [round.id, input.action, input.actorId, input.reason],
+        )
+        if (input.action === 'advance') {
+          await client.query(
+            `INSERT INTO dashboard.financial_invitations
+               (request_id, review_round_id, request_revision, proposal_revision, checklist_version, checklist, invited_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              current.id,
+              round.id,
+              current.revision + 1,
+              round.proposal_revision,
+              FINANCIAL_CHECKLIST_VERSION,
+              JSON.stringify(FINANCIAL_CHECKLIST),
+              input.actorId,
+            ],
+          )
+        }
+        return undefined
+      },
+    )
+  }
+
+  /** The invitation of the case's latest advancement, with the checklist as it was sent. */
+  async findFinancialInvitation(requestId: string): Promise<FinancialInvitationDto | null> {
+    if (!isUuid(requestId)) return null
+    const { rows } = await this.pool.query<{
+      id: string
+      request_id: string
+      tracking_code: string
+      request_revision: number
+      proposal_revision: number
+      checklist_version: string
+      checklist: FinancialChecklistItem[]
+      invited_at: Date
+    }>(
+      `SELECT i.id, i.request_id, r.tracking_code, i.request_revision, i.proposal_revision,
+              i.checklist_version, i.checklist, i.invited_at
+       FROM dashboard.financial_invitations i
+       JOIN dashboard.requests r ON r.id = i.request_id
+       WHERE i.request_id = $1
+       ORDER BY i.request_revision DESC
+       LIMIT 1`,
+      [requestId],
+    )
+    const row = rows[0]
+    if (!row) return null
+    return {
+      id: row.id,
+      requestId: row.request_id,
+      trackingCode: row.tracking_code,
+      requestRevision: row.request_revision,
+      proposalRevision: row.proposal_revision,
+      checklistVersion: row.checklist_version,
+      checklist: row.checklist,
+      invitedAt: row.invited_at.toISOString(),
+    }
+  }
+
+  private async applyChiefDecision<Refusal extends string = never>(
+    input: { requestId: string; actorId: string; reason: string | null; expectedRevision?: number },
+    transition: ChiefTransition,
+    fromStage: ReviewStage,
+    guard?: (client: PoolClient, current: RequestRow) => Promise<Refusal | undefined>,
+  ): Promise<TriageResult | Refusal> {
+    if (!isUuid(input.requestId)) return 'not_found'
+    const client = await this.pool.connect()
+    let decided: RequestRow
+    let notificationJobId: string
+    try {
+      await client.query('BEGIN')
+      const locked = await client.query<RequestRow & { chief_id: string }>(
+        `SELECT ${REQUEST_COLUMNS_ALIASED}, e.responsible_chief_id AS chief_id
+         FROM dashboard.requests r
+         JOIN dashboard.request_rfps rfp ON rfp.request_id = r.id
+         JOIN dashboard.events e ON e.id = rfp.event_id
+         WHERE r.id = $1
+         FOR NO KEY UPDATE OF r FOR SHARE OF e`,
+        [input.requestId],
+      )
+      const current = locked.rows[0]
+      if (!current) {
+        await client.query('ROLLBACK')
+        return 'not_found'
+      }
+      if (current.chief_id !== input.actorId) {
+        await client.query('ROLLBACK')
+        return 'forbidden'
+      }
+      if (current.status !== 'in_review' || current.review_stage !== fromStage) {
+        await client.query('ROLLBACK')
+        return 'invalid_state'
+      }
+      if (input.expectedRevision !== undefined && input.expectedRevision !== current.revision) {
+        await client.query('ROLLBACK')
+        return 'stale_revision'
+      }
+      const refusal = await guard?.(client, current)
+      if (refusal) {
+        await client.query('ROLLBACK')
+        return refusal
+      }
+      const { rows } = await client.query<RequestRow>(
+        `UPDATE dashboard.requests
+         SET status = $2, review_stage = $3, revision = revision + 1, updated_at = now()
+         WHERE id = $1
+         RETURNING ${REQUEST_COLUMNS}`,
+        [input.requestId, transition.toStatus, transition.toStage],
+      )
+      const updated = rows[0]
+      if (!updated) throw new Error('UPDATE requests returned no row')
+      await appendTransition(client, {
+        requestId: updated.id,
+        ownerId: updated.owner_id,
+        actorId: input.actorId,
+        action: transition.history,
+        fromState: current.status,
+        toState: updated.status,
+        revision: updated.revision,
+        reason: input.reason,
+      })
+      const job = await this.notificationOutbox.enqueue(client, {
+        requestId: updated.id,
+        recipientId: updated.owner_id,
+        actorId: input.actorId,
+        action: transition.history,
+        fromState: current.status,
+        toState: updated.status,
+        revision: updated.revision,
+        title: transition.title,
+        body: transition.body(updated, input.reason),
+      })
+      decided = updated
+      notificationJobId = job.id
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw err
+    } finally {
+      client.release()
+    }
+    await this.deliverQuietly(notificationJobId)
+    return { request: mapRequestRow(decided) }
+  }
+
+  /**
+   * Company resubmission of a case the chief returned. The same request and
+   * tracking code receive a new revision with its own proposal/agreement snapshot;
+   * earlier revisions stay untouched.
+   */
+  async resubmitCorrection(
+    id: string,
+    actorId: string,
+    companyId: string | null,
+    eventSubmission?: { nonCompeteVersion: string; eventRulesVersion: string },
+  ): Promise<ResubmitResult> {
+    if (!isUuid(id)) return 'not_found'
+    const ownership = companyId
+      ? '(company_id = $3 OR (company_id IS NULL AND owner_id = $2))'
+      : '(company_id IS NULL AND owner_id = $2)'
+    const ownershipParams = companyId ? [companyId] : []
+    const client = await this.pool.connect()
+    let resubmitted: RequestRow
+    const jobIds: string[] = []
+    try {
+      await client.query('BEGIN')
+      const { rows } = await client.query<RequestRow>(
+        `UPDATE dashboard.requests
+         SET status = 'in_review', updated_at = now(), revision = revision + 1, submitted_by = $2
+         WHERE id = $1 AND ${ownership} AND status = 'action_needed' AND review_stage = 'chief_triage'
+         RETURNING ${REQUEST_COLUMNS}`,
+        [id, actorId, ...ownershipParams],
+      )
+      const updated = rows[0]
+      if (!updated) {
+        await client.query('ROLLBACK')
+        const existing = await client.query(
+          `SELECT 1 FROM dashboard.requests WHERE id = $1 AND ${ownership}`,
+          [id, actorId, ...ownershipParams],
+        )
+        return existing.rows.length > 0 ? 'not_correctable' : 'not_found'
+      }
+      const verification = await lockApprovedVerification(client, companyId ?? updated.company_id)
+      if (!verification) {
+        await client.query('ROLLBACK')
+        return 'company_not_verified'
+      }
+      const missing = await pinEventSubmission(client, updated, actorId, eventSubmission)
+      if (missing) {
+        await client.query('ROLLBACK')
+        return missing
+      }
+      const chiefId = await ensureChiefAssignment(client, updated.id)
+      await appendTransition(client, {
+        requestId: updated.id,
+        ownerId: updated.owner_id,
+        actorId,
+        action: 'correction_submit',
+        fromState: 'action_needed',
+        toState: updated.status,
+        revision: updated.revision,
+        reason: null,
+      })
+      const recipients = new Set([updated.owner_id, ...(chiefId ? [chiefId] : [])])
+      for (const recipientId of recipients) {
+        const job = await this.notificationOutbox.enqueue(client, {
+          requestId: updated.id,
+          recipientId,
+          actorId,
+          action: 'correction_submit',
+          fromState: 'action_needed',
+          toState: updated.status,
+          revision: updated.revision,
+          title: 'ارسال اصلاحیه درخواست',
+          body: `اصلاحیه درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} ارسال شد.`,
+        })
+        jobIds.push(job.id)
+      }
+      resubmitted = updated
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw err
+    } finally {
+      client.release()
+    }
+    for (const jobId of jobIds) await this.deliverQuietly(jobId)
+    return mapRequestRow(resubmitted)
+  }
+
+  /** Owner-only reopen of a terminally rejected application: same case, new revision, reason on record. */
+  async reopenRejected(input: {
+    requestId: string
+    actorId: string
+    reason: string
+    expectedRevision?: number
+  }): Promise<ReopenResult> {
+    if (!isUuid(input.requestId)) return 'not_found'
+    const client = await this.pool.connect()
+    let reopened: RequestRow
+    const jobIds: string[] = []
+    try {
+      await client.query('BEGIN')
+      const locked = await client.query<RequestRow>(
+        `SELECT ${REQUEST_COLUMNS} FROM dashboard.requests WHERE id = $1 FOR NO KEY UPDATE`,
+        [input.requestId],
+      )
+      const current = locked.rows[0]
+      if (!current) {
+        await client.query('ROLLBACK')
+        return 'not_found'
+      }
+      if (current.status !== 'rejected' || current.review_stage !== 'chief_triage') {
+        await client.query('ROLLBACK')
+        return 'not_rejected'
+      }
+      if (input.expectedRevision !== undefined && input.expectedRevision !== current.revision) {
+        await client.query('ROLLBACK')
+        return 'stale_revision'
+      }
+      const { rows } = await client.query<RequestRow>(
+        `UPDATE dashboard.requests
+         SET status = 'in_review', revision = revision + 1, updated_at = now()
+         WHERE id = $1
+         RETURNING ${REQUEST_COLUMNS}`,
+        [input.requestId],
+      )
+      const updated = rows[0]
+      if (!updated) throw new Error('UPDATE requests returned no row')
+      const chiefId = await ensureChiefAssignment(client, updated.id)
+      await appendTransition(client, {
+        requestId: updated.id,
+        ownerId: updated.owner_id,
+        actorId: input.actorId,
+        action: 'owner_reopen',
+        fromState: 'rejected',
+        toState: updated.status,
+        revision: updated.revision,
+        reason: input.reason,
+      })
+      const recipients = new Set([updated.owner_id, ...(chiefId ? [chiefId] : [])])
+      for (const recipientId of recipients) {
+        const job = await this.notificationOutbox.enqueue(client, {
+          requestId: updated.id,
+          recipientId,
+          actorId: input.actorId,
+          action: 'owner_reopen',
+          fromState: 'rejected',
+          toState: updated.status,
+          revision: updated.revision,
+          title: 'بازگشایی درخواست',
+          body: `درخواست ${updated.title} با کد رهگیری ${updated.tracking_code} بازگشایی شد: ${input.reason}`,
+        })
+        jobIds.push(job.id)
+      }
+      reopened = updated
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw err
+    } finally {
+      client.release()
+    }
+    for (const jobId of jobIds) await this.deliverQuietly(jobId)
+    return mapRequestRow(reopened)
+  }
+
+  /** A committed pending job stays available for operator recovery if delivery fails. */
+  private async deliverQuietly(jobId: string): Promise<void> {
+    try {
+      await this.notificationOutbox.deliver(jobId)
+    } catch {
+      // Recoverable through the outbox retry endpoints.
+    }
+  }
+
+  /** Ids among `requestIds` whose event names `chiefId` as responsible chief. */
+  async requestsOfResponsibleChief(requestIds: string[], chiefId: string): Promise<Set<string>> {
+    const ids = requestIds.filter(isUuid)
+    if (ids.length === 0) return new Set()
+    const { rows } = await this.pool.query<{ request_id: string }>(
+      `SELECT rfp.request_id
+       FROM dashboard.request_rfps rfp
+       JOIN dashboard.events e ON e.id = rfp.event_id
+       WHERE rfp.request_id = ANY($1::uuid[]) AND e.responsible_chief_id = $2`,
+      [ids, chiefId],
+    )
+    return new Set(rows.map((row) => row.request_id))
+  }
+
   async findRequestVerification(requestId: string): Promise<RequestVerificationDto | null> {
     if (!isUuid(requestId)) return null
     const { rows } = await this.pool.query<{
@@ -478,5 +1195,78 @@ export class RequestRepository {
       snapshot: row.snapshot,
       createdAt: row.created_at.toISOString(),
     }
+  }
+
+  async findRequestProposal(requestId: string, revision?: number): Promise<RequestProposalDto | null> {
+    if (!isUuid(requestId)) return null
+    const params: unknown[] = [requestId]
+    let sql = `SELECT request_id, revision, form_version, application_team, proposal_documents, answers, created_at
+               FROM dashboard.request_proposals WHERE request_id = $1`
+    if (revision !== undefined) {
+      params.push(revision)
+      sql += ` AND revision = $${params.length}`
+    } else {
+      sql += ` ORDER BY revision DESC LIMIT 1`
+    }
+    const { rows } = await this.pool.query<{
+      request_id: string
+      revision: number
+      form_version: string
+      application_team: ApplicationTeamMember[]
+      proposal_documents: PinnedProposalDocument[]
+      answers: Record<string, unknown> | null
+      created_at: Date
+    }>(sql, params)
+    const row = rows[0]
+    if (!row) return null
+    return {
+      requestId: row.request_id,
+      revision: row.revision,
+      formVersion: row.form_version,
+      applicationTeam: row.application_team,
+      proposalDocuments: row.proposal_documents,
+      answers: row.answers ?? null,
+      createdAt: row.created_at.toISOString(),
+    }
+  }
+
+  /** Revisions that have a submitted snapshot, oldest first. */
+  async listProposalRevisions(requestId: string): Promise<number[]> {
+    if (!isUuid(requestId)) return []
+    const { rows } = await this.pool.query<{ revision: number }>(
+      'SELECT revision FROM dashboard.request_proposals WHERE request_id = $1 ORDER BY revision ASC',
+      [requestId],
+    )
+    return rows.map((row) => row.revision)
+  }
+
+  async listRequestAgreements(requestId: string, revision?: number): Promise<RequestAgreementDto[]> {
+    if (!isUuid(requestId)) return []
+    const params: unknown[] = [requestId]
+    let sql = `SELECT id, request_id, revision, agreement_type, text_version_id, accepted_by, accepted_at
+               FROM dashboard.request_agreements WHERE request_id = $1`
+    if (revision !== undefined) {
+      params.push(revision)
+      sql += ` AND revision = $${params.length}`
+    }
+    sql += ` ORDER BY revision ASC, agreement_type ASC`
+    const { rows } = await this.pool.query<{
+      id: string
+      request_id: string
+      revision: number
+      agreement_type: AgreementType
+      text_version_id: string
+      accepted_by: string
+      accepted_at: Date
+    }>(sql, params)
+    return rows.map((r) => ({
+      id: r.id,
+      requestId: r.request_id,
+      revision: r.revision,
+      agreementType: r.agreement_type,
+      textVersionId: r.text_version_id,
+      acceptedBy: r.accepted_by,
+      acceptedAt: r.accepted_at.toISOString(),
+    }))
   }
 }

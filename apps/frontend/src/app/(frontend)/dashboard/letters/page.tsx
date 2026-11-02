@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import { AdminLettersView, type AdminLetterItem } from '@/components/dashboard/admin-letters-view'
 import { ApplicantLettersView, type ApplicantLetterItem } from '@/components/dashboard/applicant-letters-view'
+import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
 import { Typography } from '@/components/ui/typography'
 import {
   formatDate,
@@ -12,7 +13,12 @@ import {
   type Paginated,
   type SupportTicketDto,
 } from '@/utilities/dashboard-api'
-import { isSeniorManagerUser, serverDashboardFetch } from '@/utilities/dashboard-server'
+import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
+import {
+  isSeniorManagerUser,
+  serverDashboardFetchResult,
+  type DashboardFetchResult,
+} from '@/utilities/dashboard-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,8 +28,15 @@ export const metadata: Metadata = {
     'مشاهده نامه‌ها، پیام‌ها و تیکت‌های پشتیبانی در سامانه کارخانه نوآوری صنایع انرژی بوشهر',
 }
 
-interface PageProps {
-  searchParams?: Promise<{ state?: 'default' | 'loading' | 'empty' }>
+/**
+ * Support tickets are closed to reviewers and investment staff by design, so a 403 there
+ * only means the tab has nothing for this role. Any other failed read must not look empty.
+ */
+function lettersFailure(
+  letters: DashboardFetchResult<unknown>,
+  tickets: DashboardFetchResult<unknown>,
+) {
+  return unavailableReasonFor(letters) ?? (tickets.kind === 'denied' ? undefined : unavailableReasonFor(tickets))
 }
 
 function toAdminLetterItem(dto: LetterDto): AdminLetterItem {
@@ -40,19 +53,19 @@ function toAdminLetterItem(dto: LetterDto): AdminLetterItem {
   }
 }
 
-export default async function LettersPage(props: PageProps) {
+export default async function LettersPage() {
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: await headers() })
   const isSeniorManager = await isSeniorManagerUser(payload, user)
-  const searchParams = await props.searchParams
-  const state = searchParams?.state ?? 'default'
 
   if (isSeniorManager) {
     const [lettersRes, ticketsRes] = await Promise.all([
-      serverDashboardFetch<Paginated<LetterDto>>('/admin/letters?limit=100'),
-      serverDashboardFetch<Paginated<SupportTicketDto>>('/support?limit=100'),
+      serverDashboardFetchResult<Paginated<LetterDto>>('/admin/letters?limit=100'),
+      serverDashboardFetchResult<Paginated<SupportTicketDto>>('/support?limit=100'),
     ])
-    const tickets: AdminLetterItem[] = (ticketsRes?.items ?? []).map((ticket) => ({
+    const failure = lettersFailure(lettersRes, ticketsRes)
+    if (failure) return <DashboardReadNotice reason={failure} retryHref="/dashboard/letters" />
+    const tickets: AdminLetterItem[] = (ticketsRes.kind === 'ok' ? ticketsRes.data.items : []).map((ticket) => ({
       id: `support:${ticket.id}`,
       title: ticket.subject,
       type: 'notification',
@@ -62,7 +75,7 @@ export default async function LettersPage(props: PageProps) {
       sentDate: formatDate(ticket.createdAt),
       source: 'ticket',
     }))
-    const letters: AdminLetterItem[] = (lettersRes?.items ?? []).map(toAdminLetterItem)
+    const letters: AdminLetterItem[] = (lettersRes.kind === 'ok' ? lettersRes.data.items : []).map(toAdminLetterItem)
     const formsResult = await payload.find({
       collection: 'form-submissions',
       limit: 100,
@@ -97,17 +110,19 @@ export default async function LettersPage(props: PageProps) {
         >
           کارتابل نامه
         </Typography>
-        <AdminLettersView initialLetters={[...letters, ...forms, ...tickets]} state={state} />
+        <AdminLettersView initialLetters={[...letters, ...forms, ...tickets]} />
       </div>
     )
   }
 
   const [lettersRes, ticketsRes] = await Promise.all([
-    serverDashboardFetch<Paginated<LetterDto>>('/letters?limit=100'),
-    serverDashboardFetch<Paginated<SupportTicketDto>>('/support?limit=100'),
+    serverDashboardFetchResult<Paginated<LetterDto>>('/letters?limit=100'),
+    serverDashboardFetchResult<Paginated<SupportTicketDto>>('/support?limit=100'),
   ])
-  const fetchedLetters = lettersRes?.items ?? []
-  const fetchedTickets = ticketsRes?.items ?? []
+  const failure = lettersFailure(lettersRes, ticketsRes)
+  if (failure) return <DashboardReadNotice reason={failure} retryHref="/dashboard/letters" />
+  const fetchedLetters = lettersRes.kind === 'ok' ? lettersRes.data.items : []
+  const fetchedTickets = ticketsRes.kind === 'ok' ? ticketsRes.data.items : []
 
   const letters: ApplicantLetterItem[] = fetchedLetters.map((dto) => ({
     id: dto.id,
@@ -141,7 +156,7 @@ export default async function LettersPage(props: PageProps) {
       >
         کارتابل نامه
       </Typography>
-      <ApplicantLettersView initialLetters={[...letters, ...tickets]} state={state} />
+      <ApplicantLettersView initialLetters={[...letters, ...tickets]} />
     </div>
   )
 }

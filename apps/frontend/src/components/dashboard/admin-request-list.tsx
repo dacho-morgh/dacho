@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   AdminListView,
@@ -7,14 +7,35 @@ import {
   type AdminColumn,
   type AdminListLoadState,
 } from '@/components/dashboard/admin-list-view'
+import { RequestsPagination } from '@/components/dashboard/requests/requests-pagination'
+import {
+  requestFiltersQuery,
+  type RequestQueueFilters,
+  type RequestStatus,
+} from '@/components/dashboard/requests/types'
 import { Typography } from '@/components/ui/typography'
 type Request = {
   id: string
   company: string
   request: string
   status: 'پیش‌نویس' | 'درحال بررسی' | 'نیازمند اصلاح' | 'تایید شده' | 'رد شده'
+  stage: string
+  /** The next step the server lists for this person, if any. */
+  pending: string | null
   date: string
 }
+const STAGE_LABELS: Record<string, string> = {
+  chief_triage: 'بررسی اولیه',
+  triaged: 'داوری',
+  advanced: 'مالی و سرمایه‌گذاری',
+}
+/** Most specific first; only commands with a control on the dossier. */
+const PENDING_LABELS: [string, string][] = [
+  ['triage', 'منتظر بررسی اولیه شما'],
+  ['startReview', 'منتظر تعیین داوران'],
+  ['decideReview', 'منتظر تصمیم شما'],
+  ['reopen', 'قابل بازگشایی'],
+]
 const statusStyle: Record<
   Request['status'],
   { color: 'brand-600' | 'error' | 'secondary' | 'success'; bg: string }
@@ -49,6 +70,18 @@ const columns: AdminColumn<Request>[] = [
       return <Typography variant="14/regular" color={style.color} className={`inline-block rounded-lg px-3 py-1 ${style.bg}`}>{item.status}</Typography>
     },
   },
+  {
+    id: 'stage',
+    header: 'مرحله',
+    render: (item) => (
+      <span className="flex flex-col gap-1">
+        {text(item.stage)}
+        {item.pending ? (
+          <Typography variant="12/regular" color="brand-600">{item.pending}</Typography>
+        ) : null}
+      </span>
+    ),
+  },
   { id: 'date', header: 'تاریخ ثبت', render: (item) => text(item.date) },
   {
     id: 'actions',
@@ -59,42 +92,68 @@ const columns: AdminColumn<Request>[] = [
     ),
   },
 ]
-export function AdminRequestList() {
+export function AdminRequestList({
+  status,
+  page = 1,
+  filters = {},
+}: {
+  status?: RequestStatus
+  page?: number
+  filters?: RequestQueueFilters
+} = {}) {
   const [requests, setRequests] = useState<Request[]>([])
+  const [totalPages, setTotalPages] = useState(1)
   const [loadState, setLoadState] = useState<AdminListLoadState>('loading')
+  // The API narrows and pages the list, so what shows matches the count of the same filters.
+  const query = `limit=50&page=${page}${status ? `&status=${status}` : ''}${requestFiltersQuery(filters)}`
+  const latestLoad = useRef(0)
   const loadRequests = useCallback(async () => {
+    const load = ++latestLoad.current
     setLoadState('loading')
     try {
-      const response = await fetch('/api/dashboard/admin/requests?limit=100', { cache: 'no-store' })
+      const response = await fetch(`/api/dashboard/admin/requests?${query}`, { cache: 'no-store' })
+      // A slower answer to an earlier filter must not replace the current list.
+      if (load !== latestLoad.current) return
       if (response.status === 401) { setLoadState('unauthenticated'); return }
       if (response.status === 403) { setLoadState('denied'); return }
       if (!response.ok) { setLoadState('error'); return }
-      const data = (await response.json()) as { items?: { id: string; title: string; status: string; createdAt: string; owner?: { companyName?: string; name?: string } }[] }
+      const data = (await response.json()) as { totalPages?: number; items?: { id: string; title: string; status: string; reviewStage?: string | null; allowedActions?: string[]; createdAt: string; owner?: { companyName?: string; name?: string } }[] }
+      if (load !== latestLoad.current) return
       if (!Array.isArray(data.items)) { setLoadState('error'); return }
+      setTotalPages(data.totalPages ?? 1)
       setRequests(data.items.map((item) => ({
         id: item.id,
         company: item.owner?.companyName || item.owner?.name || '—',
         request: item.title,
         status: ({ draft: 'پیش‌نویس', in_review: 'درحال بررسی', action_needed: 'نیازمند اصلاح', approved: 'تایید شده', rejected: 'رد شده' }[item.status] ?? item.status) as Request['status'],
+        stage: (item.reviewStage && STAGE_LABELS[item.reviewStage]) || '—',
+        pending: PENDING_LABELS.find(([action]) => item.allowedActions?.includes(action))?.[1] ?? null,
         date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fa-IR') : '—',
       })))
       setLoadState('ready')
     } catch {
-      setLoadState('error')
+      if (load === latestLoad.current) setLoadState('error')
     }
-  }, [])
+  }, [query])
   useEffect(() => { void loadRequests() }, [loadRequests])
   return (
-    <AdminListView
-      title="درخواست ها"
-      addLabel="درخواست جدید"
-      searchPlaceholder="درخواست خود را جست و جو کنید"
-      items={requests}
-      getSearchText={(item) => Object.values(item).join(' ')}
-      getKey={(item) => item.id}
-      columns={columns}
-      loadState={loadState}
-      onRetry={() => void loadRequests()}
-    />
+    <>
+      <AdminListView
+        title="درخواست ها"
+        addLabel="درخواست جدید"
+        items={requests}
+        getSearchText={(item) => Object.values(item).join(' ')}
+        getKey={(item) => item.id}
+        columns={columns}
+        loadState={loadState}
+        onRetry={() => void loadRequests()}
+        serverFiltered
+      />
+      {loadState === 'ready' && (
+        <div className="pb-4">
+          <RequestsPagination page={page} totalPages={totalPages} status={status} filters={filters} />
+        </div>
+      )}
+    </>
   )
 }

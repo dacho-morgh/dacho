@@ -1,43 +1,123 @@
+import type { ReactNode } from 'react'
 import configPromise from '@payload-config'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
-import { AdminRequestDetail } from '@/components/dashboard/admin-request-detail'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
+import { CompanyCorrectionPanel } from '@/components/dashboard/company-correction-panel'
+import { CompanyRequestTracking } from '@/components/dashboard/company-request-tracking'
+import { RequestDossier, type DossierPart } from '@/components/dashboard/request-dossier'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Typography } from '@/components/ui/typography'
 import {
-  canDeleteDocuments,
-  canUploadDocuments,
   formatDate,
+  type CompanySupplementaryRequestDto,
+  type EvaluationListDto,
+  type PublishedResultDto,
   type RequestDetail,
+  type RequestProposalDetail,
+  type RequestVerificationDto,
+  type ReviewCandidatesDto,
+  type ReviewRoundDto,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
-import { isInternalDashboardUser, serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import {
+  dashboardOperationalRole,
+  serverDashboardFetchResult,
+  type DashboardFetchResult,
+} from '@/utilities/dashboard-server'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
+import { trackingOutcome } from '@/utilities/request-tracking'
+import { ReviewerCaseFile, type ReviewerCaseInitial } from '@/components/dashboard/reviewer/reviewer-case-file'
+import { isReviewerRole, type ReviewCaseFileDto } from '@/utilities/reviewer-case'
+import { serviceFormFields } from '@/utilities/service-form-fields'
+import type { RequestFormField } from '@/components/dashboard/request-form-field'
 
 export const dynamic = 'force-dynamic'
 
-const NEXT_ACTION_LABELS: Record<string, string> = {
-  submit: 'ثبت/ارسال نهایی درخواست',
-  uploadDocument: 'بارگذاری مدارک خواسته‌شده',
-  deleteDocument: 'حذف و جایگزینی مدرک',
-  read: 'مشاهده؛ اقدام فعالی برای شما ثبت نشده است',
+/** The service's fixed form, read from the CMS; a failed read offers no answer fields rather than failing the page. */
+async function serviceFields(payload: Awaited<ReturnType<typeof getPayload>>, serviceId: string): Promise<RequestFormField[]> {
+  try {
+    const service = await payload.findByID({ collection: 'services', id: serviceId, depth: 2 })
+    return serviceFormFields(service)
+  } catch {
+    return []
+  }
+}
+
+function reviewerCaseInitial(result: DashboardFetchResult<ReviewCaseFileDto>): ReviewerCaseInitial {
+  if (result.kind === 'ok') return { kind: 'ok', data: result.data }
+  if (result.kind === 'unauthenticated') return { kind: 'expired' }
+  if (result.kind === 'denied') return { kind: 'denied' }
+  return result.status === 404 ? { kind: 'not-assigned' } : { kind: 'error' }
+}
+
+/** A section's read: a failure stays distinct from "this role has no such section". */
+async function readPart<T>(path: string): Promise<DossierPart<T>> {
+  const result = await serverDashboardFetchResult<T>(path)
+  return result.kind === 'ok' ? result.data : 'failed'
+}
+
+/** The pinned profile: a 404 means the case has none, which is not a failed read. */
+async function readProfile(path: string): Promise<DossierPart<RequestVerificationDto>> {
+  const result = await serverDashboardFetchResult<RequestVerificationDto>(path)
+  if (result.kind === 'ok') return result.data
+  return result.kind === 'unavailable' && result.status === 404 ? { verification: null } : 'failed'
+}
+
+/** Everyone the round response names: slot holders, replaced people and who replaced them. */
+function roundPeople(round: DossierPart<{ round: ReviewRoundDto | null }>): string[] {
+  const current = round && round !== 'failed' ? round.round : null
+  if (!current) return []
+  return [
+    ...(current.employerId ? [current.employerId] : []),
+    ...(current.slots ?? []).map((slot) => slot.userId),
+    ...(current.replacements ?? []).flatMap((item) => [item.oldUserId, item.newUserId, item.replacedBy]),
+  ]
+}
+
+/**
+ * Display names for ids the dashboard API already returned to this oversight reader.
+ * Only names are read; a failed lookup leaves the generic slot labels.
+ */
+async function peopleNames(payload: Awaited<ReturnType<typeof getPayload>>, ids: string[]): Promise<Record<string, string>> {
+  const unique = [...new Set(ids.filter(Boolean))]
+  if (!unique.length) return {}
+  try {
+    const found = await payload.find({
+      collection: 'users',
+      where: { id: { in: unique } },
+      depth: 0,
+      limit: unique.length,
+      pagination: false,
+      select: { name: true },
+    })
+    const names: Record<string, string> = {}
+    for (const user of found.docs) {
+      const name = typeof user.name === 'string' ? user.name.trim() : ''
+      if (name) names[String(user.id)] = name
+    }
+    return names
+  } catch {
+    return {}
+  }
 }
 
 export default async function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
-  const isInternal = isInternalDashboardUser(user)
+  const role = dashboardOperationalRole(user) ?? 'representative'
+  const path = `/requests/${encodeURIComponent(id)}`
 
-  if (isInternal) {
-    return <AdminRequestDetail id={id} />
+  // Reviewers and employers read only their assigned case file (T23). The server answers
+  // 404 for an unassigned, foreign-event or guessed id, which is a denied state, not a missing page.
+  if (isReviewerRole(role)) {
+    const caseResult = await serverDashboardFetchResult<ReviewCaseFileDto>(`/review/cases/${encodeURIComponent(id)}`)
+    return <ReviewerCaseFile key={id} requestId={id} initial={reviewerCaseInitial(caseResult)} />
   }
 
-  const result = await serverDashboardFetchResult<RequestDetail>(
-    `/requests/${encodeURIComponent(id)}`,
-  )
+  const result = await serverDashboardFetchResult<RequestDetail>(path)
   if (result.kind !== 'ok') {
     const notice = unavailableReasonFor(result)
     // A failed read is not a missing case: only a genuine 404 renders notFound.
@@ -51,181 +131,124 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       </main>
     )
   }
-  const data = result.data
-  const canUpload = canUploadDocuments(data.request)
-  const canDelete = canDeleteDocuments(data.request)
 
-  const allowedActions = data.request.allowedActions ?? []
-  const nextAction =
-    allowedActions.find((action) => action !== 'read') ??
-    (allowedActions.length ? 'read' : undefined)
+  // Reviewers and employers see only their own work, and investment people have no part
+  // in the round: these reads are for the chief, the Secretariat and the owner.
+  const oversees = role === 'system-owner' || role === 'central-secretariat' || role === 'chief-reviewer'
+  const isCompany = role === 'representative'
+  const [proposal, round, evaluations, publishedResult, supplementary, profile] = await Promise.all([
+    readPart<RequestProposalDetail>(`${path}/proposal`),
+    oversees ? readPart<{ round: ReviewRoundDto | null }>(`${path}/review-round`) : null,
+    oversees ? readPart<EvaluationListDto>(`${path}/evaluations`) : null,
+    isCompany ? readPart<{ result: PublishedResultDto | null }>(`${path}/result`) : null,
+    isCompany ? readPart<{ items: CompanySupplementaryRequestDto[] }>(`${path}/supplementary-requests`) : null,
+    // The chief triages the profile as submitted, not the live one the company may have edited since.
+    oversees ? readProfile(`${path}/verification`) : null,
+  ])
+
+  // A new round's fixed employer comes from the chief's candidate read; the dialog reads the picks itself.
+  const starts = role === 'chief-reviewer' && (result.data.request.allowedActions ?? []).includes('startReview')
+  const startCandidates = starts ? await readPart<ReviewCandidatesDto>(`${path}/review-round/candidates`) : null
+  const roundEmployerId = startCandidates && startCandidates !== 'failed' ? startCandidates.employerId : null
+  const people = oversees
+    ? await peopleNames(payload, [...roundPeople(round), ...(roundEmployerId ? [roundEmployerId] : [])])
+    : {}
+
+  // The correction form edits the service's fixed answers; an unreadable form leaves the team and files editable.
+  const correcting = isCompany && (result.data.request.allowedActions ?? []).includes('correct')
+  const correctionFields = correcting ? await serviceFields(payload, result.data.request.serviceId) : []
+  const outcome = isCompany ? trackingOutcome(result.data.request, result.data.timeline) : null
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6 sm:p-10" dir="rtl">
-      <Typography as="h1" variant="24/bold" className="text-neutral-900">
-        {data.request.title}
-      </Typography>
-      <div className="grid gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-3">
-        <Field label="کد پیگیری" value={data.request.trackingCode} mono />
-        <Field label="وضعیت" value={requestStatusLabel(data.request.status)} />
-        <Field label="گام جاری" value={data.request.currentStep || 'ثبت نشده'} />
-        <Field
-          label="اقدام بعدی شما"
-          value={
-            nextAction
-              ? (NEXT_ACTION_LABELS[nextAction] ?? nextAction)
-              : 'اقدامی برای شما تعریف نشده است'
-          }
-        />
-        <Field label="تاریخ ثبت" value={formatDate(data.request.submissionDate) || 'ثبت نشده'} />
-        <Field label="آخرین به‌روزرسانی" value={formatDate(data.request.updatedAt)} />
-      </div>
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <Typography as="h2" variant="20/bold" className="text-neutral-900">
-          اطلاعات درخواست
-        </Typography>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {Object.entries(data.request.answers ?? {}).map(([key, value]) => (
-            <div key={key} className="rounded-lg bg-neutral-50 p-3">
-              <Typography variant="12/regular" className="text-neutral-500">
-                {key}
-              </Typography>
-              <Typography variant="16/regular" className="mt-1 text-neutral-800">
-                {String(value ?? '—')}
-              </Typography>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
-        <Typography as="h2" variant="20/bold" className="text-neutral-900">
-          مدارک درخواست
-        </Typography>
-        <Typography variant="14/regular" className="text-neutral-500">
-          مدارک مالی فقط برای شرکت، دبیرخانه، صاحب سیستم و مسئول سرمایه‌گذاریِ منتسب قابل مشاهده است.
-        </Typography>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <PrivateDocumentField
-            category="proposal"
-            label="پروپوزال"
-            requestId={data.request.id}
-            canUpload={canUpload}
-            canDelete={canDelete}
+    <RequestDossier
+      role={role}
+      correctionHandled={correcting}
+      detail={result.data}
+      proposal={proposal}
+      round={round}
+      evaluations={evaluations}
+      profile={profile}
+      people={people}
+      roundEmployerId={roundEmployerId}
+      companySections={
+        isCompany ? (
+          <CompanySections
+            request={result.data.request}
+            timeline={result.data.timeline}
+            proposalRevision={proposal === 'failed' ? 'failed' : (proposal?.proposal?.revision ?? null)}
+            publishedResult={publishedResult}
+            supplementary={supplementary}
+            correction={
+              correcting ? (
+                <CompanyCorrectionPanel
+                  request={result.data.request}
+                  fields={correctionFields}
+                  after={outcome?.kind === 'correction' ? outcome.after : null}
+                />
+              ) : null
+            }
           />
-          {(
-            [
-              ['financialStatements', 'صورت‌های مالی'],
-              ['debtFacilityEvidence', 'بدهی‌ها و تسهیلات'],
-              ['taxInsuranceRecords', 'اظهارنامه مالیاتی و بیمه'],
-              ['contractsOrdersMousCommitments', 'قراردادها و تعهدات'],
-              ['projectEstimateUseOfFunds', 'برآورد و مصرف منابع'],
-              ['guaranteeCollateral', 'تضامین و وثایق'],
-            ] as const
-          ).map(([category, label]) => (
-            <PrivateDocumentField
-              key={category}
-              category={category}
-              label={label}
-              requestId={data.request.id}
-              canUpload={canUpload}
-              canDelete={canDelete}
-            />
-          ))}
-        </div>
-      </section>
+        ) : null
+      }
+    />
+  )
+}
 
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <Typography as="h2" variant="20/bold" className="text-neutral-900">
-          روند بررسی
+/** The company's tracking, correction and result, then the Secretariat's document requests. */
+function CompanySections({
+  request,
+  timeline,
+  proposalRevision,
+  publishedResult,
+  supplementary,
+  correction,
+}: {
+  request: RequestDetail['request']
+  timeline: RequestDetail['timeline']
+  proposalRevision: DossierPart<number>
+  publishedResult: DossierPart<{ result: PublishedResultDto | null }>
+  supplementary: DossierPart<{ items: CompanySupplementaryRequestDto[] }>
+  correction: ReactNode
+}) {
+  const requestId = request.id
+  return (
+    <>
+      <CompanyRequestTracking
+        request={request}
+        timeline={timeline}
+        proposalRevision={proposalRevision}
+        publishedResult={publishedResult}
+        correction={correction}
+      />
+      {supplementary === 'failed' ? (
+        <Typography role="alert" variant="14/regular" color="error">
+          دریافت درخواست‌های دبیرخانه انجام نشد. صفحه را دوباره بارگذاری کنید.
         </Typography>
-        {data.workflow.length ? (
-          <ol className="mt-4 space-y-3">
-            {data.workflow.map((step) => {
-              const isCurrent = step.title === data.request.currentStep
-              return (
-                <li
-                  key={`${step.order}-${step.title}`}
-                  className={`rounded-lg p-3 ${isCurrent ? 'bg-brand-50 text-brand-700' : 'bg-neutral-50'}`}
-                  aria-current={isCurrent ? 'step' : undefined}
-                >
-                  <Typography
-                    variant="16/regular"
-                    className={isCurrent ? 'text-brand-700' : 'text-neutral-800'}
-                  >
-                    {step.order}. {step.title}
-                    {step.roleName ? ` · ${step.roleName}` : ''}
-                  </Typography>
-                </li>
-              )
-            })}
-          </ol>
-        ) : (
-          <Typography variant="14/regular" className="mt-4 text-neutral-500">
-            روندی برای این خدمت ثبت نشده است.
+      ) : supplementary?.items.length ? (
+        <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+          <Typography as="h2" variant="20/bold" className="text-neutral-900">
+            مدارک تکمیلی درخواست‌شده
           </Typography>
-        )}
-      </section>
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <Typography as="h2" variant="20/bold" className="text-neutral-900">
-          تاریخچه
-        </Typography>
-        {data.timeline.length ? (
-          <ol className="mt-4 space-y-3">
-            {data.timeline.map((event) => (
-              <li key={event.id} className="rounded-lg border border-neutral-100 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <Typography variant="16/regular" className="text-neutral-800">
-                    {event.title}
-                  </Typography>
-                  <Typography variant="12/regular" className="font-mono text-neutral-400">
-                    {formatDate(event.at)}
-                  </Typography>
-                </div>
-                {event.description && (
-                  <Typography variant="14/regular" className="mt-1 text-neutral-600">
-                    {event.description}
-                  </Typography>
-                )}
-                <Typography variant="12/regular" className="mt-1 text-neutral-400">
-                  نوع رویداد: {event.type}
+          <ul className="flex flex-col gap-2">
+            {supplementary.items.map((item) => (
+              <li key={item.id} className="rounded-lg bg-neutral-50 p-3">
+                <Typography variant="12/regular" className="text-neutral-500">
+                  {formatDate(item.createdAt)}
+                </Typography>
+                <Typography variant="14/regular" className="mt-1 whitespace-pre-wrap text-neutral-800">
+                  {item.body}
                 </Typography>
               </li>
             ))}
-          </ol>
-        ) : (
-          <Typography variant="14/regular" className="mt-4 text-neutral-500">
-            هنوز رویدادی ثبت نشده است.
-          </Typography>
-        )}
-      </section>
-    </main>
-  )
-}
-
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="rounded-lg bg-neutral-50 p-3">
-      <Typography variant="12/regular" className="text-neutral-500">
-        {label}
-      </Typography>
-      <Typography
-        variant="16/regular"
-        className={`mt-1 text-neutral-800 ${mono ? 'font-mono' : ''}`}
-      >
-        {value}
-      </Typography>
-    </div>
-  )
-}
-
-function requestStatusLabel(status: string): string {
-  return (
-    {
-      draft: 'پیش‌نویس',
-      in_review: 'در حال بررسی',
-      action_needed: 'نیازمند اصلاح',
-      approved: 'تایید شده',
-      rejected: 'رد شده',
-    }[status] ?? status
+          </ul>
+          <PrivateDocumentField
+            category="correspondenceAttachment"
+            label="ارسال مدارک تکمیلی به دبیرخانه"
+            requestId={requestId}
+            canUpload
+          />
+        </section>
+      ) : null}
+    </>
   )
 }

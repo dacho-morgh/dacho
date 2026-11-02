@@ -69,6 +69,48 @@ export interface ActivityList {
   totalPages: number
 }
 
+/**
+ * Changes to the review panel (T26), their reasons and the round's completion
+ * (T27) are oversight history: only the owner, Secretariat and the case's chief
+ * see them, never the company or an assigned reviewer/employer/investment person.
+ */
+export const OVERSIGHT_ONLY_ACTIONS = [
+  'chief_replace_reviewer',
+  'owner_replace_employer',
+  'review_round_complete',
+] as const
+
+/** A draft of the result text stays with the Secretariat and the owner until it is published (T33). */
+const RESULT_DRAFT_ACTIONS = ['result_save'] as const
+
+/** The handoff, the memo and the delivery are internal: the company sees its own submission, not what follows it (T31-T33). */
+const INTERNAL_FINANCIAL_ACTIONS = [
+  'investment_handoff',
+  'investment_memo_save',
+  'investment_memo_send',
+  'supplementary_delivery',
+] as const
+
+/** Package status and follow-up belong to the financial audience: chiefs, reviewers and employers do not see them (T31, T33). */
+export const FINANCIAL_ONLY_ACTIONS = ['financial_package_submit', 'supplementary_request', ...INTERNAL_FINANCIAL_ACTIONS] as const
+
+function hiddenActions(scope: RequestScope): readonly string[] {
+  if (scope.kind === 'all') return []
+  if (scope.kind === 'assigned') {
+    if (scope.role === 'chief-reviewer') return [...RESULT_DRAFT_ACTIONS, ...FINANCIAL_ONLY_ACTIONS]
+    if (scope.role === 'investment-reviewer') return [...RESULT_DRAFT_ACTIONS, ...OVERSIGHT_ONLY_ACTIONS]
+    return [...RESULT_DRAFT_ACTIONS, ...OVERSIGHT_ONLY_ACTIONS, ...FINANCIAL_ONLY_ACTIONS]
+  }
+  return [...RESULT_DRAFT_ACTIONS, ...OVERSIGHT_ONLY_ACTIONS, ...INTERNAL_FINANCIAL_ACTIONS]
+}
+
+function oversightOnlyClause(scope: RequestScope): string {
+  const hidden = hiddenActions(scope)
+  if (hidden.length === 0) return 'TRUE'
+  const actions = hidden.map((action) => `'${action}'`).join(', ')
+  return `(a.action IS NULL OR a.action NOT IN (${actions}))`
+}
+
 export class ActivityRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -113,6 +155,7 @@ export class ActivityRepository {
         )`
         break
     }
+    whereSql = `(${whereSql}) AND ${oversightOnlyClause(scope)}`
 
     const { rows: countRows } = await this.pool.query<{ total: string }>(
       `SELECT COUNT(*) AS total FROM dashboard.activities a WHERE ${whereSql}`,
@@ -168,7 +211,7 @@ export class ActivityRepository {
       `SELECT ${ACTIVITY_COLUMNS_ALIASED}
        FROM dashboard.activities a
        JOIN dashboard.requests r ON r.id = a.request_id
-       WHERE a.request_id = $1 AND ${scopeSql}
+       WHERE a.request_id = $1 AND ${scopeSql} AND ${oversightOnlyClause(scope)}
        ORDER BY a.at ASC`,
       params,
     )

@@ -15,6 +15,7 @@ import { Typography } from '@/components/ui/typography'
 import {
   addAddress,
   deleteAddress,
+  describeMutationFailure,
   dossierFieldLabel,
   fetchProfileDossier,
   toEnglishDigits,
@@ -99,6 +100,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
   const [isSavingExecutive, setIsSavingExecutive] = useState(false)
 
   const [error, setError] = useState<string | null>(null)
+  const [savedNotice, setSavedNotice] = useState<string | null>(null)
 
   useEffect(() => {
     if (initialDossier) return
@@ -245,11 +247,12 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       setProfile(updatedProfile)
       setBasicForm(updatedProfile.company)
       setIsEditingBasic(false)
+      setSavedNotice('اطلاعات شرکت ذخیره شد.')
 
       const updatedDossier = await refreshDossier()
       if (updatedDossier) setDossierForm(updatedDossier.dossier)
-    } catch {
-      setError('ذخیره اطلاعات انجام نشد. ورودی‌ها را بررسی کنید.')
+    } catch (cause) {
+      setError(describeMutationFailure(cause, 'ذخیره اطلاعات انجام نشد. ورودی‌ها را بررسی کنید.'))
     } finally {
       basicSaveLock.current = false
       setIsSavingBasic(false)
@@ -393,9 +396,14 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
           {error}
         </Typography>
       )}
+      {savedNotice && !error && (
+        <Typography role="status" color="success" className="rounded-xl bg-success-50 p-4">
+          {savedNotice}
+        </Typography>
+      )}
 
       {/* وضعیت احراز هویت و تکمیل پرونده */}
-      <section className="flex flex-col gap-3 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section id="company-verification" className="flex scroll-mt-6 flex-col gap-3 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Typography as="h2" variant="20/bold" color="neutral-600">
             وضعیت تکمیل پرونده برای احراز هویت
@@ -475,8 +483,9 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
 
       {/* اطلاعات پایه و دوسیه شرکت */}
       <fieldset
+        id="company-basic"
         disabled={isSavingBasic}
-        className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6"
+        className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6"
       >
         <div className="flex items-center justify-between">
           <Typography as="h2" variant="20/bold" color="neutral-600">
@@ -731,7 +740,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       </fieldset>
 
       {/* مدارک رسمی شرکت */}
-      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section id="company-documents" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
         <div className="flex flex-col gap-1">
           <Typography as="h2" variant="20/bold" color="neutral-600">
             مدارک رسمی شرکت
@@ -788,7 +797,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       </section>
 
       {/* آدرس‌ها */}
-      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section id="company-addresses" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <Typography as="h2" variant="20/bold" color="neutral-600">
             آدرس ها

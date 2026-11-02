@@ -81,20 +81,34 @@ The browser POSTs to `/api/users/self-signup`: trimmed `companyName`,
 lowercased `email`, `password`, normalized `companyNationalId`, and existing
 optional company answers. Password confirmation and privilege fields are never
 sent. A successful response redirects to login with the safe return URL; signup
-does not confer company verification or participation rights. Backend activity
-domain compatibility remains unchanged in this frontend-only slice; removing
-the omission exemption requires separate coordinated backend delivery.
+does not confer company verification or participation rights. With FE03 the
+server requires `activityDomain` (`missing_field` when absent or blank), closing
+the earlier omission window.
 
 Supported errors use the current `{ errors: [{ code, field?, message }] }`
 envelope. `missing_field` and `invalid_field` get linked Persian field errors;
 `duplicate_national_id` returns to company identity with one-representative
-recovery wording. `signup_rejected` stays generic and must not identify an
-existing phone/email account. Legacy duplicate-contact responses remain
-supported. Unknown field errors never echo raw server messages. Malformed non-2xx
-response bodies, 5xx and network failures remain recoverable failures, never
-successful signup.
+wording, states that no second company was created and links to login.
+`signup_rejected` stays generic and must not identify an existing phone/email
+account; it carries a neutral "sign in instead if you already have an account"
+link. Legacy duplicate-contact responses remain supported. Unknown field errors
+never echo raw server messages.
+
+Outcome certainty follows the server, not the browser. `signup_failed` (the
+server's rolled-back transaction) is reported as "not created". A network
+failure, a 30-second client timeout, or a 5xx without a recognised code
+(gateway/unreadable body) is reported as an **unknown outcome**: the page never
+says the signup failed or succeeded, and asks the person to try signing in
+before resubmitting. If a later retry receives `duplicate_national_id`, the
+notice explains that the earlier submission may have gone through and that no
+other company was created. The browser keeps no duplicate rules of its own.
+
 Errors retain component values, focus the affected field (including company
-type) or summary, and unlock retry; pending submit locks submit/back.
+type) or summary, and unlock retry. A pending submit disables the field set,
+continue/back and submit, and marks the form `aria-busy`; a persistent
+"حساب کاربری دارید؟ وارد شوید" link keeps login reachable on every step. Leaving
+the page aborts the in-flight request and a late response neither navigates nor
+updates the form.
 
 `tests/int/register-page.int.spec.ts` provides component regressions with
 **mocked HTTP**, not real API or release evidence. The Phase 0 isolation setup
@@ -104,8 +118,12 @@ This slice does not complete the parent issues or their human UAT gates.
 Local `/register` returned HTTP 200. Chromium exercised all three steps at
 1440, 360, 390 and 430 px: no horizontal overflow, and missing activity focused
 the linked field. Screenshots captured for all twelve views; phone error view
-visually inspected. Real signup/API E2E and human UAT remain unrun; no full
-visual-parity claim is made. Existing
+visually inspected. FE03 adds real-API E2E for successful signup (login, then
+`/api/dashboard/profile/verification` reports `unsubmitted`, i.e. no verified
+participation), duplicate national ID (server count shows one company and no
+stray person), the required activity domain, and a dropped connection at
+375 px. Human UAT02 remains **Not run**; no full visual-parity claim is made.
+Existing
 auth-shell typography, hero placement and legacy icons remain out of scope.
 
 Keep the existing Next.js App Router, same-origin dashboard proxy, Payload session and shared UI primitives. Reuse existing lists, profile editing, support, layout and loading components where their semantics fit. Avoid a second browser workflow engine or browser-maintained access grants. The server owns eligibility, allowed actions, active revision, review completion, reservation exclusivity, price, receipt verification and publication.
@@ -200,6 +218,8 @@ For mutations, return the updated authoritative record/revision and the next per
 | Receipt returned | Correction reason; booth remains reserved; separate receipt versions |
 | Cancellation requested | Show pending manual decision; no premature released booth/refund success |
 
+Shared pieces behind these states (T40): `dashboard/loading.tsx`, `dashboard/error.tsx` (its retry re-fetches; a tab left on an old build is asked to reload) and `dashboard/not-found.tsx` keep the dashboard shell around every route. A page whose main read fails renders `DashboardReadNotice` alone; `serverDashboardFetch` cannot tell a failure from no data, so a page that can show "empty" or "not found" must read with `serverDashboardFetchResult`. An expected 403 is not a failure where a role simply has no such section, such as the support queue for reviewers. `describeMutationFailure` words failed writes by session, permission, stale version and connection while the form keeps its input. `useDialogFocus` is the modal keyboard contract. When the access service is down, `proxy.ts` answers before any layout with its own RTL retry page.
+
 Use existing Typography and Button primitives, generated icon barrel, Tailwind utilities and theme tokens under `apps/frontend/AGENTS.md`. UI copy remains Persian and RTL. Handle mixed-direction identifiers, national IDs, email, tracking codes and filenames without corrupting values. Monetary displays explicitly say toman and parse/format without unit ambiguity; the server owns the amount. Preserve keyboard access, visible focus, modal focus restoration and screen-reader labels/errors. Support small phone-width registration, documents, queues and receipt correction; a horizontally overflowing desktop table alone is not a complete mobile flow.
 
 ## Testing and delivery
@@ -213,4 +233,4 @@ FE31 and FE32 provide real-backed multi-account E2E. They cannot replace named h
 
 The applicant request list paginates the authorized backend result in groups of 50. Page and status live in the URL; changing status resets the page, and retry/navigation links preserve the current queue. The dashboard's latest-ten preview links to the complete paginated queue. Request detail keeps a genuine backend 404 separate from expired sessions, denied reads and unavailable services; expired reads offer a safe login return path.
 
-Search and extra event/stage filters remain absent from the implemented backend query contract; inactive toolbar controls are hidden on the server-driven list. Detailed actor/action/reason/revision history, released results, correction/resubmission and resumable draft submission remain separate workflow/DTO work. Displaying the backend's `submit` next-action label does not complete that action flow. These dependencies and the human acceptance gates remain open; this slice does not claim complete FE23 or FE13 coverage.
+Search, event, stage and work-queue filters now exist on the API and in the URL ([T38](work-queues.md)). Detailed actor/action/reason/revision history, released results, correction/resubmission and resumable draft submission remain separate workflow/DTO work. Displaying the backend's `submit` next-action label does not complete that action flow. These dependencies and the human acceptance gates remain open; this slice does not claim complete FE23 or FE13 coverage.

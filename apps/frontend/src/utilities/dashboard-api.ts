@@ -6,9 +6,26 @@
 import type { LetterItem } from '@/components/dashboard/inbox-list-view'
 import type { MailData } from '@/components/dashboard/mail-detail-view'
 import type { RequestItem } from '@/components/dashboard/requests/types'
+import { companyNextAction, companyStageLabel } from './request-tracking'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 export type LetterType = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
+
+/** Server-derived per role and stage; a control appears only for an action listed here. */
+export type RequestAction =
+  | 'read'
+  | 'submit'
+  | 'correct'
+  | 'assign'
+  | 'reopen'
+  | 'triage'
+  | 'startReview'
+  | 'replaceReviewer'
+  | 'replaceEmployer'
+  | 'decideReview'
+  | 'submitFinancialPackage'
+  | 'uploadDocument'
+  | 'deleteDocument'
 
 export interface RequestDto {
   id: string
@@ -19,6 +36,8 @@ export interface RequestDto {
   serviceName: string
   ownerId: string
   status: RequestStatus
+  reviewStage?: string | null
+  revision?: number
   currentStepIndex: number
   assignedRole: string | null
   currentStep: string | null
@@ -28,7 +47,7 @@ export interface RequestDto {
   submittedBy?: string | null
   createdAt: string
   updatedAt: string
-  allowedActions?: ('read' | 'submit' | 'assign' | 'uploadDocument' | 'deleteDocument')[]
+  allowedActions?: RequestAction[]
 }
 
 export interface LetterDto {
@@ -57,6 +76,10 @@ export interface ActivityDto {
   title: string
   description: string | null
   at: string
+  /** Transition rows: the server's action key, the reason it recorded and the case revision it produced. */
+  action?: string | null
+  reason?: string | null
+  revision?: number | null
 }
 
 export interface RequestStats {
@@ -65,6 +88,19 @@ export interface RequestStats {
   approved: number
   action_needed: number
   rejected: number
+}
+
+/** A queue the backend counts for the current role; an unknown key is never shown. */
+export interface WorkQueueCountDto {
+  key: string
+  count: number
+}
+
+/** GET /stats/overview: every number comes from the actor's own row scope. */
+export interface DashboardOverviewDto {
+  counts: RequestStats
+  queues: WorkQueueCountDto[]
+  events: { id: string; title: string }[]
 }
 
 export interface Paginated<T> {
@@ -189,21 +225,284 @@ export class DashboardApiError extends Error {
   constructor(
     public status: number,
     public code: string,
+    /** Field names a validation refusal reported (e.g. `invalid_answers`); empty otherwise. */
+    public missingFields: string[] = [],
   ) {
     super(code)
   }
 }
 
+/**
+ * What a failed write means to the person, with the input they typed still on screen.
+ * Session, permission and stale-version failures each ask for a different next step,
+ * and a dropped connection is not the server's refusal.
+ */
+export function describeMutationFailure(cause: unknown, fallback: string): string {
+  if (cause instanceof TypeError) return 'ارتباط با سرور برقرار نشد. اطلاعات این صفحه حفظ شده است؛ اتصال را بررسی کنید و دوباره تلاش کنید.'
+  if (!(cause instanceof DashboardApiError)) return fallback
+  if (cause.status === 401) return 'نشست شما پایان یافته است. در برگه‌ای دیگر دوباره وارد شوید و سپس همین‌جا ادامه دهید؛ اطلاعات این صفحه حفظ شده است.'
+  if (cause.status === 403) return 'اجازه انجام این کار را ندارید یا دسترسی شما تغییر کرده است.'
+  if (cause.status === 409) return 'این مورد پس از باز شدن صفحه تغییر کرده است. صفحه را تازه کنید و وضعیت را دوباره بررسی کنید.'
+  return fallback
+}
+
 async function dashboardFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api/dashboard${path}`, { cache: 'no-store', ...init })
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { error?: string } | null
+    const body = (await res.json().catch(() => null)) as { error?: string; missingFields?: unknown } | null
     throw new DashboardApiError(
       res.status,
       typeof body?.error === 'string' ? body.error : 'request_failed',
+      Array.isArray(body?.missingFields)
+        ? body.missingFields.filter((field): field is string => typeof field === 'string')
+        : [],
     )
   }
   return res.json() as Promise<T>
+}
+
+/* ── Secretariat follow-up and published result (T33) ─────────────────── */
+
+export interface PublishedResultDto {
+  body: string
+  publishedAt: string
+}
+
+export interface CompanySupplementaryRequestDto {
+  id: string
+  body: string
+  createdAt: string
+}
+
+export interface FollowUpQueueItemDto {
+  requestId: string
+  trackingCode: string
+  title: string
+  companyName: string | null
+  latestMemoVersion: number
+  latestMemoSentAt: string
+  publishedAt: string | null
+}
+
+export type FollowUpQueueDto = Paginated<FollowUpQueueItemDto>
+
+export interface ResultVersionDto {
+  id: string
+  version: number
+  body: string
+  authorName: string | null
+  createdAt: string
+  publishedByName: string | null
+  publishedAt: string | null
+}
+
+export interface CaseFollowUpDto {
+  stageOpen: boolean
+  canAct: boolean
+  memos: {
+    id: string
+    version: number
+    body: string
+    authorName: string | null
+    sentAt: string | null
+  }[]
+  supplementaryRequests: CompanySupplementaryRequestDto[]
+  files: {
+    id: string
+    filename: string
+    createdAt: string
+    deliveredAt: string | null
+    downloadUrl: string
+  }[]
+  results: ResultVersionDto[]
+  published: PublishedResultDto | null
+}
+
+const postJson = (body: unknown): RequestInit => ({
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+})
+
+export function getCaseFollowUp(id: string): Promise<CaseFollowUpDto> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/follow-up`)
+}
+
+export function requestSupplementaryDocuments(id: string, body: string): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/supplementary-requests`, postJson({ body }))
+}
+
+export function deliverSupplementaryFile(id: string, documentId: string): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/supplementary-files`, postJson({ documentId }))
+}
+
+export function saveResult(id: string, body: string): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/result`, postJson({ body }))
+}
+
+export function publishResult(id: string, version: number): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/result/publish`, postJson({ version }))
+}
+
+/* ── Role actions on the shared dossier (T21, T22, T28, T32) ──────────── */
+
+export type TriageAction = 'accept' | 'return' | 'reject'
+export type ReviewDecisionAction = 'advance' | 'return' | 'reject'
+
+const decisionBody = (action: string, reason: string, expectedRevision?: number) => ({
+  action,
+  ...(reason ? { reason } : {}),
+  ...(expectedRevision ? { expectedRevision } : {}),
+})
+
+export function decideTriage(id: string, action: TriageAction, reason: string, expectedRevision?: number): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/triage`, postJson(decisionBody(action, reason, expectedRevision)))
+}
+
+export function decideReview(id: string, action: ReviewDecisionAction, reason: string, expectedRevision?: number): Promise<unknown> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/review-decision`, postJson(decisionBody(action, reason, expectedRevision)))
+}
+
+export function reopenRequest(id: string, reason: string, expectedRevision?: number): Promise<unknown> {
+  return dashboardFetch(
+    `/admin/requests/${encodeURIComponent(id)}/reopen`,
+    postJson({ reason, ...(expectedRevision ? { expectedRevision } : {}) }),
+  )
+}
+
+export interface ReviewCandidatesDto {
+  items: { id: string; name: string | null }[]
+  employerId: string | null
+}
+
+export function getReviewCandidates(id: string): Promise<ReviewCandidatesDto> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/review-round/candidates`)
+}
+
+export function startReviewRound(id: string, reviewerIds: string[], expectedRevision?: number): Promise<unknown> {
+  return dashboardFetch(
+    `/requests/${encodeURIComponent(id)}/review-round`,
+    postJson({ reviewerIds, ...(expectedRevision ? { expectedRevision } : {}) }),
+  )
+}
+
+/** Ordinary reviewers the chief may pick, or employers the owner may substitute (T22, T26). */
+export function getEmployerCandidates(id: string): Promise<ReviewCandidatesDto> {
+  return dashboardFetch(`/requests/${encodeURIComponent(id)}/review-round/employer-candidates`)
+}
+
+const replaceBody = (fields: Record<string, string>, reason: string, expectedRevision?: number) => ({
+  ...fields,
+  ...(reason ? { reason } : {}),
+  ...(expectedRevision ? { expectedRevision } : {}),
+})
+
+/** The responsible chief replaces one unfinished ordinary reviewer; the reason is optional. */
+export function replaceReviewer(
+  id: string,
+  outgoingUserId: string,
+  replacementId: string,
+  reason: string,
+  expectedRevision?: number,
+): Promise<{ round: ReviewRoundDto }> {
+  return dashboardFetch(
+    `/requests/${encodeURIComponent(id)}/review-round/reviewers/${encodeURIComponent(outgoingUserId)}/replace`,
+    postJson(replaceBody({ replacementId }, reason, expectedRevision)),
+  )
+}
+
+/** Only the System Owner replaces the case's employer, always with a reason. */
+export function replaceEmployer(
+  id: string,
+  employerId: string,
+  reason: string,
+  expectedRevision?: number,
+): Promise<{ round: ReviewRoundDto }> {
+  return dashboardFetch(
+    `/requests/${encodeURIComponent(id)}/review-round/employer/replace`,
+    postJson(replaceBody({ employerId }, reason, expectedRevision)),
+  )
+}
+
+export type ReviewSlotKind = 'employer' | 'ordinary'
+
+/** One assignment of a round; revoked ones stay as history. */
+export interface ReviewRoundSlotDto {
+  assignmentId: string
+  userId: string
+  role: 'employer-reviewer' | 'reviewer'
+  slot: ReviewSlotKind
+  active: boolean
+  assignedAt: string
+  revokedAt: string | null
+  revokeReason: string | null
+}
+
+export interface ReviewReplacementDto {
+  id: string
+  slot: ReviewSlotKind
+  oldUserId: string
+  newUserId: string
+  replacedBy: string
+  reason: string | null
+  replacedAt: string
+}
+
+/**
+ * Oversight's view of the latest round. Slots and replacements are only sent to the
+ * owner, the Secretariat and the case's chief; an older client may omit them.
+ */
+export interface ReviewRoundDto {
+  id: string
+  requestRevision: number
+  proposalRevision: number
+  employerId?: string
+  startedAt: string
+  supersededAt?: string | null
+  completion: { required: number; finalized: number; ready: boolean; completedAt: string | null }
+  decision: { action: ReviewDecisionAction; decidedAt: string; reason: string | null } | null
+  slots?: ReviewRoundSlotDto[]
+  replacements?: ReviewReplacementDto[]
+}
+
+/** Unfinished evaluations reach oversight without scores or answers. */
+export interface EvaluationSummaryDto {
+  id: string
+  /** Whose evaluation it is; lets oversight tell a finished slot from an unfinished one. */
+  userId?: string
+  variant: 'ordinary' | 'employer'
+  state: 'draft' | 'final'
+  scoreA?: number
+  scoreB?: number
+  scoreC?: number
+  weightedHundredths?: number
+  finalizedAt: string | null
+}
+
+export interface EvaluationListDto {
+  items: EvaluationSummaryDto[]
+  completedCount: number
+  requiredCount: number
+}
+
+export interface InvestmentMemoDto {
+  id: string
+  version: number
+  body: string
+  createdAt: string
+  sentAt: string | null
+}
+
+export function listInvestmentMemos(id: string): Promise<{ memos: InvestmentMemoDto[] }> {
+  return dashboardFetch(`/investment/cases/${encodeURIComponent(id)}`)
+}
+
+export function saveInvestmentMemo(id: string, body: string): Promise<unknown> {
+  return dashboardFetch(`/investment/cases/${encodeURIComponent(id)}/memo`, postJson({ body }))
+}
+
+export function sendInvestmentMemo(id: string, version: number): Promise<unknown> {
+  return dashboardFetch(`/investment/cases/${encodeURIComponent(id)}/memo/send`, postJson({ version }))
 }
 
 export function getStats(): Promise<RequestStats> {
@@ -212,11 +511,14 @@ export function getStats(): Promise<RequestStats> {
 
 export function listRequests(params?: {
   status?: RequestStatus
+  /** Only requests bound to this event's subtopics (server-side filter). */
+  eventId?: string
   page?: number
   limit?: number
 }): Promise<Paginated<RequestDto>> {
   const qs = new URLSearchParams()
   if (params?.status) qs.set('status', params.status)
+  if (params?.eventId) qs.set('eventId', params.eventId)
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
   const suffix = qs.toString() ? `?${qs.toString()}` : ''
@@ -227,6 +529,8 @@ export interface RequestDetail {
   request: RequestDto
   timeline: ActivityDto[]
   workflow: { title: string; role: string; roleName: string; order: number }[]
+  /** Absent for reviewers and employers, who are not told whose case it is. */
+  owner?: { id: string; name: string | null } | null
 }
 
 export function getRequest(id: string): Promise<RequestDetail> {
@@ -265,6 +569,10 @@ export function createRequest(input: {
   serviceId: string
   title: string
   answers?: Record<string, unknown>
+  /** Event applications: the server binds one draft to this subtopic and the RFP version read. */
+  eventId?: string
+  subtopicId?: string
+  rfpVersionId?: string
 }): Promise<{ request: RequestDto }> {
   return dashboardFetch<{ request: RequestDto }>('/requests', {
     method: 'POST',
@@ -273,8 +581,111 @@ export function createRequest(input: {
   })
 }
 
-export function submitRequest(id: string): Promise<{ request: RequestDto }> {
-  return dashboardFetch<{ request: RequestDto }>(`/requests/${id}/submit`, { method: 'POST' })
+export function updateRequest(
+  id: string,
+  input: { title?: string; answers?: Record<string, unknown> },
+): Promise<{ request: RequestDto }> {
+  return dashboardFetch<{ request: RequestDto }>(`/requests/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+}
+
+export function submitRequest(
+  id: string,
+  body?: {
+    nonCompeteAcceptance?: { accepted: boolean; textVersionId: string }
+    eventRulesAcceptance?: { accepted: boolean; textVersionId: string }
+  },
+): Promise<{ request: RequestDto }> {
+  return dashboardFetch<{ request: RequestDto }>(`/requests/${encodeURIComponent(id)}/submit`, {
+    method: 'POST',
+    headers: body ? { 'content-type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+}
+
+/**
+ * Resubmits a case the chief returned for correction: the same application and
+ * tracking code receive a new proposal revision. The server re-checks ownership,
+ * the correction state, verification, required fields and the agreement versions.
+ */
+export function resubmitCorrection(
+  id: string,
+  body: {
+    nonCompeteAcceptance: { accepted: boolean; textVersionId: string }
+    eventRulesAcceptance: { accepted: boolean; textVersionId: string }
+  },
+): Promise<{ request: RequestDto }> {
+  return dashboardFetch<{ request: RequestDto }>(`/requests/${encodeURIComponent(id)}/resubmit`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export interface AgreementDefinition {
+  type: 'non_compete' | 'event_rules'
+  version: string
+  title: string
+  /** False while the text is unapproved: acceptance must not be presented as final. */
+  approved: boolean
+}
+
+export function listAgreements(): Promise<{ agreements: AgreementDefinition[] }> {
+  return dashboardFetch<{ agreements: AgreementDefinition[] }>('/agreements')
+}
+
+export interface RequestProposalDetail {
+  proposal: {
+    requestId: string
+    revision: number
+    formVersion: string
+    applicationTeam: Array<{ name: string; role: string; relation?: string }>
+    proposalDocuments: Array<{
+      id: string
+      filename: string
+      mimeType: string
+      sizeBytes: number
+      logicalVersion: number
+      createdAt: string
+    }>
+    createdAt: string
+  } | null
+  agreements: Array<{
+    id: string
+    requestId: string
+    revision: number
+    agreementType: 'non_compete' | 'event_rules'
+    textVersionId: string
+    acceptedBy: string
+    acceptedAt: string
+  }>
+  /** Every proposal revision of the case the reader may see, oldest first. */
+  revisions?: number[]
+}
+
+/**
+ * The company profile pinned when the request was submitted (T21). Oversight gets the
+ * whole snapshot; the dossier only reads the fields every reviewing role may see.
+ * `null` when the case has no pinned profile (the route answers 404).
+ */
+export interface RequestVerificationDto {
+  verification: {
+    requestId: string
+    revision: number
+    snapshot: {
+      company?: Record<string, unknown>
+      dossier?: Record<string, unknown>
+    }
+    createdAt: string
+  } | null
+}
+
+export function getRequestProposal(id: string, revision?: number): Promise<RequestProposalDetail> {
+  const qs = revision ? `?revision=${revision}` : ''
+  return dashboardFetch<RequestProposalDetail>(`/requests/${encodeURIComponent(id)}/proposal${qs}`)
 }
 
 export function toEnglishDigits(value: string): string {
@@ -451,6 +862,9 @@ export function mapRequestItem(dto: RequestDto): RequestItem {
     status: dto.status as RequestItem['status'],
     statusLabel: REQUEST_STATUS_LABELS[dto.status],
     currentStep: dto.currentStep ?? '',
+    stageLabel: companyStageLabel(dto),
+    nextAction: companyNextAction(dto),
+    revision: dto.revision ?? null,
     allowedActions: dto.allowedActions ?? [],
     dueDate: formatDate(dto.dueDate),
     createdDate: formatDate(dto.createdAt),
@@ -481,8 +895,34 @@ export function mapMailData(dto: LetterDto): MailData {
     dayOfWeek: formatWeekday(dto.sentAt),
     timeStr: formatTime(dto.sentAt),
     body: dto.body,
-    attachments: [],
+    attachments: mapLetterAttachments(dto.attachments),
   }
+}
+
+/**
+ * Keeps only safe display metadata from authorized letter attachments. The
+ * server omits attachments the viewer can no longer read; any URL or storage
+ * field in the payload is ignored, downloads use the letter-scoped route.
+ */
+function formatAttachmentSize(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes < 0) return '—'
+  if (bytes < 1000) return `${bytes.toLocaleString('fa-IR')} بایت`
+  return `${(bytes / 1_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 2 })} مگابایت`
+}
+
+export function mapLetterAttachments(raw: unknown): MailData['attachments'] {
+  if (!Array.isArray(raw)) return []
+  const items: NonNullable<MailData['attachments']> = []
+  for (const value of raw) {
+    if (!value || typeof value !== 'object') continue
+    const record = value as Record<string, unknown>
+    const id = typeof record.id === 'string' ? record.id : null
+    if (!id) continue
+    const name = typeof record.filename === 'string' ? record.filename : typeof record.name === 'string' ? record.name : 'پیوست'
+    const sizeBytes = typeof record.sizeBytes === 'number' ? record.sizeBytes : null
+    items.push({ id, name, size: formatAttachmentSize(sizeBytes) })
+  }
+  return items
 }
 
 export function deleteLetter(id: string): Promise<{ success: boolean }> {
@@ -652,7 +1092,7 @@ export function updateBooth(
   )
 }
 
-/* ── Event Categories, Subtopics, and RFP (FE10 / FE11 / T17 / T18) ──────── */
+/* ── Event Categories, Subtopics, and RFP (FE11 / T17 / T18) ─────────────── */
 
 export interface EventCategoryDto {
   id: string
@@ -691,42 +1131,6 @@ export interface RfpVersionDto {
   files: RfpFileDto[]
 }
 
-export function getAdminEventCategories(eventId: string): Promise<{ items: EventCategoryDto[] }> {
-  return dashboardFetch<{ items: EventCategoryDto[] }>(`/admin/events/${encodeURIComponent(eventId)}/categories`)
-}
-
-export function createEventCategory(
-  eventId: string,
-  input: { title: string },
-): Promise<{ category: EventCategoryDto }> {
-  return dashboardFetch<{ category: EventCategoryDto }>(
-    `/admin/events/${encodeURIComponent(eventId)}/categories`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-  )
-}
-
-export function getAdminEventSubtopics(eventId: string): Promise<{ items: EventSubtopicDto[] }> {
-  return dashboardFetch<{ items: EventSubtopicDto[] }>(`/admin/events/${encodeURIComponent(eventId)}/subtopics`)
-}
-
-export function createEventSubtopic(
-  eventId: string,
-  input: { title: string; categoryId: string; employerId: string },
-): Promise<{ subtopic: EventSubtopicDto }> {
-  return dashboardFetch<{ subtopic: EventSubtopicDto }>(
-    `/admin/events/${encodeURIComponent(eventId)}/subtopics`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-  )
-}
-
 export function getEventCategories(eventId: string): Promise<{ items: EventCategoryDto[] }> {
   return dashboardFetch<{ items: EventCategoryDto[] }>(`/events/${encodeURIComponent(eventId)}/categories`)
 }
@@ -746,18 +1150,9 @@ export function getSubtopicRfp(
   return dashboardFetch<{ version: RfpVersionDto }>(path)
 }
 
-export function uploadSubtopicRfp(
-  eventId: string,
-  subtopicId: string,
-  formData: FormData,
-): Promise<{ version: RfpVersionDto }> {
-  return dashboardFetch<{ version: RfpVersionDto }>(
-    `/admin/events/${encodeURIComponent(eventId)}/subtopics/${encodeURIComponent(subtopicId)}/rfp`,
-    {
-      method: 'POST',
-      body: formData,
-    },
-  )
+/** The event/subtopic/RFP version pinned to an application; 404 when the request has none. */
+export function getRequestRfp(requestId: string): Promise<{ version: RfpVersionDto }> {
+  return dashboardFetch<{ version: RfpVersionDto }>(`/requests/${encodeURIComponent(requestId)}/rfp`)
 }
 
 export function getRfpDownloadUrl(
@@ -776,4 +1171,48 @@ export function formatFileSize(bytes: number): string {
   const val = (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)
   const persianVal = val.replace(/\./g, '٫').replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)] ?? d)
   return `${persianVal} ${units[i]}`
+}
+
+/* ── Participation eligibility (FE06; T15/T19/T55) ─────────────────────── */
+
+export type CompanyVerificationStatus = 'unsubmitted' | 'pending' | 'approved' | 'returned' | 'rejected'
+
+/** The representative's own current verification, as the server derives it. */
+export interface CompanyVerificationDto {
+  status: CompanyVerificationStatus
+  revision: number
+  submittedAt: string | null
+  decidedAt: string | null
+  reason: string | null
+  canRequestVerification: boolean
+}
+
+export function fetchCompanyVerification(): Promise<CompanyVerificationDto> {
+  return dashboardFetch<CompanyVerificationDto>('/profile/verification')
+}
+
+export function submitCompanyVerification(): Promise<unknown> {
+  return dashboardFetch<unknown>('/profile/verification/submit', { method: 'POST' })
+}
+
+export type BoothAttendanceStatus = 'pending' | 'approved' | 'rejected'
+
+/** The company's own booth reservation; attendance and payment are decided per booth. */
+export interface BoothReservationDto {
+  id: string
+  boothId: string
+  boothIdentifier?: string
+  exhibitionId: string
+  active: boolean
+  attendanceStatus: BoothAttendanceStatus
+  attendanceReason: string | null
+  priceAmount?: number
+  createdAt: string
+  allowedActions: string[]
+}
+
+export function listMyBoothReservations(exhibitionId: string): Promise<{ items: BoothReservationDto[] }> {
+  return dashboardFetch<{ items: BoothReservationDto[] }>(
+    `/exhibitions/${encodeURIComponent(exhibitionId)}/my-reservations`,
+  )
 }
