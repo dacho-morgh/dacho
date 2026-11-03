@@ -239,6 +239,17 @@ describe('CompanyRequestTracking', () => {
     expect(document.body.textContent).not.toContain('شرکت دیگر')
   })
 
+  it('shows a given result view in place of its own block, and no pending note', () => {
+    tracking({
+      request: request({ reviewStage: 'advanced' }),
+      publishedResult: { result: { body: 'متن منتشرشده', publishedAt: '2026-10-30T00:00:00.000Z' } },
+      resultView: createElement('div', { 'data-testid': 'outcome-card' }, 'کارت نتیجه'),
+    })
+    expect(screen.getByTestId('outcome-card')).toBeTruthy()
+    expect(screen.queryByTestId('published-result')).toBeNull()
+    expect(screen.queryByTestId('result-pending')).toBeNull()
+  })
+
   it('says a result is not published yet, and tells a failed read apart', () => {
     tracking({ request: request({ reviewStage: 'advanced' }) })
     expect(screen.getByTestId('result-pending')).toBeTruthy()

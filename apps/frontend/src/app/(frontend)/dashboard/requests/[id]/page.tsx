@@ -269,25 +269,23 @@ function CompanySections({
   correction: ReactNode
 }) {
   const requestId = request.id
-  const financialStage = request.status === 'in_review' && request.reviewStage === 'advanced'
-  const result = publishedResult === 'failed' ? 'failed' : (publishedResult?.result ?? null)
+  const result = publishedResult === 'failed' ? null : (publishedResult?.result ?? null)
   return (
     <>
-      {/* The outcome and the financial package render below (S6), so tracking gets no result of its own. */}
       <CompanyRequestTracking
         request={request}
         timeline={timeline}
         proposalRevision={proposalRevision}
-        publishedResult={null}
+        publishedResult={publishedResult}
         correction={correction}
+        resultView={result ? <FinancialOutcomeCard result={result} /> : null}
       />
-      <FinancialOutcomeCard result={result} stageOpen={financialStage} />
       {request.reviewStage === 'advanced' ? (
         <FinancialPackagePanel
           requestId={requestId}
           trackingCode={request.trackingCode ?? null}
           canSubmit={(request.allowedActions ?? []).includes('submitFinancialPackage')}
-          resultPublished={Boolean(result && result !== 'failed')}
+          resultPublished={Boolean(result)}
         />
       ) : null}
       <div className="flex justify-end">

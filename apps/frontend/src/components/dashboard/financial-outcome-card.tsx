@@ -14,27 +14,11 @@ import { FinancialBanner, FinancialCard, FinancialSteps } from './financial-part
  */
 export function FinancialOutcomeCard({
   result,
-  stageOpen,
 }: {
-  /** `GET /requests/:id/result`; `failed` when the read did not arrive. */
-  result: PublishedResultDto | null | 'failed'
-  /** The case is at the financial and investment stage. */
-  stageOpen: boolean
+  /** The published result; tracking says when none is out yet or the read failed. */
+  result: PublishedResultDto | null
 }) {
-  if (result === 'failed') {
-    return (
-      <Typography role="alert" variant="14/regular" color="error">
-        دریافت نتیجه پرونده انجام نشد. صفحه را دوباره بارگذاری کنید.
-      </Typography>
-    )
-  }
-  if (!result) {
-    return stageOpen ? (
-      <Typography variant="14/regular" color="neutral-500" data-testid="result-pending">
-        نتیجه این پرونده هنوز منتشر نشده است. پس از انتشار توسط دبیرخانه، متن آن در همین صفحه نمایش داده می‌شود.
-      </Typography>
-    ) : null
-  }
+  if (!result) return null
   return (
     <div className="flex min-w-0 flex-col gap-4" data-testid="published-result">
       <FinancialBanner tone="success" title="نتیجه نهایی درخواست شما منتشر شد">

@@ -196,7 +196,7 @@ export function FinancialPackagePanel({
         ) : null}
         <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2" aria-labelledby="financial-package-heading">
           {slots.map((slot) => (
-            <li key={slot.key} className="min-w-0">
+            <li key={slot.key} className="min-w-0" data-testid="financial-package-slot">
               <PrivateDocumentField
                 category={slot.category}
                 label={slot.title}
