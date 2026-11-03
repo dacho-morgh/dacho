@@ -50,15 +50,40 @@ const stepsOf = async (reservationId: string) =>
     [reservationId],
   )).rows
 
+type SentNotice = { action: string; recipient_id: string; next_step: string | null; role: string | null }
+
+/** Every delivered booth notice for one transition, with the recipient's operational role. */
+const noticesFor = async (reservationId: string, action: string) =>
+  (await pool.query<SentNotice>(
+    `SELECT j.action, j.recipient_id, l.next_step, u.operational_role::text AS role
+     FROM dashboard.notification_jobs j
+     JOIN dashboard.letters l ON l.id = j.letter_id
+     LEFT JOIN public.users u ON u.id::text = j.recipient_id
+     WHERE j.booth_reservation_id = $1 AND j.action = $2
+     ORDER BY j.created_at, j.id`,
+    [reservationId, action],
+  )).rows
+
+const secretariatPhone = 'inbox-booth-int-secretariat'
+
 describe('S1: booth request next steps (int)', () => {
   const outbox = new PostgresNotificationOutbox(pool)
 
+  let secretariatId = ''
+
   beforeAll(async () => {
     await runMigrations(connectionString)
+    await pool.query('DELETE FROM public.users WHERE phone = $1', [secretariatPhone])
+    const { rows } = await pool.query<{ id: string }>(
+      `INSERT INTO public.users (phone, operational_role, is_active) VALUES ($1, 'central-secretariat', true) RETURNING id::text AS id`,
+      [secretariatPhone],
+    )
+    secretariatId = rows[0]!.id
   })
   beforeEach(clearFixtures)
   afterAll(async () => {
     await clearFixtures()
+    await pool.query('DELETE FROM public.users WHERE phone = $1', [secretariatPhone])
     await pool.end()
   })
 
@@ -92,6 +117,55 @@ describe('S1: booth request next steps (int)', () => {
     ])
     // Every pending receipt-decision step is settled by the return.
     expect((await stepsOf(id)).filter((letter) => letter.next_step === 'receipt_decision' && !letter.done)).toEqual([])
+  })
+
+  it('notifies the role that acts next exactly once per transition', async () => {
+    const id = await reserved()
+    // Other suites may leave active Secretariat users; each must be told once, and only Secretariat.
+    const toSecretariat = async (action: string, step: string) => {
+      const notices = await noticesFor(id, action)
+      expect(notices.every((notice) => notice.role === 'central-secretariat' && notice.next_step === step)).toBe(true)
+      expect(new Set(notices.map((notice) => notice.recipient_id)).size).toBe(notices.length)
+      expect(notices.filter((notice) => notice.recipient_id === secretariatId)).toHaveLength(1)
+    }
+    const toCompany = async (action: string, step: string | null) => {
+      expect((await noticesFor(id, action)).map((notice) => [notice.recipient_id, notice.next_step])).toEqual([['user-a', step]])
+    }
+
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: 'user-a', action: 'booth_request' })
+    await toSecretariat('booth_request', 'attendance_decision')
+
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: secretariatId, action: 'booth_attendance_approve' })
+    await toCompany('booth_attendance_approve', 'booth_receipt')
+
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: 'user-a', action: 'booth_receipt_submit' })
+    await toSecretariat('booth_receipt_submit', 'receipt_decision')
+
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: secretariatId, action: 'booth_receipt_confirm' })
+    await toCompany('booth_receipt_confirm', null)
+
+    // Confirmation settles the case: nobody is left with a pending booth step.
+    expect((await stepsOf(id)).filter((letter) => letter.next_step && !letter.done)).toEqual([])
+  })
+
+  it('does not ask again when a transition is notified twice', async () => {
+    const id = await reserved()
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: 'user-a', action: 'booth_request' })
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: 'user-a', action: 'booth_request' })
+    expect((await noticesFor(id, 'booth_request')).filter((notice) => notice.recipient_id === secretariatId)).toHaveLength(1)
+
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: secretariatId, action: 'booth_attendance_approve' })
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: secretariatId, action: 'booth_attendance_approve' })
+    expect(await noticesFor(id, 'booth_attendance_approve')).toHaveLength(1)
+  })
+
+  it('tells only the company about a rejected attendance', async () => {
+    const id = await reserved()
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: 'user-a', action: 'booth_request' })
+    await notifyBoothStep(pool, outbox, { reservationId: id, actorId: secretariatId, action: 'booth_attendance_reject', reason: 'ظرفیت تکمیل' })
+    expect((await noticesFor(id, 'booth_attendance_reject')).map((notice) => [notice.recipient_id, notice.next_step])).toEqual([['user-a', null]])
+    // The rejection settles every Secretariat attendance step on the request.
+    expect((await stepsOf(id)).filter((letter) => letter.next_step === 'attendance_decision' && !letter.done)).toEqual([])
   })
 
   it('records booth jobs against the booth request, never a dashboard request', async () => {
