@@ -4,12 +4,14 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   AdminListView,
-  AdminRowActions,
   type AdminColumn,
   type AdminListLoadState,
 } from '@/components/dashboard/admin-list-view'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { formatDate } from '@/utilities/dashboard-api'
 import { Typography } from '@/components/ui/typography'
+import { CompanyCreateDialog } from '@/components/dashboard/company-create-dialog'
 import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 
 export type VerificationStatus =
@@ -28,6 +30,7 @@ type Company = {
   activityAge: string
   verificationStatus: VerificationStatus
   verificationRevision: number
+  submittedAt: string | null
 }
 
 type VerificationQueue = 'all' | 'pending' | 'approved' | 'returned' | 'rejected'
@@ -75,23 +78,10 @@ const columns: AdminColumn<Company>[] = [
       </Link>
     ),
   },
-  { id: 'ceo', header: 'مدیر عامل', render: (item) => text(item.ceo) },
-  {
-    id: 'type',
-    header: 'نوع شرکت',
-    render: (item) => (
-      <Typography
-        variant="14/regular"
-        color="brand-600"
-        className="inline-block rounded-lg bg-brand-50 px-3 py-1"
-      >
-        {item.companyType}
-      </Typography>
-    ),
-  },
+  { id: 'submittedAt', header: 'تاریخ ارسال', render: (item) => text(formatDate(item.submittedAt) || '—') },
   {
     id: 'verificationStatus',
-    header: 'وضعیت احراز',
+    header: 'وضعیت',
     render: (item) => {
       const badge = verificationStatusBadge(item.verificationStatus)
       return (
@@ -108,15 +98,37 @@ const columns: AdminColumn<Company>[] = [
       )
     },
   },
-  { id: 'address', header: 'آدرس', render: (item) => text(item.address) },
-  { id: 'activity', header: 'سال فعالیت', render: (item) => text(item.activityAge) },
   {
     id: 'actions',
-    render: (item) => <AdminRowActions viewHref={`/dashboard/companies/${item.id}`} />,
+    header: 'عملیات',
+    render: (item) => (
+      <Button asChild variant="link" size="clear">
+        <Link href={`/dashboard/companies/${item.id}`}>
+          {item.verificationStatus === 'pending' ? 'بررسی' : 'مشاهده'}
+        </Link>
+      </Button>
+    ),
   },
+  { id: 'ceo', header: 'مدیر عامل', render: (item) => text(item.ceo) },
+  {
+    id: 'type',
+    header: 'نوع شرکت',
+    render: (item) => (
+      <Typography
+        variant="14/regular"
+        color="brand-600"
+        className="inline-block rounded-lg bg-brand-50 px-3 py-1"
+      >
+        {item.companyType}
+      </Typography>
+    ),
+  },
+  { id: 'address', header: 'آدرس', render: (item) => text(item.address) },
+  { id: 'activity', header: 'سال فعالیت', render: (item) => text(item.activityAge) },
 ]
 
-export function CompanyList() {
+/** `canCreateCompany`: the System Owner sees «شرکت جدید» (FE34); Secretariat only reviews. */
+export function CompanyList({ canCreateCompany = false }: { canCreateCompany?: boolean } = {}) {
   const searchParams = useSearchParams()
   const initialStatus = (searchParams?.get('status') as VerificationQueue) || 'all'
   const [queueFilter, setQueueFilter] = useState<VerificationQueue>(
@@ -154,6 +166,7 @@ export function CompanyList() {
           executives?: { role?: string; name?: string }[]
           verificationStatus?: VerificationStatus
           verificationRevision?: number
+          verificationSubmittedAt?: string | null
         }[]
       }
       if (!Array.isArray(data.items)) {
@@ -173,6 +186,7 @@ export function CompanyList() {
           activityAge: activityAgeLabel(item.companyEstablishmentDate),
           verificationStatus: item.verificationStatus || 'unsubmitted',
           verificationRevision: item.verificationRevision || 0,
+          submittedAt: item.verificationSubmittedAt ?? null,
         })),
       )
       setLoadState('ready')
@@ -226,8 +240,20 @@ export function CompanyList() {
 
   return (
     <AdminListView
-      title="شرکت ها"
-      addLabel="شرکت جدید"
+      title="احراز هویت شرکت‌ها"
+      notice={
+        loadState === 'ready' && counts.pending > 0 ? (
+          <div role="status" className="flex flex-col gap-1 rounded-2xl bg-brand-50 p-4 text-brand-700">
+            <Typography variant="16/semibold" className="text-inherit">
+              {counts.pending.toLocaleString('fa-IR')} شرکت در انتظار بررسی
+            </Typography>
+            <Typography variant="14/regular" className="text-inherit">
+              پس از تایید احراز هویت، شرکت می‌تواند درخواست ثبت کند.
+            </Typography>
+          </div>
+        ) : undefined
+      }
+      addAction={canCreateCompany ? <CompanyCreateDialog onCreated={() => void loadCompanies()} /> : undefined}
       searchPlaceholder="جستجوی شرکت"
       items={filteredCompanies}
       getSearchText={(item) =>

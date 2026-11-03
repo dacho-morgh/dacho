@@ -269,9 +269,10 @@ interface CaseFixture {
 /** One case carried all the way to a published result, holding a file of every audience. */
 async function publishedCase(team: Team): Promise<CaseFixture> {
   const companyId = await companyIdOf(team)
-  // `catalogues` belongs to the private dossier without restarting verification.
+  // Every dossier upload restarts verification (T59), so the fixture re-approves the company afterwards.
   const dossier = await uploadAs(team.company, { companyId }, 'catalogues', `${DOSSIER_MARK}-${team.company}.pdf`)
   expectOk(dossier, 201, 'dossier')
+  await seedVerifiedCompanies(pool, companyStore)
 
   const { id, eventId, proposalId } = await draftCase(team)
   const submitted = await post(team.company, `/requests/${id}/submit`, consent)

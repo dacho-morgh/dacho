@@ -62,8 +62,10 @@ async function expectDashboardPagesFit(page: Page, paths: string[]) {
         await expectProfileField(page, 'شناسه ملی', applicant.companyNationalId)
         await expectProfileField(page, 'شماره ثبت', applicant.companyRegistrationNumber)
       } else if (path === '/dashboard/profile/account') {
-        await expectProfileField(page, 'شماره تلفن همراه', applicant.phone)
-        await expectProfileField(page, 'آدرس ایمیل', applicant.email)
+        // Own account details show read-only until «ویرایش» opens the form (T58).
+        await expect(page.getByRole('heading', { name: 'اطلاعات کاربری', exact: true })).toBeVisible()
+        await expect(page.getByText(applicant.phone, { exact: true }).filter({ visible: true })).toBeVisible()
+        await expect(page.getByText(applicant.email, { exact: true }).filter({ visible: true })).toBeVisible()
       } else if (path === '/dashboard/profile/resume') {
         await expect(
           page.getByRole('heading', { name: 'رزومه و سوابق شرکت', exact: true }),

@@ -466,9 +466,6 @@ export function CompanyDetailView({ id }: { id: string }) {
               {item}
             </Typography>
           ))}
-          <Typography variant="16/regular" color="error" className="mt-auto rounded-xl p-3">
-            حذف حساب شرکت
-          </Typography>
         </nav>
 
         {/* Content Pane */}
@@ -646,7 +643,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('approve')}
                   >
-                    {decisionSubmitting ? 'در حال ثبت...' : 'تأیید مدارک'}
+                    {decisionSubmitting ? 'در حال ثبت...' : 'تایید احراز هویت'}
                   </Button>
                   <Button
                     size="40"
@@ -662,7 +659,10 @@ export function CompanyDetailView({ id }: { id: string }) {
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('reject')}
                   >
-                    رد مدارک
+                    رد احراز هویت
+                  </Button>
+                  <Button asChild size="40" variant="link">
+                    <Link href="/dashboard/companies?status=pending">بازگشت به صف</Link>
                   </Button>
                 </div>
               </div>

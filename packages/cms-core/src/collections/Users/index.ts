@@ -20,6 +20,7 @@ import {
   normalizeLoginIdentifier,
   runSelfSignup,
 } from '@cms-core/auth/self-signup'
+import { changeOwnPassword, updateOwnAccount } from '@cms-core/endpoints/selfAccount'
 import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import {
   APIError,
@@ -175,6 +176,8 @@ export const Users: CollectionConfig = {
     afterRead: [({ doc }) => ({ ...doc, roles: compatibilityRoles(doc) })],
   },
   endpoints: [
+    updateOwnAccount,
+    changeOwnPassword,
     {
       path: '/personnel/:id',
       method: 'patch',

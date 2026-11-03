@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AccountProfileView } from '@/components/dashboard/profile/account-profile-view'
+import { PersonalInfoSection } from '@/components/dashboard/profile/personal-info-section'
 import { CompanyProfileView } from '@/components/dashboard/profile/company-profile-view'
 import { ResumeProfileView } from '@/components/dashboard/profile/resume-profile-view'
 import type { DossierResponseDto, ProfileDto } from '@/utilities/dashboard-api'
@@ -57,7 +57,7 @@ function expectHeadingBeforeAction(heading: HTMLElement) {
 describe('company profile view', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
-    render(createElement(CompanyProfileView, { initialProfile: profile, initialDossier: dossier }))
+    render(createElement(CompanyProfileView, { initialProfile: profile, initialDossier: dossier, initialVerification: { status: 'unsubmitted', revision: 0, submittedAt: null, decidedAt: null, reason: null, canRequestVerification: false } }))
   })
 
   afterEach(() => {
@@ -89,6 +89,8 @@ describe('company profile view', () => {
     fetchMock
       .mockResolvedValueOnce(new Response(JSON.stringify(dossier), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(savedProfile), { status: 200 }))
+      // T59: the verification state is re-read after every company save.
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'unsubmitted', revision: 0, submittedAt: null, decidedAt: null, reason: null, canRequestVerification: false }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(dossier), { status: 200 }))
 
     const input = screen.getByRole('textbox', { name: 'نام شرکت' }) as HTMLInputElement
@@ -126,15 +128,19 @@ describe('account and resume profile views', () => {
     vi.unstubAllGlobals()
   })
 
-  it('renders and edits only account fields', () => {
+  it('renders own account fields read-only until edit, with LTR contact inputs and no company fields', () => {
     vi.stubGlobal('fetch', vi.fn())
-    render(createElement(AccountProfileView, { initialProfile: profile }))
+    render(createElement(PersonalInfoSection, {
+      initialAccount: { id: 1, name: 'کاربر نمونه', phone: '09123456789', email: 'sample@company.com', updatedAt: '2026-11-03T00:00:00.000Z' },
+      readOnlyFields: [{ label: 'سمت در شرکت', value: 'مدیرعامل' }],
+    }))
 
+    expect(screen.queryByRole('textbox', { name: 'شماره تلفن همراه' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'ویرایش' }))
     const phone = screen.getByRole('textbox', { name: 'شماره تلفن همراه' }) as HTMLInputElement
     expect(phone.dir).toBe('ltr')
-    expect(phone.readOnly).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: 'ویرایش' }))
-    expect(phone.readOnly).toBe(false)
+    expect(phone.value).toBe('09123456789')
+    expect(screen.queryByRole('textbox', { name: 'سمت در شرکت' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'اطلاعات پایه' })).toBeNull()
   })
 

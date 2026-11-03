@@ -17,13 +17,15 @@ import {
   addAddress,
   deleteAddress,
   describeMutationFailure,
-  dossierFieldLabel,
+  fetchCompanyVerification,
   fetchProfileDossier,
+  submitCompanyVerification,
   toEnglishDigits,
   type AbsenceField,
   type AddressDto,
   type CompanyDossierDto,
   type CompanyInfoDto,
+  type CompanyVerificationDto,
   type DossierResponseDto,
   type MissingDossierItemsDto,
   type ProfileDto,
@@ -32,8 +34,10 @@ import {
   updateProfileDossier,
 } from '@/utilities/dashboard-api'
 import { buildCompanyDossierPatch } from '@/utilities/dossier-edits'
+import { CompanyVerificationCard, editWithdrawsVerification } from './company-verification-card'
 import { InlineProfileField } from './inline-profile-field'
 import { ProfileDialog } from './profile-dialog'
+import { useReverificationConfirm } from './use-reverification-confirm'
 import { toast } from 'sonner'
 
 const emptyAddress: Omit<AddressDto, 'id'> = {
@@ -67,13 +71,30 @@ const emptyMissing: MissingDossierItemsDto = {
   canRequestVerification: false,
 }
 
+const unsubmittedVerification: CompanyVerificationDto = {
+  status: 'unsubmitted',
+  revision: 0,
+  submittedAt: null,
+  decidedAt: null,
+  reason: null,
+  canRequestVerification: false,
+}
+
 interface CompanyProfileViewProps {
   initialProfile: ProfileDto
   initialDossier?: DossierResponseDto
+  initialVerification?: CompanyVerificationDto
 }
 
-export function CompanyProfileView({ initialProfile, initialDossier }: CompanyProfileViewProps) {
+export function CompanyProfileView({ initialProfile, initialDossier, initialVerification }: CompanyProfileViewProps) {
   const [profile, setProfile] = useState(initialProfile)
+  const [verification, setVerification] = useState<CompanyVerificationDto>(
+    initialVerification ?? unsubmittedVerification,
+  )
+  const [isSubmittingVerification, setIsSubmittingVerification] = useState(false)
+  const { confirm: confirmReverification, dialog: reverificationDialog } = useReverificationConfirm(
+    verification.status,
+  )
   const [basicForm, setBasicForm] = useState<CompanyInfoDto>(initialProfile.company)
   const [isEditingBasic, setIsEditingBasic] = useState(false)
   const [isSavingBasic, setIsSavingBasic] = useState(false)
@@ -123,6 +144,36 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
     }
   }, [initialDossier])
 
+  // T59: every company edit may withdraw the approval, so the state is re-read after each save.
+  const refreshVerification = async () => {
+    try {
+      setVerification(await fetchCompanyVerification())
+    } catch {
+      // The card keeps the last known state; the next save or reload refreshes it.
+    }
+  }
+
+  useEffect(() => {
+    if (initialVerification) return
+    void fetchCompanyVerification().then(setVerification).catch(() => undefined)
+  }, [initialVerification])
+
+  const submitVerification = async () => {
+    setIsSubmittingVerification(true)
+    setError(null)
+    try {
+      await submitCompanyVerification()
+      toast.success('پرونده برای احراز هویت ارسال شد.')
+      await refreshVerification()
+    } catch (cause) {
+      toast.error('ارسال برای احراز هویت انجام نشد.')
+      setError(describeMutationFailure(cause, 'ارسال برای احراز هویت انجام نشد. موارد الزامی پرونده را بررسی کنید.'))
+      await Promise.all([refreshVerification(), refreshDossier()])
+    } finally {
+      setIsSubmittingVerification(false)
+    }
+  }
+
   const refreshDossier = async () => {
     const sequence = ++refreshSequence.current
     try {
@@ -153,12 +204,14 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
         (field) => field !== 'amendmentNotices',
       )
       if (absent) notAvailable.push('amendmentNotices')
+      if (!(await confirmReverification())) return
       const result = await updateProfileDossier({ notAvailable })
       if (!result) throw new Error('dossier_update_failed')
       setDossier(result.dossier)
       setDossierForm(result.dossier)
       setMissing(result.missing)
       toast.success('وضعیت آگهی تغییرات ثبت شد.')
+      await refreshVerification()
     } catch {
       toast.error('ثبت وضعیت آگهی تغییرات انجام نشد.')
       setError(
@@ -241,6 +294,10 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       for (const field of Object.keys(basicForm) as (keyof CompanyInfoDto)[]) {
         if (basicForm[field] !== profile.company[field]) companyPatch[field] = basicForm[field]
       }
+      if (
+        (Object.keys(companyPatch).length > 0 || Object.keys(dossierPatch).length > 0) &&
+        !(await confirmReverification())
+      ) return
 
       const updatedProfile = await updateProfile({
         company: companyPatch,
@@ -251,6 +308,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       setBasicForm(updatedProfile.company)
       setIsEditingBasic(false)
       toast.success('اطلاعات شرکت ذخیره شد.')
+      void refreshVerification()
 
       const updatedDossier = await refreshDossier()
       if (updatedDossier) setDossierForm(updatedDossier.dossier)
@@ -289,6 +347,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       return
     }
 
+    if (!(await confirmReverification())) return
     setError(null)
     setIsSavingAddress(true)
     try {
@@ -307,7 +366,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       }))
       setAddressDialogOpen(false)
       toast.success(editingAddressId ? 'آدرس ویرایش شد.' : 'آدرس اضافه شد.')
-      await refreshDossier()
+      await Promise.all([refreshDossier(), refreshVerification()])
     } catch {
       toast.error(editingAddressId ? 'ویرایش آدرس انجام نشد.' : 'افزودن آدرس انجام نشد.')
       setError(editingAddressId ? 'ویرایش آدرس انجام نشد.' : 'افزودن آدرس انجام نشد.')
@@ -317,6 +376,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
   }
 
   const removeAddress = async (id: string) => {
+    if (!(await confirmReverification())) return
     setError(null)
     try {
       await deleteAddress(id)
@@ -325,7 +385,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
         addresses: current.addresses.filter((address) => address.id !== id),
       }))
       toast.success('آدرس حذف شد.')
-      await refreshDossier()
+      await Promise.all([refreshDossier(), refreshVerification()])
     } catch {
       toast.error('حذف آدرس انجام نشد.')
       setError('حذف آدرس انجام نشد.')
@@ -350,6 +410,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
     if (editingExecutiveIndex === -1) executives.push(executiveForm)
     else if (editingExecutiveIndex !== null) executives[editingExecutiveIndex] = executiveForm
 
+    if (!(await confirmReverification())) return
     setError(null)
     setIsSavingExecutive(true)
     try {
@@ -357,7 +418,10 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       if (!updated) throw new Error('executive_update_failed')
       setProfile(updated)
       setEditingExecutiveIndex(null)
+      toast.success('اطلاعات شخص ذخیره شد.')
+      await refreshVerification()
     } catch {
+      toast.error('ذخیره شخص انجام نشد.')
       setError('ذخیره شخص انجام نشد.')
     } finally {
       setIsSavingExecutive(false)
@@ -365,6 +429,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
   }
 
   const removeExecutive = async (index: number) => {
+    if (!(await confirmReverification())) return
     setError(null)
     try {
       const updated = await updateProfile({
@@ -372,7 +437,10 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
       })
       if (!updated) throw new Error('executive_delete_failed')
       setProfile(updated)
+      toast.success('شخص حذف شد.')
+      await refreshVerification()
     } catch {
+      toast.error('حذف شخص انجام نشد.')
       setError('حذف شخص انجام نشد.')
     }
   }
@@ -405,74 +473,14 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
         </Typography>
       )}
 
-      {/* وضعیت احراز هویت و تکمیل پرونده */}
-      <section id="company-verification" className="flex scroll-mt-6 flex-col gap-3 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Typography as="h2" variant="20/bold" color="neutral-600">
-            وضعیت تکمیل پرونده برای احراز هویت
-          </Typography>
-          {missing.canRequestVerification ? (
-            <Typography
-              as="span"
-              className="rounded-full bg-success-50 px-3 py-1 text-sm font-semibold text-success-700"
-            >
-              اطلاعات الزامی کامل است
-            </Typography>
-          ) : (
-            <Typography
-              as="span"
-              className="rounded-full bg-warning-50 px-3 py-1 text-sm font-semibold text-warning-700"
-            >
-              در حال تکمیل ({missing.required.length.toLocaleString('fa-IR')} مورد الزامی باقی‌مانده)
-            </Typography>
-          )}
-        </div>
-
-        {missing.canRequestVerification ? (
-          <Typography variant="14/regular" className="text-success-700">
-            تمامی فیلدها و مدارک الزامی ثبت شده است؛ درخواست احراز هویت هنوز ارسال نشده است.
-          </Typography>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {missing.required.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                <Typography variant="14/semibold" color="neutral-600">
-                  اطلاعات یا مدارک الزامی ناقص:
-                </Typography>
-                <div className="flex flex-wrap gap-2">
-                  {missing.required.map((key) => (
-                    <Typography
-                      as="span"
-                      key={key}
-                      className="rounded-lg border border-error-200 bg-error-50 px-2.5 py-1 text-xs font-medium text-error-700"
-                    >
-                      {dossierFieldLabel(key)}
-                    </Typography>
-                  ))}
-                </div>
-              </div>
-            )}
-            {missing.optional.length > 0 && (
-              <div className="flex flex-col gap-1.5 pt-1">
-                <Typography variant="12/regular" color="neutral-500">
-                  موارد اختیاری بدون پاسخ (می‌توانید تکمیل کنید یا گزینه «ندارم» را علامت بزنید):
-                </Typography>
-                <div className="flex flex-wrap gap-1.5">
-                  {missing.optional.map((key) => (
-                    <Typography
-                      as="span"
-                      key={key}
-                      className="rounded-lg border border-neutral-200 bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600"
-                    >
-                      {dossierFieldLabel(key)}
-                    </Typography>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
+      <CompanyVerificationCard
+        verification={verification}
+        missing={missing}
+        companyName={profile.company.name}
+        nationalId={profile.company.nationalId}
+        submitting={isSubmittingVerification}
+        onSubmit={() => void submitVerification()}
+      />
 
       <div className="relative size-20 overflow-hidden rounded-2xl border border-neutral-100 bg-neutral-100 shadow-2xs">
         <Image
@@ -743,6 +751,11 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
             فایل‌ها به‌صورت امن ذخیره می‌شوند و فقط با مجوز همین شرکت یا دبیرخانه/صاحب سیستم قابل
             دریافت هستند (Word یا PDF، حداکثر ۱۰ مگابایت).
           </Typography>
+          {editWithdrawsVerification(verification.status) && (
+            <Typography role="note" variant="12/regular" className="rounded-lg bg-warning-50 p-2 text-warning-700">
+              بارگذاری مدرک جدید، احراز هویت فعلی شرکت را باطل می‌کند و پرونده باید دوباره برای احراز ارسال شود.
+            </Typography>
+          )}
         </div>
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {(
@@ -780,6 +793,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
                   }
                   onDocumentsChange={() => {
                     void refreshDossier()
+                    void refreshVerification()
                   }}
                 />
               )}
@@ -992,6 +1006,7 @@ export function CompanyProfileView({ initialProfile, initialDossier }: CompanyPr
           />
         </ProfileDialog>
       )}
+      {reverificationDialog}
     </div>
   )
 }

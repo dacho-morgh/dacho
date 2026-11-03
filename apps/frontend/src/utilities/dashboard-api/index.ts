@@ -185,3 +185,13 @@ export {
   type RfpFileDto,
   type RfpVersionDto,
 } from './events'
+export {
+  AccountApiError,
+  updateOwnAccount,
+  changeOwnPassword,
+  createOwnerCompany,
+  MIN_PASSWORD_LENGTH,
+  type OwnAccountDto,
+  type AccountFieldError,
+  type OwnerCompanyInput,
+} from './account'

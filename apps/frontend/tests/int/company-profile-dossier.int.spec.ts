@@ -130,8 +130,8 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
       }),
     )
 
-    // Verification badge
-    expect(screen.getByText('اطلاعات الزامی کامل است')).toBeTruthy()
+    // Verification state (S4 card): complete dossier, not yet submitted
+    expect(screen.getByText('پرونده آماده ارسال برای احراز است')).toBeTruthy()
 
     // Basic & dossier fields
     expect(screen.getByDisplayValue('شرکت نوآوران پیشرو')).toBeTruthy()
@@ -164,7 +164,7 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
       }),
     )
 
-    expect(screen.getByText(/در حال تکمیل/)).toBeTruthy()
+    expect(screen.getByText('اطلاعات شرکت هنوز کامل نیست')).toBeTruthy()
     expect(screen.getByText('نوع شخصیت حقوقی')).toBeTruthy()
     expect(screen.getByText('سال تأسیس')).toBeTruthy()
     expect(screen.getByText('اساس‌نامه')).toBeTruthy()
