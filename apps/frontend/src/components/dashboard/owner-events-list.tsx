@@ -416,8 +416,8 @@ export function OwnerEventsList() {
                   <tr>
                     <HeaderCell label="عنوان" />
                     <HeaderCell label="نوع" className="w-[120px]" />
-                    <HeaderCell label="تاریخ برگزاری" className="w-[220px]" />
-                    <HeaderCell label="وضعیت" className="w-[180px]" />
+                    <HeaderCell label="تاریخ برگزاری" className="w-[210px]" />
+                    <HeaderCell label="وضعیت" className="w-[190px]" />
                     <HeaderCell label="در سایت" className="w-[140px]" />
                     <HeaderCell className="w-[52px]" />
                   </tr>
@@ -428,13 +428,14 @@ export function OwnerEventsList() {
                       key={row.key}
                       className="h-[72px] border-b border-neutral-100 transition-colors hover:bg-neutral-100 has-[[data-state=open]]:bg-neutral-100"
                     >
-                      <td className="px-4">
-                        <div className="flex items-center gap-3">
+                      {/* max-w-0: the title takes the width left over and truncates, so the table fits its card. */}
+                      <td className="max-w-0 px-4">
+                        <div className="flex min-w-0 items-center gap-3">
                           <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600">
                             <DashboardEventsIcon className="size-5" />
                           </span>
                           <div className="flex min-w-0 flex-col gap-0.5">
-                            <Link href={row.editHref} className="min-w-0 truncate rounded-sm focus-visible:outline-2 focus-visible:outline-brand-500">
+                            <Link href={row.editHref} title={row.title} className="min-w-0 truncate rounded-sm focus-visible:outline-2 focus-visible:outline-brand-500">
                               <Typography as="span" variant="16/regular" color="neutral-600">
                                 {row.title}
                               </Typography>
@@ -458,7 +459,7 @@ export function OwnerEventsList() {
                         </Typography>
                       </td>
                       <td className="px-4">
-                        <Badge variant={row.state.variant} size="md">
+                        <Badge variant={row.state.variant} size="md" className="whitespace-nowrap">
                           <Typography as="span" variant="14/regular" className="text-inherit">
                             {row.state.label}
                           </Typography>
