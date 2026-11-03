@@ -343,3 +343,17 @@ again. Uploaded media remains in the `media` volume.
 
 - The frontend runs via `next start` against a complete prod `node_modules` — **not** Next's `output: standalone` tracer, which only partially copies symlinked pnpm deps (e.g. `@swc/helpers/esm`) and crashed on boot.
 - `payload migrate` at container startup is a catch-up no-op; the entrypoint auto-answers Payload's "dev mode → data loss?" prompt with "no" so it can't hang a non-interactive boot.
+
+## Demo branch
+
+The `demo` branch carries a snapshot of `staging` for demos. A push to `demo`
+runs the same CI checks and then publishes `demo` and `demo-sha-<7-character
+commit>` images. Production keeps `main`, `latest` and `sha-` tags, so the
+production poller never deploys a demo build.
+
+To run a demo image with `docker-compose.prod.yml`, set
+`IMAGE_TAG=demo-sha-<commit>` in that stack's `.env`. When it shares a host with
+production, give it its own directory, Compose project name (`-p dacho-demo`),
+secrets and loopback ports. When it replaces production on the host, stop the
+poller first (`sudo systemctl disable --now dacho-deploy.timer`), or it will
+redeploy `main`. To update the demo, merge `staging` into `demo` and push.

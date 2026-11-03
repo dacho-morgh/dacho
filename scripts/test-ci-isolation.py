@@ -82,7 +82,7 @@ class CIIsolationContract(unittest.TestCase):
 
     def test_staging_and_main_share_checks_before_publishing(self):
         push = block(block(CI, "on", 0), "push", 2)
-        self.assertIn("branches: [main, staging]", push)
+        self.assertIn("branches: [main, staging, demo]", push)
         jobs = block(CI, "jobs", 0)
         for name in ("quality", "build-without-database", "integration", "e2e"):
             self.assertTrue(block(jobs, name, 2), name)
@@ -98,6 +98,7 @@ class CIIsolationContract(unittest.TestCase):
         self.assertIn("needs: [branch-policy, quality, build-without-database, integration, e2e]", publish)
         self.assertIn("refs/heads/main", publish)
         self.assertIn("refs/heads/staging", publish)
+        self.assertIn("refs/heads/demo", publish)
         self.assertIn("uses: ./.github/workflows/publish.yml", publish)
         self.assertIn("contents: read", publish)
         self.assertIn("packages: write", publish)
@@ -141,6 +142,12 @@ class CIIsolationContract(unittest.TestCase):
             "type=raw,value=staging",
         ):
             self.assertIn(tag + ",enable=${{ github.ref_name == 'staging' }}", publish)
+        # The demo branch gets its own tags, never a production or staging alias.
+        for tag in (
+            "type=sha,format=short,prefix=demo-sha-",
+            "type=raw,value=demo",
+        ):
+            self.assertIn(tag + ",enable=${{ github.ref_name == 'demo' }}", publish)
 
     def test_browser_dependencies_use_the_primary_ubuntu_mirror(self):
         e2e = block(block(CI, "jobs", 0), "e2e", 2)

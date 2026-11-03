@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, staging]
+    branches: [main, staging, demo]
 
 permissions:
   contents: read
@@ -250,7 +250,7 @@ jobs:
 
   publish-images:
     name: Publish images after checks
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/demo')
     needs: [branch-policy, quality, build-without-database, integration, e2e]
     permissions:
       contents: read
