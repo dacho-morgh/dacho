@@ -188,21 +188,23 @@ export function FormSection({ title, children }: { title: string; children: Reac
 /* Breadcrumb — Figma add-new page (31070:16796): grey-500 parent, "/", 24/Bold page; actions at the end. */
 export function AdminBreadcrumb({ title, actions }: { title: string; actions?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <nav aria-label="مسیر صفحه" className="flex min-w-0 items-center gap-2">
-        <Link href="/dashboard/events" className="rounded-sm focus-visible:outline-2 focus-visible:outline-brand-500">
+    <div className="flex flex-wrap items-center justify-between gap-3 md:flex-nowrap">
+      {/* pe-12: clear of the mobile menu button at the top-left corner. */}
+      <nav aria-label="مسیر صفحه" className="flex min-w-0 basis-full items-center gap-2 pe-12 md:basis-auto md:flex-1 lg:pe-0">
+        {/* Phones keep the room for the page title; cancel and back lead to the list. */}
+        <Link href="/dashboard/events" className="hidden rounded-sm focus-visible:outline-2 focus-visible:outline-brand-500 sm:inline">
           <Typography as="span" variant="16/regular" color="neutral-500" className="whitespace-nowrap">
             رویدادها و نمایشگاه‌ها
           </Typography>
         </Link>
-        <Typography as="span" variant="16/regular" color="neutral-500" aria-hidden="true">
+        <Typography as="span" variant="16/regular" color="neutral-500" aria-hidden="true" className="hidden sm:inline">
           /
         </Typography>
         <Typography as="h1" variant="24/bold" color="neutral-700" className="truncate">
           {title}
         </Typography>
       </nav>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
     </div>
   )
 }
@@ -493,17 +495,17 @@ function EventEditor({
         title={title}
         actions={
           <>
-            <Button type="submit" form={formId} size="48" disabled={disabled}>
-              <Typography as="span" variant="20/regular" className="text-inherit">
-                {isSubmitting ? 'در حال ثبت...' : event ? 'ذخیره رویداد' : 'ثبت رویداد'}
-              </Typography>
-            </Button>
             <Button asChild variant="outline-gray" size="48">
               <Link href="/dashboard/events">
                 <Typography as="span" variant="20/regular" className="text-inherit">
                   انصراف
                 </Typography>
               </Link>
+            </Button>
+            <Button type="submit" form={formId} size="48" disabled={disabled}>
+              <Typography as="span" variant="20/regular" className="text-inherit">
+                {isSubmitting ? 'در حال ثبت...' : event ? 'ذخیره رویداد' : 'ثبت رویداد'}
+              </Typography>
             </Button>
           </>
         }

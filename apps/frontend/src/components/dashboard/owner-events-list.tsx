@@ -262,10 +262,10 @@ function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
           ))}
         </RadioGroup>
         <DialogFooter>
-          <Button size="40" onClick={() => router.push(`/dashboard/events/new?type=${kind}`)}>
+          <Button size="40" className="flex-1" onClick={() => router.push(`/dashboard/events/new?type=${kind}`)}>
             ادامه
           </Button>
-          <Button size="40" variant="outline-gray" onClick={() => onOpenChange(false)}>
+          <Button size="40" variant="outline-gray" className="flex-1" onClick={() => onOpenChange(false)}>
             انصراف
           </Button>
         </DialogFooter>
@@ -337,7 +337,7 @@ export function OwnerEventsList() {
 
   return (
     <main dir="rtl" className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 p-4 lg:pt-10">
-      <Typography as="h1" variant="24/bold" color="neutral-700">
+      <Typography as="h1" variant="24/bold" color="neutral-700" className="pe-12 lg:pe-0">
         رویدادها و نمایشگاه‌ها
       </Typography>
 
@@ -411,7 +411,7 @@ export function OwnerEventsList() {
             </div>
           ) : (
             <ScrollArea className="min-h-0 flex-1">
-              <table className="w-full min-w-[900px] border-collapse text-right">
+              <table className="w-full min-w-[1040px] border-collapse text-right">
                 <thead className="sticky top-0 z-10 bg-white">
                   <tr>
                     <HeaderCell label="عنوان" />
@@ -447,7 +447,7 @@ export function OwnerEventsList() {
                         </div>
                       </td>
                       <td className="px-4">
-                        <Badge variant={row.kind === 'event' ? 'primary' : 'gray'} size="md">
+                        <Badge variant="primary" size="md">
                           <Typography as="span" variant="14/regular" className="text-inherit">
                             {KIND_LABELS[row.kind]}
                           </Typography>

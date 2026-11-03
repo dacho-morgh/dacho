@@ -32,6 +32,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Input } from '@/components/ui/input'
 import { FileInput } from '@/components/ui/file-input'
 import { toast } from 'sonner'
+import { AdminBreadcrumb } from './owner-events-form'
 
 type Event = {
   id: string
@@ -613,14 +614,14 @@ function EventSubtopicsManager({
 
   return (
     <section className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Typography variant="h3">
-          عناوین، زیرعنوان‌ها و RFP رویداد: {event.title}
-        </Typography>
-        <Button size="40" type="button" variant="outline-gray" onClick={onBack}>
-          <Typography variant="14/regular">بازگشت به فهرست رویدادها</Typography>
-        </Button>
-      </div>
+      <AdminBreadcrumb
+        title={`عناوین، زیرعنوان‌ها و RFP رویداد: ${event.title}`}
+        actions={
+          <Button size="40" type="button" variant="outline-gray" onClick={onBack}>
+            <Typography variant="14/regular">بازگشت به فهرست رویدادها</Typography>
+          </Button>
+        }
+      />
 
       {successMessage && (
         <Typography role="status" variant="14/regular" color="success">

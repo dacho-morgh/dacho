@@ -197,17 +197,17 @@ function ExhibitionEditor({
         title={title}
         actions={
           <>
-            <Button type="submit" form={formId} size="48" disabled={isSubmitting || stale || reloading}>
-              <Typography as="span" variant="20/regular" className="text-inherit">
-                {isSubmitting ? 'در حال ثبت...' : exhibition ? 'ذخیره نمایشگاه' : 'ثبت نمایشگاه'}
-              </Typography>
-            </Button>
             <Button asChild variant="outline-gray" size="48">
               <Link href="/dashboard/events?type=exhibition">
                 <Typography as="span" variant="20/regular" className="text-inherit">
                   انصراف
                 </Typography>
               </Link>
+            </Button>
+            <Button type="submit" form={formId} size="48" disabled={isSubmitting || stale || reloading}>
+              <Typography as="span" variant="20/regular" className="text-inherit">
+                {isSubmitting ? 'در حال ثبت...' : exhibition ? 'ذخیره نمایشگاه' : 'ثبت نمایشگاه'}
+              </Typography>
             </Button>
           </>
         }
