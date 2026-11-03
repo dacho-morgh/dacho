@@ -84,20 +84,25 @@ test('tall mobile cards scroll fully before joining the stack', async ({ page })
   const height = await first.evaluate((card) => card.getBoundingClientRect().height)
   expect(height).toBeGreaterThan(480)
   await expect(section.locator('.pin-spacer')).toHaveCount(5)
-
   await first.evaluate((card) =>
     window.scrollTo(
       0,
       window.scrollY + card.getBoundingClientRect().bottom - window.innerHeight + 20,
     ),
   )
+  // The pin starts at `bottom bottom`, so once ScrollTrigger catches up the card
+  // rests on the viewport bottom. Reading it before then records a mid-scroll value.
   await expect
     .poll(() => first.evaluate((card) => card.getBoundingClientRect().bottom))
-    .toBeLessThanOrEqual(480)
+    .toBeCloseTo(480, 0)
 
   const firstBottom = await first.evaluate((card) => card.getBoundingClientRect().bottom)
   const second = section.locator('[data-service-card]').nth(1)
-  const secondTop = await second.evaluate((card) => card.getBoundingClientRect().top)
+  // anticipatePin can pin a card early after a fast scroll, so take positions
+  // from its pin spacer, which keeps the card's place in the page.
+  const secondTop = await second.evaluate(
+    (card) => card.parentElement!.getBoundingClientRect().top,
+  )
   await page.evaluate(() => window.scrollBy(0, 150))
   await expect
     .poll(() => second.evaluate((card) => card.getBoundingClientRect().top))
@@ -110,10 +115,21 @@ test('tall mobile cards scroll fully before joining the stack', async ({ page })
   await second.evaluate((card) =>
     window.scrollTo(
       0,
-      window.scrollY + card.getBoundingClientRect().bottom - window.innerHeight + 20,
+      window.scrollY +
+        card.parentElement!.getBoundingClientRect().bottom -
+        window.innerHeight +
+        20,
     ),
   )
-  await page.waitForTimeout(700)
+  // Wait for the second card to join the stack instead of a fixed delay.
+  await expect
+    .poll(() =>
+      section.evaluate((element) => {
+        const cards = element.querySelectorAll<HTMLElement>('[data-service-card]')
+        return Math.abs(cards[0].getBoundingClientRect().top - cards[1].getBoundingClientRect().top)
+      }),
+    )
+    .toBeLessThan(2)
   const bounds = await section.evaluate((element) => {
     const header = document.querySelector('header')!
     const heading = element.querySelector('h2')!
