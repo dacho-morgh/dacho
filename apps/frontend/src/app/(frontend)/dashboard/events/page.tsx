@@ -1,11 +1,11 @@
-import { ScrollArea } from '@/components/ui/scroll-area'
 import configPromise from '@payload-config'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import { EventsView, type EventItem } from '@/components/dashboard/events-view'
-import { OwnerEvents } from '@/components/dashboard/owner-events'
-import { dashboardOperationalRole } from '@/utilities/dashboard-server'
+import { OwnerEventsList } from '@/components/dashboard/owner-events-list'
+import { dashboardOperationalRole, serverDashboardFetch } from '@/utilities/dashboard-server'
+import { operationalEventIds, withOperationalId, type OperationalEvent } from '@/utilities/public-event-ids'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
@@ -31,29 +31,17 @@ export default async function EventsPage(props: PageProps = {}) {
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isOwner = dashboardOperationalRole(user) === 'system-owner'
 
-  if (isOwner) {
-    const exhibitions = await payload.find({
-      collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate',
-    })
-    return (
-      <ScrollArea className="min-h-0 flex-1">
-        <OwnerEvents />
-        <div className="flex w-full flex-col items-center bg-[#fafafa] px-4 pb-12 sm:px-6 lg:px-8">
-          <EventsView
-            initialEventsList={exhibitions.docs.map((item) => mapEvent(item, 'exhibitions'))}
-            isOwner
-            initialSelectedEventId={eventId}
-          />
-        </div>
-      </ScrollArea>
-    )
-  }
-  const [eventResult, exhibitionResult] = await Promise.all([
+  // FE40 (S5): the owner's one list of events and exhibitions; companies keep discovery.
+  if (isOwner) return <OwnerEventsList />
+
+  const [eventResult, exhibitionResult, operational] = await Promise.all([
     payload.find({ collection: 'events', limit: 100, depth: 1, sort: 'startDate' }),
     payload.find({ collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate' }),
+    serverDashboardFetch<{ items?: OperationalEvent[] }>('/events'),
   ])
+  const operationalIds = operationalEventIds(operational?.items)
   const events = [
-    ...eventResult.docs.map((item) => mapEvent(item, 'events')),
+    ...eventResult.docs.map((item) => withOperationalId(mapEvent(item, 'events'), operationalIds)),
     ...exhibitionResult.docs.map((item) => mapEvent(item, 'exhibitions')),
   ].sort((left, right) => left.startTimestamp - right.startTimestamp)
 

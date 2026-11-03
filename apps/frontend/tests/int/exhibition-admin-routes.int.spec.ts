@@ -12,8 +12,10 @@ const backend = vi.hoisted(() => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({ getPayload: async () => backend }))
 vi.mock('next/headers', () => ({ headers: async () => backend.requestHeaders }))
+const redirectTo = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({
-  redirect: () => {
+  redirect: (url: string) => {
+    redirectTo(url)
     throw new Error('REDIRECT')
   },
   notFound: () => {
@@ -60,16 +62,10 @@ afterEach(() => {
   vi.resetAllMocks()
 })
 
-it('keeps owner booth navigation independent of the operational events workspace and paginates CMS data', async () => {
-  backend.find
-    .mockResolvedValueOnce({ docs: [{ id: 17, title: 'First' }], hasNextPage: true })
-    .mockResolvedValueOnce({ docs: [{ id: 18, title: 'Last' }], hasNextPage: false })
-  render(await OwnerExhibitionsPage())
-  expect(screen.getByText('Manage exhibitions-17,exhibitions-18')).toBeTruthy()
-  expect(backend.find).toHaveBeenCalledTimes(2)
-  expect(
-    screen.getByRole('link', { name: 'مدیریت اطلاعات نمایشگاه در CMS' }).getAttribute('href'),
-  ).toBe('/admin/collections/exhibitions')
+it('sends the owner to the one events and exhibitions list (S5, FE40)', async () => {
+  await expect(OwnerExhibitionsPage()).rejects.toThrow('REDIRECT')
+  expect(redirectTo).toHaveBeenLastCalledWith('/dashboard/events?type=exhibition')
+  expect(backend.find).not.toHaveBeenCalled()
 })
 it.each(['chief-reviewer', 'reviewer', 'investment-reviewer'])(
   'denies %s both exhibition pages',

@@ -55,6 +55,12 @@ export interface DashboardDeps {
   verificationStore?: VerificationStore
 }
 
+/**
+ * Without a CMS (tests that do not inject one), app instances in one process share
+ * one in-memory store, as they share one database. Production passes the Payload store.
+ */
+const sharedInMemoryPublicRecords = new InMemoryPublicRecordStore()
+
 /** Stores and case helpers shared by every dashboard route module. */
 export function createDashboardContext(deps: DashboardDeps) {
   const notificationOutbox =
@@ -84,7 +90,7 @@ export function createDashboardContext(deps: DashboardDeps) {
     deps.boothReservations ?? new PostgresBoothReservationRepository(deps.pool)
   const verificationStore =
     deps.verificationStore ?? new PostgresVerificationStore(deps.pool)
-  const publicRecords = deps.publicRecords ?? new InMemoryPublicRecordStore()
+  const publicRecords = deps.publicRecords ?? sharedInMemoryPublicRecords
 
   async function checkExhibition(
     exhibitionId: string,

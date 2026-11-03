@@ -13,6 +13,7 @@ import { JwtSigner } from '../../src/jwt.js'
 import { InMemoryCodeStore } from '../../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../../src/otp/console-delivery.js'
 import { clearVerifiedCompanies, seedVerifiedCompanies } from './verified-company-fixtures.js'
+import { PUBLIC_EVENT_FIELDS } from './public-event-fields.js'
 import {
   CURRENT_EVENT_RULES_VERSION,
   CURRENT_NON_COMPETE_VERSION,
@@ -214,6 +215,7 @@ async function draftCase(team: Team) {
     registrationCloseAt: '2099-01-01T00:00:00Z',
     responsibleChiefId: team.chief,
     responsibleInvestmentId: team.investment,
+    ...PUBLIC_EVENT_FIELDS,
   })
   expectOk(eventRes, 201, 'event')
   const eventId = eventRes.body.event.id as string
@@ -763,6 +765,7 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
         registrationCloseAt: '2099-01-01T00:00:00Z',
         responsibleChiefId: chief,
         responsibleInvestmentId: holder,
+        ...PUBLIC_EVENT_FIELDS,
       }))
       await expectOnly(id, 'edit event', ['owner'], (user, target) =>
         request(app).patch(`/admin/events/${real(target, eventId)}`).set(auth(user)).send({ title: 'تلاش', revision: 1, reason: 'تلاش' }))

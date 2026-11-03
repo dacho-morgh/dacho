@@ -178,6 +178,11 @@ test('an event case travels from submission to the company reading its published
       registrationCloseAt: `${lastCompleted + 3}-01-01T00:00:00Z`,
       responsibleChiefId: ids.chief,
       responsibleInvestmentId: ids.investment,
+      // The event's public page is created with it (S5).
+      location: 'بوشهر',
+      startDate: `${lastCompleted + 3}-02-01T08:00:00Z`,
+      endDate: `${lastCompleted + 3}-02-02T16:00:00Z`,
+      status: 'upcoming',
     })
     const { category } = await api<{ category: { id: string } }>(as('owner'), 'POST', `/admin/events/${event.id}/categories`, { title: 'انرژی' })
     const { subtopic } = await api<{ subtopic: { id: string } }>(as('owner'), 'POST', `/admin/events/${event.id}/subtopics`, {

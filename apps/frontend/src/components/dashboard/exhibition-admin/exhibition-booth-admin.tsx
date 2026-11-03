@@ -211,7 +211,7 @@ export function ExhibitionBoothAdmin({
       {/* Navigation & Header */}
       <div className="flex flex-col gap-4">
         <Link
-          href="/dashboard/exhibitions"
+          href="/dashboard/events?type=exhibition"
           className="inline-flex w-fit items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-brand-600"
         >
           <ArrowRight className="size-4" />
@@ -243,18 +243,27 @@ export function ExhibitionBoothAdmin({
               </div>
             )}
           </div>
-          <Button
-            type="button"
-            variant="default"
-            size="36"
-            onClick={handleOpenAdd}
-            disabled={!canEdit}
-          >
-            <Plus className="size-4" />
-            <Typography as="span" variant="14/regular">
-              تعریف غرفه جدید
-            </Typography>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline-gray" size="36">
+              <Link href={`/dashboard/exhibitions/${encodeURIComponent(exhibition.id)}/edit`}>
+                <Typography as="span" variant="14/regular">
+                  ویرایش اطلاعات نمایشگاه
+                </Typography>
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="36"
+              onClick={handleOpenAdd}
+              disabled={!canEdit}
+            >
+              <Plus className="size-4" />
+              <Typography as="span" variant="14/regular">
+                تعریف غرفه جدید
+              </Typography>
+            </Button>
+          </div>
         </div>
       </div>
 

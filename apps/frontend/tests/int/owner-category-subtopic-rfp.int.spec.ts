@@ -3,9 +3,10 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { OwnerEvents } from '@/components/dashboard/owner-events'
+import { OwnerEventSubtopics } from '@/components/dashboard/owner-events'
 
 vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
   usePathname: () => '/dashboard/events',
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -76,7 +77,7 @@ describe('owner category and subtopic administration', () => {
     let categoriesList = [cat1]
     const request = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.startsWith('/api/users?')) return json({ docs: people, hasNextPage: false })
-      if (url === '/api/dashboard/admin/events') return json({ items: [event1] })
+      if (url === `/api/dashboard/admin/events/${event1.id}`) return json({ event: event1 })
       if (url === `/api/dashboard/admin/events/${event1.id}/categories` && init?.method === 'POST') {
         const body = JSON.parse(init.body as string)
         if (body.title === 'تکراری') {
@@ -96,15 +97,11 @@ describe('owner category and subtopic administration', () => {
     })
     vi.stubGlobal('fetch', request)
 
-    render(createElement(OwnerEvents))
-    const manageBtn = await screen.findByRole('button', {
-      name: `مدیریت دسته‌ها، زیرعنوان‌ها و RFP ${event1.title}`,
-    })
-    fireEvent.click(manageBtn)
+    render(createElement(OwnerEventSubtopics, { eventId: event1.id }))
 
     // Verify view header and existing category
     await screen.findByText(`عناوین، زیرعنوان‌ها و RFP رویداد: ${event1.title}`)
-    expect(screen.getByText('برق و ابزار دقیق')).toBeTruthy()
+    expect(await screen.findByText('برق و ابزار دقیق')).toBeTruthy()
     expect(screen.getByText('طراحی سیستم‌های پایش آنلاین')).toBeTruthy()
 
     // Open add category form
@@ -136,7 +133,7 @@ describe('owner category and subtopic administration', () => {
     }> = [sub1]
     const request = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.startsWith('/api/users?')) return json({ docs: people, hasNextPage: false })
-      if (url === '/api/dashboard/admin/events') return json({ items: [event1] })
+      if (url === `/api/dashboard/admin/events/${event1.id}`) return json({ event: event1 })
       if (url === `/api/dashboard/admin/events/${event1.id}/categories`) return json({ items: [cat1] })
       if (url === `/api/dashboard/admin/events/${event1.id}/subtopics` && init?.method === 'POST') {
         const body = JSON.parse(init.body as string)
@@ -165,10 +162,7 @@ describe('owner category and subtopic administration', () => {
     })
     vi.stubGlobal('fetch', request)
 
-    render(createElement(OwnerEvents))
-    fireEvent.click(await screen.findByRole('button', {
-      name: `مدیریت دسته‌ها، زیرعنوان‌ها و RFP ${event1.title}`,
-    }))
+    render(createElement(OwnerEventSubtopics, { eventId: event1.id }))
     await screen.findByText(`عناوین، زیرعنوان‌ها و RFP رویداد: ${event1.title}`)
 
     // Click new subtopic
@@ -202,20 +196,18 @@ describe('owner category and subtopic administration', () => {
     const noEmployerPeople = people.filter((p) => p.operationalRole !== 'employer-reviewer')
     const request = vi.fn(async (url: string) => {
       if (url.startsWith('/api/users?')) return json({ docs: noEmployerPeople, hasNextPage: false })
-      if (url === '/api/dashboard/admin/events') return json({ items: [event1] })
+      if (url === `/api/dashboard/admin/events/${event1.id}`) return json({ event: event1 })
       if (url === `/api/dashboard/admin/events/${event1.id}/categories`) return json({ items: [cat1] })
       if (url === `/api/dashboard/admin/events/${event1.id}/subtopics`) return json({ items: [] })
       return json({}, 404)
     })
     vi.stubGlobal('fetch', request)
 
-    render(createElement(OwnerEvents))
-    fireEvent.click(await screen.findByRole('button', {
-      name: `مدیریت دسته‌ها، زیرعنوان‌ها و RFP ${event1.title}`,
-    }))
+    render(createElement(OwnerEventSubtopics, { eventId: event1.id }))
+    await screen.findByText('برق و ابزار دقیق')
     fireEvent.click(await screen.findByRole('button', { name: 'زیرعنوان جدید' }))
     expect(
-      screen.getByText('شخص کارفرمای واجد شرایط وجود ندارد؛ ابتدا در بخش پرسنل حساب فعال با نقش کارفرما بسازید.'),
+      await screen.findByText('شخص کارفرمای واجد شرایط وجود ندارد؛ ابتدا در بخش پرسنل حساب فعال با نقش کارفرما بسازید.'),
     ).toBeTruthy()
   })
 })
@@ -224,7 +216,7 @@ describe('owner RFP administration', () => {
   it('displays active RFP version, files and download links', async () => {
     const request = vi.fn(async (url: string) => {
       if (url.startsWith('/api/users?')) return json({ docs: people, hasNextPage: false })
-      if (url === '/api/dashboard/admin/events') return json({ items: [event1] })
+      if (url === `/api/dashboard/admin/events/${event1.id}`) return json({ event: event1 })
       if (url === `/api/dashboard/admin/events/${event1.id}/categories`) return json({ items: [cat1] })
       if (url === `/api/dashboard/admin/events/${event1.id}/subtopics`) return json({ items: [sub1] })
       if (url === `/api/dashboard/events/${event1.id}/subtopics/${sub1.id}/rfp`) {
@@ -234,10 +226,7 @@ describe('owner RFP administration', () => {
     })
     vi.stubGlobal('fetch', request)
 
-    render(createElement(OwnerEvents))
-    fireEvent.click(await screen.findByRole('button', {
-      name: `مدیریت دسته‌ها، زیرعنوان‌ها و RFP ${event1.title}`,
-    }))
+    render(createElement(OwnerEventSubtopics, { eventId: event1.id }))
 
     // Click manage RFP on sub1
     fireEvent.click(await screen.findByRole('button', { name: `مدیریت فایل RFP ${sub1.title}` }))
@@ -260,7 +249,7 @@ describe('owner RFP administration', () => {
     let currentVersion = rfpVersion1
     const request = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.startsWith('/api/users?')) return json({ docs: people, hasNextPage: false })
-      if (url === '/api/dashboard/admin/events') return json({ items: [event1] })
+      if (url === `/api/dashboard/admin/events/${event1.id}`) return json({ event: event1 })
       if (url === `/api/dashboard/admin/events/${event1.id}/categories`) return json({ items: [cat1] })
       if (url === `/api/dashboard/admin/events/${event1.id}/subtopics`) {
         return json({ items: [{ ...sub1, currentRfpVersionId: currentVersion.id }] })
@@ -296,10 +285,7 @@ describe('owner RFP administration', () => {
     })
     vi.stubGlobal('fetch', request)
 
-    render(createElement(OwnerEvents))
-    fireEvent.click(await screen.findByRole('button', {
-      name: `مدیریت دسته‌ها، زیرعنوان‌ها و RFP ${event1.title}`,
-    }))
+    render(createElement(OwnerEventSubtopics, { eventId: event1.id }))
     fireEvent.click(await screen.findByRole('button', { name: `مدیریت فایل RFP ${sub1.title}` }))
 
     await screen.findByText(/انتشار نسخه اولیه مستندات فنی/)
@@ -349,7 +335,7 @@ describe('owner administration failure and isolation behavior', () => {
       const overridden = overrides(url, init)
       if (overridden) return overridden
       if (url.startsWith('/api/users?')) return json({ docs: people, hasNextPage: false })
-      if (url === '/api/dashboard/admin/events') return json({ items: [event1] })
+      if (url === `/api/dashboard/admin/events/${event1.id}`) return json({ event: event1 })
       if (url === `/api/dashboard/admin/events/${event1.id}/categories`) return json({ items: [cat1] })
       if (url === `/api/dashboard/admin/events/${event1.id}/subtopics`) return json({ items: [sub1, sub2] })
       if (url === `/api/dashboard/events/${event1.id}/subtopics/${sub1.id}/rfp`) return json({ version: rfpVersion1 })
@@ -360,10 +346,7 @@ describe('owner administration failure and isolation behavior', () => {
   }
 
   async function openManager() {
-    render(createElement(OwnerEvents))
-    fireEvent.click(await screen.findByRole('button', {
-      name: `مدیریت دسته‌ها، زیرعنوان‌ها و RFP ${event1.title}`,
-    }))
+    render(createElement(OwnerEventSubtopics, { eventId: event1.id }))
   }
 
   const pdf = (name = 'rfp.pdf', size = 10) => {

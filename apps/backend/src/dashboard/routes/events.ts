@@ -49,7 +49,8 @@ export function registerEventRoutes(router: Router, ctx: DashboardContext): void
     try {
       pages = await publicRecords.list('events')
     } catch {
-      res.status(503).json({ error: 'public_records_unavailable' })
+      // The operational list stays usable (the owner's overview reads it) while the CMS is down.
+      res.json({ items, unlinkedPublicEvents: [], publicPagesUnavailable: true })
       return
     }
     const byId = new Map(pages.map((page) => [page.id, page]))

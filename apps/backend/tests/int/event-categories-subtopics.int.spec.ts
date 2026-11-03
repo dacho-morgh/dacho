@@ -12,6 +12,7 @@ import { runMigrations } from '../../src/db/migrate.js'
 import { JwtSigner } from '../../src/jwt.js'
 import { InMemoryCodeStore } from '../../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../../src/otp/console-delivery.js'
+import { PUBLIC_EVENT_FIELDS } from './public-event-fields.js'
 
 const connectionString = process.env.DATABASE_URL ?? 'postgres://phase0_test:phase0_test_only@127.0.0.1:55439/dacho_phase0_test'
 const pool = new Pool({ connectionString, application_name: 'event-categories-integration' })
@@ -74,6 +75,7 @@ describe('event categories and subtopics integration (PostgreSQL)', () => {
       registrationCloseAt: '2027-02-01T00:00:00.000Z',
       responsibleChiefId: 'chief-1',
       responsibleInvestmentId: 'investment-1',
+      ...PUBLIC_EVENT_FIELDS,
       createdBy: 'owner-1',
     })
 
@@ -114,6 +116,7 @@ describe('event categories and subtopics integration (PostgreSQL)', () => {
       registrationCloseAt: '2027-02-01T00:00:00.000Z',
       responsibleChiefId: 'chief-1',
       responsibleInvestmentId: 'investment-1',
+      ...PUBLIC_EVENT_FIELDS,
       createdBy: 'owner-1',
     })
     const event2 = await eventRepo.create({
@@ -123,6 +126,7 @@ describe('event categories and subtopics integration (PostgreSQL)', () => {
       registrationCloseAt: '2027-02-01T00:00:00.000Z',
       responsibleChiefId: 'chief-1',
       responsibleInvestmentId: 'investment-1',
+      ...PUBLIC_EVENT_FIELDS,
       createdBy: 'owner-1',
     })
 
@@ -147,6 +151,7 @@ describe('event categories and subtopics integration (PostgreSQL)', () => {
       registrationCloseAt: '2027-02-01T00:00:00.000Z',
       responsibleChiefId: 'chief-1',
       responsibleInvestmentId: 'investment-1',
+      ...PUBLIC_EVENT_FIELDS,
       createdBy: 'owner-1',
     })
 

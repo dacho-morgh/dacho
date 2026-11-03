@@ -13,6 +13,7 @@ import { JwtSigner } from '../../src/jwt.js'
 import { InMemoryCodeStore } from '../../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../../src/otp/console-delivery.js'
 import { clearVerifiedCompanies, seedVerifiedCompanies } from './verified-company-fixtures.js'
+import { PUBLIC_EVENT_FIELDS } from './public-event-fields.js'
 
 const connectionString = process.env.DATABASE_URL ?? 'postgres://phase0_test:phase0_test_only@127.0.0.1:55439/dacho_phase0_test'
 const pool = new Pool({ connectionString, application_name: 't19-subtopic-requests' })
@@ -63,6 +64,7 @@ const eventPayload = (title = 'رویداد اصلی') => ({
   registrationCloseAt: '2099-01-01T00:00:00Z',
   responsibleChiefId: 'chief',
   responsibleInvestmentId: 'investment',
+  ...PUBLIC_EVENT_FIELDS,
 })
 
 async function cleanup() {

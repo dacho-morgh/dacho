@@ -14,6 +14,7 @@ import { JwtSigner } from '../../src/jwt.js'
 import { InMemoryCodeStore } from '../../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../../src/otp/console-delivery.js'
 import { clearVerifiedCompanies, seedVerifiedCompanies } from './verified-company-fixtures.js'
+import { PUBLIC_EVENT_FIELDS } from './public-event-fields.js'
 import {
   CURRENT_EVENT_RULES_VERSION,
   CURRENT_NON_COMPETE_VERSION,
@@ -190,6 +191,7 @@ async function roundCase(app: App) {
       registrationCloseAt: '2099-01-01T00:00:00Z',
       responsibleChiefId: 'chief',
       responsibleInvestmentId: 'investment',
+      ...PUBLIC_EVENT_FIELDS,
     })
   expect(eventRes.status).toBe(201)
   const eventId = eventRes.body.event.id as string

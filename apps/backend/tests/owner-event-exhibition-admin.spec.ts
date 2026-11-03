@@ -91,6 +91,16 @@ describe('owner event admin with its public page', () => {
     ])
   })
 
+  it('keeps the event list readable while the CMS is unavailable', async () => {
+    const { app, publicRecords, eventStore } = await setup()
+    await eventStore.create({ ...eventBody(), createdBy: 'owner-1' })
+    publicRecords.failNext.read = true
+    const list = await request(app).get('/admin/events').set(as('owner-1')).expect(200)
+    expect(list.body).toMatchObject({ unlinkedPublicEvents: [], publicPagesUnavailable: true })
+    expect(list.body.items).toHaveLength(1)
+    expect(list.body.items[0].public).toBeUndefined()
+  })
+
   it('writes neither record when the public page cannot be created', async () => {
     const { app, publicRecords, eventStore } = await setup()
     publicRecords.failNext.create = true
