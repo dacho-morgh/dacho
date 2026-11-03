@@ -21,7 +21,7 @@ import {
   type BoothCompanyEligibility,
   type BoothReservationRepository,
 } from '../src/exhibitions/reservation-repo.js'
-import type { ExhibitionStore } from '../src/exhibitions/exhibition-store.js'
+import type { ExhibitionStore, PublicRecordStore } from '../src/exhibitions/exhibition-store.js'
 import type { EvaluationStore } from '../src/reviews/evaluation-repo.js'
 import {
   InMemoryVerificationStore,
@@ -57,6 +57,7 @@ export interface TestAppOptions {
   boothCompanyEligibility?: BoothCompanyEligibility
   eventCompanyEligibility?: BoothCompanyEligibility
   exhibitionStore?: ExhibitionStore
+  publicRecords?: PublicRecordStore
   evaluationStore?: EvaluationStore
   pool?: Pool
   notificationOutbox?: NotificationOutbox
@@ -100,6 +101,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     boothCompanyEligibility: options.boothCompanyEligibility,
     eventCompanyEligibility: options.eventCompanyEligibility,
     exhibitionStore: options.exhibitionStore,
+    publicRecords: options.publicRecords,
     evaluationStore: options.evaluationStore,
     notificationOutbox,
     verificationStore,

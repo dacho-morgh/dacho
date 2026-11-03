@@ -40,6 +40,12 @@ export function canOpenDashboardDestination(role: OperationalRole, value: string
   if (path === '/dashboard/employees' || path.startsWith('/dashboard/employees/')) {
     return managementRoles.includes(role)
   }
+  // The owner's event and exhibition admin pages (S5): create, edit and subtopics.
+  if (path === '/dashboard/events/new' ||
+      /^\/dashboard\/events\/[^/]+\/(edit|subtopics)$/.test(path) ||
+      /^\/dashboard\/exhibitions\/[^/]+\/edit$/.test(path)) {
+    return role === 'system-owner'
+  }
   if (path === '/dashboard/events' || path.startsWith('/dashboard/events/')) {
     return role === 'representative' || role === 'system-owner'
   }

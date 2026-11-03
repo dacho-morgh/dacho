@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { anyone } from '@cms-core/access/anyone'
-import { adminOnly } from '@cms-core/access/adminOnly'
+import { adminOrBackendService } from '@cms-core/access/adminOrBackendService'
 
 export const Exhibitions: CollectionConfig = {
   slug: 'exhibitions',
@@ -9,10 +9,10 @@ export const Exhibitions: CollectionConfig = {
     plural: 'Exhibitions',
   },
   access: {
-    create: adminOnly,
-    delete: adminOnly,
+    create: adminOrBackendService,
+    delete: adminOrBackendService,
     read: anyone,
-    update: adminOnly,
+    update: adminOrBackendService,
   },
   admin: {
     useAsTitle: 'title',

@@ -1,6 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { anyone } from "@cms-core/access/anyone";
-import { adminOnly } from "@cms-core/access/adminOnly";
+import { adminOrBackendService } from "@cms-core/access/adminOrBackendService";
 import { eventPageFields } from "@cms-core/fields/eventPage";
 import { getServerSideURL } from "@cms-core/utilities/getURL";
 
@@ -11,10 +11,10 @@ export const Events: CollectionConfig = {
     plural: "Events",
   },
   access: {
-    create: adminOnly,
-    delete: adminOnly,
+    create: adminOrBackendService,
+    delete: adminOrBackendService,
     read: anyone,
-    update: adminOnly,
+    update: adminOrBackendService,
   },
   admin: {
     useAsTitle: "title",

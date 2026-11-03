@@ -25,6 +25,8 @@ const delivery = config.kavenegar
 const jwt = await JwtSigner.fromPrivateKeyPem(config.jwtKid, config.jwtPrivateKey)
 const privateDocumentStorage = new PrivateDocumentStorage(config.privateDocumentsDir)
 await privateDocumentStorage.ensure()
+// One Payload service-account client checks exhibitions and writes event/exhibition pages (S5).
+const cms = new PayloadExhibitionStore({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey })
 
 const app = createApp({
   codeStore: new PostgresCodeStore(pool),
@@ -36,7 +38,8 @@ const app = createApp({
   serviceCatalog: new PayloadServiceCatalog({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
   proxySecret: config.internalProxySecret,
   privateDocumentStorage,
-  exhibitionStore: new PayloadExhibitionStore({ baseUrl: config.payloadUrl, apiKey: config.payloadApiKey }),
+  exhibitionStore: cms,
+  publicRecords: cms,
 })
 
 app.listen(config.port, () => {

@@ -4,7 +4,8 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import { EventsView, type EventItem } from '@/components/dashboard/events-view'
-import { dashboardOperationalRole } from '@/utilities/dashboard-server'
+import { dashboardOperationalRole, serverDashboardFetch } from '@/utilities/dashboard-server'
+import { operationalEventIds, withOperationalId, type OperationalEvent } from '@/utilities/public-event-ids'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,8 @@ export default async function EventDetailPage(props: PageProps) {
 
   // Only a real published event may be shown; an unknown ID is not rendered as a placeholder event.
   if (!eventDoc) notFound()
-  const eventItem: EventItem = mapEvent(eventDoc, 'events')
+  const operational = await serverDashboardFetch<{ items?: OperationalEvent[] }>('/events')
+  const eventItem: EventItem = withOperationalId(mapEvent(eventDoc, 'events'), operationalEventIds(operational?.items))
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">

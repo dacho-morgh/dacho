@@ -16,8 +16,8 @@ vi.mock('@/components/dashboard/employee-list', () => ({
   EmployeeList: ({ canManage }: { canManage?: boolean }) =>
     createElement('div', null, canManage ? 'Manage personnel' : 'Read personnel'),
 }))
-vi.mock('@/components/dashboard/owner-events', () => ({
-  OwnerEvents: () => createElement('div', null, 'Manage operational events'),
+vi.mock('@/components/dashboard/owner-events-list', () => ({
+  OwnerEventsList: () => createElement('div', null, 'Manage operational events'),
 }))
 vi.mock('@/components/dashboard/events-view', () => ({
   EventsView: ({ initialEventsList }: { initialEventsList: { id: string }[] }) =>
@@ -39,14 +39,12 @@ it('routes active owner to personnel management', async () => {
   render(await EmployeesPage())
   expect(screen.getByText('Manage personnel')).toBeTruthy()
 })
-it('routes active owner to operational events and exhibition catalogue management', async () => {
+it('routes the active owner to the one events and exhibitions list (S5)', async () => {
   backend.auth.mockResolvedValue({ user: { operationalRole: 'system-owner', isActive: true } })
   render(await EventsPage())
   expect(screen.getByText('Manage operational events')).toBeTruthy()
-  expect(screen.getByText('Discover exhibitions-17')).toBeTruthy()
-  expect(backend.find).toHaveBeenCalledExactlyOnceWith({
-    collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate',
-  })
+  // The list loads its own data; the page reads nothing from the CMS for the owner.
+  expect(backend.find).not.toHaveBeenCalled()
 })
 it.each(['employees', 'events'])(
   'preserves owner cookie authentication on mobile HTTP navigation to %s',

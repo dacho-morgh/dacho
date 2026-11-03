@@ -5,15 +5,32 @@ import { isInternalOperationalRole, operationalRoleOf } from '../../access/roles
 import { isEventId } from '../event-repo.js'
 import { actorOf } from '../proxy-auth.js'
 import { isUuid } from '../../exhibitions/catalogue.js'
+import type { PublicRecord } from '../../exhibitions/exhibition-store.js'
+import {
+  PublicRecordFailure,
+  contentErrorBody,
+  isPublicRecordId,
+  parsePublicContent,
+  publicCall,
+  undoPublicWrite,
+  type PublicWrite,
+} from '../../exhibitions/public-content.js'
 import { parseEventRevision, parseEventReason, normalizeEventInput, eventWithActions, ineligibleResponsibleField } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 
+const NO_STORE = 'private, no-store, max-age=0'
+
+function isUniqueViolation(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === '23505'
+}
+
 export function registerEventRoutes(router: Router, ctx: DashboardContext): void {
-  const { deps, eventStore, categoryStore } = ctx
+  const { deps, eventStore, categoryStore, publicRecords } = ctx
 
   router.get('/admin/events', async (_req, res, next) => {
     try {
     const actor = actorOf(res)
+    res.set('Cache-Control', NO_STORE)
     if (!isInternalOperationalRole(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
       return
@@ -22,13 +39,33 @@ export function registerEventRoutes(router: Router, ctx: DashboardContext): void
     const items = events
       .filter((event) => canActOnEvent(actor.operationalRole, actor.id, event, 'read'))
       .map((event) => eventWithActions(actor.operationalRole, actor.id, event))
-    res.json({ items })
+    if (!canManageEvents(actor.operationalRole)) {
+      res.json({ items })
+      return
+    }
+    // The owner's admin list shows each event's public page, and the CMS events
+    // that no dashboard event owns yet so they can be taken over (S5, T60).
+    let pages: PublicRecord[]
+    try {
+      pages = await publicRecords.list('events')
+    } catch {
+      // The operational list stays usable (the owner's overview reads it) while the CMS is down.
+      res.json({ items, unlinkedPublicEvents: [], publicPagesUnavailable: true })
+      return
+    }
+    const byId = new Map(pages.map((page) => [page.id, page]))
+    const linked = new Set(events.map((event) => event.publicEventId).filter(Boolean))
+    res.json({
+      items: items.map((event) => ({ ...event, public: event.publicEventId ? byId.get(event.publicEventId) ?? null : null })),
+      unlinkedPublicEvents: pages.filter((page) => !linked.has(page.id)),
+    })
     } catch (error) { next(error) }
   })
 
   router.get('/admin/events/:id', async (req, res, next) => {
     try {
     const actor = actorOf(res)
+    res.set('Cache-Control', NO_STORE)
     if (!isInternalOperationalRole(actor.operationalRole)) {
       res.status(403).json({ error: 'forbidden' })
       return
@@ -42,11 +79,23 @@ export function registerEventRoutes(router: Router, ctx: DashboardContext): void
       res.status(404).json({ error: 'not_found' })
       return
     }
-    res.json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
+    if (!canManageEvents(actor.operationalRole)) {
+      res.json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
+      return
+    }
+    let page: PublicRecord | undefined
+    try {
+      page = event.publicEventId ? await publicRecords.find('events', event.publicEventId) : undefined
+    } catch {
+      res.status(503).json({ error: 'public_records_unavailable' })
+      return
+    }
+    res.json({ event: { ...eventWithActions(actor.operationalRole, actor.id, event), public: page ?? null } })
     } catch (error) { next(error) }
   })
 
   router.post('/admin/events', async (req, res, next) => {
+    let write: PublicWrite | undefined
     try {
     const actor = actorOf(res)
     if (!canManageEvents(actor.operationalRole)) {
@@ -62,17 +111,74 @@ export function registerEventRoutes(router: Router, ctx: DashboardContext): void
       )
       return
     }
+    // The public page carries the same title and description as the event.
+    const content = parsePublicContent({ ...req.body, title: parsed.input.title, description: parsed.input.description })
+    if (!content.ok) {
+      res.status(400).json(contentErrorBody(content))
+      return
+    }
     const ineligible = await ineligibleResponsibleField(deps.userStore, parsed.input)
     if (ineligible) {
       res.status(400).json({ error: 'ineligible_responsible_person', field: ineligible })
       return
     }
-    const event = await eventStore.create({ ...parsed.input, createdBy: actor.id })
-    res.status(201).json({ event: eventWithActions(actor.operationalRole, actor.id, event) })
-    } catch (error) { next(error) }
+    // An existing CMS event without a dashboard event may be taken over instead of
+    // creating a second public page for the same event.
+    const adoptId = typeof req.body?.publicEventId === 'string' ? req.body.publicEventId.trim() : ''
+    let adopted: PublicRecord | undefined
+    if (adoptId) {
+      if (!isPublicRecordId(adoptId)) {
+        res.status(404).json({ error: 'public_event_not_found' })
+        return
+      }
+      try {
+        adopted = await publicRecords.find('events', adoptId)
+      } catch {
+        res.status(502).json({ error: 'public_record_failed' })
+        return
+      }
+      if (!adopted) {
+        res.status(404).json({ error: 'public_event_not_found' })
+        return
+      }
+      if (await eventStore.findByPublicEventId(adoptId)) {
+        res.status(409).json({ error: 'public_event_linked' })
+        return
+      }
+    }
+    let page: PublicRecord | undefined
+    let event
+    try {
+      event = await eventStore.create({ ...parsed.input, createdBy: actor.id }, async () => {
+        page = await publicCall(() => adopted
+          ? publicRecords.update('events', adopted.id, content.value)
+          : publicRecords.create('events', content.value))
+        if (!page) throw new PublicRecordFailure('missing')
+        write = adopted ? { kind: 'updated', id: page.id, previous: adopted } : { kind: 'created', id: page.id }
+        return page.id
+      })
+    } catch (error) {
+      if (error instanceof PublicRecordFailure) {
+        res.status(error.reason === 'missing' ? 404 : 502).json({
+          error: error.reason === 'missing' ? 'public_event_not_found' : 'public_record_failed',
+        })
+        return
+      }
+      throw error
+    }
+    res.status(201).json({ event: { ...eventWithActions(actor.operationalRole, actor.id, event), public: page ?? null } })
+    } catch (error) {
+      if (write) await undoPublicWrite(publicRecords, 'events', write)
+      if (isUniqueViolation(error)) {
+        res.status(409).json({ error: 'public_event_linked' })
+        return
+      }
+      next(error)
+    }
   })
 
   router.patch('/admin/events/:id', async (req, res, next) => {
+    let write: PublicWrite | undefined
     try {
     const actor = actorOf(res)
     if (!canManageEvents(actor.operationalRole)) {
@@ -111,17 +217,56 @@ export function registerEventRoutes(router: Router, ctx: DashboardContext): void
       )
       return
     }
+    let currentPage: PublicRecord | undefined
+    try {
+      currentPage = existing.publicEventId ? await publicRecords.find('events', existing.publicEventId) : undefined
+    } catch {
+      res.status(502).json({ error: 'public_record_failed' })
+      return
+    }
+    // An event made before S5 has no public page; this save creates it, so the
+    // public fields are required then.
+    const content = parsePublicContent(
+      { ...req.body, title: parsed.input.title, description: parsed.input.description },
+      currentPage,
+    )
+    if (!content.ok) {
+      res.status(400).json(contentErrorBody(content))
+      return
+    }
     const ineligible = await ineligibleResponsibleField(deps.userStore, parsed.input)
     if (ineligible) {
       res.status(400).json({ error: 'ineligible_responsible_person', field: ineligible })
       return
     }
-    const updated = await eventStore.update(existing.id, {
-      ...parsed.input,
-      expectedRevision: revision,
-      actorId: actor.id,
-      reason,
-    })
+    let page: PublicRecord | undefined
+    let updated
+    try {
+      updated = await eventStore.update(existing.id, {
+        ...parsed.input,
+        expectedRevision: revision,
+        actorId: actor.id,
+        reason,
+      }, async () => {
+        page = currentPage
+          ? await publicCall(() => publicRecords.update('events', currentPage!.id, content.value))
+          : undefined
+        if (page && currentPage) {
+          write = { kind: 'updated', id: page.id, previous: currentPage }
+        } else {
+          // The page was removed in the CMS meanwhile, or never existed: make it again.
+          page = await publicCall(() => publicRecords.create('events', content.value))
+          write = { kind: 'created', id: page.id }
+        }
+        return page.id
+      })
+    } catch (error) {
+      if (error instanceof PublicRecordFailure) {
+        res.status(502).json({ error: 'public_record_failed' })
+        return
+      }
+      throw error
+    }
     if (!updated.ok) {
       if (updated.error === 'stale') {
         res.status(409).json({ error: 'stale_event', revision: updated.event.revision })
@@ -130,7 +275,36 @@ export function registerEventRoutes(router: Router, ctx: DashboardContext): void
       res.status(404).json({ error: 'not_found' })
       return
     }
-    res.json({ event: eventWithActions(actor.operationalRole, actor.id, updated.event) })
+    res.json({ event: { ...eventWithActions(actor.operationalRole, actor.id, updated.event), public: page ?? null } })
+    } catch (error) {
+      if (write) await undoPublicWrite(publicRecords, 'events', write)
+      next(error)
+    }
+  })
+
+  /** Events a company can apply to, keyed by their public page (S5). */
+  router.get('/events', async (_req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      res.set('Cache-Control', NO_STORE)
+      const admin = actor.operationalRole === 'system-owner' || actor.operationalRole === 'central-secretariat'
+      const company = actor.operationalRole === 'representative' && (await deps.companyStore.findByRepresentative(actor.id))
+      if (!admin && !company) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const events = await eventStore.list()
+      res.json({
+        items: events
+          .filter((event) => event.publicEventId)
+          .map((event) => ({
+            id: event.id,
+            publicEventId: event.publicEventId,
+            title: event.title,
+            registrationOpenAt: event.registrationOpenAt,
+            registrationCloseAt: event.registrationCloseAt,
+          })),
+      })
     } catch (error) { next(error) }
   })
 

@@ -18,6 +18,7 @@ import { InMemoryCodeStore } from '../../src/otp/code-store.js'
 import { ConsoleOtpDelivery } from '../../src/otp/console-delivery.js'
 import { PrivateDocumentStorage } from '../../src/documents/storage.js'
 import { DOCUMENT_POLICY_VERSION } from '../../src/documents/policy.js'
+import { PUBLIC_EVENT_FIELDS } from './public-event-fields.js'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
 const users: User[] = [
@@ -61,6 +62,7 @@ const eventBody = {
   registrationCloseAt: '2099-01-01T00:00:00Z',
   responsibleChiefId: 'chief',
   responsibleInvestmentId: 'investment',
+  ...PUBLIC_EVENT_FIELDS,
 }
 
 async function cleanup() {

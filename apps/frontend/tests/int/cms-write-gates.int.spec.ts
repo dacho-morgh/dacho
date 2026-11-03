@@ -1,4 +1,5 @@
 import { adminOnly } from '@cms-core/access/adminOnly'
+import { adminOrBackendService } from '@cms-core/access/adminOrBackendService'
 import { hasContentRole } from '@cms-core/access/editorContent'
 import { getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -66,6 +67,8 @@ describe('CMS write gates', () => {
 
   afterAll(cleanup)
 
+  const PUBLIC_PAGE_SLUGS = ['events', 'exhibitions']
+
   describe('no write gate is left open', () => {
     it('gates every collection write on adminOnly or hasContentRole', async () => {
       const sanitized = await config
@@ -96,9 +99,28 @@ describe('CMS write gates', () => {
               c.access?.delete === hasContentRole
             ),
         )
+        // Event and exhibition pages are also written by the backend's service
+        // account, together with their operational record (S5, T60).
+        .filter(
+          (c) =>
+            !(
+              PUBLIC_PAGE_SLUGS.includes(c.slug) &&
+              c.access?.create === adminOrBackendService &&
+              c.access?.update === adminOrBackendService &&
+              c.access?.delete === adminOrBackendService
+            ),
+        )
         .map((c) => c.slug)
 
       expect(offenders).toEqual([])
+    })
+
+    it('lets only admins and the backend service account write event and exhibition pages', async () => {
+      const sanitized = await config
+      const writers = sanitized.collections
+        .filter((c) => c.access?.create === adminOrBackendService)
+        .map((c) => c.slug)
+      expect(writers.sort()).toEqual([...PUBLIC_PAGE_SLUGS].sort())
     })
 
     it('keeps the exemptions exempt, so the list above cannot rot', async () => {

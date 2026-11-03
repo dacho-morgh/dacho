@@ -50,6 +50,10 @@ function eventPayload(overrides: Record<string, unknown> = {}) {
     registrationCloseAt: '2027-02-01T00:00:00.000Z',
     responsibleChiefId: 'chief-1',
     responsibleInvestmentId: 'investment-1',
+    location: 'بوشهر، سالن همایش',
+    startDate: '2027-03-01T08:00:00.000Z',
+    endDate: '2027-03-02T16:00:00.000Z',
+    status: 'upcoming',
     ...overrides,
   }
 }
