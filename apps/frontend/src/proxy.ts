@@ -34,6 +34,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
+  // Payload's own REST API. Over plain HTTP a same-origin browser GET carries neither
+  // Origin nor Sec-Fetch-Site, so Payload ignores the session cookie and the owner's
+  // lists answer 403. Reads get the same metadata as /api/dashboard; writes keep
+  // Payload's own Origin check.
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    if (request.method !== 'GET' && request.method !== 'HEAD') return NextResponse.next()
+    return NextResponse.next({ request: { headers: requestHeaders } })
+  }
+
   if (!hasSessionCookie) {
     return NextResponse.redirect(new URL(getLoginUrl(returnUrl), request.url))
   }
@@ -105,5 +114,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/api/:path*'],
 }
