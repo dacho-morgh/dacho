@@ -90,15 +90,17 @@ async function main(): Promise<void> {
       where: { key: { equals: svc.key } },
       limit: 1,
     })
+    // A script has no Next request, so the services hook must not call revalidatePath (#263).
     if (existing.docs.length > 0) {
       await payload.update({
         collection: 'services',
         id: existing.docs[0].id,
         data,
+        context: { disableRevalidate: true },
       })
       console.log(`• service updated: ${svc.key}`)
     } else {
-      await payload.create({ collection: 'services', data })
+      await payload.create({ collection: 'services', data, context: { disableRevalidate: true } })
       console.log(`• service created: ${svc.key}`)
     }
   }
