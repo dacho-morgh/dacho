@@ -116,6 +116,9 @@ describe('S4 own account (FE37)', () => {
       fireEvent.change(screen.getByLabelText(label), { target: { value } })
     fill('رمز فعلی', 'old-password')
     fill('رمز جدید', 'new-password-1')
+    fireEvent.click(screen.getByRole('button', { name: 'تغییر رمز' }))
+    expect(await screen.findByText('تکرار رمز جدید را وارد کنید.')).toBeTruthy()
+
     fill('تکرار رمز جدید', 'different')
     fireEvent.click(screen.getByRole('button', { name: 'تغییر رمز' }))
     expect(await screen.findByText('تکرار رمز با رمز جدید یکسان نیست.')).toBeTruthy()

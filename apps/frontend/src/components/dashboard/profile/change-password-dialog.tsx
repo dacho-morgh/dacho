@@ -28,10 +28,10 @@ const passwordSchema = z
   .object({
     currentPassword: z.string().min(1, 'رمز فعلی را وارد کنید.'),
     newPassword: z.string().min(MIN_PASSWORD_LENGTH, `رمز جدید باید دست‌کم ${MIN_PASSWORD_LENGTH.toLocaleString('fa-IR')} نویسه باشد.`),
-    confirmPassword: z.string(),
+    confirmPassword: z.string().min(1, 'تکرار رمز جدید را وارد کنید.'),
   })
   .superRefine((values, context) => {
-    if (values.confirmPassword !== values.newPassword) {
+    if (values.confirmPassword && values.confirmPassword !== values.newPassword) {
       context.addIssue({ code: 'custom', path: ['confirmPassword'], message: 'تکرار رمز با رمز جدید یکسان نیست.' })
     }
     if (values.newPassword && values.newPassword === values.currentPassword) {
