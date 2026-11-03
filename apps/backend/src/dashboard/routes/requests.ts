@@ -528,7 +528,16 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
         res.status(409).json({ error: 'financial_stage_not_open' })
         return
       }
-      res.set('Cache-Control', 'private, no-store, max-age=0').json({ invitation })
+      // The statement years the package must cover, by the same rule the submit checks (S6).
+      // `null` when the founding date has no readable year, which the submit rejects too.
+      const company = request.companyId
+        ? await deps.companyStore.findById(request.companyId).catch(() => undefined)
+        : await deps.companyStore.findByRepresentative(request.ownerId)
+      const plan = statementYearPlan(company?.establishmentDate)
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({
+        invitation,
+        statementYears: plan.ok ? plan.years : null,
+      })
     } catch (error) { next(error) }
   })
 

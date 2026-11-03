@@ -8,7 +8,7 @@ The chief's `advance` opens the financial stage. In the same transaction it reco
 
 | Route | Who | Behaviour |
 | --- | --- | --- |
-| `GET /requests/:id/financial-invitation` | Owning company, Secretariat, owner | `{ invitation }`: `id`, `requestId`, `trackingCode`, `requestRevision`, `proposalRevision`, `checklistVersion`, `checklist`, `invitedAt`. Before advancement `409 financial_stage_not_open`. Another company gets `404`. Chief, reviewer, employer and investment person get `403`. |
+| `GET /requests/:id/financial-invitation` | Owning company, Secretariat, owner | `{ invitation, statementYears }`. `invitation`: `id`, `requestId`, `trackingCode`, `requestRevision`, `proposalRevision`, `checklistVersion`, `checklist`, `invitedAt`. `statementYears`: the years the [package](financial-package.md) must cover, by the submit's own rule, or `null` when the founding date has no readable year. Before advancement `409 financial_stage_not_open`. Another company gets `404`. Chief, reviewer, employer and investment person get `403`. |
 
 The response names neither the chief nor the round.
 
