@@ -93,7 +93,9 @@ access check.
 | `DELETE /admin/requests/:id/assignments/:userId` | System Owner only; stores revoker, time and reason; access ends immediately |
 | `GET /admin/requests/:id/assignments` | System Owner / Central Secretariat |
 | `GET /admin/events`, `GET /admin/events/:id` | internal roles only; System Owner / Central Secretariat all, assigned chief/investment reviewer own event, other internal roles empty/404 |
-| `POST /admin/events`, `PATCH /admin/events/:id` | System Owner only; responsible people must be active and currently hold chief-reviewer / investment-reviewer respectively; registration close must be after open; PATCH requires the current revision and a reason, records an atomic audit entry and returns `409` for a stale revision |
+| `POST /admin/events`, `PATCH /admin/events/:id` | System Owner only; responsible people must be active and currently hold chief-reviewer / investment-reviewer respectively; registration close must be after open; PATCH requires the current revision and a reason, records an atomic audit entry and returns `409` for a stale revision. Both also write the event's public CMS page in the same step (S5, see [owner event and exhibition admin](owner-event-exhibition-admin.md)) |
+| `GET /events` | System Owner, Central Secretariat or a representative with a company; events that have a public page, keyed by it |
+| `GET/POST /admin/exhibitions`, `GET/PATCH /admin/exhibitions/:id` | System Owner only; the exhibition's public CMS page and booth settings, written together; stale `revision` → `409` |
 | `GET /letters`, `GET /letters/:id`, `DELETE /letters/:id` | case letters require current case ownership/assignment and sender-or-recipient participation; deletion additionally requires recipient scope. Non-case personal letters retain sender/recipient scope; all-scope oversight remains explicit |
 | `GET /stats`, `GET /stats/overview`, `GET /activities` | identical scope as the request list; [queues and filters](work-queues.md) only narrow it |
 | `GET /admin/companies`, `GET /admin/companies/:id` | System Owner / Central Secretariat; explicit projection with no raw user, credential, API key, session or personnel history |
@@ -126,9 +128,10 @@ records.
 - `hasCmsRole` now admits the System Owner, Central Secretariat and the
   independent editorial desk. Editorial privilege still never grants an
   operational role or workflow authority.
-- Public `events`/`exhibitions` CMS content remains separate from the backend
-  event configuration. The configuration record stores the registration window
-  and responsible people; it does not publish content or grant CMS edit access.
+- Public `events`/`exhibitions` CMS content remains a separate record from the
+  backend event configuration and exhibition settings. Since S5 the backend's
+  API-key service account writes it together with them on the owner's command
+  (`adminOrBackendService`); no person gains CMS edit access from it.
 
 ## Deliberately denied / future integration
 

@@ -10,6 +10,8 @@ CMS `exhibitions` remains the public content record (title, description,
 location, dates and status). The operational catalogue is owned by the backend
 in `dashboard.*` and is keyed by the CMS exhibition id. The catalogue tables are
 separate from Payload's `public` schema, matching the existing storage split.
+Since S5 the owner creates and edits both from the dashboard in one step; see
+[owner event and exhibition admin](owner-event-exhibition-admin.md).
 
 ## Stored records
 
