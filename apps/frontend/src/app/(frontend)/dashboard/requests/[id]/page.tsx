@@ -7,6 +7,8 @@ import { getPayload } from 'payload'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { CompanyCorrectionPanel } from '@/components/dashboard/company-correction-panel'
 import { CompanyRequestTracking } from '@/components/dashboard/company-request-tracking'
+import { FinancialOutcomeCard } from '@/components/dashboard/financial-outcome-card'
+import { FinancialPackagePanel } from '@/components/dashboard/financial-package-panel'
 import { RequestDossier, type DossierPart } from '@/components/dashboard/request-dossier'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
@@ -267,15 +269,27 @@ function CompanySections({
   correction: ReactNode
 }) {
   const requestId = request.id
+  const financialStage = request.status === 'in_review' && request.reviewStage === 'advanced'
+  const result = publishedResult === 'failed' ? 'failed' : (publishedResult?.result ?? null)
   return (
     <>
+      {/* The outcome and the financial package render below (S6), so tracking gets no result of its own. */}
       <CompanyRequestTracking
         request={request}
         timeline={timeline}
         proposalRevision={proposalRevision}
-        publishedResult={publishedResult}
+        publishedResult={null}
         correction={correction}
       />
+      <FinancialOutcomeCard result={result} stageOpen={financialStage} />
+      {request.reviewStage === 'advanced' ? (
+        <FinancialPackagePanel
+          requestId={requestId}
+          trackingCode={request.trackingCode ?? null}
+          canSubmit={(request.allowedActions ?? []).includes('submitFinancialPackage')}
+          resultPublished={Boolean(result && result !== 'failed')}
+        />
+      ) : null}
       <div className="flex justify-end">
         <Button asChild variant="outline-gray" size="40">
           <Link href={`/dashboard/letters/new?requestId=${encodeURIComponent(requestId)}`}>

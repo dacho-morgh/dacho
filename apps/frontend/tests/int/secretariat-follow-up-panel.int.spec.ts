@@ -76,12 +76,12 @@ describe('SecretariatFollowUpPanel', () => {
 
     await screen.findByText(MEMO)
     expect(resultBox().value).toBe('')
-    expect(screen.queryByRole('button', { name: 'انتشار برای شرکت' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'انتشار و ارسال به شرکت' })).toBeNull()
 
     fireEvent.change(resultBox(), { target: { value: 'متن برای شرکت' } })
     fireEvent.click(screen.getByRole('button', { name: 'ثبت پیش‌نویس و پیش‌نمایش' }))
 
-    const publish = await screen.findByRole('button', { name: 'انتشار برای شرکت' })
+    const publish = await screen.findByRole('button', { name: 'انتشار و ارسال به شرکت' })
     fireEvent.click(publish)
 
     await waitFor(() => {
@@ -99,9 +99,9 @@ describe('SecretariatFollowUpPanel', () => {
       }],
     }))
     renderPanel()
-    await screen.findByRole('button', { name: 'انتشار برای شرکت' })
+    await screen.findByRole('button', { name: 'انتشار و ارسال به شرکت' })
     fireEvent.change(resultBox(), { target: { value: 'متن تغییرکرده' } })
-    expect(screen.queryByRole('button', { name: 'انتشار برای شرکت' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'انتشار و ارسال به شرکت' })).toBeNull()
   })
 
   it('explains a stale publish', async () => {
@@ -116,7 +116,7 @@ describe('SecretariatFollowUpPanel', () => {
       })
     })
     renderPanel()
-    fireEvent.click(await screen.findByRole('button', { name: 'انتشار برای شرکت' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'انتشار و ارسال به شرکت' }))
     expect((await screen.findByRole('alert')).textContent).toContain('نسخه تازه‌تری')
   })
 

@@ -393,7 +393,7 @@ describe('RequestDossier with the correction form', () => {
       }),
     )
     expect(screen.queryByText(/ارسال دوباره از این صفحه هنوز فعال نیست/)).toBeNull()
-    expect(screen.getAllByTestId('document-field').map((field) => field.textContent)).not.toContain('proposal')
+    expect(screen.queryAllByTestId('document-field').map((field) => field.textContent)).not.toContain('proposal')
     expect(screen.getByText('فرم اصلاح')).toBeTruthy()
   })
 })

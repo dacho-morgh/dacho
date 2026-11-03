@@ -49,6 +49,8 @@ export interface PrivateDocumentDto {
   mimeType: string
   sizeBytes: number
   logicalVersion: number
+  /** The year a financial statement covers (T30); null for every other file. */
+  statementYear?: number | null
   requestId: string | null
   companyId: string | null
   uploaderId: string
@@ -162,6 +164,8 @@ export interface UploadDocumentInput {
   requestId?: string
   companyId?: string
   logicalVersion?: number
+  /** Only for `financialStatements`: the Gregorian year the statement covers. */
+  statementYear?: number
 }
 
 /** XHR is used because `fetch` cannot report upload progress in browsers. */
@@ -176,6 +180,7 @@ export function uploadDocument(
     if (input.requestId) form.set('requestId', input.requestId)
     if (input.companyId) form.set('companyId', input.companyId)
     if (input.logicalVersion) form.set('logicalVersion', String(input.logicalVersion))
+    if (input.statementYear) form.set('statementYear', String(input.statementYear))
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', '/api/dashboard/documents')
