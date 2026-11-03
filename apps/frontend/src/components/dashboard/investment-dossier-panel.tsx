@@ -69,7 +69,7 @@ export function InvestmentDossierPanel({ id }: { id: string }) {
     <div className="flex min-w-0 flex-col gap-4" data-testid="investment-dossier">
       <FinancialBanner
         tone={complete ? 'success' : 'warning'}
-        title={complete ? 'پرونده کامل · آماده یادداشت سرمایه‌گذاری' : 'ارزیابی‌های این پرونده کامل نیست'}
+        title={complete ? 'پرونده کامل · آماده ارجاع' : 'ارزیابی‌های این پرونده کامل نیست'}
       >
         {complete
           ? 'بسته مالی و هر چهار ارزیابی نهایی دریافت شده‌اند.'

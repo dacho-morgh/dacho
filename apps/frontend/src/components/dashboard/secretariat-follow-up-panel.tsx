@@ -44,12 +44,10 @@ type LoadState = 'loading' | 'ready' | 'denied' | 'error'
  */
 export function SecretariatFollowUpPanel({
   id,
-  companyName = null,
   trackingCode = null,
 }: {
   id: string
   /** From the case read, for the summary (Figma 03) and the publication preview (Figma 04). */
-  companyName?: string | null
   trackingCode?: string | null
 }) {
   const [state, setState] = useState<LoadState>('loading')
@@ -126,6 +124,7 @@ export function SecretariatFollowUpPanel({
   const trimmed = resultBody.trim()
   const previewReady = Boolean(latest && !latest.publishedAt && latest.body === trimmed)
   const lastSent = followUp.memos.find((memo) => memo.sentAt)
+  const companyName = followUp.companyName ?? null
   const code = trackingCode ? <bdi dir="ltr">{trackingCode}</bdi> : '—'
 
   return (

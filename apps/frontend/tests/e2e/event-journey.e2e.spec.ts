@@ -21,6 +21,7 @@ const suffix = `${Date.now()}${randomInt(100, 999)}`.slice(-8)
 const lastCompleted = new Date().getUTCFullYear() - 1
 const STATEMENT_YEARS = [lastCompleted - 2, lastCompleted - 1, lastCompleted]
 const MEMO = `یادداشت داخلی سرمایه‌گذاری ${suffix}`
+const companyName = `شرکت آزمون مسیر ${suffix}`
 const RESULT = `نتیجه رسمی: درخواست شما برای ادامه همکاری پذیرفته شد (${suffix}).`
 
 const ROLES = {
@@ -136,7 +137,7 @@ test.beforeAll(async ({ browser }) => {
   const company = await payload.create({
     collection: 'companies',
     data: {
-      name: `شرکت آزمون مسیر ${suffix}`,
+      name: companyName,
       nationalId: `11${suffix}`,
       registrationNumber: suffix,
       type: 'سهامی خاص',
@@ -152,7 +153,7 @@ test.beforeAll(async ({ browser }) => {
   await dashboardDb().query(
     `INSERT INTO dashboard.company_verifications (company_id, representative_id, status, snapshot)
      VALUES ($1, $2, 'approved', $3)`,
-    [companyId, ids.company, JSON.stringify({ company: { id: companyId } })],
+    [companyId, ids.company, JSON.stringify({ company: { id: companyId, name: companyName } })],
   )
   serviceId = String((await payload.find({ collection: 'services', limit: 1, overrideAccess: true })).docs[0]!.id)
 
@@ -280,6 +281,7 @@ test('an event case travels from submission to the company reading its published
     await page.getByRole('button', { name: 'ارجاع به دبیرخانه' }).click()
     const confirm = page.getByTestId('memo-send-confirm')
     await expect(confirm.getByText(MEMO)).toBeVisible({ timeout: 30_000 })
+    await expect(confirm.getByText(companyName)).toBeVisible()
     await confirm.getByRole('button', { name: 'تایید و ارسال به دبیرخانه' }).click()
     await expect(page.getByText(/ارسال .*/).filter({ hasText: 'نسخه' }).first()).toBeVisible({ timeout: 30_000 })
     await page.close()
@@ -305,6 +307,7 @@ test('an event case travels from submission to the company reading its published
     await panel.getByRole('button', { name: 'ثبت پیش‌نویس و پیش‌نمایش' }).click()
     const preview = panel.getByTestId('result-preview')
     await expect(preview.getByText(RESULT)).toBeVisible({ timeout: 30_000 })
+    await expect(preview.getByText(companyName)).toBeVisible()
     await preview.getByRole('button', { name: 'انتشار و ارسال به شرکت' }).click()
     await expect(panel.getByText('نتیجه این پرونده منتشر شده است')).toBeVisible({ timeout: 30_000 })
     await queue.close()

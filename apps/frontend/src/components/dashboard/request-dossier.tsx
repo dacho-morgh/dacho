@@ -135,6 +135,9 @@ export function RequestDossier({
     unbuiltNotes.push('فرم ارزیابی از این صفحه هنوز فعال نیست.')
   }
   const proposalDetail = proposal === 'failed' ? null : proposal?.proposal
+  const followUp = role === 'system-owner' || role === 'central-secretariat' ? (
+    <SecretariatFollowUpPanel id={id} trackingCode={request.trackingCode} />
+  ) : null
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6 sm:p-10" dir="rtl">
@@ -175,6 +178,8 @@ export function RequestDossier({
         </ul>
       ) : null}
       {role === 'investment-reviewer' ? <InvestmentDossierPanel id={id} /> : null}
+      {/* At the financial stage the follow-up is the Secretariat's main work (Figma 03, 04), so it leads. */}
+      {followUp && financialStageOpen ? followUp : null}
 
       {companySections}
 
@@ -282,9 +287,7 @@ export function RequestDossier({
         />
       ) : null}
 
-      {role === 'system-owner' || role === 'central-secretariat' ? (
-        <SecretariatFollowUpPanel id={id} companyName={owner?.name ?? null} trackingCode={request.trackingCode} />
-      ) : null}
+      {followUp && !financialStageOpen ? followUp : null}
       {actions.includes('assign') ? <RequestAssignmentPanel id={id} /> : null}
 
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">

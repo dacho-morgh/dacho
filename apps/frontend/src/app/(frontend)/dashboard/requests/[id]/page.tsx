@@ -272,14 +272,8 @@ function CompanySections({
   const result = publishedResult === 'failed' ? null : (publishedResult?.result ?? null)
   return (
     <>
-      <CompanyRequestTracking
-        request={request}
-        timeline={timeline}
-        proposalRevision={proposalRevision}
-        publishedResult={publishedResult}
-        correction={correction}
-        resultView={result ? <FinancialOutcomeCard result={result} /> : null}
-      />
+      {/* S6 leads with the outcome and the financial package (Figma 20, 19, 25); tracking follows. */}
+      {result ? <FinancialOutcomeCard result={result} /> : null}
       {request.reviewStage === 'advanced' ? (
         <FinancialPackagePanel
           requestId={requestId}
@@ -288,6 +282,14 @@ function CompanySections({
           resultPublished={Boolean(result)}
         />
       ) : null}
+      <CompanyRequestTracking
+        request={request}
+        timeline={timeline}
+        proposalRevision={proposalRevision}
+        publishedResult={publishedResult}
+        correction={correction}
+        resultShownElsewhere
+      />
       <div className="flex justify-end">
         <Button asChild variant="outline-gray" size="40">
           <Link href={`/dashboard/letters/new?requestId=${encodeURIComponent(requestId)}`}>

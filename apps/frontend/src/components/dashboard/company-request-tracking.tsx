@@ -20,8 +20,8 @@ export interface CompanyRequestTrackingProps {
   publishedResult: Part<{ result: PublishedResultDto | null }>
   /** Correction form, rendered only when the server lists `correct`. */
   correction?: ReactNode
-  /** Replaces the built-in block for a published result (S6 outcome card). */
-  resultView?: ReactNode
+  /** The page shows a published result itself (S6 outcome card), so this block stays out. */
+  resultShownElsewhere?: boolean
 }
 
 const fa = (value: number) => value.toLocaleString('fa-IR')
@@ -38,7 +38,7 @@ export function CompanyRequestTracking({
   proposalRevision,
   publishedResult,
   correction,
-  resultView,
+  resultShownElsewhere = false,
 }: CompanyRequestTrackingProps) {
   const outcome = trackingOutcome(request, timeline)
   const result = publishedResult === 'failed' ? null : publishedResult?.result
@@ -122,9 +122,7 @@ export function CompanyRequestTracking({
         <Typography role="alert" variant="14/regular" color="error">
           دریافت نتیجه پرونده انجام نشد. صفحه را دوباره بارگذاری کنید.
         </Typography>
-      ) : result && resultView ? (
-        resultView
-      ) : result ? (
+      ) : result && resultShownElsewhere ? null : result ? (
         <section data-testid="published-result" className="flex min-w-0 flex-col gap-2 rounded-2xl border border-brand-600 bg-white p-4 sm:p-6">
           <Typography as="h2" variant="20/bold" className="text-neutral-900">نتیجه پرونده</Typography>
           <Typography variant="12/regular" className="text-neutral-500">تاریخ انتشار: {formatDate(result.publishedAt)}</Typography>

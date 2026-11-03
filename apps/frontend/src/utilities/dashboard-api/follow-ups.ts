@@ -36,6 +36,8 @@ export interface ResultVersionDto {
 export interface CaseFollowUpDto {
   stageOpen: boolean
   canAct: boolean
+  /** The company as pinned at submission; null when the case has no pinned profile. */
+  companyName?: string | null
   memos: {
     id: string
     version: number

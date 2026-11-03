@@ -52,17 +52,19 @@ export function registerFollowUpRoutes(router: Router, ctx: DashboardContext): v
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const [memos, requests, files, results, published] = await Promise.all([
+      const [memos, requests, files, results, published, companyName] = await Promise.all([
         investmentMemos.listForRequest(found.id, { includeDrafts: role === 'system-owner' }),
         followUps.listSupplementaryRequests(found.id),
         followUps.listCaseFiles(found.id),
         followUps.listResultVersions(found.id),
         followUps.findPublished(found.id),
+        followUps.findCompanyName(found.id),
       ])
       const names = await resolveRequesterNames(deps.userStore, results.flatMap((item) => [item.authorId, item.publishedBy ?? item.authorId]))
       res.set('Cache-Control', 'private, no-store, max-age=0').json({
         stageOpen: isFinancialStageOpen(found.status, found.reviewStage),
         canAct: role === 'central-secretariat',
+        companyName,
         memos: await withAuthorNames(memos),
         supplementaryRequests: requests,
         files,

@@ -388,6 +388,8 @@ describe('T33: Secretariat follow-up and result publication (int)', () => {
     const followUp = await get(app, 'secretariat', `/requests/${id}/follow-up`)
     expect(followUp.body.results.map((item: { version: number; publishedAt: string | null }) => [item.version, Boolean(item.publishedAt)]))
       .toEqual([[3, true], [2, true], [1, false]])
+    // The company as pinned at submission, for the summary and the preview's recipient (S6).
+    expect(followUp.body.companyName).toBe('شرکت فناور پیشرو')
   })
 
   it('requests documents as correspondence and opens only delivered files to the holder', async () => {
