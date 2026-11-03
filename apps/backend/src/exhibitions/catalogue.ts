@@ -8,6 +8,8 @@ export interface ExhibitionCatalogueSettings {
   exhibitionId: string
   companyBoothLimit: number
   guideMapReference: string | null
+  /** Bumped by every settings write; exhibition edits send it back (S5). */
+  revision: number
   updatedAt: string
 }
 

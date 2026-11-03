@@ -25,7 +25,8 @@ const dashboardRoles = {
   'system-owner': {
     label: 'صاحب سیستم',
     responsibilities: ['مدیریت دسترسی‌های سامانه', 'پیگیری همه درخواست‌ها و نامه‌ها'],
-    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/follow-ups', '/dashboard/letters', '/dashboard/events', '/dashboard/exhibitions', '/dashboard/profile'],
+    // One entry for events and exhibitions (S5, FE40); /dashboard/exhibitions redirects into it.
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/follow-ups', '/dashboard/letters', '/dashboard/events', '/dashboard/profile'],
   },
   'central-secretariat': {
     label: 'دبیرخانه مرکزی',

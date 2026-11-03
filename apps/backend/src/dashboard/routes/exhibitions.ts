@@ -6,12 +6,207 @@ import type { NextFunction, Request, Response } from 'express'
 import { actorOf } from '../proxy-auth.js'
 import { MAX_DOCUMENT_BYTES, validateDocumentFile } from '../../documents/policy.js'
 import { isUuid, parseBoothCreate, parseBoothUpdate, parseSettingsInput } from '../../exhibitions/catalogue.js'
+import type { ExhibitionAdminSummary } from '../../exhibitions/catalogue-repo.js'
+import type { PublicRecord } from '../../exhibitions/exhibition-store.js'
+import {
+  PublicRecordFailure,
+  contentErrorBody,
+  isPublicRecordId,
+  parsePublicContent,
+  publicCall,
+  undoPublicWrite,
+  type PublicWrite,
+} from '../../exhibitions/public-content.js'
 import { isCompanyAdministrator } from './route-helpers.js'
 import { notifyBoothStep } from '../next-role.js'
 import type { DashboardContext } from './context.js'
 
+const NO_STORE = 'private, no-store, max-age=0'
+
+/** The public page and operational settings of one exhibition, as the owner's admin edits them (S5). */
+function presentExhibition(record: PublicRecord, summary?: Omit<ExhibitionAdminSummary, 'exhibitionId'>) {
+  return {
+    ...record,
+    companyBoothLimit: summary?.settings?.companyBoothLimit ?? null,
+    guideMapReference: summary?.settings?.guideMapReference ?? null,
+    // 0: no operational settings yet (an exhibition made in the CMS before S5).
+    revision: summary?.settings?.revision ?? 0,
+    boothCount: summary?.boothCount ?? 0,
+  }
+}
+
+function parseExhibitionRevision(body: unknown): number | null {
+  const value = (body as { revision?: unknown } | null)?.revision
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+}
+
 export function registerExhibitionRoutes(router: Router, ctx: DashboardContext): void {
-  const { deps, catalogue, boothReservations, verificationStore, checkExhibition, notificationOutbox } = ctx
+  const { deps, catalogue, boothReservations, verificationStore, checkExhibition, notificationOutbox, publicRecords } = ctx
+
+  router.get('/admin/exhibitions', async (_req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      res.set('Cache-Control', NO_STORE)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      let records: PublicRecord[]
+      try {
+        records = await publicRecords.list('exhibitions')
+      } catch {
+        res.status(503).json({ error: 'public_records_unavailable' })
+        return
+      }
+      const summaries = new Map((await catalogue.listAdminSummaries()).map((item) => [item.exhibitionId, item]))
+      res.json({ items: records.map((record) => presentExhibition(record, summaries.get(record.id))) })
+    } catch (error) { next(error) }
+  })
+
+  router.get('/admin/exhibitions/:exhibitionId', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      res.set('Cache-Control', NO_STORE)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isPublicRecordId(req.params.exhibitionId)) {
+        res.status(404).json({ error: 'exhibition_not_found' })
+        return
+      }
+      let record: PublicRecord | undefined
+      try {
+        record = await publicRecords.find('exhibitions', req.params.exhibitionId)
+      } catch {
+        res.status(503).json({ error: 'public_records_unavailable' })
+        return
+      }
+      if (!record) {
+        res.status(404).json({ error: 'exhibition_not_found' })
+        return
+      }
+      const [settings, booths] = await Promise.all([
+        catalogue.getSettings(record.id),
+        catalogue.listBooths(record.id, { includeInactive: true }),
+      ])
+      res.json({ exhibition: presentExhibition(record, { settings: settings ?? null, boothCount: booths.length }) })
+    } catch (error) { next(error) }
+  })
+
+  // The public page (CMS) and the operational settings are made together: if the
+  // settings cannot be written, the new page is removed again (S5, T60).
+  router.post('/admin/exhibitions', async (req, res, next) => {
+    let write: PublicWrite | undefined
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const content = parsePublicContent(req.body)
+      if (!content.ok) {
+        res.status(400).json(contentErrorBody(content))
+        return
+      }
+      const settings = parseSettingsInput(req.body)
+      if (!settings.ok) {
+        res.status(400).json({ error: settings.error })
+        return
+      }
+      let record: PublicRecord
+      try {
+        record = await publicRecords.create('exhibitions', content.value)
+      } catch {
+        res.status(502).json({ error: 'public_record_failed' })
+        return
+      }
+      write = { kind: 'created', id: record.id }
+      const saved = await catalogue.writeSettingsVersioned(record.id, settings.value, 0, actor.id)
+      if (!saved.ok) {
+        // Settings left behind under this CMS id; never adopt them silently.
+        await undoPublicWrite(publicRecords, 'exhibitions', write)
+        res.status(409).json({ error: 'exhibition_settings_conflict' })
+        return
+      }
+      res.status(201).json({ exhibition: presentExhibition(record, { settings: saved.settings, boothCount: 0 }) })
+    } catch (error) {
+      if (write) await undoPublicWrite(publicRecords, 'exhibitions', write)
+      next(error)
+    }
+  })
+
+  router.patch('/admin/exhibitions/:exhibitionId', async (req, res, next) => {
+    let write: PublicWrite | undefined
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'system-owner') {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!isPublicRecordId(req.params.exhibitionId)) {
+        res.status(404).json({ error: 'exhibition_not_found' })
+        return
+      }
+      const revision = parseExhibitionRevision(req.body)
+      if (revision === null) {
+        res.status(400).json({ error: 'invalid_public_content', fields: ['revision'] })
+        return
+      }
+      let current: PublicRecord | undefined
+      try {
+        current = await publicRecords.find('exhibitions', req.params.exhibitionId)
+      } catch {
+        res.status(502).json({ error: 'public_record_failed' })
+        return
+      }
+      if (!current) {
+        res.status(404).json({ error: 'exhibition_not_found' })
+        return
+      }
+      const content = parsePublicContent(req.body, current)
+      if (!content.ok) {
+        res.status(400).json(contentErrorBody(content))
+        return
+      }
+      const existing = await catalogue.getSettings(current.id)
+      const body = (req.body ?? {}) as Record<string, unknown>
+      const settings = parseSettingsInput({
+        companyBoothLimit: 'companyBoothLimit' in body ? body.companyBoothLimit : existing?.companyBoothLimit,
+        guideMapReference: 'guideMapReference' in body ? body.guideMapReference : existing?.guideMapReference,
+      })
+      if (!settings.ok) {
+        res.status(400).json({ error: settings.error })
+        return
+      }
+      let record: PublicRecord | undefined
+      let saved
+      try {
+        saved = await catalogue.writeSettingsVersioned(current.id, settings.value, revision, actor.id, async () => {
+          record = await publicCall(() => publicRecords.update('exhibitions', current!.id, content.value))
+          if (!record) throw new PublicRecordFailure('missing')
+          write = { kind: 'updated', id: current!.id, previous: current! }
+        })
+      } catch (error) {
+        if (error instanceof PublicRecordFailure) {
+          res.status(error.reason === 'missing' ? 404 : 502).json({
+            error: error.reason === 'missing' ? 'exhibition_not_found' : 'public_record_failed',
+          })
+          return
+        }
+        throw error
+      }
+      if (!saved.ok) {
+        res.status(409).json({ error: 'stale_exhibition', revision: saved.revision })
+        return
+      }
+      const booths = await catalogue.listBooths(current.id, { includeInactive: true })
+      res.json({ exhibition: presentExhibition(record!, { settings: saved.settings, boothCount: booths.length }) })
+    } catch (error) {
+      if (write) await undoPublicWrite(publicRecords, 'exhibitions', write)
+      next(error)
+    }
+  })
 
   router.get('/exhibitions/:exhibitionId/catalogue', async (req, res, next) => {
     try {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 
 export interface EventConfiguration {
   id: string
@@ -10,11 +10,19 @@ export interface EventConfiguration {
   registrationCloseAt: string
   responsibleChiefId: string
   responsibleInvestmentId: string
+  /** The CMS `events` record that is this event's public page; null for events made before S5. */
+  publicEventId: string | null
   revision: number
   createdBy: string
   createdAt: string
   updatedAt: string
 }
+
+/**
+ * Writes the event's public CMS record inside the event's transaction and returns
+ * its id. A throw rolls the operational write back (S5, T60).
+ */
+export type PublicEventLink = (event: EventConfiguration) => Promise<string>
 
 export interface EventInput {
   title: string
@@ -53,9 +61,10 @@ export interface EventAuditEntry {
 }
 
 export interface EventStore {
-  create(input: CreateEventInput): Promise<EventConfiguration>
-  update(id: string, input: UpdateEventInput): Promise<EventUpdateResult>
+  create(input: CreateEventInput, link?: PublicEventLink): Promise<EventConfiguration>
+  update(id: string, input: UpdateEventInput, link?: PublicEventLink): Promise<EventUpdateResult>
   findById(id: string): Promise<EventConfiguration | undefined>
+  findByPublicEventId(publicEventId: string): Promise<EventConfiguration | undefined>
   list(): Promise<EventConfiguration[]>
   listAudit(eventId: string): Promise<EventAuditEntry[]>
 }
@@ -75,6 +84,7 @@ interface EventRow {
   registration_close_at: Date
   responsible_chief_id: string
   responsible_investment_id: string
+  public_event_id: string | null
   revision: number
   created_by: string
   created_at: Date
@@ -95,7 +105,7 @@ interface EventAuditRow {
 
 const EVENT_COLUMNS = `
   id, title, description, registration_open_at, registration_close_at,
-  responsible_chief_id, responsible_investment_id, revision, created_by, created_at, updated_at
+  responsible_chief_id, responsible_investment_id, public_event_id, revision, created_by, created_at, updated_at
 `
 
 const AUDITED_EVENT_FIELDS = [
@@ -116,6 +126,7 @@ function mapRow(row: EventRow): EventConfiguration {
     registrationCloseAt: row.registration_close_at.toISOString(),
     responsibleChiefId: row.responsible_chief_id,
     responsibleInvestmentId: row.responsible_investment_id,
+    publicEventId: row.public_event_id,
     revision: row.revision,
     createdBy: row.created_by,
     createdAt: row.created_at.toISOString(),
@@ -138,36 +149,64 @@ function mapAuditRow(row: EventAuditRow): EventAuditEntry {
 }
 
 function changedEventFields(before: EventConfiguration, after: EventConfiguration): string[] {
-  return AUDITED_EVENT_FIELDS.filter((field) => before[field] !== after[field])
+  const fields: string[] = AUDITED_EVENT_FIELDS.filter((field) => before[field] !== after[field])
+  if (before.publicEventId !== after.publicEventId) fields.push('publicEventId')
+  return fields
 }
 
 export class EventRepository implements EventStore {
   constructor(private readonly pool: Pool) {}
 
-  async create(input: CreateEventInput): Promise<EventConfiguration> {
-    const { rows } = await this.pool.query<EventRow>(
-      `INSERT INTO dashboard.events (
-         title, description, registration_open_at, registration_close_at,
-         responsible_chief_id, responsible_investment_id, created_by
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING ${EVENT_COLUMNS}`,
-      [
-        input.title,
-        input.description,
-        input.registrationOpenAt,
-        input.registrationCloseAt,
-        input.responsibleChiefId,
-        input.responsibleInvestmentId,
-        input.createdBy,
-      ],
-    )
-    const row = rows[0]
-    if (!row) throw new Error('INSERT events returned no row')
-    return mapRow(row)
+  async create(input: CreateEventInput, link?: PublicEventLink): Promise<EventConfiguration> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const { rows } = await client.query<EventRow>(
+        `INSERT INTO dashboard.events (
+           title, description, registration_open_at, registration_close_at,
+           responsible_chief_id, responsible_investment_id, created_by
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING ${EVENT_COLUMNS}`,
+        [
+          input.title,
+          input.description,
+          input.registrationOpenAt,
+          input.registrationCloseAt,
+          input.responsibleChiefId,
+          input.responsibleInvestmentId,
+          input.createdBy,
+        ],
+      )
+      const row = rows[0]
+      if (!row) throw new Error('INSERT events returned no row')
+      let event = mapRow(row)
+      if (link) event = await this.setPublicEventId(client, event, await link(event))
+      await client.query('COMMIT')
+      return event
+    } catch (error) {
+      await rollbackQuietly(client)
+      throw error
+    } finally {
+      client.release()
+    }
   }
 
-  async update(id: string, input: UpdateEventInput): Promise<EventUpdateResult> {
+  private async setPublicEventId(
+    client: PoolClient,
+    event: EventConfiguration,
+    publicEventId: string,
+  ): Promise<EventConfiguration> {
+    if (event.publicEventId === publicEventId) return event
+    const { rows } = await client.query<EventRow>(
+      `UPDATE dashboard.events SET public_event_id = $2 WHERE id = $1 RETURNING ${EVENT_COLUMNS}`,
+      [event.id, publicEventId],
+    )
+    if (!rows[0]) throw new Error('UPDATE events public_event_id returned no row')
+    return mapRow(rows[0])
+  }
+
+  async update(id: string, input: UpdateEventInput, link?: PublicEventLink): Promise<EventUpdateResult> {
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
@@ -222,7 +261,8 @@ export class EventRepository implements EventStore {
           : { ok: false, error: 'not_found' }
       }
 
-      const event = mapRow(row)
+      let event = mapRow(row)
+      if (link) event = await this.setPublicEventId(client, event, await link(event))
       await client.query(
         `INSERT INTO dashboard.event_audit (
            event_id, revision, actor_id, reason, changed_fields, before_state, after_state
@@ -266,11 +306,7 @@ export class EventRepository implements EventStore {
       await client.query('COMMIT')
       return { ok: true, event }
     } catch (error) {
-      try {
-        await client.query('ROLLBACK')
-      } catch {
-        // Preserve the original failure when the connection is already gone.
-      }
+      await rollbackQuietly(client)
       throw error
     } finally {
       client.release()
@@ -281,6 +317,15 @@ export class EventRepository implements EventStore {
     const { rows } = await this.pool.query<EventRow>(
       `SELECT ${EVENT_COLUMNS} FROM dashboard.events WHERE id = $1`,
       [id],
+    )
+    const row = rows[0]
+    return row ? mapRow(row) : undefined
+  }
+
+  async findByPublicEventId(publicEventId: string): Promise<EventConfiguration | undefined> {
+    const { rows } = await this.pool.query<EventRow>(
+      `SELECT ${EVENT_COLUMNS} FROM dashboard.events WHERE public_event_id = $1`,
+      [publicEventId],
     )
     const row = rows[0]
     return row ? mapRow(row) : undefined
@@ -311,27 +356,29 @@ export class InMemoryEventStore implements EventStore {
   private readonly events = new Map<string, EventConfiguration>()
   private readonly auditEntries: EventAuditEntry[] = []
 
-  async create(input: CreateEventInput): Promise<EventConfiguration> {
+  async create(input: CreateEventInput, link?: PublicEventLink): Promise<EventConfiguration> {
     const now = new Date().toISOString()
-    const event: EventConfiguration = {
+    let event: EventConfiguration = {
       id: randomUUID(),
       ...input,
+      publicEventId: null,
       revision: 1,
       createdAt: now,
       updatedAt: now,
     }
+    if (link) event = { ...event, publicEventId: await link(event) }
     this.events.set(event.id, event)
     return event
   }
 
-  async update(id: string, input: UpdateEventInput): Promise<EventUpdateResult> {
+  async update(id: string, input: UpdateEventInput, link?: PublicEventLink): Promise<EventUpdateResult> {
     const existing = this.events.get(id)
     if (!existing) return { ok: false, error: 'not_found' }
     if (existing.revision !== input.expectedRevision) {
       return { ok: false, error: 'stale', event: existing }
     }
     const now = new Date().toISOString()
-    const event: EventConfiguration = {
+    let event: EventConfiguration = {
       id: existing.id,
       title: input.title,
       description: input.description,
@@ -339,11 +386,13 @@ export class InMemoryEventStore implements EventStore {
       registrationCloseAt: input.registrationCloseAt,
       responsibleChiefId: input.responsibleChiefId,
       responsibleInvestmentId: input.responsibleInvestmentId,
+      publicEventId: existing.publicEventId,
       revision: existing.revision + 1,
       createdBy: existing.createdBy,
       createdAt: existing.createdAt,
       updatedAt: now,
     }
+    if (link) event = { ...event, publicEventId: await link(event) }
     this.events.set(id, event)
     this.auditEntries.push({
       id: randomUUID(),
@@ -363,6 +412,10 @@ export class InMemoryEventStore implements EventStore {
     return this.events.get(id)
   }
 
+  async findByPublicEventId(publicEventId: string): Promise<EventConfiguration | undefined> {
+    return [...this.events.values()].find((event) => event.publicEventId === publicEventId)
+  }
+
   async list(): Promise<EventConfiguration[]> {
     return [...this.events.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
   }
@@ -371,5 +424,13 @@ export class InMemoryEventStore implements EventStore {
     return this.auditEntries
       .filter((entry) => entry.eventId === eventId)
       .sort((left, right) => left.revision - right.revision)
+  }
+}
+
+async function rollbackQuietly(client: PoolClient): Promise<void> {
+  try {
+    await client.query('ROLLBACK')
+  } catch {
+    // Preserve the original failure when the connection is already gone.
   }
 }

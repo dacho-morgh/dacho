@@ -51,6 +51,24 @@ describe('current-role dashboard destinations', () => {
     expect(canOpenDashboardDestination('chief-reviewer', '/dashboard/exhibitions/ex-1')).toBe(false)
     expect(canOpenDashboardDestination('reviewer', '/dashboard/exhibitions')).toBe(false)
   })
+
+  it('keeps the event and exhibition admin pages to the System Owner (S5)', () => {
+    const adminPages = [
+      '/dashboard/events/new',
+      '/dashboard/events/0f5f8c1e-3b8a-4c7e-9a43-2f6a1c0d9e11/edit',
+      '/dashboard/events/0f5f8c1e-3b8a-4c7e-9a43-2f6a1c0d9e11/subtopics',
+      '/dashboard/exhibitions/12/edit',
+    ]
+    for (const path of adminPages) {
+      expect(canOpenDashboardDestination('system-owner', path)).toBe(true)
+      for (const role of ['central-secretariat', 'chief-reviewer', 'reviewer', 'employer-reviewer', 'investment-reviewer', 'representative'] as const) {
+        expect(canOpenDashboardDestination(role, path)).toBe(false)
+      }
+    }
+    // Companies keep the public event list and booth pages.
+    expect(canOpenDashboardDestination('representative', '/dashboard/events')).toBe(true)
+    expect(canOpenDashboardDestination('representative', '/dashboard/exhibitions/12')).toBe(true)
+  })
 })
 
 describe('dashboard own-profile projection', () => {

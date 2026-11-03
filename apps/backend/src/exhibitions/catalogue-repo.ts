@@ -31,6 +31,17 @@ export interface UpdateBoothInput extends BoothChanges {
   updatedBy: string
 }
 
+/** One exhibition's operational state for the owner's admin list (S5). */
+export interface ExhibitionAdminSummary {
+  exhibitionId: string
+  settings: ExhibitionCatalogueSettings | null
+  boothCount: number
+}
+
+export type VersionedSettingsResult =
+  | { ok: true; settings: ExhibitionCatalogueSettings }
+  | { ok: false; error: 'stale'; revision: number }
+
 export interface BoothCatalogueRepository {
   getSettings(exhibitionId: string): Promise<ExhibitionCatalogueSettings | undefined>
   upsertSettings(
@@ -38,6 +49,18 @@ export interface BoothCatalogueRepository {
     input: SettingsWrite,
     actorId: string,
   ): Promise<ExhibitionCatalogueSettings>
+  /**
+   * Writes the settings only if they are still at `expectedRevision` (0: none yet),
+   * then runs `alsoWrite` before committing; a throw from it rolls the settings back.
+   */
+  writeSettingsVersioned(
+    exhibitionId: string,
+    input: SettingsWrite,
+    expectedRevision: number,
+    actorId: string,
+    alsoWrite?: () => Promise<void>,
+  ): Promise<VersionedSettingsResult>
+  listAdminSummaries(): Promise<ExhibitionAdminSummary[]>
   listBooths(exhibitionId: string, options?: { includeInactive?: boolean }): Promise<Booth[]>
   getBooth(exhibitionId: string, boothId: string): Promise<Booth | undefined>
   createBooth(input: CreateBoothInput): Promise<CreateBoothResult>
@@ -49,6 +72,7 @@ interface SettingsRow {
   exhibition_id: string
   company_booth_limit: string
   guide_map_reference: string | null
+  revision: number
   updated_at: Date
 }
 
@@ -94,7 +118,7 @@ const BOOTH_RETURNING = `
 `
 
 const SETTINGS_COLUMNS = `
-  exhibition_id, company_booth_limit, guide_map_reference, updated_at
+  exhibition_id, company_booth_limit, guide_map_reference, revision, updated_at
 `
 
 function isUniqueViolation(error: unknown): boolean {
@@ -111,6 +135,7 @@ function mapSettings(row: SettingsRow): ExhibitionCatalogueSettings {
     exhibitionId: row.exhibition_id,
     companyBoothLimit: Number(row.company_booth_limit),
     guideMapReference: row.guide_map_reference,
+    revision: row.revision,
     updatedAt: row.updated_at.toISOString(),
   }
 }
@@ -216,6 +241,7 @@ export class PostgresBoothCatalogueRepository implements BoothCatalogueRepositor
          company_booth_limit = EXCLUDED.company_booth_limit,
          guide_map_reference = EXCLUDED.guide_map_reference,
          updated_by = EXCLUDED.updated_by,
+         revision = exhibition_catalogue_settings.revision + 1,
          updated_at = now()
        RETURNING ${SETTINGS_COLUMNS}`,
       [exhibitionId, input.companyBoothLimit, input.guideMapReference, actorId],
@@ -223,6 +249,82 @@ export class PostgresBoothCatalogueRepository implements BoothCatalogueRepositor
     const row = rows[0]
     if (!row) throw new Error('Upsert exhibition catalogue settings returned no row')
     return mapSettings(row)
+  }
+
+  async writeSettingsVersioned(
+    exhibitionId: string,
+    input: SettingsWrite,
+    expectedRevision: number,
+    actorId: string,
+    alsoWrite?: () => Promise<void>,
+  ): Promise<VersionedSettingsResult> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const { rows: current } = await client.query<SettingsRow>(
+        `SELECT ${SETTINGS_COLUMNS} FROM dashboard.exhibition_catalogue_settings
+         WHERE exhibition_id = $1 FOR UPDATE`,
+        [exhibitionId],
+      )
+      const revision = current[0]?.revision ?? 0
+      if (revision !== expectedRevision) {
+        await client.query('ROLLBACK')
+        return { ok: false, error: 'stale', revision }
+      }
+      // A first write races another first write on the primary key; that loser is stale too.
+      const { rows } = current[0]
+        ? await client.query<SettingsRow>(
+            `UPDATE dashboard.exhibition_catalogue_settings
+             SET company_booth_limit = $2, guide_map_reference = $3, updated_by = $4,
+                 revision = revision + 1, updated_at = now()
+             WHERE exhibition_id = $1
+             RETURNING ${SETTINGS_COLUMNS}`,
+            [exhibitionId, input.companyBoothLimit, input.guideMapReference, actorId],
+          )
+        : await client.query<SettingsRow>(
+            `INSERT INTO dashboard.exhibition_catalogue_settings
+              (exhibition_id, company_booth_limit, guide_map_reference, updated_by)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (exhibition_id) DO NOTHING
+             RETURNING ${SETTINGS_COLUMNS}`,
+            [exhibitionId, input.companyBoothLimit, input.guideMapReference, actorId],
+          )
+      if (!rows[0]) {
+        await client.query('ROLLBACK')
+        return { ok: false, error: 'stale', revision: (await this.getSettings(exhibitionId))?.revision ?? 0 }
+      }
+      await alsoWrite?.()
+      await client.query('COMMIT')
+      return { ok: true, settings: mapSettings(rows[0]) }
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        // Preserve the original failure when the connection is already gone.
+      }
+      throw error
+    } finally {
+      client.release()
+    }
+  }
+
+  async listAdminSummaries(): Promise<ExhibitionAdminSummary[]> {
+    const { rows } = await this.pool.query<SettingsRow & { id: string; booth_count: string }>(
+      `WITH counts AS (
+         SELECT exhibition_id, count(*) AS booth_count
+         FROM dashboard.exhibition_booths GROUP BY exhibition_id
+       )
+       SELECT coalesce(s.exhibition_id, c.exhibition_id) AS id, s.exhibition_id,
+              s.company_booth_limit, s.guide_map_reference, s.revision, s.updated_at,
+              coalesce(c.booth_count, 0) AS booth_count
+       FROM dashboard.exhibition_catalogue_settings s
+       FULL OUTER JOIN counts c ON c.exhibition_id = s.exhibition_id`,
+    )
+    return rows.map((row) => ({
+      exhibitionId: row.id,
+      settings: row.exhibition_id ? mapSettings(row) : null,
+      boothCount: Number(row.booth_count),
+    }))
   }
 
   async listBooths(
@@ -425,10 +527,41 @@ export class InMemoryBoothCatalogueRepository implements BoothCatalogueRepositor
       exhibitionId,
       companyBoothLimit: input.companyBoothLimit,
       guideMapReference: input.guideMapReference,
+      revision: (this.settings.get(exhibitionId)?.revision ?? 0) + 1,
       updatedAt: new Date().toISOString(),
     }
     this.settings.set(exhibitionId, settings)
     return settings
+  }
+
+  async writeSettingsVersioned(
+    exhibitionId: string,
+    input: SettingsWrite,
+    expectedRevision: number,
+    actorId: string,
+    alsoWrite?: () => Promise<void>,
+  ): Promise<VersionedSettingsResult> {
+    const before = this.settings.get(exhibitionId)
+    const revision = before?.revision ?? 0
+    if (revision !== expectedRevision) return { ok: false, error: 'stale', revision }
+    const settings = await this.upsertSettings(exhibitionId, input, actorId)
+    try {
+      await alsoWrite?.()
+    } catch (error) {
+      if (before) this.settings.set(exhibitionId, before)
+      else this.settings.delete(exhibitionId)
+      throw error
+    }
+    return { ok: true, settings }
+  }
+
+  async listAdminSummaries(): Promise<ExhibitionAdminSummary[]> {
+    const ids = new Set([...this.settings.keys(), ...[...this.booths.values()].map((booth) => booth.exhibitionId)])
+    return [...ids].map((exhibitionId) => ({
+      exhibitionId,
+      settings: this.settings.get(exhibitionId) ?? null,
+      boothCount: [...this.booths.values()].filter((booth) => booth.exhibitionId === exhibitionId).length,
+    }))
   }
 
   async listBooths(

@@ -26,7 +26,7 @@ import type { PrivateDocumentStorage } from '../../documents/storage.js'
 import { isUuid } from '../../exhibitions/catalogue.js'
 import { PostgresBoothCatalogueRepository, type BoothCatalogueRepository } from '../../exhibitions/catalogue-repo.js'
 import { PostgresBoothReservationRepository, type BoothCompanyEligibility, type BoothReservationRepository } from '../../exhibitions/reservation-repo.js'
-import type { ExhibitionStore } from '../../exhibitions/exhibition-store.js'
+import { InMemoryPublicRecordStore, type ExhibitionStore, type PublicRecordStore } from '../../exhibitions/exhibition-store.js'
 import { PostgresEvaluationRepository, type EvaluationStore } from '../../reviews/evaluation-repo.js'
 import { PostgresNotificationOutbox, type NotificationOutbox } from '../notification-outbox.js'
 import { PostgresVerificationStore, type VerificationStore } from '../verification-repo.js'
@@ -48,6 +48,8 @@ export interface DashboardDeps {
   boothCompanyEligibility?: BoothCompanyEligibility
   eventCompanyEligibility?: BoothCompanyEligibility
   exhibitionStore?: ExhibitionStore
+  /** The public CMS records of events and exhibitions (S5); in memory when not given. */
+  publicRecords?: PublicRecordStore
   evaluationStore?: EvaluationStore
   notificationOutbox?: NotificationOutbox
   verificationStore?: VerificationStore
@@ -82,6 +84,7 @@ export function createDashboardContext(deps: DashboardDeps) {
     deps.boothReservations ?? new PostgresBoothReservationRepository(deps.pool)
   const verificationStore =
     deps.verificationStore ?? new PostgresVerificationStore(deps.pool)
+  const publicRecords = deps.publicRecords ?? new InMemoryPublicRecordStore()
 
   async function checkExhibition(
     exhibitionId: string,
@@ -244,6 +247,7 @@ export function createDashboardContext(deps: DashboardDeps) {
     boothReservations,
     verificationStore,
     checkExhibition,
+    publicRecords,
     actorCompanyId,
     presentRequests,
     limitRequest,
