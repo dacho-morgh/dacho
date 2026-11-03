@@ -164,12 +164,14 @@ describe('owner category and subtopic administration', () => {
 
     render(createElement(OwnerEventSubtopics, { eventId: event1.id }))
     await screen.findByText(`عناوین، زیرعنوان‌ها و RFP رویداد: ${event1.title}`)
+    // The page loads its event first, then the categories and subtopics.
+    await screen.findByText('برق و ابزار دقیق')
 
     // Click new subtopic
     fireEvent.click(screen.getByRole('button', { name: 'زیرعنوان جدید' }))
 
     // Verify category select only contains categories for this event
-    const categorySelect = screen.getByLabelText('دسته فناوری') as HTMLSelectElement
+    const categorySelect = (await screen.findByLabelText('دسته فناوری')) as HTMLSelectElement
     expect(categorySelect.options).toHaveLength(2) // "انتخاب دسته" + "برق و ابزار دقیق"
 
     // Verify employer select only lists active employer-reviewer persons
