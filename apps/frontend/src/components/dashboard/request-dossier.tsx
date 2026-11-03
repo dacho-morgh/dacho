@@ -2,7 +2,7 @@ import type { OperationalRole } from '@cms-core/access/roles'
 import Link from 'next/link'
 
 import { ChiefReviewSummary, type SummaryPart } from '@/components/dashboard/chief-review-summary'
-import { InvestmentMemoPanel } from '@/components/dashboard/investment-memo-panel'
+import { InvestmentDossierPanel } from '@/components/dashboard/investment-dossier-panel'
 import { RequestActionsPanel } from '@/components/dashboard/request-actions-panel'
 import { RequestAssignmentPanel } from '@/components/dashboard/request-assignment-panel'
 import { ReviewAssignmentPanel } from '@/components/dashboard/review-assignment-panel'
@@ -57,7 +57,6 @@ const NEXT_ACTION_LABELS: [RequestAction, string][] = [
 const UNBUILT_ACTION_NOTES: Partial<Record<RequestAction, string>> = {
   submit: 'ارسال نهایی این پیش‌نویس از این صفحه هنوز فعال نیست.',
   correct: 'مدارک را می‌توانید جایگزین کنید. ارسال دوباره از این صفحه هنوز فعال نیست و به متن تأییدشده توافق‌نامه‌ها نیاز دارد.',
-  submitFinancialPackage: 'ارسال نهایی بسته مالی از این صفحه هنوز فعال نیست.',
 }
 
 const REVIEW_STAGE_LABELS: Record<string, string> = {
@@ -136,6 +135,9 @@ export function RequestDossier({
     unbuiltNotes.push('فرم ارزیابی از این صفحه هنوز فعال نیست.')
   }
   const proposalDetail = proposal === 'failed' ? null : proposal?.proposal
+  const followUp = role === 'system-owner' || role === 'central-secretariat' ? (
+    <SecretariatFollowUpPanel id={id} trackingCode={request.trackingCode} />
+  ) : null
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6 sm:p-10" dir="rtl">
@@ -175,7 +177,9 @@ export function RequestDossier({
           ))}
         </ul>
       ) : null}
-      {role === 'investment-reviewer' ? <InvestmentMemoPanel id={id} /> : null}
+      {role === 'investment-reviewer' ? <InvestmentDossierPanel id={id} /> : null}
+      {/* At the financial stage the follow-up is the Secretariat's main work (Figma 03, 04), so it leads. */}
+      {followUp && financialStageOpen ? followUp : null}
 
       {companySections}
 
@@ -246,7 +250,8 @@ export function RequestDossier({
               canDelete={canDelete && proposalWritable}
             />
           )}
-          {seesFinancial
+          {/* The company uploads in the package form and the investment person reads the frozen package (S6). */}
+          {seesFinancial && !isCompany && role !== 'investment-reviewer'
             ? FINANCIAL_CATEGORIES.map((category) => (
                 <PrivateDocumentField
                   key={category}
@@ -282,7 +287,7 @@ export function RequestDossier({
         />
       ) : null}
 
-      {role === 'system-owner' || role === 'central-secretariat' ? <SecretariatFollowUpPanel id={id} /> : null}
+      {followUp && !financialStageOpen ? followUp : null}
       {actions.includes('assign') ? <RequestAssignmentPanel id={id} /> : null}
 
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">

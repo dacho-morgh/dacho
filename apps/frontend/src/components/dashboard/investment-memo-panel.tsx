@@ -15,6 +15,8 @@ import {
 } from '@/utilities/dashboard-api'
 import { toast } from 'sonner'
 
+import { FinancialBanner, FinancialFacts } from './financial-parts'
+
 const ERROR_MESSAGES: Record<string, string> = {
   investment_stage_closed: 'پرونده دیگر در مرحله پیگیری سرمایه‌گذاری نیست و این اقدام انجام نشد.',
   memo_version_stale: 'نسخه تازه‌تری از یادداشت ثبت شده است. صفحه به‌روز شد؛ دوباره بررسی کنید.',
@@ -29,8 +31,18 @@ type LoadState = 'loading' | 'ready' | 'absent' | 'error'
  * decides nothing about the case. Before the handoff the server answers 404, and the
  * section does not exist.
  */
-export function InvestmentMemoPanel({ id }: { id: string }) {
+export function InvestmentMemoPanel({
+  id,
+  companyName = null,
+  trackingCode = null,
+}: {
+  id: string
+  /** From the dossier, for the confirm step (Figma 15). */
+  companyName?: string | null
+  trackingCode?: string | null
+}) {
   const [state, setState] = useState<LoadState>('loading')
+  const [confirming, setConfirming] = useState(false)
   const [memos, setMemos] = useState<InvestmentMemoDto[]>([])
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
@@ -120,15 +132,47 @@ export function InvestmentMemoPanel({ id }: { id: string }) {
             <Button
               type="button"
               size="40"
-              disabled={busy || !canSend}
-              onClick={() => {
-                if (!latest || !window.confirm('این نسخه برای دبیرخانه ارسال شود؟')) return
-                void run(() => sendInvestmentMemo(id, latest.version), 'یادداشت برای دبیرخانه ارسال شد.')
-              }}
+              disabled={busy || !canSend || confirming}
+              onClick={() => setConfirming(true)}
             >
-              <Typography variant="14/regular" className="text-inherit">ارسال به دبیرخانه</Typography>
+              <Typography variant="14/regular" className="text-inherit">ارجاع به دبیرخانه</Typography>
             </Button>
           </div>
+          {confirming && canSend && latest ? (
+            <div className="flex flex-col gap-4 rounded-xl border border-neutral-200 p-4" data-testid="memo-send-confirm">
+              <Typography as="h3" variant="16/semibold" color="neutral-900">تایید ارجاع پرونده</Typography>
+              <FinancialFacts
+                items={[
+                  { label: 'شرکت', value: companyName ?? 'نامشخص' },
+                  { label: 'کد درخواست', value: trackingCode ? <bdi dir="ltr">{trackingCode}</bdi> : '—' },
+                  { label: 'گیرنده', value: 'دبیرخانه صندوق' },
+                  { label: 'مدارک همراه', value: 'بسته مالی، ارزیابی‌های نهایی و فایل‌های پرونده' },
+                ]}
+              />
+              <div className="flex flex-col gap-1">
+                <Typography variant="12/regular" color="neutral-500">متن یادداشت · نسخه {latest.version.toLocaleString('fa-IR')}</Typography>
+                <Typography variant="14/regular" color="neutral-800" className="whitespace-pre-wrap break-words rounded-lg bg-neutral-50 p-3">
+                  {latest.body}
+                </Typography>
+              </div>
+              <FinancialBanner tone="info" title="پرونده و مستندات همراه ارجاع ارسال می‌شوند">
+                پس از ارسال، ارجاع در تاریخچه پرونده ثبت می‌شود. این یادداشت تصمیمی درباره پرونده نیست و برای شرکت منتشر نمی‌شود.
+              </FinancialBanner>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="40"
+                  disabled={busy}
+                  onClick={() => void run(() => sendInvestmentMemo(id, latest.version), 'یادداشت برای دبیرخانه ارسال شد.').then(() => setConfirming(false))}
+                >
+                  <Typography variant="14/regular" className="text-inherit">تایید و ارسال به دبیرخانه</Typography>
+                </Button>
+                <Button type="button" variant="outline-gray" size="40" disabled={busy} onClick={() => setConfirming(false)}>
+                  <Typography variant="14/regular" className="text-inherit">بازگشت به پرونده</Typography>
+                </Button>
+              </div>
+            </div>
+          ) : null}
           {memos.length ? (
             <ul className="flex flex-col gap-2">
               {memos.map((memo) => (

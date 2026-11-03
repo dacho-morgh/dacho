@@ -454,6 +454,17 @@ export class SecretariatFollowUpRepository {
     return rows.map(mapFile)
   }
 
+  /** The company name from the profile pinned at submission, as the queue shows it. */
+  async findCompanyName(requestId: string): Promise<string | null> {
+    if (!isUuid(requestId)) return null
+    const { rows } = await this.pool.query<{ company_name: string | null }>(
+      `SELECT snapshot -> 'company' ->> 'name' AS company_name
+       FROM dashboard.request_verifications WHERE request_id = $1`,
+      [requestId],
+    )
+    return rows[0]?.company_name ?? null
+  }
+
   /** One row per case with a sent memo. Cases without a published result come first. */
   async listFollowUps(options: { page: number; limit: number }): Promise<FollowUpList> {
     const counted = await this.pool.query<{ total: string }>(

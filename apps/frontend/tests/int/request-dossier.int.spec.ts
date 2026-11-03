@@ -24,8 +24,8 @@ vi.mock('@/components/dashboard/secretariat-follow-up-panel', () => ({
 vi.mock('@/components/dashboard/request-assignment-panel', () => ({
   RequestAssignmentPanel: () => createElement('div', null, 'پنل انتساب'),
 }))
-vi.mock('@/components/dashboard/investment-memo-panel', () => ({
-  InvestmentMemoPanel: () => createElement('div', null, 'پنل یادداشت'),
+vi.mock('@/components/dashboard/investment-dossier-panel', () => ({
+  InvestmentDossierPanel: () => createElement('div', null, 'پنل یادداشت'),
 }))
 
 const FINANCIAL = [
@@ -92,13 +92,27 @@ describe('RequestDossier per role', () => {
     },
   )
 
-  it.each(['system-owner', 'central-secretariat', 'investment-reviewer', 'representative'] as const)(
+  it.each(['system-owner', 'central-secretariat'] as const)(
     'keeps the financial slots for %s',
     (role) => {
       dossier({ role, detail: detail(['read']) })
       expect(fields()).toEqual(['proposal', ...FINANCIAL])
     },
   )
+
+  // The company uploads in its package form and the investment person reads the frozen package (S6).
+  it.each(['investment-reviewer', 'representative'] as const)(
+    'leaves the financial files to the package views for %s',
+    (role) => {
+      dossier({ role, detail: detail(['read']) })
+      expect(fields()).toEqual(['proposal'])
+    },
+  )
+
+  it('gives the investment person the dossier with the memo', () => {
+    dossier({ role: 'investment-reviewer', detail: detail(['read']) })
+    expect(screen.getByText('پنل یادداشت')).toBeTruthy()
+  })
 
   it('shows stage, revision and history for internal roles and hides raw event types', () => {
     dossier({ role: 'chief-reviewer', detail: detail(['read']) })

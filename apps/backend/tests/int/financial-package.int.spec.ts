@@ -303,6 +303,9 @@ describe('T30: Financial package submission (int)', () => {
   it('names every missing category and year, stores nothing, and keeps the case where it was', async () => {
     const app = await makeApp()
     const { id } = await advancedCase(app)
+    // The invitation names the same years the submit checks, so the screen can ask for them up front.
+    const invitation = await request(app).get(`/requests/${id}/financial-invitation`).set(auth('company-user-1'))
+    expect(invitation.body.statementYears).toEqual(YEARS)
     await uploadPackage(app, id, { skipCategories: ['debtFacilityEvidence'], skipYears: [YEARS[0]!] })
 
     const incomplete = await submitPackage(app, 'company-user-1', id)

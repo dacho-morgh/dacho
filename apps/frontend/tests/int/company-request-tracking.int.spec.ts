@@ -239,6 +239,16 @@ describe('CompanyRequestTracking', () => {
     expect(document.body.textContent).not.toContain('شرکت دیگر')
   })
 
+  it('leaves a published result to the page when told, with no pending note', () => {
+    tracking({
+      request: request({ reviewStage: 'advanced' }),
+      publishedResult: { result: { body: 'متن منتشرشده', publishedAt: '2026-10-30T00:00:00.000Z' } },
+      resultShownElsewhere: true,
+    })
+    expect(screen.queryByTestId('published-result')).toBeNull()
+    expect(screen.queryByTestId('result-pending')).toBeNull()
+  })
+
   it('says a result is not published yet, and tells a failed read apart', () => {
     tracking({ request: request({ reviewStage: 'advanced' }) })
     expect(screen.getByTestId('result-pending')).toBeTruthy()
@@ -393,7 +403,7 @@ describe('RequestDossier with the correction form', () => {
       }),
     )
     expect(screen.queryByText(/ارسال دوباره از این صفحه هنوز فعال نیست/)).toBeNull()
-    expect(screen.getAllByTestId('document-field').map((field) => field.textContent)).not.toContain('proposal')
+    expect(screen.queryAllByTestId('document-field').map((field) => field.textContent)).not.toContain('proposal')
     expect(screen.getByText('فرم اصلاح')).toBeTruthy()
   })
 })

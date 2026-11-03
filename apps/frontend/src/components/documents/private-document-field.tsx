@@ -38,6 +38,8 @@ export interface PrivateDocumentFieldProps {
   requestId?: string
   companyId?: string
   logicalVersion?: number
+  /** A financial statement's year: uploads carry it and only that year's files are listed. */
+  statementYear?: number
   required?: boolean
   disabled?: boolean
   canUpload?: boolean
@@ -68,6 +70,7 @@ export function PrivateDocumentField({
   requestId,
   companyId,
   logicalVersion,
+  statementYear,
   required = false,
   disabled = false,
   canUpload = true,
@@ -82,7 +85,7 @@ export function PrivateDocumentField({
   const inputRef = useRef<HTMLInputElement>(null)
   const keyCounter = useRef(0)
   const callbacks = useRef({ onPendingChange, onReadyChange, onDocumentsChange })
-  const scopeKey = `${requestId ?? ''}|${companyId ?? ''}|${category}|${logicalVersion ?? ''}`
+  const scopeKey = `${requestId ?? ''}|${companyId ?? ''}|${category}|${logicalVersion ?? ''}|${statementYear ?? ''}`
   const scopeKeyRef = useRef(scopeKey)
   useEffect(() => {
     scopeKeyRef.current = scopeKey
@@ -106,8 +109,9 @@ export function PrivateDocumentField({
   const scopedDocuments = useMemo(() => documents.filter((document) =>
     document.category === category &&
     (requestId ? document.requestId === requestId : document.requestId === null && document.companyId === companyId) &&
-    (logicalVersion === undefined || document.logicalVersion === logicalVersion),
-  ), [documents, category, companyId, logicalVersion, requestId])
+    (logicalVersion === undefined || document.logicalVersion === logicalVersion) &&
+    (statementYear === undefined || document.statementYear === statementYear),
+  ), [documents, category, companyId, logicalVersion, requestId, statementYear])
 
   useEffect(() => {
     let active = true
@@ -168,7 +172,7 @@ export function PrivateDocumentField({
 
     try {
       const document = await uploadDocument(
-        { file, category, requestId, companyId, logicalVersion },
+        { file, category, requestId, companyId, logicalVersion, statementYear },
         (progress) => {
           if (scopeKeyRef.current !== uploadScope) return
           setUploads((current) =>

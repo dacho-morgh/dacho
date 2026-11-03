@@ -323,6 +323,8 @@ describe('T29: Financial package invitation (int)', () => {
       checklist: FINANCIAL_CHECKLIST,
       invitedAt: expect.any(String),
     })
+    // This fixture company has no founding date, so no statement years can be named.
+    expect(invitation.body.statementYears).toBeNull()
     expect(await invitationRows(id)).toEqual([
       { request_revision: revision + 1, proposal_revision: proposalRevision, invited_by: 'chief' },
     ])

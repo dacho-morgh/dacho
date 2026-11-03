@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -17,6 +18,8 @@ import {
 } from '@/utilities/dashboard-api'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
+
+import { FinancialBanner, FinancialFacts } from './financial-parts'
 
 const ERROR_MESSAGES: Record<string, string> = {
   investment_stage_closed: 'پرونده دیگر در مرحله پیگیری سرمایه‌گذاری نیست و این اقدام انجام نشد.',
@@ -39,11 +42,19 @@ type LoadState = 'loading' | 'ready' | 'denied' | 'error'
  * The Secretariat's work on one case: the memos it received, the documents it asks the
  * company for and the separate text it publishes. The memo never prefills that text.
  */
-export function SecretariatFollowUpPanel({ id }: { id: string }) {
+export function SecretariatFollowUpPanel({
+  id,
+  trackingCode = null,
+}: {
+  id: string
+  /** From the case read, for the summary (Figma 03) and the publication preview (Figma 04). */
+  trackingCode?: string | null
+}) {
   const [state, setState] = useState<LoadState>('loading')
   const [data, setData] = useState<CaseFollowUpDto | null>(null)
   const [askBody, setAskBody] = useState('')
   const [resultBody, setResultBody] = useState('')
+  const resultBoxRef = useRef<HTMLTextAreaElement>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
   const prefilled = useRef(false)
@@ -112,10 +123,37 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
   const latest = followUp.results[0]
   const trimmed = resultBody.trim()
   const previewReady = Boolean(latest && !latest.publishedAt && latest.body === trimmed)
+  const lastSent = followUp.memos.find((memo) => memo.sentAt)
+  const companyName = followUp.companyName ?? null
+  const code = trackingCode ? <bdi dir="ltr">{trackingCode}</bdi> : '—'
 
   return (
-    <section className="flex flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-6">
+    <section className="flex flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6" data-testid="secretariat-follow-up">
       <Typography as="h2" variant="20/bold" color="neutral-900">پیگیری دبیرخانه و انتشار نتیجه</Typography>
+      {followUp.published ? (
+        <FinancialBanner tone="success" title="نتیجه این پرونده منتشر شده است">
+          شرکت متن منتشرشده را در صفحه پرونده و کارتابل خود می‌بیند. اصلاح، نسخه تازه‌ای است که باید دوباره منتشر شود.
+        </FinancialBanner>
+      ) : hasSentMemo ? (
+        <FinancialBanner tone="success" title="پرونده آماده انتشار نتیجه است">
+          بسته مالی ثبت شده و یادداشت سرمایه‌گذاری به دبیرخانه رسیده است.
+        </FinancialBanner>
+      ) : (
+        <FinancialBanner tone="info" title="در انتظار یادداشت سرمایه‌گذاری">
+          پس از رسیدن یادداشت مسئول سرمایه‌گذاری، درخواست مدارک تکمیلی و انتشار نتیجه ممکن می‌شود.
+        </FinancialBanner>
+      )}
+      <FinancialFacts
+        items={[
+          { label: 'شرکت', value: companyName ?? 'نامشخص' },
+          { label: 'کد درخواست', value: code },
+          {
+            label: 'یادداشت سرمایه‌گذاری',
+            value: lastSent ? `نسخه ${lastSent.version.toLocaleString('fa-IR')} · ${formatDate(lastSent.sentAt)}` : 'هنوز نرسیده',
+          },
+          { label: 'نتیجه برای شرکت', value: followUp.published ? `منتشر شده · ${formatDate(followUp.published.publishedAt)}` : 'منتشر نشده' },
+        ]}
+      />
 
       {message ? (
         <Typography role={message.tone === 'error' ? 'alert' : 'status'} variant="14/regular" color={message.tone === 'error' ? 'error' : 'neutral-700'}>
@@ -239,6 +277,7 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
             <label className="flex flex-col gap-1">
               <Typography variant="12/regular" color="neutral-500">متن جداگانه نتیجه</Typography>
               <Textarea
+                ref={resultBoxRef}
                 value={resultBody}
                 onChange={(event) => setResultBody(event.target.value)}
                 maxLength={20000}
@@ -257,21 +296,33 @@ export function SecretariatFollowUpPanel({ id }: { id: string }) {
               <Typography variant="14/regular" className="text-inherit">ثبت پیش‌نویس و پیش‌نمایش</Typography>
             </Button>
             {previewReady && latest ? (
-              <div className="flex flex-col gap-3 rounded-lg border border-brand-600 p-4">
-                <Typography variant="12/regular" color="neutral-500">پیش‌نمایش آنچه شرکت خواهد دید · نسخه {latest.version}</Typography>
-                <Typography variant="14/regular" color="neutral-800" className="whitespace-pre-wrap">{latest.body}</Typography>
-                <Button
-                  type="button"
-                  size="40"
-                  className="w-fit"
-                  disabled={busy}
-                  onClick={() => {
-                    if (!window.confirm('این متن برای شرکت منتشر می‌شود و شرکت از آن مطلع خواهد شد. ادامه می‌دهید؟')) return
-                    void run(() => publishResult(id, latest.version), 'نتیجه منتشر شد.', () => setResultBody(''))
-                  }}
-                >
-                  <Typography variant="14/regular" className="text-inherit">انتشار برای شرکت</Typography>
-                </Button>
+              <div className="flex flex-col gap-4 rounded-xl border border-neutral-200 p-4" data-testid="result-preview">
+                <Typography as="h4" variant="16/semibold" color="neutral-900">پیش‌نمایش پیام شرکت</Typography>
+                <Badge variant="primary" size="md">پیش‌نویس نسخه {latest.version.toLocaleString('fa-IR')}</Badge>
+                <Typography variant="14/regular" color="neutral-800" className="whitespace-pre-wrap break-words">{latest.body}</Typography>
+                <FinancialFacts
+                  items={[
+                    { label: 'گیرنده', value: companyName ?? 'شرکت صاحب پرونده' },
+                    { label: 'کد درخواست', value: code },
+                    { label: 'وضعیت انتشار', value: 'هنوز منتشر نشده' },
+                  ]}
+                />
+                <FinancialBanner tone="warning" title="نتیجه در صفحه پرونده و کارتابل شرکت نمایش داده می‌شود">
+                  متن را پیش از انتشار بررسی کنید. یادداشت داخلی، امتیازها و مدارک به آن اضافه نمی‌شوند.
+                </FinancialBanner>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="40"
+                    disabled={busy}
+                    onClick={() => void run(() => publishResult(id, latest.version), 'نتیجه منتشر شد.', () => setResultBody(''))}
+                  >
+                    <Typography variant="14/regular" className="text-inherit">انتشار و ارسال به شرکت</Typography>
+                  </Button>
+                  <Button type="button" variant="outline-gray" size="40" disabled={busy} onClick={() => resultBoxRef.current?.focus()}>
+                    <Typography variant="14/regular" className="text-inherit">بازگشت و ویرایش</Typography>
+                  </Button>
+                </div>
               </div>
             ) : null}
           </div>

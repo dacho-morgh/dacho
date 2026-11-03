@@ -7,6 +7,8 @@ import { getPayload } from 'payload'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { CompanyCorrectionPanel } from '@/components/dashboard/company-correction-panel'
 import { CompanyRequestTracking } from '@/components/dashboard/company-request-tracking'
+import { FinancialOutcomeCard } from '@/components/dashboard/financial-outcome-card'
+import { FinancialPackagePanel } from '@/components/dashboard/financial-package-panel'
 import { RequestDossier, type DossierPart } from '@/components/dashboard/request-dossier'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
@@ -267,14 +269,26 @@ function CompanySections({
   correction: ReactNode
 }) {
   const requestId = request.id
+  const result = publishedResult === 'failed' ? null : (publishedResult?.result ?? null)
   return (
     <>
+      {/* S6 leads with the outcome and the financial package (Figma 20, 19, 25); tracking follows. */}
+      {result ? <FinancialOutcomeCard result={result} /> : null}
+      {request.reviewStage === 'advanced' ? (
+        <FinancialPackagePanel
+          requestId={requestId}
+          trackingCode={request.trackingCode ?? null}
+          canSubmit={(request.allowedActions ?? []).includes('submitFinancialPackage')}
+          resultPublished={Boolean(result)}
+        />
+      ) : null}
       <CompanyRequestTracking
         request={request}
         timeline={timeline}
         proposalRevision={proposalRevision}
         publishedResult={publishedResult}
         correction={correction}
+        resultShownElsewhere
       />
       <div className="flex justify-end">
         <Button asChild variant="outline-gray" size="40">
