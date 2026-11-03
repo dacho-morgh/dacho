@@ -636,14 +636,10 @@ export function CompanyDetailView({ id }: { id: string }) {
                     متن پیش‌نویس شما ذخیره شده است.
                   </Typography>
                 )}
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <Button
-                    size="40"
-                    variant="default"
-                    disabled={decisionSubmitting}
-                    onClick={() => void handleSubmitDecision('approve')}
-                  >
-                    {decisionSubmitting ? 'در حال ثبت...' : 'تایید احراز هویت'}
+                {/* Figma 02 (31650:7): actions sit at the row's end, approve last in reading order. */}
+                <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
+                  <Button asChild size="40" variant="link">
+                    <Link href="/dashboard/companies?status=pending">بازگشت به صف</Link>
                   </Button>
                   <Button
                     size="40"
@@ -661,8 +657,13 @@ export function CompanyDetailView({ id }: { id: string }) {
                   >
                     رد احراز هویت
                   </Button>
-                  <Button asChild size="40" variant="link">
-                    <Link href="/dashboard/companies?status=pending">بازگشت به صف</Link>
+                  <Button
+                    size="40"
+                    variant="default"
+                    disabled={decisionSubmitting}
+                    onClick={() => void handleSubmitDecision('approve')}
+                  >
+                    {decisionSubmitting ? 'در حال ثبت...' : 'تایید احراز هویت'}
                   </Button>
                 </div>
               </div>

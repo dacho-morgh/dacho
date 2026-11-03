@@ -135,7 +135,7 @@ export function CompanyCreateDialog({ onCreated }: { onCreated: () => void }) {
           <DialogHeader>
             <DialogTitle>ثبت شرکت جدید</DialogTitle>
             <DialogDescription>
-              شرکت با وضعیت «ارسال نشده» ساخته می‌شود و پس از تکمیل پرونده، همان مسیر احراز دبیرخانه را طی می‌کند. نماینده با شماره همراه و رمز موقت وارد می‌شود و رمز را از پروفایل خود تغییر می‌دهد.
+              شرکت احرازنشده ساخته می‌شود. نماینده با رمز موقت وارد می‌شود و آن را در پروفایل تغییر می‌دهد.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
