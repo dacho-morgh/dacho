@@ -90,6 +90,7 @@ export function AppSidebar({
     { scope: rootRef, dependencies: [isCollapsed] },
   )
   const displayName = companyName || user?.name || user?.email || 'حساب کاربری'
+  const responsibility = navigation.responsibilities[0]
 
   return (
     <Sidebar
@@ -206,10 +207,10 @@ export function AppSidebar({
         </div>
 
         <SidebarFooter className="p-0">
-          <div className="flex min-h-10 w-full items-center justify-start gap-2 group-data-[collapsible=icon]:justify-center">
+          <div className="flex min-h-10 w-full items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
             <Link
               href="/dashboard/profile"
-              className="flex shrink-0 items-center transition-opacity hover:opacity-85"
+              className="flex min-w-0 items-center gap-2.5 overflow-hidden transition-opacity hover:opacity-85"
               title="مشاهده پروفایل"
             >
               <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-neutral-200/80 shadow-2xs">
@@ -222,9 +223,29 @@ export function AppSidebar({
                   onError={(event) => event.currentTarget.remove()}
                 />
               </div>
-              <Typography as="span" variant="12/regular" className="sr-only">
-                {displayName}
-              </Typography>
+              <span className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
+                <Typography
+                  as="span"
+                  variant="14/semibold"
+                  color="neutral-600"
+                  className="truncate"
+                >
+                  {displayName}
+                </Typography>
+                <Typography as="span" variant="12/regular" color="neutral-400" className="truncate">
+                  {navigation.roleLabel}
+                  {responsibility ? ` · ${responsibility}` : ''}
+                </Typography>
+              </span>
+            </Link>
+
+            <Link
+              href="/dashboard/profile"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 group-data-[collapsible=icon]:hidden transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+              title="تنظیمات و گزینه‌ها"
+            >
+              <MoreOptionsIcon className="size-6 text-neutral-600" />
+              <span className="sr-only">گزینه‌های بیشتر</span>
             </Link>
           </div>
         </SidebarFooter>
