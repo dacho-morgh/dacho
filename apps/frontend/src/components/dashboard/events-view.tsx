@@ -536,6 +536,8 @@ export function EventsView({
           </div>
         </div>
 
+        {/* The route keeps the page fixed (list routes scroll their own region), so the details scroll here. */}
+        <ScrollArea className="min-h-0 flex-1">
         {/* Slot 1: Event Summary Banner Card - Figma Frame 61 / Frame 46 / Frame 60 */}
         <section className="relative mt-4 flex w-full flex-col gap-4 rounded-[16px] border border-[#e5e5e5] bg-white p-4 sm:p-6">
           <div className="flex flex-col-reverse items-start justify-end gap-5 sm:flex-row">
@@ -822,6 +824,7 @@ export function EventsView({
             </div>
           )}
         </section>
+        </ScrollArea>
 
         {/* Quick Select Modal Dialog */}
         <QuickSelectModal
@@ -845,7 +848,7 @@ export function EventsView({
   // VIEW: EVENTS LIST VIEW (Figma node 56:14018)
   // -------------------------------------------------------------
   return (
-    <div className="flex w-full flex-1 flex-col text-right" dir="rtl">
+    <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
       {/* Page Title - Figma node 56:13203 */}
       <h1 className="font-sans text-[24px] leading-[36px] font-bold text-[#404040]">
         رویدادها و نمایشگاه‌ها
