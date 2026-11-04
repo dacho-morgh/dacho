@@ -169,6 +169,34 @@ describe('access service outage', () => {
   })
 })
 
+describe('Payload REST reads over plain HTTP', () => {
+  // A same-origin browser GET on http://<ip> carries neither Origin nor Sec-Fetch-Site.
+  const bare = (method: string) =>
+    new NextRequest('http://37.32.26.180:8090/api/users?depth=0', {
+      method,
+      headers: { cookie: 'payload-token=session' },
+    })
+
+  it('gives a bare GET the same-origin metadata Payload needs to read the session', async () => {
+    const response = await proxy(bare('GET'))
+    expect(response.headers.get('x-middleware-request-sec-fetch-site')).toBe('same-origin')
+  })
+
+  it('leaves writes to Payload\'s own Origin check', async () => {
+    const response = await proxy(bare('POST'))
+    expect(response.headers.get('x-middleware-request-sec-fetch-site')).toBeNull()
+  })
+
+  it('keeps a cross-site GET cross-site', async () => {
+    const response = await proxy(
+      new NextRequest('http://37.32.26.180:8090/api/users', {
+        headers: { cookie: 'payload-token=session', 'sec-fetch-site': 'cross-site', origin: 'https://evil.example' },
+      }),
+    )
+    expect(response.headers.get('x-middleware-request-sec-fetch-site')).toBe('cross-site')
+  })
+})
+
 describe('route error boundary', () => {
   it('retries by re-fetching rather than re-rendering the failure', () => {
     const retry = vi.fn()
