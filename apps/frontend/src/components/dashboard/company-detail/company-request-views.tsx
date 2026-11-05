@@ -212,17 +212,17 @@ export function CompanyEvaluationView({ companyId, company, detail, fields, canM
     >
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center gap-2">
-          <Typography as="h2" variant="24/bold" color="neutral-700">
-            فرم ارزیابی
-          </Typography>
-          <Typography as="span" variant="16/regular" color="muted" aria-hidden="true">
-            /
-          </Typography>
           <Link href={requestHref}>
             <Typography as="span" variant="16/regular" color="muted">
               صفحه درخواست
             </Typography>
           </Link>
+          <Typography as="span" variant="16/regular" color="muted" aria-hidden="true">
+            /
+          </Typography>
+          <Typography as="h2" variant="24/bold" color="neutral-700">
+            فرم ارزیابی
+          </Typography>
         </div>
         <Typography as="h3" variant="20/bold" color="neutral-700">
           {request.title}

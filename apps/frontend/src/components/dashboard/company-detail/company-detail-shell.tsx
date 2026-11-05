@@ -51,18 +51,19 @@ export function CompanyDetailShell({
       className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pt-20 md:pt-10 lg:overflow-hidden"
       dir="rtl"
     >
+      {/* Parent first, so in the right-to-left page the trail reads «شرکت ها / name» whatever language the name is in. */}
       <nav aria-label="مسیر صفحه" className="flex flex-wrap items-center gap-2">
-        <Typography as="h1" variant="24/bold" color="neutral-700">
-          {companyName || '—'}
-        </Typography>
-        <Typography as="span" variant="16/regular" color="muted" aria-hidden="true">
-          /
-        </Typography>
         <Link href="/dashboard/companies">
           <Typography as="span" variant="16/regular" color="muted">
             شرکت ها
           </Typography>
         </Link>
+        <Typography as="span" variant="16/regular" color="muted" aria-hidden="true">
+          /
+        </Typography>
+        <Typography as="h1" variant="24/bold" color="neutral-700" dir="auto" className="min-w-0 break-words">
+          {companyName || '—'}
+        </Typography>
       </nav>
 
       <div className="flex shrink-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 lg:min-h-0 lg:flex-1 lg:flex-row">
