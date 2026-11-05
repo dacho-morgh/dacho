@@ -10,6 +10,13 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
+import { CompanyAccountTab } from '@/components/dashboard/company-detail/company-account-tab'
+import { DetailCard, InfoField } from '@/components/dashboard/company-detail/company-detail-parts'
+import {
+  CompanyDetailShell,
+  type CompanyTab,
+} from '@/components/dashboard/company-detail/company-detail-shell'
+import { CompanyRequestsTab } from '@/components/dashboard/company-detail/company-requests-tab'
 import { notFound } from 'next/navigation'
 import {
   DashboardAddIcon,
@@ -129,7 +136,7 @@ function verificationStatusBadge(status: VerificationStatus): {
   }
 }
 
-export function CompanyDetailView({ id }: { id: string }) {
+export function CompanyDetailView({ id, tab = 'profile' }: { id: string; tab?: CompanyTab }) {
   const [data, setData] = useState<CompanyDetailResponse | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   // Each load gets a sequence number so a slower, older response never overwrites a newer one.
@@ -422,7 +429,7 @@ export function CompanyDetailView({ id }: { id: string }) {
 
   const fields: Array<[string, string | undefined]> = [
     ['نام شرکت', company?.name],
-    ['تاریخ تاسیس', company?.establishmentDate],
+    ['تاریخ تاسیس', establishmentLabel(company?.establishmentDate)],
     ['وضعیت شرکت', company?.status],
     ['نوع شرکت', company?.type],
     ['شماره ثبت', company?.registrationNumber],
@@ -434,102 +441,146 @@ export function CompanyDetailView({ id }: { id: string }) {
   const snapshotDocuments = verification?.snapshot?.documents ?? []
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 pt-20 md:p-10" dir="rtl">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2">
-        <Link href="/dashboard/companies">
-          <Typography variant="14/regular" color="brand-600">
-            شرکت ها
-          </Typography>
-        </Link>
-        <Typography variant="14/regular" color="muted">
-          / {companyName || '—'}
-        </Typography>
-      </div>
-
-      <div className="flex min-h-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-background p-4 lg:min-h-[912px] lg:flex-row">
-        <nav className="order-first flex w-full shrink-0 flex-row flex-wrap gap-2 border-b border-neutral-200 pb-4 lg:order-none lg:w-[200px] lg:flex-col lg:border-b-0 lg:border-l lg:pl-5">
-          <Typography
-            variant="16/semibold"
-            color="brand-600"
-            className="rounded-xl bg-brand-50 p-3"
-          >
-            پروفایل شرکت
-          </Typography>
-          {['رزومه', 'اطلاعات حساب', 'درخواست‌ها'].map((item) => (
-            <Typography
-              key={item}
-              variant="16/regular"
-              color="secondary"
-              className="rounded-xl p-3"
-            >
-              {item}
-            </Typography>
-          ))}
-        </nav>
-
-        {/* Content Pane */}
-        <div className="flex w-full max-w-[892px] flex-col gap-6">
-          {/* Header */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-4">
-              <Image
-                src="/figma/dashboard/profile-avatar.png"
-                alt={companyName || 'شرکت'}
-                width={80}
-                height={80}
-                className="rounded-xl object-cover"
-              />
-              <div className="min-w-0 break-words">
-                <Typography variant="20/bold" color="neutral-900">
-                  {companyName || '—'}
+    <CompanyDetailShell id={id} companyName={companyName} active={tab}>
+      {tab === 'profile' && (
+        <>
+          {/* Logo: the server stores no company logo yet, so upload and removal stay inert. */}
+          <div className="flex flex-wrap items-center gap-4">
+            <Image
+              src="/figma/dashboard/profile-avatar.png"
+              alt={companyName || 'شرکت'}
+              width={80}
+              height={80}
+              className="size-20 rounded-2xl object-cover"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button disabled variant="outline-gray" size="40" className="px-4">
+                <Typography as="span" variant="16/semibold" className="text-inherit">
+                  آپلود پروفایل جدید
                 </Typography>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <Typography variant="14/regular" color="muted">
-                    شناسه: {id}
-                  </Typography>
-                  <span className="text-neutral-300">•</span>
-                  <Badge variant={badgeInfo.variant} size="sm">
-                    {badgeInfo.label}
-                  </Badge>
-                  {verification?.revision ? (
-                    <Typography variant="12/regular" color="muted">
-                      (نسخه {verification.revision.toLocaleString('fa-IR')})
-                    </Typography>
-                  ) : null}
-                </div>
-              </div>
+              </Button>
+              <Button disabled variant="gray" size="40" className="px-4">
+                <Typography as="span" variant="16/semibold" className="text-inherit">
+                  حذف پروفایل
+                </Typography>
+              </Button>
+            </div>
+            <div className="ms-auto flex items-center gap-2">
+              <Badge variant={badgeInfo.variant} size="md">
+                {badgeInfo.label}
+              </Badge>
+              {verification?.revision ? (
+                <Typography as="span" variant="12/regular" color="muted">
+                  نسخه {verification.revision.toLocaleString('fa-IR')}
+                </Typography>
+              ) : null}
             </div>
           </div>
+
+          {/* Basic Company Info */}
+          <DetailCard
+            title="اطلاعات پایه"
+            action={
+              // Editing company identity as an admin is not offered by the server yet.
+              <Button disabled variant="gray" size="32" icon={<DashboardEditIcon />} className="px-3">
+                <Typography as="span" variant="14/regular" className="text-inherit">
+                  ویرایش
+                </Typography>
+              </Button>
+            }
+          >
+            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+              {fields.map(([label, value]) => (
+                <InfoField key={label} label={label} value={value || '—'} />
+              ))}
+            </div>
+          </DetailCard>
+
+          {/* Addresses: the server lists them for admins but has no admin write endpoints yet. */}
+          <DetailCard
+            title="آدرس ها"
+            action={
+              <Button disabled variant="gray" size="32" icon={<DashboardAddIcon />} className="px-3">
+                <Typography as="span" variant="14/regular" className="text-inherit">
+                  آدرس جدید
+                </Typography>
+              </Button>
+            }
+          >
+            <div className="flex flex-col gap-5">
+              {addresses.map((address) => (
+                <div
+                  key={`${address.title}-${address.postalCode}`}
+                  className="flex flex-col gap-3 rounded-lg border border-neutral-100 px-4 py-2"
+                >
+                  <div className="flex items-start gap-3">
+                    <Typography as="h3" variant="16/bold" color="secondary" className="min-w-0 flex-1 break-words">
+                      {address.title}
+                    </Typography>
+                    <div className="flex items-center gap-2">
+                      <Button disabled variant="text-gray" size="icon-32" aria-label="ویرایش آدرس">
+                        <DashboardEditIcon />
+                      </Button>
+                      <Button disabled variant="text-gray" size="icon-32" aria-label="حذف آدرس">
+                        <DashboardTrashIcon />
+                      </Button>
+                    </div>
+                  </div>
+                  <Typography variant="16/semibold" color="neutral-400">
+                    {address.address}
+                  </Typography>
+                  <Typography variant="16/semibold" color="neutral-400">
+                    کد پستی: {address.postalCode || '—'}
+                  </Typography>
+                </div>
+              ))}
+              {addresses.length === 0 ? (
+                <Typography variant="14/regular" color="muted">
+                  آدرسی برای این شرکت ثبت نشده است.
+                </Typography>
+              ) : null}
+            </div>
+          </DetailCard>
 
           {/* Identity Edits Awaiting Re-verification Banner */}
           {identityEdits.length > 0 && (
             <section
-              className="rounded-xl border border-amber-300 bg-amber-50 p-4"
+              className="flex flex-col gap-3 rounded-2xl border border-warning-400 bg-warning-50 p-4"
               role="region"
               aria-label="تغییرات هویتی نیازمند احراز مجدد"
             >
-              <div className="flex items-center gap-2">
-                <Typography variant="16/semibold" color="secondary" className="text-amber-900">
-                  تغییرات هویتی جدید در انتظار احراز مجدد
-                </Typography>
-              </div>
-              <Typography variant="14/regular" color="secondary" className="mt-1 text-amber-800">
+              <Typography as="h2" variant="20/bold" className="text-warning-700">
+                تغییرات هویتی جدید در انتظار احراز مجدد
+              </Typography>
+              <Typography variant="14/regular" className="text-warning-700">
                 اطلاعات هویتی شرکت پس از ثبت تغییر یافته است. پرونده‌های قبلی نسخه تأییدشده زمان
                 ارسال را حفظ می‌کنند.
               </Typography>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {identityEdits.map((item) => (
                   <div
                     key={item.label}
-                    className="rounded-lg border border-amber-200 bg-background/70 p-2.5 text-xs text-amber-950"
+                    className="flex flex-col gap-1 rounded-lg border border-neutral-100 bg-background p-2"
                   >
-                    <span className="font-semibold">{item.label}:</span>{' '}
-                    <span className="text-neutral-500">نسخه احراز:</span>{' '}
-                    <span className="font-medium text-neutral-700">{item.snapVal}</span>{' '}
-                    <span className="text-amber-600 font-bold">←</span>{' '}
-                    <span className="text-neutral-500">جاری:</span>{' '}
-                    <span className="font-bold text-amber-900">{item.liveVal}</span>
+                    <Typography as="span" variant="14/semibold" color="neutral-400">
+                      {item.label}
+                    </Typography>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Typography as="span" variant="12/regular" color="muted">
+                        نسخه احراز:
+                      </Typography>
+                      <Typography as="span" variant="14/regular" color="secondary">
+                        {item.snapVal}
+                      </Typography>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Typography as="span" variant="12/regular" color="muted">
+                        جاری:
+                      </Typography>
+                      <Typography as="span" variant="14/semibold" color="secondary">
+                        {item.liveVal}
+                      </Typography>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -537,98 +588,71 @@ export function CompanyDetailView({ id }: { id: string }) {
           )}
 
           {/* Secretariat Verification Decision Workbench */}
-          <section className="rounded-xl border border-brand-200 bg-background p-5 shadow-xs">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-3">
-              <div>
-                <Typography variant="16/semibold" color="neutral-900">
-                  میز کار بررسی و تصمیم احراز دبیرخانه
-                </Typography>
-                <Typography variant="12/regular" color="muted" className="mt-0.5">
-                  بررسی نسخه اطلاعات ثبتی، مدارک ارسالی و ثبت تأیید یا بازگرداندن پرونده
-                </Typography>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={badgeInfo.variant} size="md">
-                  {badgeInfo.label}
-                </Badge>
-                {verification?.revision ? (
-                  <span className="text-xs text-neutral-500">
-                    نسخه {verification.revision.toLocaleString('fa-IR')}
-                  </span>
-                ) : null}
-              </div>
-            </div>
+          <DetailCard
+            title="میز کار بررسی و تصمیم احراز دبیرخانه"
+            className="border-brand-400"
+            action={
+              <Badge variant={badgeInfo.variant} size="md">
+                {badgeInfo.label}
+              </Badge>
+            }
+          >
+            <Typography variant="14/regular" color="muted" className="-mt-3">
+              بررسی نسخه اطلاعات ثبتی، مدارک ارسالی و ثبت تأیید یا بازگرداندن پرونده
+            </Typography>
 
             {/* Notification / Feedback Alerts */}
             {staleNotice && (
-              <div
-                role="alert"
-                className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-              >
-                {staleNotice}
+              <div role="alert" className="rounded-lg border border-warning-400 bg-warning-50 p-3">
+                <Typography variant="14/regular" className="text-warning-700">
+                  {staleNotice}
+                </Typography>
               </div>
             )}
             {decisionError && (
-              <div
-                role="alert"
-                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-              >
-                {decisionError}
+              <div role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3">
+                <Typography variant="14/regular" color="error">
+                  {decisionError}
+                </Typography>
               </div>
             )}
 
             {/* Verification Metadata Summary */}
-            <div className="mb-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-neutral-50 p-3">
-                <Typography variant="12/regular" color="muted">
-                  تاریخ ارسال پرونده
-                </Typography>
-                <Typography variant="14/regular" color="secondary" className="mt-1">
-                  {verification?.submittedAt ? formatDate(verification.submittedAt) : '—'}
-                </Typography>
-              </div>
-              <div className="rounded-lg bg-neutral-50 p-3">
-                <Typography variant="12/regular" color="muted">
-                  تاریخ آخرین تصمیم
-                </Typography>
-                <Typography variant="14/regular" color="secondary" className="mt-1">
-                  {verification?.decidedAt ? formatDate(verification.decidedAt) : '—'}
-                </Typography>
-              </div>
-              <div className="rounded-lg bg-neutral-50 p-3">
-                <Typography variant="12/regular" color="muted">
-                  نماینده ثبت‌کننده
-                </Typography>
-                <Typography variant="14/regular" color="secondary" className="mt-1">
-                  {data.representative?.name || '—'} ({data.representative?.phone || '—'})
-                </Typography>
-              </div>
+            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-3">
+              <InfoField
+                label="تاریخ ارسال پرونده"
+                value={verification?.submittedAt ? formatDate(verification.submittedAt) : '—'}
+              />
+              <InfoField
+                label="تاریخ آخرین تصمیم"
+                value={verification?.decidedAt ? formatDate(verification.decidedAt) : '—'}
+              />
+              <InfoField
+                label="نماینده ثبت‌کننده"
+                value={`${data.representative?.name || '—'} (${data.representative?.phone || '—'})`}
+              />
             </div>
 
             {/* Previous return/rejection reason if available */}
             {verification?.reason && (
-              <div className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 text-sm">
-                <span className="font-semibold text-neutral-800">توضیحات و دلیل تصمیم قبلی:</span>{' '}
-                <span className="text-neutral-700">{verification.reason}</span>
-              </div>
+              <InfoField label="توضیحات و دلیل تصمیم قبلی" value={verification.reason} />
             )}
 
             {/* Decision Controls */}
             {isPending && canDecide && (
-              <div className="mt-4 flex flex-col gap-3">
-                <label htmlFor="decision-reason" className="text-sm font-medium text-neutral-800">
+              <div className="flex flex-col gap-3">
+                <Typography as="label" htmlFor="decision-reason" variant="16/semibold" color="neutral-700">
                   توضیحات و دلیل تصمیم{' '}
-                  <span className="text-xs text-neutral-500 font-normal">
+                  <Typography as="span" variant="12/regular" color="muted">
                     (برای برگشت مدارک یا رد احراز الزامی است)
-                  </span>
-                </label>
+                  </Typography>
+                </Typography>
                 <Textarea
                   id="decision-reason"
                   rows={3}
                   placeholder="دلیل تصمیم، نواقص مدارک یا توضیحات لازم را اینجا وارد کنید..."
                   value={decisionReason}
                   onChange={(e) => handleReasonChange(e.target.value)}
-                  className="rounded-lg border-neutral-300 bg-background p-3 text-sm"
                   disabled={decisionSubmitting}
                 />
                 {decisionReason.trim().length > 0 && (
@@ -637,13 +661,14 @@ export function CompanyDetailView({ id }: { id: string }) {
                   </Typography>
                 )}
                 {/* Figma 02 (31650:7): actions sit at the row's end, approve last in reading order. */}
-                <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   <Button asChild size="40" variant="link">
                     <Link href="/dashboard/companies?status=pending">بازگشت به صف</Link>
                   </Button>
                   <Button
                     size="40"
                     variant="outline-gray"
+                    className="px-4"
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('return')}
                   >
@@ -652,6 +677,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                   <Button
                     size="40"
                     variant="destructive"
+                    className="px-4"
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('reject')}
                   >
@@ -660,6 +686,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                   <Button
                     size="40"
                     variant="default"
+                    className="px-4"
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('approve')}
                   >
@@ -670,78 +697,70 @@ export function CompanyDetailView({ id }: { id: string }) {
             )}
 
             {isSelf && (
-              <div
-                role="alert"
-                className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-              >
-                شما نماینده این شرکت هستید. تأیید یا تصمیم‌گیری برای شرکت خود مجاز نیست (ممنوعیت
-                تأیید خود).
+              <div role="alert" className="rounded-lg border border-warning-400 bg-warning-50 p-3">
+                <Typography variant="14/regular" className="text-warning-700">
+                  شما نماینده این شرکت هستید. تأیید یا تصمیم‌گیری برای شرکت خود مجاز نیست (ممنوعیت
+                  تأیید خود).
+                </Typography>
               </div>
             )}
 
             {!isPending && (
-              <div className="mt-2 text-xs text-neutral-500">
+              <Typography variant="12/regular" color="muted">
                 این پرونده در وضعیت{' '}
-                <span className="font-semibold text-neutral-700">{badgeInfo.label}</span> قرار دارد و
-                در این نسخه نهایی شده است.
-              </div>
+                <Typography as="span" variant="12/semibold" color="neutral-700">
+                  {badgeInfo.label}
+                </Typography>{' '}
+                قرار دارد و در این نسخه نهایی شده است.
+              </Typography>
             )}
-          </section>
-
+          </DetailCard>
           {/* Exact Submitted Verification Documents & Authorized Downloads */}
-          <section className="rounded-xl border border-neutral-200 p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <Typography variant="16/semibold" color="neutral-900">
-                  مدارک ارسالی در نسخه احراز
-                </Typography>
-                <Typography variant="12/regular" color="muted">
-                  مدارک رسمی ثبت‌شده در پرونده این نسخه با امکان دریافت فایل با مجوز معتبر
-                </Typography>
-              </div>
-            </div>
-
+          <DetailCard title="مدارک ارسالی در نسخه احراز">
+            <Typography variant="14/regular" color="muted" className="-mt-3">
+              مدارک رسمی ثبت‌شده در پرونده این نسخه با امکان دریافت فایل با مجوز معتبر
+            </Typography>
             {downloadError && (
-              <div
-                role="alert"
-                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-              >
-                {downloadError}
+              <div role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3">
+                <Typography variant="14/regular" color="error">
+                  {downloadError}
+                </Typography>
               </div>
             )}
             {snapshotDocuments.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
                 {snapshotDocuments.map((doc) => (
                   <div
                     key={doc.id}
-                    className="flex flex-col justify-between rounded-xl border border-neutral-200 bg-neutral-50/50 p-3.5"
+                    className="flex min-w-0 flex-col justify-between gap-3 rounded-lg border border-neutral-100 p-2"
                   >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="inline-block rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge variant="primary" size="sm">
                           {documentCategoryLabel(doc.category)}
-                        </span>
-                        <span className="text-xs text-neutral-500">
+                        </Badge>
+                        <Typography as="span" variant="12/regular" color="muted">
                           {formatDocumentSize(doc.sizeBytes)}
-                        </span>
+                        </Typography>
                       </div>
                       <Typography
                         variant="14/regular"
                         color="secondary"
-                        className="mt-2 truncate font-mono text-xs"
+                        className="truncate font-mono"
                         title={doc.filename}
                       >
                         {doc.filename}
                       </Typography>
                     </div>
-                    <div className="mt-3 flex justify-end">
+                    <div className="flex justify-end">
                       <Button
                         size="32"
                         variant="outline-gray"
+                        className="px-3"
                         disabled={downloadingDocId === doc.id}
                         onClick={() => void handleDownloadDocument(doc.id, doc.filename)}
                       >
-                        <Typography variant="12/regular">
+                        <Typography as="span" variant="14/regular" className="text-inherit">
                           {downloadingDocId === doc.id ? 'در حال دریافت...' : 'دانلود مدرک'}
                         </Typography>
                       </Button>
@@ -750,53 +769,15 @@ export function CompanyDetailView({ id }: { id: string }) {
                 ))}
               </div>
             ) : (
-              <Typography variant="14/regular" color="muted" className="py-2 text-center">
+              <Typography variant="14/regular" color="muted" className="text-center">
                 مدرکی در نسخه ارسالی احراز ثبت نشده است.
               </Typography>
             )}
-          </section>
-
-          {/* Basic Company Info */}
-          <InfoSection title="اطلاعات پایه" edit>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {fields.map(([label, value]) => (
-                <InfoField key={label} label={label} value={value || '—'} />
-              ))}
-            </div>
-          </InfoSection>
-
-          {/* Addresses */}
-          <InfoSection title="آدرس ها" add>
-            <div className="flex flex-col gap-3">
-              {addresses.map((address) => (
-                <div key={address.title} className="rounded-xl border border-neutral-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <Typography variant="14/semibold" color="secondary">
-                      {address.title}
-                    </Typography>
-                    <div className="flex gap-1">
-                      <Button disabled variant="text-gray" size="icon-sm" aria-label="ویرایش">
-                        <DashboardEditIcon className="size-5" />
-                      </Button>
-                      <Button disabled variant="text-gray" size="icon-sm" aria-label="حذف">
-                        <DashboardTrashIcon className="size-5" />
-                      </Button>
-                    </div>
-                  </div>
-                  <Typography variant="14/regular" color="secondary" className="mt-3">
-                    {address.address}
-                  </Typography>
-                  <Typography variant="12/regular" color="muted" className="mt-2">
-                    کد پستی: {address.postalCode || '—'}
-                  </Typography>
-                </div>
-              ))}
-            </div>
-          </InfoSection>
+          </DetailCard>
 
           {/* General Private Documents Field (Upload Seam) */}
-          <InfoSection title="مدارک خصوصی بارگذاری‌شده">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <DetailCard title="مدارک خصوصی بارگذاری‌شده">
+            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
               {(
                 [
                   ['articlesOfAssociation', 'اساس‌نامه'],
@@ -815,10 +796,23 @@ export function CompanyDetailView({ id }: { id: string }) {
                 />
               ))}
             </div>
-          </InfoSection>
-        </div>
-      </div>
-    </main>
+          </DetailCard>
+        </>
+      )}
+
+      {tab === 'resume' && (
+        <DetailCard title="رزومه شرکت">
+          {/* No admin read of a company's dossier exists yet, so there is nothing to show here. */}
+          <Typography variant="14/regular" color="muted">
+            رزومه شرکت هنوز در سرویس پشتیبانی نمی‌شود.
+          </Typography>
+        </DetailCard>
+      )}
+
+      {tab === 'account' && <CompanyAccountTab representative={data.representative} />}
+
+      {tab === 'requests' && <CompanyRequestsTab companyId={id} />}
+    </CompanyDetailShell>
   )
 }
 
@@ -854,47 +848,26 @@ function formatDate(iso: string): string {
   }
 }
 
-function InfoSection({
-  title,
-  children,
-  edit,
-  add,
-}: {
-  title: string
-  children: React.ReactNode
-  edit?: boolean
-  add?: boolean
-}) {
-  return (
-    <section className="rounded-xl border border-neutral-200 p-4">
-      <div className="mb-5 flex items-center justify-between">
-        <Typography variant="16/semibold" color="neutral-900">
-          {title}
-        </Typography>
-        {edit ? (
-          <Button disabled variant="outline-gray" size="32" icon={<DashboardEditIcon className="size-5" />}>
-            <Typography variant="14/regular">ویرایش</Typography>
-          </Button>
-        ) : add ? (
-          <Button disabled variant="outline-gray" size="32" icon={<DashboardAddIcon className="size-5" />}>
-            <Typography variant="14/regular">افزودن آدرس</Typography>
-          </Button>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  )
+const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹'
+const toLatinDigits = (value: string) => value.replace(/[۰-۹]/g, (digit) => String(PERSIAN_DIGITS.indexOf(digit)))
+const toPersianDigits = (value: string) => value.replace(/\d/g, (digit) => PERSIAN_DIGITS[Number(digit)] ?? digit)
+
+function currentJalaliYear(): number | undefined {
+  const year = new Intl.DateTimeFormat('en-u-ca-persian-nu-latn', { year: 'numeric' })
+    .formatToParts(new Date())
+    .find((part) => part.type === 'year')?.value
+  return year ? Number(year) : undefined
 }
 
-function InfoField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-neutral-50 p-3">
-      <Typography variant="12/regular" color="muted">
-        {label}
-      </Typography>
-      <Typography variant="16/regular" color="secondary" className="mt-1">
-        {value}
-      </Typography>
-    </div>
-  )
+/** "۱۳۵۱/۰۴/۱۲ (۵۴ سال)": the establishment date as stored (Jalali) or converted (ISO), with the company's age. */
+function establishmentLabel(value?: string): string | undefined {
+  if (!value) return undefined
+  const match = /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/.exec(toLatinDigits(value))
+  if (!match) return value
+  const year = Number(match[1])
+  const isJalali = year >= 1200 && year <= 1600
+  const now = isJalali ? currentJalaliYear() : new Date().getFullYear()
+  const age = now ? now - year : undefined
+  const date = isJalali ? toPersianDigits(`${match[1]}/${match[2].padStart(2, '0')}/${match[3].padStart(2, '0')}`) : formatDate(value)
+  return age !== undefined && age >= 0 ? `${date} (${age.toLocaleString('fa-IR')} سال)` : date
 }

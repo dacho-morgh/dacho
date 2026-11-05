@@ -3,6 +3,7 @@ export { default as BrandFooterSandoqLogotype } from './brand-footer-sandoq-logo
 export { default as BrandSandoqLogomark } from './brand-sandoq-logomark'
 export { default as BrandSandoqLogotype } from './brand-sandoq-logotype'
 export { default as CarouselArrowRightIcon } from './carousel-arrow-right-icon'
+export { default as ChevronUpIcon } from './chevron-up-icon'
 export { default as DashboardAddIcon } from './dashboard-add-icon'
 export { default as CopyIcon } from './copy-icon'
 export {
