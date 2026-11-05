@@ -77,8 +77,8 @@ export function CompanyLogoRow({
           <span className="sr-only">لوگو ثبت نشده است</span>
         </span>
       )}
-      {/* Small screens: the buttons stack opposite the logo. From sm they follow the logo in one row. */}
-      <div className="ms-auto flex flex-col items-stretch gap-2 sm:ms-0 sm:flex-row sm:flex-wrap sm:items-center">
+      {/* Small screens: compact buttons with short names keep the logo and both buttons on one line. */}
+      <div className="flex items-center gap-2 sm:flex-wrap">
         {/* The picker is driven by the button below, so the native control stays visually hidden. */}
         <div className="sr-only">
           <FileInput
@@ -92,28 +92,36 @@ export function CompanyLogoRow({
         <Button
           type="button"
           variant="outline-gray"
-          size="40"
+          size="32"
+          sm="40"
           icon={<UploadIcon aria-hidden="true" />}
-          className="px-4"
+          className="px-2 sm:px-4"
           loading={busy === 'upload'}
           disabled={busy !== null}
           onClick={() => input.current?.click()}
         >
-          <Typography as="span" variant="16/semibold" className="text-inherit">
+          <Typography as="span" variant="14/regular" className="text-inherit sm:hidden">
+            آپلود جدید
+          </Typography>
+          <Typography as="span" variant="16/semibold" className="hidden text-inherit sm:inline">
             آپلود پروفایل جدید
           </Typography>
         </Button>
         <Button
           type="button"
           variant="text-destructive"
-          size="40"
+          size="32"
+          sm="40"
           icon={<DashboardTrashIcon aria-hidden="true" />}
-          className="px-4"
+          className="px-2 sm:px-4"
           loading={busy === 'remove'}
           disabled={!logo || busy !== null}
           onClick={() => void run('remove', () => removeCompanyLogo(companyId), 'لوگوی شرکت حذف شد.', 'حذف لوگو انجام نشد. دوباره تلاش کنید.')}
         >
-          <Typography as="span" variant="16/semibold" className="text-inherit">
+          <Typography as="span" variant="14/regular" className="text-inherit sm:hidden">
+            حذف
+          </Typography>
+          <Typography as="span" variant="16/semibold" className="hidden text-inherit sm:inline">
             حذف پروفایل
           </Typography>
         </Button>
