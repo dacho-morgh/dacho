@@ -77,18 +77,18 @@ export function EvaluationScoreCard({
       aria-label="ثبت امتیاز"
       className="flex flex-col gap-5 rounded-2xl border border-brand-400 bg-background p-4"
     >
-      <Typography as="h2" variant="20/bold" color="secondary">
+      <Typography as="h2" variant="16/bold" sm="20/bold" color="secondary">
         ثبت امتیاز
       </Typography>
 
       <div className="flex flex-col gap-2">
-        <Typography as="label" htmlFor="evaluation-message" variant="16/semibold" color="neutral-700">
+        <Typography as="label" htmlFor="evaluation-message" variant="14/semibold" sm="16/semibold" color="neutral-700">
           متن پیام
         </Typography>
         <Textarea
           id="evaluation-message"
           rows={6}
-          placeholder="متن پیام"
+          placeholder="پیام خود را برای شرکت بنویسید؛ برای رد درخواست الزامی است"
           value={message}
           disabled={!stage || submitting !== null}
           onChange={(event) => setMessage(event.target.value)}

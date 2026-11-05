@@ -1,11 +1,10 @@
 'use client'
 
-import { useState } from 'react'
 import { DashboardEditIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import type { CompanyDetailResponse } from '@/components/dashboard/company-detail-view'
-import { ContactDialog, PasswordDialog } from './company-action-dialogs'
+import { DeleteCompanyAccount } from './company-delete-account'
 import { DetailCard, InfoField } from './company-detail-parts'
 
 const OWNER_ONLY = 'فقط مالک سیستم می‌تواند اطلاعات حساب نماینده را تغییر دهد'
@@ -13,17 +12,19 @@ const OWNER_ONLY = 'فقط مالک سیستم می‌تواند اطلاعات 
 /** The representative's sign-in contact details (Figma 30950:17441). */
 export function CompanyAccountTab({
   userId,
+  companyName,
   representative,
   canManage,
-  onChanged,
+  onEditContact,
+  onChangePassword,
 }: {
   userId: string
+  companyName?: string
   representative: CompanyDetailResponse['representative']
   canManage: boolean
-  onChanged: () => void | Promise<void>
+  onEditContact: () => void
+  onChangePassword: () => void
 }) {
-  const [dialog, setDialog] = useState<'contact' | 'password' | null>(null)
-  const close = () => setDialog(null)
 
   return (
     <>
@@ -38,7 +39,7 @@ export function CompanyAccountTab({
             className="px-3"
             disabled={!canManage}
             title={canManage ? undefined : OWNER_ONLY}
-            onClick={() => setDialog('contact')}
+            onClick={onEditContact}
           >
             <Typography as="span" variant="14/regular" className="text-inherit">
               ویرایش
@@ -62,25 +63,23 @@ export function CompanyAccountTab({
         className="w-fit px-4"
         disabled={!canManage}
         title={canManage ? undefined : OWNER_ONLY}
-        onClick={() => setDialog('password')}
+        onClick={onChangePassword}
       >
-        <Typography as="span" variant="16/semibold" className="text-inherit">
+        <Typography as="span" variant="14/semibold" sm="16/semibold" className="text-inherit">
           تغییر رمز عبور
         </Typography>
       </Button>
 
-      {dialog === 'contact' ? (
-        <ContactDialog
+      {/* On small screens the removal is here, since the bottom bar has no entry for it. */}
+      <div className="lg:hidden">
+        <DeleteCompanyAccount
+          inline
           userId={userId}
           updatedAt={representative?.updatedAt}
-          representative={representative}
-          onClose={close}
-          onSaved={onChanged}
+          companyName={companyName}
+          canManage={canManage}
         />
-      ) : null}
-      {dialog === 'password' ? (
-        <PasswordDialog userId={userId} updatedAt={representative?.updatedAt} onClose={close} onSaved={onChanged} />
-      ) : null}
+      </div>
     </>
   )
 }

@@ -7,44 +7,31 @@ import { CompanyBuildingIcon, DashboardTrashIcon, UploadIcon } from '@/component
 import { Button } from '@/components/ui/button'
 import { FileInput } from '@/components/ui/file-input'
 import { Typography } from '@/components/ui/typography'
-import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
-import {
-  COMPANY_LOGO_MAX_BYTES,
-  COMPANY_LOGO_MIME_TYPES,
-  removeCompanyLogo,
-  uploadCompanyLogo,
-} from './company-admin-api'
+import { COMPANY_LOGO_MAX_BYTES, COMPANY_LOGO_MIME_TYPES } from './company-admin-api'
 
 /** The company logo with its upload and removal buttons (Figma 30537:19247). */
 export function CompanyLogoRow({
-  companyId,
   companyName,
   logo,
-  onChanged,
+  onUpload,
+  onRemove,
   children,
 }: {
-  companyId: string
   companyName?: string
   logo: { id: string; url: string } | null | undefined
-  onChanged: () => void | Promise<void>
+  /** Shows the picture at once and stores it; the promise settles when the server has answered. */
+  onUpload: (file: File) => Promise<void>
+  onRemove: () => Promise<void>
   /** What closes the row, e.g. the verification status. */
   children?: ReactNode
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState<'upload' | 'remove' | null>(null)
 
-  const run = async (kind: 'upload' | 'remove', task: () => Promise<void>, success: string, fallback: string) => {
+  const run = async (kind: 'upload' | 'remove', task: () => Promise<void>) => {
     setBusy(kind)
     try {
       await task()
-      toast.success(success)
-      await onChanged()
-    } catch (cause) {
-      toast.error(
-        cause instanceof DashboardApiError && cause.code === 'logo_too_large'
-          ? 'حجم لوگو حداکثر ۲ مگابایت است.'
-          : describeMutationFailure(cause, fallback),
-      )
     } finally {
       setBusy(null)
     }
@@ -56,7 +43,7 @@ export function CompanyLogoRow({
     if (!file) return
     if (!COMPANY_LOGO_MIME_TYPES.includes(file.type)) return void toast.error('لوگو باید تصویر PNG، JPG یا WebP باشد.')
     if (file.size > COMPANY_LOGO_MAX_BYTES) return void toast.error('حجم لوگو حداکثر ۲ مگابایت است.')
-    void run('upload', () => uploadCompanyLogo(companyId, file), 'لوگوی شرکت ذخیره شد.', 'ذخیرهٔ لوگو انجام نشد. دوباره تلاش کنید.')
+    void run('upload', () => onUpload(file))
   }
 
   return (
@@ -100,8 +87,8 @@ export function CompanyLogoRow({
           disabled={busy !== null}
           onClick={() => input.current?.click()}
         >
-          <Typography as="span" variant="16/semibold" className="whitespace-nowrap text-inherit">
-            آپلود پروفایل
+          <Typography as="span" variant="14/semibold" sm="16/semibold" className="whitespace-nowrap text-inherit">
+            آپلود عکس پروفایل
           </Typography>
         </Button>
         <Button
@@ -113,10 +100,10 @@ export function CompanyLogoRow({
           className="px-2 sm:px-4"
           loading={busy === 'remove'}
           disabled={!logo || busy !== null}
-          onClick={() => void run('remove', () => removeCompanyLogo(companyId), 'لوگوی شرکت حذف شد.', 'حذف لوگو انجام نشد. دوباره تلاش کنید.')}
+          onClick={() => void run('remove', onRemove)}
         >
-          <Typography as="span" variant="16/semibold" className="text-inherit">
-            حذف پروفایل
+          <Typography as="span" variant="14/semibold" sm="16/semibold" className="text-inherit">
+            حذف عکس پروفایل
           </Typography>
         </Button>
       </div>

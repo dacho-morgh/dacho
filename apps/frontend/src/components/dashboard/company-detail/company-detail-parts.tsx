@@ -24,7 +24,7 @@ export function DetailCard({
       className={cn('flex flex-col gap-5 rounded-2xl border border-neutral-200 bg-background p-4', className)}
     >
       <div className="flex min-h-8 items-center justify-between gap-4">
-        <Typography as="h2" variant="20/bold" color="secondary">
+        <Typography as="h2" variant="16/bold" sm="20/bold" color="secondary">
           {title}
         </Typography>
         {action}
@@ -46,10 +46,10 @@ export function InfoField({
 }) {
   return (
     <div className={cn('flex min-w-0 flex-col gap-3 rounded-lg border border-neutral-100 p-2', className)}>
-      <Typography as="span" variant="14/semibold" color="neutral-400">
+      <Typography as="span" variant="12/semibold" sm="14/semibold" color="neutral-400">
         {label}
       </Typography>
-      <Typography as="span" variant="16/semibold" color="secondary" className="break-words">
+      <Typography as="span" variant="14/semibold" sm="16/semibold" color="secondary" className="break-words">
         {value}
       </Typography>
     </div>
@@ -60,11 +60,11 @@ export function InfoField({
 export function ReadonlyField({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <Typography as="span" variant="16/semibold" color="neutral-700">
+      <Typography as="span" variant="14/semibold" sm="16/semibold" color="neutral-700">
         {label}
       </Typography>
       <div className="flex min-h-10 items-center rounded-lg border border-neutral-100 bg-neutral-50 p-2">
-        <Typography as="span" variant="16/regular" color={value ? 'secondary' : 'neutral-400'} className="break-words">
+        <Typography as="span" variant="14/regular" sm="16/regular" color={value ? 'secondary' : 'neutral-400'} className="break-words">
           {value || '—'}
         </Typography>
       </div>
@@ -93,7 +93,7 @@ export function CollapsibleCard({
       className={cn('flex flex-col gap-6 rounded-2xl border border-neutral-200 bg-background p-4', className)}
     >
       <div className="flex items-center justify-between gap-4">
-        <Typography as="h2" variant="20/extrabold" color="neutral-800">
+        <Typography as="h2" variant="16/bold" sm="20/extrabold" color="neutral-800">
           {title}
         </Typography>
         <Button

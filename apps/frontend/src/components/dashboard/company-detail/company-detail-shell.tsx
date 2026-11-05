@@ -55,23 +55,23 @@ export function CompanyDetailShell({
       {/* On small screens the breadcrumb shares the row of the menu button, which sits at the opposite edge. */}
       <nav aria-label="مسیر صفحه" className="flex min-h-10 flex-wrap items-center gap-2 pe-12 md:pe-0">
         <Link href="/dashboard/companies">
-          <Typography as="span" variant="16/regular" color="muted">
+          <Typography as="span" variant="14/regular" sm="16/regular" color="muted">
             شرکت ها
           </Typography>
         </Link>
-        <Typography as="span" variant="16/regular" color="muted" aria-hidden="true">
+        <Typography as="span" variant="14/regular" sm="16/regular" color="muted" aria-hidden="true">
           /
         </Typography>
-        <Typography as="h1" variant="24/bold" color="neutral-700" dir="auto" className="min-w-0 break-words">
+        <Typography as="h1" variant="20/bold" sm="24/bold" color="neutral-700" dir="auto" className="min-w-0 break-words">
           {companyName || '—'}
         </Typography>
       </nav>
 
-      <div className="flex shrink-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 lg:min-h-0 lg:flex-1 lg:flex-row">
+      <div className="flex shrink-0 grow flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 lg:min-h-0 lg:flex-1 lg:flex-row">
         {/* Below lg the sections are a bottom navigation bar that floats at the foot of the screen. */}
         <nav
           aria-label="بخش‌های شرکت"
-          className="sticky bottom-2 z-20 order-last grid grid-cols-5 gap-1 rounded-2xl border border-neutral-200 bg-background p-1 shadow-lg lg:static lg:order-first lg:flex lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-4 lg:self-stretch lg:rounded-none lg:border-y-0 lg:border-r-0 lg:bg-transparent lg:p-0 lg:pl-2 lg:shadow-none"
+          className="sticky bottom-2 z-20 order-last grid grid-cols-4 gap-1 rounded-2xl border border-neutral-200 bg-background p-1 shadow-lg lg:static lg:order-first lg:flex lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-4 lg:self-stretch lg:rounded-none lg:border-y-0 lg:border-r-0 lg:bg-transparent lg:p-0 lg:pl-2 lg:shadow-none"
         >
           {TABS.map((tab) => {
             const isActive = tab.id === active
@@ -94,14 +94,15 @@ export function CompanyDetailShell({
                   <Typography as="span" variant="12/regular" className="whitespace-nowrap text-inherit lg:hidden">
                     {tab.shortLabel}
                   </Typography>
-                  <Typography as="span" variant="16/regular" className="hidden text-inherit lg:inline">
+                  <Typography as="span" variant="14/regular" sm="16/regular" className="hidden text-inherit lg:inline">
                     {tab.label}
                   </Typography>
                 </Link>
               </div>
             )
           })}
-          <div className="flex min-w-0 items-stretch gap-2 lg:w-full lg:items-center">
+          {/* On small screens the removal lives on the account tab, away from the bar the thumb taps most. */}
+          <div className="hidden min-w-0 items-center gap-2 lg:flex lg:w-full">
             <span aria-hidden="true" className="hidden h-7 w-1 shrink-0 lg:block" />
             <DeleteCompanyAccount
               userId={id}

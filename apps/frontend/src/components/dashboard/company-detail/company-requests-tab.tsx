@@ -24,7 +24,7 @@ const HEADERS = ['درخواست', 'وضعیت', 'تاریخ سررسید', 'ت�
 
 function HeaderText({ children }: { children: string }) {
   return (
-    <Typography as="span" variant="14/semibold" color="neutral-400">
+    <Typography as="span" variant="12/semibold" sm="14/semibold" color="neutral-400">
       {children}
     </Typography>
   )
@@ -90,7 +90,7 @@ export function CompanyRequestsTab({ companyId }: { companyId: string }) {
               <TableRow key={request.id}>
                 <TableCell className="h-[72px] p-4">
                   <Link href={`/dashboard/companies/${encodeURIComponent(companyId)}/requests/${encodeURIComponent(request.id)}`}>
-                    <Typography as="span" variant="16/regular" color="secondary">
+                    <Typography as="span" variant="14/regular" sm="16/regular" color="secondary">
                       {request.title}
                     </Typography>
                   </Link>
@@ -101,12 +101,12 @@ export function CompanyRequestsTab({ companyId }: { companyId: string }) {
                   </Badge>
                 </TableCell>
                 <TableCell className="p-4">
-                  <Typography as="span" variant="16/regular" color="secondary">
+                  <Typography as="span" variant="14/regular" sm="16/regular" color="secondary">
                     {formatDate(request.dueDate) || '—'}
                   </Typography>
                 </TableCell>
                 <TableCell className="p-4">
-                  <Typography as="span" variant="16/regular" color="secondary">
+                  <Typography as="span" variant="14/regular" sm="16/regular" color="secondary">
                     {formatDate(request.createdAt) || '—'}
                   </Typography>
                 </TableCell>

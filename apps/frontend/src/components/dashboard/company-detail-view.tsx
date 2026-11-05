@@ -6,15 +6,35 @@ import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
 import {
   AddressDialog,
   CompanyInfoDialog,
+  ContactDialog,
   DeleteAddressDialog,
+  PasswordDialog,
+  describeCommandError,
+  type AddressValues,
   type CompanyAddress,
+  type CompanyInfoValues,
+  type ContactValues,
 } from '@/components/dashboard/company-detail/company-action-dialogs'
+import {
+  addCompanyAddress,
+  deleteCompanyAddress,
+  removeCompanyLogo,
+  updateCompanyAddress,
+  updateCompanyInfo,
+  updateRepresentativeAccount,
+  uploadCompanyLogo,
+} from '@/components/dashboard/company-detail/company-admin-api'
+import {
+  mergeVerification,
+  verificationTargetId,
+  type VerificationDetailResponse,
+} from '@/components/dashboard/company-detail/company-detail-data'
+import { CompanyDetailSkeleton } from '@/components/dashboard/company-detail/company-detail-skeleton'
 import { CompanyLogoRow } from '@/components/dashboard/company-detail/company-logo-row'
 import { CompanyAccountTab } from '@/components/dashboard/company-detail/company-account-tab'
 import { DetailCard, InfoField } from '@/components/dashboard/company-detail/company-detail-parts'
@@ -35,6 +55,7 @@ import {
   downloadDocument,
   formatDocumentSize,
 } from '@/utilities/document-api'
+import { DashboardApiError } from '@/utilities/dashboard-api'
 import { toast } from 'sonner'
 
 export type VerificationStatus =
@@ -146,24 +167,35 @@ function verificationStatusBadge(status: VerificationStatus): {
   }
 }
 
+/** An open dialog, with what was typed and the server's refusal when it is reopened after one. */
 type CompanyDialog =
-  | { kind: 'info' }
-  | { kind: 'address'; address?: CompanyAddress }
-  | { kind: 'delete-address'; address: CompanyAddress }
+  | { kind: 'info'; values?: CompanyInfoValues; error?: string }
+  | { kind: 'address'; address?: CompanyAddress; values?: AddressValues; error?: string }
+  | { kind: 'delete-address'; address: CompanyAddress; error?: string }
+  | { kind: 'contact'; values?: ContactValues; error?: string }
+  | { kind: 'password'; error?: string }
+
+/** Optimistic addresses carry this id until the server has given them a real one. */
+const PENDING_ADDRESS = 'pending-'
 
 export function CompanyDetailView({
   id,
   tab = 'profile',
   canManageAccount = false,
+  initial,
 }: {
   id: string
   tab?: CompanyTab
+  /** The case as the server read it, so the page opens with its content instead of a skeleton. */
+  initial?: CompanyDetailResponse
   /** Only the System Owner may change or remove the representative's account. */
   canManageAccount?: boolean
 }) {
   const [dialog, setDialog] = useState<CompanyDialog | null>(null)
-  const [data, setData] = useState<CompanyDetailResponse | null>(null)
-  const [loadState, setLoadState] = useState<LoadState>('loading')
+  const [data, setData] = useState<CompanyDetailResponse | null>(initial ?? null)
+  const [loadState, setLoadState] = useState<LoadState>(initial ? 'ready' : 'loading')
+  const dataRef = useRef<CompanyDetailResponse | null>(initial ?? null)
+  const skipFirstLoad = useRef(Boolean(initial))
   // Each load gets a sequence number so a slower, older response never overwrites a newer one.
   const loadSequence = useRef(0)
 
@@ -193,36 +225,28 @@ export function CompanyDetailView({
     writeDraft(draftKey, value)
   }
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (options: { quiet?: boolean } = {}) => {
     const sequence = ++loadSequence.current
     const isCurrent = () => sequence === loadSequence.current
     // Keep the loaded case on screen while refreshing after a decision or a stale revision.
     setLoadState((previous) => (previous === 'ready' ? 'ready' : 'loading'))
+    // A background refresh after a change never replaces the page with an error: what is shown stays.
+    const fail = (state: LoadState) => {
+      if (!options.quiet) setLoadState(state)
+    }
     try {
       const response = await fetch(`/api/dashboard/admin/companies/${encodeURIComponent(id)}`, {
         cache: 'no-store',
       })
       if (!isCurrent()) return
-      if (response.status === 401) {
-        setLoadState('expired')
-        return
-      }
-      if (response.status === 403) {
-        setLoadState('denied')
-        return
-      }
-      if (response.status === 404) {
-        setLoadState('missing')
-        return
-      }
-      if (!response.ok) {
-        setLoadState('unavailable')
-        return
-      }
-      const companyData = (await response.json()) as CompanyDetailResponse
+      if (response.status === 401) return fail('expired')
+      if (response.status === 403) return fail('denied')
+      if (response.status === 404) return fail('missing')
+      if (!response.ok) return fail('unavailable')
+      let companyData = (await response.json()) as CompanyDetailResponse
 
       // Try fetching detailed verification data (including full snapshot and history) if available
-      const verifTargetId = companyData.verification?.id || companyData.companyId
+      const verifTargetId = verificationTargetId(companyData)
       if (verifTargetId) {
         try {
           const verifRes = await fetch(
@@ -230,20 +254,7 @@ export function CompanyDetailView({
             { cache: 'no-store' },
           )
           if (verifRes.ok) {
-            const verifJson = (await verifRes.json()) as {
-              verification?: CompanyDetailResponse['verification']
-              history?: VerificationHistoryItem[]
-              allowedActions?: ('read' | 'approve' | 'return' | 'reject')[]
-            }
-            if (verifJson.verification) {
-              companyData.verification = verifJson.verification
-            }
-            if (verifJson.history) {
-              companyData.history = verifJson.history
-            }
-            if (verifJson.allowedActions) {
-              companyData.allowedActions = verifJson.allowedActions
-            }
+            companyData = mergeVerification(companyData, (await verifRes.json()) as VerificationDetailResponse)
           }
         } catch {
           // Keep base verification projection from /admin/companies/:id
@@ -251,20 +262,175 @@ export function CompanyDetailView({
       }
 
       if (!isCurrent()) return
+      dataRef.current = companyData
       setData(companyData)
       setLoadState('ready')
     } catch {
-      if (isCurrent()) setLoadState('unavailable')
+      if (isCurrent()) fail('unavailable')
     }
   }, [id])
 
   useEffect(() => {
+    // The server already read the case this page opened with.
+    if (skipFirstLoad.current) {
+      skipFirstLoad.current = false
+      return
+    }
     void loadData()
     return () => {
       // Ignore responses that arrive after unmount or after the id changes.
       loadSequence.current += 1
     }
   }, [loadData])
+
+  /**
+   * Shows a change on the page at once and rolls it back when the server refuses it. The dialog
+   * closes with the change; a refusal reopens it with what was typed and the reason.
+   */
+  const patchData = (patch: (current: CompanyDetailResponse) => CompanyDetailResponse) => {
+    const previous = dataRef.current
+    if (!previous) return () => undefined
+    const next = patch(previous)
+    dataRef.current = next
+    setData(next)
+    return () => {
+      dataRef.current = previous
+      setData(previous)
+    }
+  }
+
+  const mutate = async ({
+    reopen,
+    optimistic,
+    task,
+    success,
+    failure,
+  }: {
+    /** The dialog to reopen when the server refuses; none for a change made without one. */
+    reopen?: CompanyDialog
+    optimistic?: () => () => void
+    task: () => Promise<void>
+    success: string
+    failure: string
+  }) => {
+    const rollback = optimistic?.()
+    setDialog(null)
+    try {
+      await task()
+      toast.success(success)
+      await loadData({ quiet: true })
+    } catch (cause) {
+      rollback?.()
+      const reason = describeCommandError(cause, failure)
+      if (reopen) setDialog({ ...reopen, error: reason })
+      else toast.error(reason)
+    }
+  }
+
+  const infoInitial: CompanyInfoValues = {
+    name: data?.company?.name ?? '',
+    establishmentDate: data?.company?.establishmentDate ?? '',
+    status: data?.company?.status ?? '',
+    type: data?.company?.type ?? '',
+    registrationNumber: data?.company?.registrationNumber ?? '',
+    economicCode: data?.company?.economicCode ?? '',
+  }
+
+  const submitInfo = (values: CompanyInfoValues) => {
+    const changed = (Object.keys(infoInitial) as (keyof CompanyInfoValues)[]).filter(
+      (field) => values[field] !== infoInitial[field],
+    )
+    if (changed.length === 0) return setDialog(null)
+    void mutate({
+      reopen: { kind: 'info', values },
+      optimistic: () => patchData((current) => ({ ...current, company: { ...current.company, ...values } })),
+      task: () => updateCompanyInfo(id, Object.fromEntries(changed.map((field) => [field, values[field]]))),
+      success: 'اطلاعات شرکت ذخیره شد.',
+      failure: 'ذخیرهٔ اطلاعات شرکت انجام نشد. دوباره تلاش کنید.',
+    })
+  }
+
+  const submitAddress = (current: CompanyAddress | undefined, values: AddressValues) => {
+    if (current) {
+      void mutate({
+        reopen: { kind: 'address', address: current, values },
+        optimistic: () =>
+          patchData((state) => ({
+            ...state,
+            addresses: state.addresses?.map((item) => (item.id === current.id ? { ...item, ...values } : item)),
+          })),
+        task: () => updateCompanyAddress(id, current.id, values),
+        success: 'آدرس ذخیره شد.',
+        failure: 'ذخیرهٔ آدرس انجام نشد. دوباره تلاش کنید.',
+      })
+      return
+    }
+    const pendingId = `${PENDING_ADDRESS}${Date.now()}`
+    void mutate({
+      reopen: { kind: 'address', values },
+      optimistic: () =>
+        patchData((state) => ({ ...state, addresses: [...(state.addresses ?? []), { id: pendingId, ...values }] })),
+      task: () => addCompanyAddress(id, values),
+      success: 'آدرس افزوده شد.',
+      failure: 'افزودن آدرس انجام نشد. دوباره تلاش کنید.',
+    })
+  }
+
+  const removeAddress = (address: CompanyAddress) =>
+    void mutate({
+      reopen: { kind: 'delete-address', address },
+      optimistic: () =>
+        patchData((state) => ({ ...state, addresses: state.addresses?.filter((item) => item.id !== address.id) })),
+      task: () => deleteCompanyAddress(id, address.id),
+      success: 'آدرس حذف شد.',
+      failure: 'حذف آدرس انجام نشد. دوباره تلاش کنید.',
+    })
+
+  /** Changes the representative's account through the CMS command, guarded by the account's version. */
+  const accountTask = (fields: Parameters<typeof updateRepresentativeAccount>[2]) => async () => {
+    const version = dataRef.current?.representative?.updatedAt
+    if (!version) throw new DashboardApiError(409, 'stale_personnel')
+    await updateRepresentativeAccount(id, version, fields)
+  }
+
+  const submitContact = (values: ContactValues) => {
+    const current = data?.representative
+    const changed = (['name', 'phone', 'email'] as const).filter((field) => values[field] !== (current?.[field] ?? ''))
+    if (changed.length === 0) return setDialog(null)
+    void mutate({
+      reopen: { kind: 'contact', values },
+      optimistic: () =>
+        patchData((state) => ({ ...state, representative: { ...state.representative!, ...values } })),
+      task: accountTask(Object.fromEntries(changed.map((field) => [field, values[field]]))),
+      success: 'اطلاعات تماس ذخیره شد.',
+      failure: 'ذخیرهٔ اطلاعات تماس انجام نشد. دوباره تلاش کنید.',
+    })
+  }
+
+  const submitPassword = (password: string) =>
+    void mutate({
+      reopen: { kind: 'password' },
+      task: accountTask({ password }),
+      success: 'رمز عبور نماینده تغییر کرد.',
+      failure: 'تغییر رمز عبور انجام نشد. دوباره تلاش کنید.',
+    })
+
+  const uploadLogo = (file: File) =>
+    mutate({
+      optimistic: () =>
+        patchData((state) => ({ ...state, logo: { id: 'pending', url: URL.createObjectURL(file) } })),
+      task: () => uploadCompanyLogo(id, file),
+      success: 'لوگوی شرکت ذخیره شد.',
+      failure: 'ذخیرهٔ لوگو انجام نشد. دوباره تلاش کنید.',
+    })
+
+  const removeLogo = () =>
+    mutate({
+      optimistic: () => patchData((state) => ({ ...state, logo: null })),
+      task: () => removeCompanyLogo(id),
+      success: 'لوگوی شرکت حذف شد.',
+      failure: 'حذف لوگو انجام نشد. دوباره تلاش کنید.',
+    })
 
   // Handle secretariat verification decision (Approve / Return / Reject)
   const handleSubmitDecision = async (action: 'approve' | 'return' | 'reject') => {
@@ -430,17 +596,7 @@ export function CompanyDetailView({
       </div>
     )
   }
-  if (loadState === 'loading' || !data) {
-    return (
-      <div className="flex w-full flex-col gap-5 p-6 pt-20 md:p-10" dir="rtl">
-        <Typography as="span" role="status" variant="14/regular" className="sr-only">
-          در حال دریافت اطلاعات شرکت
-        </Typography>
-        <Skeleton aria-hidden="true" className="h-6 w-48 rounded-lg bg-neutral-200 motion-reduce:animate-none" />
-        <Skeleton aria-hidden="true" className="h-96 w-full rounded-2xl bg-neutral-100 motion-reduce:animate-none" />
-      </div>
-    )
-  }
+  if (loadState === 'loading' || !data) return <CompanyDetailSkeleton />
 
   const company = data.company
   const companyName = company?.name
@@ -475,12 +631,7 @@ export function CompanyDetailView({
     >
       {tab === 'profile' && (
         <>
-          <CompanyLogoRow
-            companyId={id}
-            companyName={companyName}
-            logo={data.logo}
-            onChanged={loadData}
-          >
+          <CompanyLogoRow companyName={companyName} logo={data.logo} onUpload={uploadLogo} onRemove={removeLogo}>
             <div className="order-last flex w-full items-center gap-2 sm:order-none sm:ms-auto sm:w-auto">
               <Badge variant={badgeInfo.variant} size="md">
                 {badgeInfo.label}
@@ -543,7 +694,7 @@ export function CompanyDetailView({
                   className="flex flex-col gap-3 rounded-lg border border-neutral-100 px-4 py-2"
                 >
                   <div className="flex items-start gap-3">
-                    <Typography as="h3" variant="16/bold" color="secondary" className="min-w-0 flex-1 break-words">
+                    <Typography as="h3" variant="14/semibold" sm="16/bold" color="secondary" className="min-w-0 flex-1 break-words">
                       {address.title}
                     </Typography>
                     <div className="flex items-center gap-2">
@@ -552,7 +703,7 @@ export function CompanyDetailView({
                         variant="text-gray"
                         size="icon-32"
                         aria-label={`ویرایش آدرس ${address.title}`}
-                        disabled={!address.id}
+                        disabled={!isSavedAddress(address.id)}
                         onClick={() => address.id && setDialog({ kind: 'address', address: toCompanyAddress(address, address.id) })}
                       >
                         <DashboardEditIcon />
@@ -562,7 +713,7 @@ export function CompanyDetailView({
                         variant="text-gray"
                         size="icon-32"
                         aria-label={`حذف آدرس ${address.title}`}
-                        disabled={!address.id}
+                        disabled={!isSavedAddress(address.id)}
                         onClick={() =>
                           address.id && setDialog({ kind: 'delete-address', address: toCompanyAddress(address, address.id) })
                         }
@@ -571,10 +722,10 @@ export function CompanyDetailView({
                       </Button>
                     </div>
                   </div>
-                  <Typography variant="16/semibold" color="neutral-400">
+                  <Typography variant="14/semibold" sm="16/semibold" color="neutral-400">
                     {address.address}
                   </Typography>
-                  <Typography variant="16/semibold" color="neutral-400">
+                  <Typography variant="14/semibold" sm="16/semibold" color="neutral-400">
                     کد پستی: {address.postalCode || '—'}
                   </Typography>
                 </div>
@@ -594,7 +745,7 @@ export function CompanyDetailView({
               role="region"
               aria-label="تغییرات هویتی نیازمند احراز مجدد"
             >
-              <Typography as="h2" variant="20/bold" className="text-warning-700">
+              <Typography as="h2" variant="16/bold" sm="20/bold" className="text-warning-700">
                 تغییرات هویتی جدید در انتظار احراز مجدد
               </Typography>
               <Typography variant="14/regular" className="text-warning-700">
@@ -607,7 +758,7 @@ export function CompanyDetailView({
                     key={item.label}
                     className="flex flex-col gap-1 rounded-lg border border-neutral-100 bg-background p-2"
                   >
-                    <Typography as="span" variant="14/semibold" color="neutral-400">
+                    <Typography as="span" variant="12/semibold" sm="14/semibold" color="neutral-400">
                       {item.label}
                     </Typography>
                     <div className="flex flex-wrap items-center gap-1">
@@ -622,7 +773,7 @@ export function CompanyDetailView({
                       <Typography as="span" variant="12/regular" color="muted">
                         جاری:
                       </Typography>
-                      <Typography as="span" variant="14/semibold" color="secondary">
+                      <Typography as="span" variant="12/semibold" sm="14/semibold" color="secondary">
                         {item.liveVal}
                       </Typography>
                     </div>
@@ -686,7 +837,7 @@ export function CompanyDetailView({
             {/* Decision Controls */}
             {isPending && canDecide && (
               <div className="flex flex-col gap-3">
-                <Typography as="label" htmlFor="decision-reason" variant="16/semibold" color="neutral-700">
+                <Typography as="label" htmlFor="decision-reason" variant="14/semibold" sm="16/semibold" color="neutral-700">
                   توضیحات و دلیل تصمیم{' '}
                   <Typography as="span" variant="12/regular" color="muted">
                     (برای برگشت مدارک یا رد احراز الزامی است)
@@ -851,20 +1002,59 @@ export function CompanyDetailView({
       {tab === 'account' && (
         <CompanyAccountTab
           userId={id}
+          companyName={companyName}
           representative={data.representative}
           canManage={canManageAccount}
-          onChanged={loadData}
+          onEditContact={() => setDialog({ kind: 'contact' })}
+          onChangePassword={() => setDialog({ kind: 'password' })}
         />
       )}
 
       {dialog?.kind === 'info' ? (
-        <CompanyInfoDialog companyId={id} company={company} onClose={() => setDialog(null)} onSaved={loadData} />
+        <CompanyInfoDialog
+          initial={dialog.values ?? infoInitial}
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onSubmit={submitInfo}
+        />
       ) : null}
       {dialog?.kind === 'address' ? (
-        <AddressDialog companyId={id} address={dialog.address} onClose={() => setDialog(null)} onSaved={loadData} />
+        <AddressDialog
+          isNew={!dialog.address}
+          initial={dialog.values ?? addressInitial(dialog.address)}
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onSubmit={(values) => submitAddress(dialog.address, values)}
+        />
       ) : null}
       {dialog?.kind === 'delete-address' ? (
-        <DeleteAddressDialog companyId={id} address={dialog.address} onClose={() => setDialog(null)} onSaved={loadData} />
+        <DeleteAddressDialog
+          address={dialog.address}
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onConfirm={() => removeAddress(dialog.address)}
+        />
+      ) : null}
+      {dialog?.kind === 'contact' ? (
+        <ContactDialog
+          initial={
+            dialog.values ?? {
+              name: data.representative?.name ?? '',
+              phone: data.representative?.phone ?? '',
+              email: data.representative?.email ?? '',
+            }
+          }
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onSubmit={submitContact}
+        />
+      ) : null}
+      {dialog?.kind === 'password' ? (
+        <PasswordDialog
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onSubmit={(values) => submitPassword(values.password)}
+        />
       ) : null}
 
       {tab === 'requests' && <CompanyRequestsTab companyId={id} />}
@@ -903,6 +1093,16 @@ function formatDate(iso: string): string {
     return iso
   }
 }
+
+const isSavedAddress = (id: string | undefined): id is string => Boolean(id) && !id!.startsWith(PENDING_ADDRESS)
+
+const addressInitial = (address: CompanyAddress | undefined): AddressValues => ({
+  title: address?.title ?? '',
+  province: address?.province ?? '',
+  city: address?.city ?? '',
+  postalCode: address?.postalCode ?? '',
+  address: address?.address ?? '',
+})
 
 function toCompanyAddress(
   address: NonNullable<CompanyDetailResponse['addresses']>[number],

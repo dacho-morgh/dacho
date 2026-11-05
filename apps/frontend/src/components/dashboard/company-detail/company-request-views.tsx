@@ -88,7 +88,7 @@ function RequestStepper({ detail }: { detail: RequestDetail }) {
                 {state === 'done' ? (
                   <TickCircleIcon className="size-6" aria-hidden="true" />
                 ) : (
-                  <Typography as="span" variant="14/semibold" className="text-inherit">
+                  <Typography as="span" variant="12/semibold" sm="14/semibold" className="text-inherit">
                     {(index + 1).toLocaleString('fa-IR')}
                   </Typography>
                 )}
@@ -98,7 +98,7 @@ function RequestStepper({ detail }: { detail: RequestDetail }) {
               ) : null}
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-2 pb-8">
-              <Typography as="span" variant="16/semibold" color="secondary" aria-current={state === 'current' ? 'step' : undefined}>
+              <Typography as="span" variant="14/semibold" sm="16/semibold" color="secondary" aria-current={state === 'current' ? 'step' : undefined}>
                 {step.title}
               </Typography>
               <Typography as="span" variant="14/regular" color="muted">
@@ -120,13 +120,13 @@ function EventInfoCard({ detail }: { detail: RequestDetail }) {
         <Badge variant={request.status === 'in_review' ? 'primary' : 'gray'}>
           {REQUEST_STATUS_LABELS[request.status]}
         </Badge>
-        <Typography as="h3" variant="20/bold" color="neutral-700">
+        <Typography as="h3" variant="16/bold" sm="20/bold" color="neutral-700">
           {request.title}
         </Typography>
       </div>
       <div className="flex items-center gap-2">
         <CalendarBulkIcon className="size-7 shrink-0 text-neutral-400" aria-hidden="true" />
-        <Typography as="span" variant="16/semibold" color="secondary">
+        <Typography as="span" variant="14/semibold" sm="16/semibold" color="secondary">
           تاریخ ثبت: {formatDate(request.submissionDate ?? request.createdAt) || '—'} | سررسید:{' '}
           {formatDate(request.dueDate) || '—'}
         </Typography>
@@ -151,7 +151,7 @@ export function CompanyRequestView({ companyId, company, detail, fields, canMana
       canManageAccount={canManageAccount}
     >
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <Typography as="h2" variant="24/bold" color="neutral-700" className="min-w-0 flex-1 break-words">
+        <Typography as="h2" variant="20/bold" sm="24/bold" color="neutral-700" className="min-w-0 flex-1 break-words">
           درخواست {companyName || '—'}
         </Typography>
         {canEvaluate ? (
@@ -213,18 +213,18 @@ export function CompanyEvaluationView({ companyId, company, detail, fields, canM
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center gap-2">
           <Link href={requestHref}>
-            <Typography as="span" variant="16/regular" color="muted">
+            <Typography as="span" variant="14/regular" sm="16/regular" color="muted">
               صفحه درخواست
             </Typography>
           </Link>
-          <Typography as="span" variant="16/regular" color="muted" aria-hidden="true">
+          <Typography as="span" variant="14/regular" sm="16/regular" color="muted" aria-hidden="true">
             /
           </Typography>
-          <Typography as="h2" variant="24/bold" color="neutral-700">
+          <Typography as="h2" variant="20/bold" sm="24/bold" color="neutral-700">
             فرم ارزیابی
           </Typography>
         </div>
-        <Typography as="h3" variant="20/bold" color="neutral-700">
+        <Typography as="h3" variant="16/bold" sm="20/bold" color="neutral-700">
           {request.title}
         </Typography>
       </div>

@@ -13,11 +13,14 @@ export function DeleteCompanyAccount({
   updatedAt,
   companyName,
   canManage,
+  inline = false,
 }: {
   userId: string
   updatedAt: string | null | undefined
   companyName?: string
   canManage: boolean
+  /** A plain button of its own, instead of an entry of the section tabs. */
+  inline?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -30,14 +33,11 @@ export function DeleteCompanyAccount({
         size="40"
         disabled={!canManage}
         icon={<DashboardTrashIcon className="size-6" aria-hidden="true" />}
-        className="h-auto min-w-0 flex-1 flex-col gap-1 rounded-xl px-1 py-2 text-center lg:h-10 lg:flex-row lg:justify-start lg:gap-2 lg:p-2 lg:text-start"
+        className={inline ? 'w-fit px-4' : 'min-w-0 flex-1 justify-start gap-2 rounded-xl p-2 text-start'}
         title={canManage ? undefined : 'فقط مالک سیستم می‌تواند حساب شرکت را حذف کند'}
         onClick={() => setOpen(true)}
       >
-        <Typography as="span" variant="12/regular" className="whitespace-nowrap text-inherit lg:hidden">
-          حذف حساب
-        </Typography>
-        <Typography as="span" variant="16/regular" className="hidden text-inherit lg:inline">
+        <Typography as="span" variant="14/regular" sm="16/regular" className="whitespace-nowrap text-inherit">
           حذف حساب شرکت
         </Typography>
       </Button>
