@@ -3,7 +3,7 @@
 import { useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import Image from 'next/image'
 import { toast } from 'sonner'
-import { CompanyBuildingIcon } from '@/components/icons'
+import { CompanyBuildingIcon, DashboardTrashIcon, UploadIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { FileInput } from '@/components/ui/file-input'
 import { Typography } from '@/components/ui/typography'
@@ -92,6 +92,7 @@ export function CompanyLogoRow({
           type="button"
           variant="outline-gray"
           size="40"
+          icon={<UploadIcon aria-hidden="true" />}
           className="px-4"
           loading={busy === 'upload'}
           disabled={busy !== null}
@@ -103,8 +104,9 @@ export function CompanyLogoRow({
         </Button>
         <Button
           type="button"
-          variant="gray"
+          variant="text-destructive"
           size="40"
+          icon={<DashboardTrashIcon aria-hidden="true" />}
           className="px-4"
           loading={busy === 'remove'}
           disabled={!logo || busy !== null}
