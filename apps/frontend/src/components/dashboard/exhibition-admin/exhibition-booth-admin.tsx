@@ -393,7 +393,6 @@ export function ExhibitionBoothAdmin({
           {/* Search & Status Filter */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <SearchField
-              className="sm:w-60"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="جستجو در غرفه‌ها..."

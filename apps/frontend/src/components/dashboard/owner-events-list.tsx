@@ -354,7 +354,6 @@ export function OwnerEventsList() {
               placeholder="رویداد یا نمایشگاه را جست و جو کنید"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="sm:w-[400px]"
             />
             <ListFilterButton
               label="فیلتر نوع"

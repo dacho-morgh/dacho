@@ -858,7 +858,6 @@ export function EventsView({
       <div className="mt-5 flex items-center justify-start">
         <div className="flex h-[48px] w-full items-center gap-[8px] sm:w-[458px]">
           <SearchField
-                className="flex-1 sm:w-[400px]"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="درخواست خود را جست و جو کنید"

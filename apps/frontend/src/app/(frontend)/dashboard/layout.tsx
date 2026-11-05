@@ -118,7 +118,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <SidebarInset id="dashboard-content" tabIndex={-1} className="flex h-svh min-w-0 flex-1 flex-col overflow-hidden bg-neutral-50 outline-none">
           <SidebarTrigger
             aria-label="باز کردن منو"
-            className="absolute top-6 left-6 z-30 size-10 rounded-[10px] text-black md:hidden"
+            className="absolute top-6 left-6 z-30 size-10 rounded-[10px] text-neutral-800 md:hidden"
           >
             <MenuIcon aria-hidden="true" className="size-6" />
           </SidebarTrigger>

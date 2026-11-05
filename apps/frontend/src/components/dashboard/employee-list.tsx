@@ -331,7 +331,6 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
               placeholder="کارمند مورد نظر را جست و جو کنید"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="sm:w-[400px]"
             />
             <ListFilterButton
               label="فیلتر نقش"
