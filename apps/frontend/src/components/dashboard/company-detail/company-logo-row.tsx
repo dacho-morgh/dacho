@@ -77,8 +77,8 @@ export function CompanyLogoRow({
           <span className="sr-only">لوگو ثبت نشده است</span>
         </span>
       )}
-      {/* Small screens: compact buttons with short names keep the logo and both buttons on one line. */}
-      <div className="flex items-center gap-2 sm:flex-wrap">
+      {/* Small screens: the two compact buttons stack beside the logo, as tall as it is; from sm they sit in a row. */}
+      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         {/* The picker is driven by the button below, so the native control stays visually hidden. */}
         <div className="sr-only">
           <FileInput
@@ -100,10 +100,7 @@ export function CompanyLogoRow({
           disabled={busy !== null}
           onClick={() => input.current?.click()}
         >
-          <Typography as="span" variant="16/semibold" className="text-inherit sm:hidden">
-            آپلود جدید
-          </Typography>
-          <Typography as="span" variant="16/semibold" className="hidden text-inherit sm:inline">
+          <Typography as="span" variant="16/semibold" className="text-inherit">
             آپلود پروفایل جدید
           </Typography>
         </Button>
@@ -118,10 +115,7 @@ export function CompanyLogoRow({
           disabled={!logo || busy !== null}
           onClick={() => void run('remove', () => removeCompanyLogo(companyId), 'لوگوی شرکت حذف شد.', 'حذف لوگو انجام نشد. دوباره تلاش کنید.')}
         >
-          <Typography as="span" variant="16/semibold" className="text-inherit sm:hidden">
-            حذف
-          </Typography>
-          <Typography as="span" variant="16/semibold" className="hidden text-inherit sm:inline">
+          <Typography as="span" variant="16/semibold" className="text-inherit">
             حذف پروفایل
           </Typography>
         </Button>
