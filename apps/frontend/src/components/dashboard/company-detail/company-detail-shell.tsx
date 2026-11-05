@@ -48,11 +48,12 @@ export function CompanyDetailShell({
 }) {
   return (
     <main
-      className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pt-20 md:pt-10 lg:overflow-hidden"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pt-6 md:pt-10 lg:overflow-hidden"
       dir="rtl"
     >
       {/* Parent first, so in the right-to-left page the trail reads «شرکت ها / name» whatever language the name is in. */}
-      <nav aria-label="مسیر صفحه" className="flex flex-wrap items-center gap-2">
+      {/* On small screens the breadcrumb shares the row of the menu button, which sits at the opposite edge. */}
+      <nav aria-label="مسیر صفحه" className="flex min-h-10 flex-wrap items-center gap-2 pe-12 md:pe-0">
         <Link href="/dashboard/companies">
           <Typography as="span" variant="16/regular" color="muted">
             شرکت ها
@@ -67,14 +68,15 @@ export function CompanyDetailShell({
       </nav>
 
       <div className="flex shrink-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 lg:min-h-0 lg:flex-1 lg:flex-row">
+        {/* Below lg the sections are a bottom navigation bar that floats at the foot of the screen. */}
         <nav
           aria-label="بخش‌های شرکت"
-          className="flex w-full shrink-0 flex-row flex-wrap gap-2 border-b border-neutral-200 pb-4 lg:w-[200px] lg:flex-col lg:gap-4 lg:self-stretch lg:border-b-0 lg:border-l lg:pb-0 lg:pl-2"
+          className="sticky bottom-2 z-20 order-last grid grid-cols-5 gap-1 rounded-2xl border border-neutral-200 bg-background p-1 shadow-lg lg:static lg:order-first lg:flex lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-4 lg:self-stretch lg:rounded-none lg:border-y-0 lg:border-r-0 lg:bg-transparent lg:p-0 lg:pl-2 lg:shadow-none"
         >
           {TABS.map((tab) => {
             const isActive = tab.id === active
             return (
-              <div key={tab.id} className="flex items-center gap-2 lg:w-full">
+              <div key={tab.id} className="flex min-w-0 items-stretch gap-2 lg:w-full lg:items-center">
                 <span
                   aria-hidden="true"
                   className={cn('hidden h-7 w-1 shrink-0 rounded-sm lg:block', isActive && 'bg-brand-500')}
@@ -83,19 +85,19 @@ export function CompanyDetailShell({
                   href={companyTabHref(id, tab.id)}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'flex h-10 flex-1 items-center gap-2 rounded-xl p-2 transition-colors',
+                    'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center transition-colors lg:h-10 lg:flex-row lg:justify-start lg:gap-2 lg:p-2 lg:text-start',
                     isActive ? 'bg-brand-50 text-brand-600' : 'text-neutral-600 hover:bg-neutral-50',
                   )}
                 >
                   <tab.Icon className="size-6 shrink-0" aria-hidden="true" />
-                  <Typography as="span" variant="16/regular" className="text-inherit">
+                  <Typography as="span" variant="12/regular" lg="16/regular" className="text-inherit">
                     {tab.label}
                   </Typography>
                 </Link>
               </div>
             )
           })}
-          <div className="flex items-center gap-2 lg:w-full">
+          <div className="flex min-w-0 items-stretch gap-2 lg:w-full lg:items-center">
             <span aria-hidden="true" className="hidden h-7 w-1 shrink-0 lg:block" />
             <DeleteCompanyAccount
               userId={id}
