@@ -1,16 +1,23 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import {
+  ClipboardTextIcon,
+  CompanyBuildingIcon,
+  DashboardTrashIcon,
+  DocumentTextIcon,
+  ProfileUserIcon,
+} from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
 
 export type CompanyTab = 'profile' | 'resume' | 'account' | 'requests'
 
-const TABS: { id: CompanyTab; label: string; query: string }[] = [
-  { id: 'profile', label: 'پروفایل شرکت', query: '' },
-  { id: 'resume', label: 'رزومه', query: '?tab=resume' },
-  { id: 'account', label: 'اطلاعات حساب', query: '?tab=account' },
-  { id: 'requests', label: 'درخواست‌ها', query: '?tab=requests' },
+const TABS: { id: CompanyTab; label: string; query: string; Icon: typeof ProfileUserIcon }[] = [
+  { id: 'profile', label: 'پروفایل شرکت', query: '', Icon: CompanyBuildingIcon },
+  { id: 'resume', label: 'رزومه', query: '?tab=resume', Icon: DocumentTextIcon },
+  { id: 'account', label: 'اطلاعات حساب', query: '?tab=account', Icon: ProfileUserIcon },
+  { id: 'requests', label: 'درخواست‌ها', query: '?tab=requests', Icon: ClipboardTextIcon },
 ]
 
 export function companyTabHref(id: string, tab: CompanyTab): string {
@@ -67,10 +74,11 @@ export function CompanyDetailShell({
                   href={companyTabHref(id, tab.id)}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'flex h-10 flex-1 items-center rounded-xl p-2 transition-colors',
+                    'flex h-10 flex-1 items-center gap-2 rounded-xl p-2 transition-colors',
                     isActive ? 'bg-brand-50 text-brand-600' : 'text-neutral-600 hover:bg-neutral-50',
                   )}
                 >
+                  <tab.Icon className="size-6 shrink-0" aria-hidden="true" />
                   <Typography as="span" variant="16/regular" className="text-inherit">
                     {tab.label}
                   </Typography>
@@ -85,6 +93,7 @@ export function CompanyDetailShell({
               disabled
               variant="text-destructive"
               size="40"
+              icon={<DashboardTrashIcon className="size-6" aria-hidden="true" />}
               className="flex-1 justify-start rounded-xl"
               title="حذف حساب شرکت هنوز در سرویس پشتیبانی نمی‌شود"
             >
