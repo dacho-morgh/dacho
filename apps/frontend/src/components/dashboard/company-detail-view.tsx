@@ -481,7 +481,7 @@ export function CompanyDetailView({
             logo={data.logo}
             onChanged={loadData}
           >
-            <div className="flex items-center gap-2">
+            <div className="order-last flex w-full items-center gap-2 sm:order-none sm:ms-auto sm:w-auto">
               <Badge variant={badgeInfo.variant} size="md">
                 {badgeInfo.label}
               </Badge>

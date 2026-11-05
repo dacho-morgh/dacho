@@ -27,7 +27,7 @@ export function CompanyLogoRow({
   companyName?: string
   logo: { id: string; url: string } | null | undefined
   onChanged: () => void | Promise<void>
-  /** What sits beside the logo, e.g. the verification status; the buttons take the opposite edge. */
+  /** What closes the row, e.g. the verification status. */
   children?: ReactNode
 }) {
   const input = useRef<HTMLInputElement>(null)
@@ -77,8 +77,8 @@ export function CompanyLogoRow({
           <span className="sr-only">لوگو ثبت نشده است</span>
         </span>
       )}
-      {children}
-      <div className="ms-auto flex flex-wrap items-center gap-2">
+      {/* Small screens: the buttons stack opposite the logo. From sm they follow the logo in one row. */}
+      <div className="ms-auto flex flex-col items-stretch gap-2 sm:ms-0 sm:flex-row sm:flex-wrap sm:items-center">
         {/* The picker is driven by the button below, so the native control stays visually hidden. */}
         <div className="sr-only">
           <FileInput
@@ -118,6 +118,7 @@ export function CompanyLogoRow({
           </Typography>
         </Button>
       </div>
+      {children}
     </div>
   )
 }
