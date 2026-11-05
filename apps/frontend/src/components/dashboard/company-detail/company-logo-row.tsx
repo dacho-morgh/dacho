@@ -100,8 +100,8 @@ export function CompanyLogoRow({
           disabled={busy !== null}
           onClick={() => input.current?.click()}
         >
-          <Typography as="span" variant="16/semibold" className="text-inherit">
-            آپلود پروفایل جدید
+          <Typography as="span" variant="16/semibold" className="whitespace-nowrap text-inherit">
+            آپلود پروفایل
           </Typography>
         </Button>
         <Button
