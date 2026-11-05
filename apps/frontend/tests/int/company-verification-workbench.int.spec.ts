@@ -9,7 +9,10 @@ import { CompanyDetailView } from '@/components/dashboard/company-detail-view'
 
 const navigation = vi.hoisted(() => ({
   push: vi.fn(),
+  replace: vi.fn(),
   refresh: vi.fn(),
+  /** The query string the page was opened with. */
+  search: '',
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND')
   }),
@@ -18,7 +21,7 @@ const navigation = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => navigation,
   usePathname: () => '/dashboard/companies',
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(navigation.search),
   notFound: navigation.notFound,
 }))
 
@@ -38,6 +41,7 @@ afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   vi.clearAllMocks()
+  navigation.search = ''
   if (typeof window !== 'undefined') {
     localStorage.clear()
   }
@@ -118,11 +122,322 @@ describe('FE05: Secretariat Company Verification Workbench', () => {
     for (const name of [/همه/, /در انتظار بررسی/, /تأیید شده/, /برگشت داده شده/, /رد شده/]) {
       expect(await screen.findByRole('menuitemradio', { name })).toBeTruthy()
     }
+    // The queue is part of the URL (and restarts at page 1); the API does the filtering.
     fireEvent.click(screen.getByRole('menuitemradio', { name: /در انتظار بررسی/ }))
-    expect(await screen.findByRole('button', { name: /فیلتر شرکت‌ها \(۱ فیلتر فعال\)/ })).toBeTruthy()
-    expect(screen.getByText('شرکت پترو صنعت')).toBeTruthy()
-    expect(screen.queryByText('شرکت نفت و گاز جنوب')).toBeNull()
-    expect(screen.queryByText('شرکت توسعه انرژی')).toBeNull()
+    // (The filter button reads the path from window.location, which is "/" under jsdom.)
+    expect(navigation.push).toHaveBeenCalledWith(expect.stringMatching(/\?status=pending$/))
+  })
+
+  describe('paging, selection and bulk actions', () => {
+    const page = (items: typeof mockCompanyListItems, extra: Record<string, unknown> = {}) => ({
+      items,
+      page: 1,
+      limit: 10,
+      totalDocs: items.length,
+      totalPages: 1,
+      counts: { all: 3, pending: 1, approved: 1, returned: 1, rejected: 0 },
+      ...extra,
+    })
+    const respond = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+
+    it('asks the API for the page, queue and search held in the URL, and pages through the URL', async () => {
+      navigation.search = 'page=2&status=pending&search=%D9%BE%D8%AA%D8%B1%D9%88'
+      const fetchMock = vi.fn().mockResolvedValue(respond(page(mockCompanyListItems.slice(0, 1), { page: 2, totalPages: 3 })))
+      vi.stubGlobal('fetch', fetchMock)
+
+      render(createElement(CompanyList))
+      await screen.findByText('شرکت پترو صنعت')
+
+      const requested = new URL(String(fetchMock.mock.calls[0]![0]), 'http://localhost')
+      expect(requested.pathname).toBe('/api/dashboard/admin/companies')
+      expect(Object.fromEntries(requested.searchParams)).toEqual({
+        page: '2',
+        limit: '10',
+        status: 'pending',
+        search: 'پترو',
+      })
+      expect(screen.getByText('صفحه ۲ از ۳')).toBeTruthy()
+
+      fireEvent.click(screen.getByRole('button', { name: 'صفحه بعد' }))
+      expect(navigation.push).toHaveBeenCalledWith('/dashboard/companies?page=3&status=pending&search=%D9%BE%D8%AA%D8%B1%D9%88')
+      fireEvent.click(screen.getByRole('button', { name: 'صفحه قبل' }))
+      // Page 1 is the default, so it leaves the URL.
+      expect(navigation.push).toHaveBeenCalledWith('/dashboard/companies?status=pending&search=%D9%BE%D8%AA%D8%B1%D9%88')
+    })
+
+    it('opens with the rows the server read, without fetching or showing a loading line', async () => {
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      const first = mockCompanyListItems[0]!
+
+      render(
+        createElement(CompanyList, {
+          initial: {
+            key: 'page=1&limit=10',
+            page: 1,
+            totalPages: 2,
+            counts: { all: 3, pending: 1, approved: 1, returned: 1, rejected: 0 },
+            companies: [
+              {
+                id: first.id,
+                name: first.companyName,
+                ceo: 'علی رضایی',
+                companyType: first.companyType,
+                address: 'تهران، تهران',
+                activityAge: '۶ سال',
+                verificationStatus: 'pending',
+                verificationRevision: 2,
+                submittedAt: null,
+                updatedAt: null,
+              },
+            ],
+          },
+        }),
+      )
+
+      // The rows are there on the very first render, and nothing was requested.
+      expect(screen.getByText('شرکت پترو صنعت')).toBeTruthy()
+      expect(screen.queryByText(/در حال دریافت اطلاعات/)).toBeNull()
+      expect(screen.getByText('صفحه ۱ از ۲')).toBeTruthy()
+      await waitFor(() => expect(fetchMock).not.toHaveBeenCalled())
+    })
+
+    it('approves only the selected pending companies after a confirmation', async () => {
+      const fetchMock = vi.fn((url: string, init?: RequestInit) =>
+        Promise.resolve(init?.method === 'POST' ? respond({ verification: {} }) : respond(page(mockCompanyListItems))),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+
+      render(createElement(CompanyList))
+      await screen.findByText('شرکت پترو صنعت')
+      // Nothing is selected yet, so the actions are not beside the filter.
+      expect(screen.queryByRole('group', { name: 'عملیات گروهی' })).toBeNull()
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'انتخاب همه ردیف‌ها' }))
+      // The actions are icon buttons named by their label (shown on hover).
+      const actions = screen.getByRole('group', { name: 'عملیات گروهی' })
+      // Only the owner may remove companies.
+      expect(within(actions).queryByRole('button', { name: 'حذف شرکت‌ها' })).toBeNull()
+
+      fireEvent.click(within(actions).getByRole('button', { name: 'تأیید احراز هویت' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText(/احراز هویت ۱ شرکت تأیید می‌شود/)).toBeTruthy()
+      expect(within(dialog).getByText(/۲ شرکت انتخاب‌شده در انتظار بررسی نیست/)).toBeTruthy()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'تأیید' }))
+
+      await waitFor(() => {
+        const decisions = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')
+        expect(decisions).toHaveLength(1)
+        expect(decisions[0]![0]).toBe('/api/dashboard/admin/companies/rep-1/verification/decision')
+        expect(JSON.parse(String(decisions[0]![1]!.body))).toEqual({ action: 'approve', expectedRevision: 2 })
+      })
+      // The list reloads and the selection starts empty.
+      await waitFor(() => expect(screen.queryByRole('group', { name: 'عملیات گروهی' })).toBeNull())
+    })
+
+    it('lists the actions of a row in its popover and runs one on that row alone', async () => {
+      const items = mockCompanyListItems.map((item, index) => ({ ...item, updatedAt: `2026-11-0${index + 1}T10:00:00.000Z` }))
+      const fetchMock = vi.fn((url: string, init?: RequestInit) =>
+        Promise.resolve(init?.method === 'POST' ? respond({ verification: {} }) : respond(page(items))),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+
+      render(createElement(CompanyList, { canRemoveCompany: true }))
+      await screen.findByText('شرکت پترو صنعت')
+
+      // The approved company's popover has no approval; the pending one's has all three.
+      const triggers = screen.getAllByRole('button', { name: 'عملیات' })
+      fireEvent.click(triggers[1]!)
+      expect(await screen.findByRole('link', { name: 'مشاهده' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'تأیید احراز هویت' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'حذف شرکت' })).toBeTruthy()
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+
+      fireEvent.click(triggers[0]!)
+      expect(await screen.findByRole('link', { name: 'بررسی' })).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'تأیید احراز هویت' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText(/احراز هویت ۱ شرکت تأیید می‌شود/)).toBeTruthy()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'تأیید' }))
+
+      await waitFor(() => {
+        const decisions = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')
+        expect(decisions).toHaveLength(1)
+        expect(decisions[0]![0]).toBe('/api/dashboard/admin/companies/rep-1/verification/decision')
+      })
+    })
+
+    /** A fetch whose POST/PATCH answers only when the test says so. */
+    function gatedFetch(list: unknown, mutationStatus: number) {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      const mock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === 'POST' || init?.method === 'PATCH') {
+          await gate
+          return respond(mutationStatus === 200 ? { ok: true } : { error: 'refused' }, mutationStatus)
+        }
+        return respond(list)
+      })
+      return { mock, release }
+    }
+
+    it('approves a company on screen before the server answers', async () => {
+      const { mock, release } = gatedFetch(page(mockCompanyListItems), 200)
+      vi.stubGlobal('fetch', mock)
+      render(createElement(CompanyList))
+      await screen.findByText('شرکت پترو صنعت')
+      expect(screen.getByText('۱ شرکت در انتظار بررسی')).toBeTruthy()
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'عملیات' })[0]!)
+      fireEvent.click(await screen.findByRole('button', { name: 'تأیید احراز هویت' }))
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'تأیید' }))
+
+      // The request is still waiting, yet the pending banner is gone and the company shows as approved.
+      await waitFor(() => expect(screen.queryByText('۱ شرکت در انتظار بررسی')).toBeNull())
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(mock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true)
+      release()
+    })
+
+    it('puts the company back when the server refuses the approval', async () => {
+      const { mock, release } = gatedFetch(page(mockCompanyListItems), 409)
+      vi.stubGlobal('fetch', mock)
+      render(createElement(CompanyList))
+      await screen.findByText('شرکت پترو صنعت')
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'عملیات' })[0]!)
+      fireEvent.click(await screen.findByRole('button', { name: 'تأیید احراز هویت' }))
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'تأیید' }))
+      await waitFor(() => expect(screen.queryByText('۱ شرکت در انتظار بررسی')).toBeNull())
+
+      release()
+      // The server's list still has the company pending, so that is what the screen returns to.
+      expect(await screen.findByText('۱ شرکت در انتظار بررسی')).toBeTruthy()
+    })
+
+    it('removes a deleted company at once', async () => {
+      const { mock, release } = gatedFetch(page(mockCompanyListItems.map((item) => ({ ...item, updatedAt: '2026-11-01T10:00:00.000Z' }))), 200)
+      vi.stubGlobal('fetch', mock)
+      render(createElement(CompanyList, { canRemoveCompany: true }))
+      await screen.findByText('شرکت نفت و گاز جنوب')
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'عملیات' })[1]!)
+      fireEvent.click(await screen.findByRole('button', { name: 'حذف شرکت' }))
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'حذف شرکت‌ها' }))
+
+      await waitFor(() => expect(screen.queryByText('شرکت نفت و گاز جنوب')).toBeNull())
+      expect(screen.getByText('شرکت پترو صنعت')).toBeTruthy()
+      release()
+    })
+
+    it('shows a new company at once and takes it back, with the form, when the server refuses it', async () => {
+      const { mock, release } = gatedFetch(page(mockCompanyListItems), 400)
+      vi.stubGlobal('fetch', mock)
+      render(createElement(CompanyList, { canCreateCompany: true }))
+      await screen.findByText('شرکت پترو صنعت')
+
+      fireEvent.click(screen.getByRole('button', { name: 'شرکت جدید' }))
+      const dialog = await screen.findByRole('dialog')
+      const fill = (label: string, value: string) =>
+        fireEvent.change(within(dialog).getByLabelText(label, { exact: false }), { target: { value } })
+      fill('نام شرکت', 'شرکت تازه')
+      fill('شناسه ملی', '10101010101')
+      fill('حوزه فعالیت', 'انرژی')
+      fill('نام و نام خانوادگی', 'مریم احمدی')
+      fill('سمت در شرکت', 'مدیرعامل')
+      fill('شماره تلفن همراه', '09123456789')
+      fill('آدرس ایمیل', 'maryam@example.com')
+      fill('رمز موقت ورود', 'Passw0rd!x')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'ثبت شرکت' }))
+
+      // Waiting on the server: the dialog is closed and the company is already in the table.
+      expect(await screen.findByText('شرکت تازه')).toBeTruthy()
+      expect(screen.getByText('در حال ثبت…')).toBeTruthy()
+      expect(screen.queryByRole('dialog')).toBeNull()
+
+      release()
+      // Refused: the row is gone and the dialog is back with what was typed.
+      await waitFor(() => expect(screen.queryByText('در حال ثبت…')).toBeNull())
+      const reopened = await screen.findByRole('dialog')
+      expect((within(reopened).getByLabelText('نام شرکت', { exact: false }) as HTMLInputElement).value).toBe('شرکت تازه')
+    })
+
+    it('tells what is wrong in each field of the new-company form, and has a hint in every field', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(respond(page(mockCompanyListItems)))
+      vi.stubGlobal('fetch', fetchMock)
+      render(createElement(CompanyList, { canCreateCompany: true }))
+      await screen.findByText('شرکت پترو صنعت')
+
+      fireEvent.click(screen.getByRole('button', { name: 'شرکت جدید' }))
+      const dialog = await screen.findByRole('dialog')
+      const field = (label: string) => within(dialog).getByLabelText(label, { exact: false }) as HTMLInputElement
+
+      // Every field says what to type.
+      for (const label of [
+        'نام شرکت', 'شناسه ملی', 'حوزه فعالیت', 'نوع شرکت', 'نام و نام خانوادگی',
+        'سمت در شرکت', 'شماره تلفن همراه', 'آدرس ایمیل', 'رمز موقت ورود',
+      ]) {
+        expect(field(label).placeholder).not.toBe('')
+      }
+
+      // A field is checked when it is left, with its own message, and the message goes once it is fixed.
+      fireEvent.blur(field('آدرس ایمیل'))
+      expect(await within(dialog).findByText('آدرس ایمیل نماینده را وارد کنید.')).toBeTruthy()
+      fireEvent.change(field('آدرس ایمیل'), { target: { value: 'not-an-email' } })
+      expect(await within(dialog).findByText(/آدرس ایمیل معتبر وارد کنید/)).toBeTruthy()
+      fireEvent.change(field('آدرس ایمیل'), { target: { value: 'maryam@example.com' } })
+      await waitFor(() => expect(within(dialog).queryByText(/آدرس ایمیل معتبر وارد کنید/)).toBeNull())
+
+      // Submitting the rest empty marks every required field and sends nothing.
+      fireEvent.click(within(dialog).getByRole('button', { name: 'ثبت شرکت' }))
+      for (const message of [
+        'نام شرکت را وارد کنید.',
+        'شناسه ملی شرکت را وارد کنید.',
+        'حوزه فعالیت را وارد کنید.',
+        'نام و نام خانوادگی نماینده را وارد کنید.',
+        'سمت نماینده در شرکت را وارد کنید.',
+        'شماره همراه نماینده را وارد کنید.',
+        'رمز موقت ورود را وارد کنید.',
+      ]) {
+        expect(await within(dialog).findByText(message)).toBeTruthy()
+      }
+      fireEvent.change(field('شماره تلفن همراه'), { target: { value: '0912' } })
+      expect(await within(dialog).findByText('شماره همراه باید ۱۱ رقم و با ۰۹ شروع شود.')).toBeTruthy()
+      fireEvent.change(field('رمز موقت ورود'), { target: { value: 'short' } })
+      expect(await within(dialog).findByText(/رمز موقت باید دست‌کم ۸ نویسه باشد/)).toBeTruthy()
+      expect(fetchMock.mock.calls.every(([, init]) => (init as RequestInit | undefined)?.method !== 'POST')).toBe(true)
+    })
+
+    it('lets the owner deactivate the selected companies with the account version', async () => {
+      const items = mockCompanyListItems.map((item, index) => ({ ...item, updatedAt: `2026-11-0${index + 1}T10:00:00.000Z` }))
+      const fetchMock = vi.fn((url: string, init?: RequestInit) =>
+        Promise.resolve(init?.method === 'PATCH' ? respond({ doc: { isActive: false } }) : respond(page(items))),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+
+      render(createElement(CompanyList, { canRemoveCompany: true }))
+      await screen.findByText('شرکت پترو صنعت')
+
+      fireEvent.click(screen.getAllByRole('checkbox', { name: 'انتخاب ردیف' })[1]!)
+      const actions = screen.getByRole('group', { name: 'عملیات گروهی' })
+      fireEvent.click(within(actions).getByRole('button', { name: 'حذف شرکت‌ها' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText(/سوابق و درخواست‌ها حذف نمی‌شود/)).toBeTruthy()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'حذف شرکت‌ها' }))
+
+      await waitFor(() => {
+        const patches = fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')
+        expect(patches).toHaveLength(1)
+        expect(patches[0]![0]).toBe('/api/users/personnel/rep-2')
+        expect(JSON.parse(String(patches[0]![1]!.body))).toEqual({
+          expectedUpdatedAt: '2026-11-02T10:00:00.000Z',
+          isActive: false,
+        })
+      })
+    })
   })
 
   it('displays verification workbench, snapshot documents, and validates reason for return/reject', async () => {

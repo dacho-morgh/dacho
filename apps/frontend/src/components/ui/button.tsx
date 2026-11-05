@@ -84,8 +84,9 @@ const buttonVariants = cva(
         segment:
           "border-transparent bg-transparent text-neutral-600 hover:text-neutral-700 aria-pressed:bg-background aria-pressed:text-neutral-700 aria-selected:bg-background aria-selected:text-neutral-700 disabled:text-neutral-300",
         // The shared list filter trigger; data-active marks applied filters.
+        // Light: a white tile. Dark: it looks like the page's create button (the filled brand style).
         filter:
-          "border-transparent bg-background text-neutral-600 hover:bg-neutral-50 data-[active=true]:text-brand-600 data-[active=true]:ring-2 data-[active=true]:ring-brand-500/20 disabled:text-neutral-300",
+          "border-transparent bg-background text-neutral-600 hover:bg-neutral-50 data-[active=true]:text-brand-600 data-[active=true]:ring-2 data-[active=true]:ring-brand-500/20 disabled:text-neutral-300 dark:border-neutral-200 dark:bg-fill-brand dark:text-fill-brand-foreground dark:hover:bg-fill-brand-hover dark:active:bg-fill-brand-active dark:data-[active=true]:text-fill-brand-foreground dark:data-[active=true]:ring-brand-500/40 dark:disabled:bg-neutral-200 dark:disabled:text-neutral-300",
         // One choice in a group of options; the chosen one is aria-pressed.
         chip:
           "border-neutral-200 bg-background text-neutral-600 hover:bg-neutral-50 aria-pressed:border-transparent aria-pressed:bg-brand-500 aria-pressed:text-white aria-pressed:hover:bg-brand-600 dark:aria-pressed:border-neutral-300 dark:aria-pressed:bg-fill-brand dark:aria-pressed:text-fill-brand-foreground dark:aria-pressed:hover:bg-fill-brand-hover disabled:text-neutral-300",
