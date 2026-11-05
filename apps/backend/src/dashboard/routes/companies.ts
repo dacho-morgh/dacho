@@ -15,6 +15,13 @@ const EDITABLE_COMPANY_FIELDS = [
 ] as const satisfies readonly (keyof CompanyInfo)[]
 const ADDRESS_FIELDS = ['title', 'province', 'city', 'postalCode', 'address'] as const
 
+/** The logo the admin page shows: its id and the access-checked file route. Null when the company has none. */
+function logoOf(company: { logo?: { id: string; filename: string | null } | null } | undefined) {
+  const logo = company?.logo
+  if (!logo?.filename) return null
+  return { id: logo.id, url: `/api/company-logos/file/${encodeURIComponent(logo.filename)}` }
+}
+
 /** A trimmed string within the field limit, or undefined when the value is not one. */
 function shortText(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
@@ -136,6 +143,7 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
         },
         companyId: profile.companyId,
         company: profile.company,
+        logo: logoOf(await deps.companyStore.findByRepresentative(target.id)),
         executives: profile.executives,
         addresses: profile.addresses,
         allowedActions,
@@ -206,6 +214,29 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
       }
       const profile = await profileRepo.updateBasicInfo(found.target.id, update)
       res.json({ company: profile.company })
+    } catch (error) { next(error) }
+  })
+
+  router.put('/admin/companies/:id/logo', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      const logoId = req.body?.logoId
+      if (typeof logoId !== 'string' || !/^\d{1,10}$/.test(logoId)) {
+        res.status(400).json({ error: 'invalid_logo' })
+        return
+      }
+      const company = await deps.companyStore.setLogo(found.companyId, logoId)
+      res.json({ logo: logoOf(company) })
+    } catch (error) { next(error) }
+  })
+
+  router.delete('/admin/companies/:id/logo', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      await deps.companyStore.setLogo(found.companyId, null)
+      res.json({ logo: null })
     } catch (error) { next(error) }
   })
 

@@ -30,6 +30,10 @@ class SlowCompanyStore implements CompanyStore {
     return this.inner.update(id, fields)
   }
 
+  setLogo(id: string, logoId: string | null) {
+    return this.inner.setLogo(id, logoId)
+  }
+
   list(options?: { search?: string }) {
     return this.inner.list(options)
   }

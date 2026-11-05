@@ -117,4 +117,25 @@ describe('admin company edits', () => {
     await request(app).delete(`/admin/companies/${rep.id}/addresses/missing`).set(admin).expect(404)
     expect((await current())?.status).toBe('approved')
   })
+
+  it('sets, shows and clears the company logo', async () => {
+    const { app, admin, rep } = await setup()
+    const detail = () => request(app).get(`/admin/companies/${rep.id}`).set(admin).expect(200)
+    expect((await detail()).body.logo).toBeNull()
+
+    const set = await request(app).put(`/admin/companies/${rep.id}/logo`).set(admin).send({ logoId: '7' }).expect(200)
+    expect(set.body.logo).toEqual({ id: '7', url: '/api/company-logos/file/logo-7.png' })
+    expect((await detail()).body.logo).toEqual(set.body.logo)
+
+    await request(app).delete(`/admin/companies/${rep.id}/logo`).set(admin).expect(200)
+    expect((await detail()).body.logo).toBeNull()
+  })
+
+  it('refuses a malformed logo id and a representative setting a logo', async () => {
+    const { app, admin, representative, rep } = await setup()
+    await request(app).put(`/admin/companies/${rep.id}/logo`).set(admin).send({ logoId: 'abc' }).expect(400)
+    await request(app).put(`/admin/companies/${rep.id}/logo`).set(admin).send({}).expect(400)
+    await request(app).put(`/admin/companies/${rep.id}/logo`).set(representative).send({ logoId: '7' }).expect(403)
+    await request(app).delete(`/admin/companies/${rep.id}/logo`).set(representative).expect(403)
+  })
 })
