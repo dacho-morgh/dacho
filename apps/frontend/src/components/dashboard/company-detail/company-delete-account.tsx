@@ -34,7 +34,10 @@ export function DeleteCompanyAccount({
         title={canManage ? undefined : 'فقط مالک سیستم می‌تواند حساب شرکت را حذف کند'}
         onClick={() => setOpen(true)}
       >
-        <Typography as="span" variant="12/regular" lg="16/regular" className="whitespace-normal text-inherit">
+        <Typography as="span" variant="12/regular" className="whitespace-nowrap text-inherit lg:hidden">
+          حذف حساب
+        </Typography>
+        <Typography as="span" variant="16/regular" className="hidden text-inherit lg:inline">
           حذف حساب شرکت
         </Typography>
       </Button>

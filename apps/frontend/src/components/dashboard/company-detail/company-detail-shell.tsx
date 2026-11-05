@@ -13,11 +13,11 @@ import { DeleteCompanyAccount } from './company-delete-account'
 
 export type CompanyTab = 'profile' | 'resume' | 'account' | 'requests'
 
-const TABS: { id: CompanyTab; label: string; query: string; Icon: typeof ProfileUserIcon }[] = [
-  { id: 'profile', label: 'پروفایل شرکت', query: '', Icon: CompanyBuildingIcon },
-  { id: 'resume', label: 'رزومه', query: '?tab=resume', Icon: DocumentTextIcon },
-  { id: 'account', label: 'اطلاعات حساب', query: '?tab=account', Icon: ProfileUserIcon },
-  { id: 'requests', label: 'درخواست‌ها', query: '?tab=requests', Icon: ClipboardTextIcon },
+const TABS: { id: CompanyTab; label: string; shortLabel: string; query: string; Icon: typeof ProfileUserIcon }[] = [
+  { id: 'profile', label: 'پروفایل شرکت', shortLabel: 'پروفایل', query: '', Icon: CompanyBuildingIcon },
+  { id: 'resume', label: 'رزومه', shortLabel: 'رزومه', query: '?tab=resume', Icon: DocumentTextIcon },
+  { id: 'account', label: 'اطلاعات حساب', shortLabel: 'حساب', query: '?tab=account', Icon: ProfileUserIcon },
+  { id: 'requests', label: 'درخواست‌ها', shortLabel: 'درخواست‌ها', query: '?tab=requests', Icon: ClipboardTextIcon },
 ]
 
 export function companyTabHref(id: string, tab: CompanyTab): string {
@@ -90,7 +90,11 @@ export function CompanyDetailShell({
                   )}
                 >
                   <tab.Icon className="size-6 shrink-0" aria-hidden="true" />
-                  <Typography as="span" variant="12/regular" lg="16/regular" className="text-inherit">
+                  {/* One line in the bottom bar: a short name there, the full one beside the icon from lg. */}
+                  <Typography as="span" variant="12/regular" className="whitespace-nowrap text-inherit lg:hidden">
+                    {tab.shortLabel}
+                  </Typography>
+                  <Typography as="span" variant="16/regular" className="hidden text-inherit lg:inline">
                     {tab.label}
                   </Typography>
                 </Link>
