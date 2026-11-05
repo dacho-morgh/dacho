@@ -25,7 +25,7 @@ export function ExhibitionPicker({
         {title}
       </Typography>
       {items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-neutral-200 bg-white p-6">
+        <div className="rounded-xl border border-dashed border-neutral-200 bg-background p-6">
           <Typography variant="14/regular" color="neutral-500">
             نمایشگاه فعالی وجود ندارد.
           </Typography>
@@ -35,7 +35,7 @@ export function ExhibitionPicker({
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-4"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-background p-4"
             >
               <div className="flex flex-col gap-1">
                 <Typography variant="16/bold" color="neutral-800">

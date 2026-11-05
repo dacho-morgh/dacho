@@ -10,6 +10,7 @@
 @custom-variant lg (@media (width >= theme(--breakpoint-lg)));
 @custom-variant xl (@media (width >= theme(--breakpoint-xl)));
 @custom-variant 2xl (@media (width >= theme(--breakpoint-2xl)));
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 @layer base {
   h1,
@@ -127,6 +128,15 @@
   --warning: oklch(89% 0.1 75deg);
   --error: oklch(75% 0.15 25deg);
 
+  /* Solid button fills; dark mode uses deeper tones so white labels stay readable */
+  --fill-brand: var(--brand-600);
+  --fill-brand-hover: var(--brand-700);
+  --fill-brand-active: var(--brand-900);
+  --fill-brand-foreground: #ffffff;
+  --fill-danger: var(--error-500);
+  --fill-danger-hover: var(--error-700);
+  --fill-danger-active: #991b1b;
+
   /* Sandoq Design System - Brand Colors */
   --brand-50: #eef2ff;
   --brand-100: #dbeafe;
@@ -185,6 +195,87 @@
   --orange-700: #c2410c;
   --pink-50: #fdf2f8;
   --pink-700: #be185d;
+}
+
+/* Dashboard dark theme: a neutral charcoal (not pure black) so cards, borders
+   and text stay distinguishable. The neutral scale is mirrored so existing
+   `neutral-*` utilities keep their meaning (50 = page well, 900 = strongest text),
+   and the 500-700 brand/status shades that are mostly used as text are lightened. */
+:root[data-theme='dark'] {
+  --background: #1f1f1f;
+  --foreground: #f5f5f5;
+  --card: #262626;
+  --card-foreground: #f5f5f5;
+  --popover: #2b2b2b;
+  --popover-foreground: #f5f5f5;
+  --primary: #f5f5f5;
+  --primary-foreground: #141414;
+  --secondary: #2b2b2b;
+  --secondary-foreground: #f5f5f5;
+  --muted: #2b2b2b;
+  --muted-foreground: #a8a8a8;
+  --accent: #2b2b2b;
+  --accent-foreground: #f5f5f5;
+  --destructive: oklch(72% 0.17 22deg);
+  --destructive-foreground: oklch(72% 0.17 22deg);
+  --border: #3d3d3d;
+  --input: #575757;
+  --ring: #7a7a7a;
+  --sidebar: #1f1f1f;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #f5f5f5;
+  --sidebar-primary-foreground: #141414;
+  --sidebar-accent: #2b2b2b;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #3d3d3d;
+  --sidebar-ring: #7a7a7a;
+
+  --fill-brand: #2e2e2e;
+  --fill-brand-foreground: #fafafa;
+  --fill-brand-hover: #3a3a3a;
+  --fill-brand-active: #454545;
+  --fill-danger: #d64545;
+  --fill-danger-hover: #e25a5a;
+  --fill-danger-active: #b83a3a;
+
+  --brand-50: #292c35;
+  --brand-100: #31353f;
+  --brand-200: #3a3f4d;
+  --brand-300: #4a5166;
+  --brand-500: #6d89c4;
+  --brand-600: #869fd2;
+  --brand-700: #a3b6dd;
+
+  --neutral-50: #141414;
+  --neutral-100: #2e2e2e;
+  --neutral-200: #3d3d3d;
+  --neutral-300: #575757;
+  --neutral-400: #8c8c8c;
+  --neutral-500: #a8a8a8;
+  --neutral-600: #c2c2c2;
+  --neutral-700: #d8d8d8;
+  --neutral-800: #e9e9e9;
+  --neutral-900: #fafafa;
+
+  --success-50: #123324;
+  --success-500: #22c55e;
+  --success-700: #4ade80;
+  --error-50: #3b1c24;
+  --error-100: #52252e;
+  --error-200: #73303c;
+  --error-600: #f87171;
+  --error-700: #fca5a5;
+  --warning-50: #36290f;
+  --warning-400: #facc15;
+  --warning-500: #eab308;
+  --warning-700: #fbbf24;
+  --orange-50: #3a2211;
+  --orange-700: #fb923c;
+  --pink-50: #3b1a2c;
+  --pink-700: #f472b6;
+  --secondary-50: #2f2810;
+  --secondary-100: #3d3314;
+  --secondary-200: #50421a;
 }
 
 @theme inline {
@@ -246,6 +337,13 @@
   --color-secondary-500: var(--secondary-500);
   --color-secondary-600: var(--secondary-600);
   --color-secondary-700: var(--secondary-700);
+  --color-fill-brand: var(--fill-brand);
+  --color-fill-brand-hover: var(--fill-brand-hover);
+  --color-fill-brand-active: var(--fill-brand-active);
+  --color-fill-brand-foreground: var(--fill-brand-foreground);
+  --color-fill-danger: var(--fill-danger);
+  --color-fill-danger-hover: var(--fill-danger-hover);
+  --color-fill-danger-active: var(--fill-danger-active);
   --color-about-cta-start: var(--about-cta-start);
   --color-about-cta-end: var(--about-cta-end);
 

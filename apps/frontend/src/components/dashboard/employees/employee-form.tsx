@@ -134,7 +134,7 @@ function Section({
   children?: ReactNode
 }) {
   return (
-    <section className="grid grid-cols-1 gap-x-5 gap-y-8 rounded-2xl border border-neutral-200 bg-white p-4 md:grid-cols-2">
+    <section className="grid grid-cols-1 gap-x-5 gap-y-8 rounded-2xl border border-neutral-200 bg-background p-4 md:grid-cols-2">
       <div className="flex items-center justify-between gap-3 md:col-span-2">
         <Typography as="h2" variant="20/bold" color="neutral-600">
           {title}
@@ -198,7 +198,7 @@ export function EmployeeForm({
             {[3, 7].map((rows) => (
               <div
                 key={rows}
-                className="grid gap-4 rounded-2xl border border-neutral-200 bg-white p-4 md:grid-cols-2"
+                className="grid gap-4 rounded-2xl border border-neutral-200 bg-background p-4 md:grid-cols-2"
               >
                 {Array.from({ length: rows }, (_, row) => (
                   <Skeleton
@@ -364,7 +364,7 @@ function ResumeList({
     return (
       <div
         id={id}
-        className="flex h-10 items-center rounded-lg border border-neutral-100 bg-white px-2"
+        className="flex h-10 items-center rounded-lg border border-neutral-100 bg-background px-2"
       >
         <Typography as="span" variant="16/light" color="neutral-400">
           فایلی بارگذاری نشده است
@@ -380,7 +380,7 @@ function ResumeList({
         return (
           <li
             key={`${name}-${index}`}
-            className="flex h-10 items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-white px-2"
+            className="flex h-10 items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-background px-2"
           >
             {href ? (
               <a href={href} className="min-w-0 truncate text-brand-600 hover:underline" download>

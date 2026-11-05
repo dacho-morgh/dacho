@@ -53,7 +53,7 @@ export function FinancialCard({
     <section
       data-testid={testId}
       aria-labelledby={headingId}
-      className="flex min-w-0 flex-col gap-5 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6"
+      className="flex min-w-0 flex-col gap-5 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6"
     >
       <Typography as="h2" id={headingId} variant="20/bold" color="neutral-900">{title}</Typography>
       {children}

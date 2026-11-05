@@ -10,7 +10,7 @@ export function ProfileRouteError({
   retry: () => void
 }) {
   return (
-    <section className="flex min-h-80 w-full flex-col items-center justify-center gap-4 rounded-2xl border border-error-100 bg-white p-6 text-center">
+    <section className="flex min-h-80 w-full flex-col items-center justify-center gap-4 rounded-2xl border border-error-100 bg-background p-6 text-center">
       <Typography as="h2" variant="24/bold" color="neutral-700">
         بارگذاری این بخش انجام نشد
       </Typography>

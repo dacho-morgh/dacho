@@ -10,13 +10,13 @@ export interface RequestsSearchInputProps
 
 /**
  * Requests Search Bar (Figma Node 42:4336)
- * w-400, h-48 (lg), rounded-8, border-neutral-100, bg-white
+ * w-400, h-48 (lg), rounded-8, border-neutral-100, bg-background
  * Placeholder: درخواست خود را جست و جو کنید
  */
 export function RequestsSearchInput({
   inputSize = 'md',
   placeholder = 'درخواست خود را جست و جو کنید',
-  containerClassName = 'h-12 w-full rounded-lg border-neutral-100 bg-white',
+  containerClassName = 'h-12 w-full rounded-lg border-neutral-100 bg-background',
   className = 'text-neutral-700 placeholder:text-neutral-300 placeholder:text-base',
   ...props
 }: RequestsSearchInputProps) {

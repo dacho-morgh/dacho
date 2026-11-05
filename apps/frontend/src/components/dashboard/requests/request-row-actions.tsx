@@ -49,7 +49,7 @@ export function RequestRowActions({
       <DropdownMenuContent
         align="start"
         sideOffset={4}
-        className="w-41 min-w-41 rounded-[12px] p-1 bg-white shadow-[0px_2px_8px_rgba(21,21,21,0.1)] border-none flex flex-col gap-1"
+        className="w-41 min-w-41 rounded-[12px] p-1 bg-background shadow-[0px_2px_8px_rgba(21,21,21,0.1)] border-none flex flex-col gap-1"
       >
         {/* Item 1: مشاهده (View) */}
         <DropdownMenuItem

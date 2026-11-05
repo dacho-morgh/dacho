@@ -30,7 +30,7 @@ const badgeVariants = cva(
         warning: "bg-warning-50 text-warning-500",
         secondary: "bg-[#fef0cd] text-[#c18404] ",
         amber: "bg-[#fef0cd] text-[#c18404]",
-        white: "bg-white text-neutral-600 border-neutral-200 shadow-2xs",
+        white: "bg-background text-neutral-600 border-neutral-200 shadow-2xs",
         black: "bg-neutral-800 text-neutral-50",
 
         // Outlines for compatibility
@@ -100,7 +100,7 @@ function Badge({
                   : variant === "yellow" || variant === "warning" || variant === "secondary" || variant === "amber"
                     ? "bg-warning-500"
                     : variant === "black"
-                      ? "bg-white"
+                      ? "bg-background"
                       : "bg-neutral-500"
           )}
         />

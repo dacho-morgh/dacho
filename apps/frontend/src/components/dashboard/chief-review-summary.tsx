@@ -61,7 +61,7 @@ export function ChiefReviewSummary({ round, evaluations, history, people = {}, c
 
   return (
     <section
-      className="flex min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6"
+      className="flex min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6"
       aria-labelledby="chief-review-summary"
       data-testid="chief-review-summary"
     >
@@ -212,7 +212,7 @@ function EvaluationList({ items, people }: { items: EvaluationSummaryDto[]; peop
 
 function Score({ label, value }: { label: string; value: number | undefined }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-lg bg-white p-2">
+    <div className="flex min-w-0 flex-col rounded-lg bg-background p-2">
       <Typography as="dt" variant="12/regular" color="neutral-500">{label}</Typography>
       <Typography as="dd" variant="14/semibold" color="neutral-800">{value === undefined ? '—' : fa(value)}</Typography>
     </div>

@@ -25,7 +25,7 @@ function Toaster(props: ToasterProps) {
         unstyled: true,
         classNames: {
           toast: cn(
-            'flex w-full items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4 text-right shadow-lg sm:w-[360px]',
+            'flex w-full items-start gap-3 rounded-xl border border-neutral-200 bg-background p-4 text-right shadow-lg sm:w-[360px]',
             'data-[type=error]:border-error-100 data-[type=success]:border-success-500/30',
           ),
           title: typographyVariants({ variant: '14/semibold', color: 'neutral-800' }),

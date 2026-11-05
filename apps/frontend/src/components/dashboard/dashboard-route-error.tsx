@@ -24,7 +24,7 @@ export function DashboardRouteError({
   return (
     <section
       role="alert"
-      className="m-6 mt-20 flex min-h-80 flex-col items-center justify-center gap-4 rounded-2xl border border-error-100 bg-white p-6 text-center sm:m-8 sm:mt-20 md:mt-8"
+      className="m-6 mt-20 flex min-h-80 flex-col items-center justify-center gap-4 rounded-2xl border border-error-100 bg-background p-6 text-center sm:m-8 sm:mt-20 md:mt-8"
     >
       <Typography as="h2" variant="24/bold" color="neutral-700">
         {staleBuild ? 'نسخه تازه‌ای از سامانه منتشر شده است' : 'دریافت اطلاعات این بخش انجام نشد'}

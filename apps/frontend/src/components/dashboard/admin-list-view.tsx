@@ -107,9 +107,9 @@ export function AdminListView<T>({
           </div>
         )}
       </div>
-      <ScrollArea className="min-h-0 min-w-0 flex-1 rounded-xl border border-neutral-200 bg-white">
+      <ScrollArea className="min-h-0 min-w-0 flex-1 rounded-xl border border-neutral-200 bg-background">
         <table className="w-full min-w-[900px] border-collapse">
-          <thead className="sticky top-0 z-10 bg-white">
+          <thead className="sticky top-0 z-10 bg-background">
             <tr className="h-11 border-b border-neutral-200">
               {columns.map((column) => (
                 <th key={column.id} className="px-4 text-right">

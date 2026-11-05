@@ -146,7 +146,7 @@ function QueueBody({
 }) {
   if (state.kind === 'loading') {
     return (
-      <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-4">
+      <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-background p-4">
         <Typography as="span" role="status" aria-live="polite" variant="14/regular" className="sr-only">
           در حال دریافت پرونده‌ها
         </Typography>
@@ -194,7 +194,7 @@ function QueueBody({
   const { items, totalPages } = state.data
   if (!items.length) {
     return (
-      <div className="flex min-h-60 flex-col items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white p-6 text-center">
+      <div className="flex min-h-60 flex-col items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-background p-6 text-center">
         <Typography variant="16/regular" color="neutral-700">
           {view === 'open' ? 'پرونده‌ای در انتظار ارزیابی شما نیست.' : 'پرونده‌ای در این بخش وجود ندارد.'}
         </Typography>
@@ -216,9 +216,9 @@ function QueueBody({
         ))}
       </ul>
       {/* Tablet and up: the Figma table. */}
-      <div className="hidden min-w-0 rounded-xl border border-neutral-200 bg-white md:block">
+      <div className="hidden min-w-0 rounded-xl border border-neutral-200 bg-background md:block">
         <table className="w-full table-fixed border-collapse">
-          <thead className="sticky top-0 z-10 bg-white">
+          <thead className="sticky top-0 z-10 bg-background">
             <tr className="h-11 border-b border-neutral-200">
               {['نام شرکت', 'عنوان درخواست', 'رویداد', 'وضعیت', 'ارزیابی شما', 'تاریخ ارجاع'].map((header) => (
                 <th key={header} scope="col" className="px-4 text-right">
@@ -283,7 +283,7 @@ function QueueCard({ item }: { item: ReviewQueueItemDto }) {
   return (
     <Link
       href={`/dashboard/requests/${encodeURIComponent(item.requestId)}`}
-      className="flex min-w-0 flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-4 focus-visible:outline-2 focus-visible:outline-brand-500"
+      className="flex min-w-0 flex-col gap-2 rounded-xl border border-neutral-200 bg-background p-4 focus-visible:outline-2 focus-visible:outline-brand-500"
     >
       <div className="flex min-w-0 items-start justify-between gap-2">
         <Typography variant="14/semibold" color="neutral-900" className="min-w-0 break-words">{item.title}</Typography>

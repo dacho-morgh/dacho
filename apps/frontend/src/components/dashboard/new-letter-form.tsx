@@ -261,7 +261,7 @@ export function NewLetterForm({
         </div>
       </header>
 
-      <section aria-label={isSupport ? 'اطلاعات پیام' : 'اطلاعات نامه'} className="flex flex-1 flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:min-h-[calc(100svh-112px)]">
+      <section aria-label={isSupport ? 'اطلاعات پیام' : 'اطلاعات نامه'} className="flex flex-1 flex-col gap-6 rounded-2xl border border-neutral-200 bg-background p-4 lg:min-h-[calc(100svh-112px)]">
         {/* Recipient field */}
         <div className="flex flex-col gap-2">
           <Typography as="label" htmlFor="letter-recipient" variant="16/semibold" className="text-neutral-700">

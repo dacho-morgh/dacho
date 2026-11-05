@@ -176,7 +176,7 @@ export function FormRow({
 /* Figma card (31070:16605): white, grey-200 border, 16px radius/padding, 20×32 grid gaps. */
 export function FormSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="grid grid-cols-1 gap-x-5 gap-y-8 rounded-2xl border border-neutral-200 bg-white p-4 md:grid-cols-2">
+    <section className="grid grid-cols-1 gap-x-5 gap-y-8 rounded-2xl border border-neutral-200 bg-background p-4 md:grid-cols-2">
       <Typography as="h2" variant="20/bold" color="neutral-600" className="md:col-span-2">
         {title}
       </Typography>
@@ -213,7 +213,7 @@ export function FormSkeleton({ sections }: { sections: number[] }) {
   return (
     <div role="status" aria-label="در حال دریافت اطلاعات" className="flex flex-col gap-5">
       {sections.map((rows, index) => (
-        <div key={index} className="grid gap-4 rounded-2xl border border-neutral-200 bg-white p-4 md:grid-cols-2">
+        <div key={index} className="grid gap-4 rounded-2xl border border-neutral-200 bg-background p-4 md:grid-cols-2">
           {Array.from({ length: rows }, (_, row) => (
             <Skeleton key={row} className="h-10 w-full rounded-lg bg-neutral-100 motion-reduce:animate-none" />
           ))}

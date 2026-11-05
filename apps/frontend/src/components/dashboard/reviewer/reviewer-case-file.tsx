@@ -141,7 +141,7 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
       ) : null}
       {work !== 'open' ? <Banner tone="neutral">{REVIEW_WORK_STATE_LABELS[work]}. فقط نسخه‌ای که به شما ارجاع شده بود قابل مشاهده است.</Banner> : null}
 
-      <section aria-labelledby="review-info" className="grid gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-3">
+      <section aria-labelledby="review-info" className="grid gap-3 rounded-2xl border border-neutral-200 bg-background p-4 sm:grid-cols-3">
         <Typography as="h2" id="review-info" variant="16/semibold" color="neutral-900" className="sm:col-span-3">اطلاعات داوری</Typography>
         <Field label="نقش شما" value={reviewerRoleLabel(item)} />
         <Field label="وضعیت داوری" value={REVIEW_WORK_STATE_LABELS[work]} />
@@ -162,7 +162,7 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
         </Button>
       </div>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">اطلاعات شرکت</Typography>
         {data.company ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -175,7 +175,7 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
         )}
       </section>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">پروپوزال</Typography>
         {data.proposal ? (
           <>
@@ -224,7 +224,7 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
         )}
       </section>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">RFP رویداد</Typography>
         {data.rfp?.files.length ? (
           <>

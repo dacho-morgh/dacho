@@ -1,35 +1,82 @@
 'use client'
 
-import React, { createContext, useCallback, use, useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import React, { createContext, use, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 
-import type { Theme, ThemeContextType } from './types'
+import type { ThemeContextType, ThemePreference } from './types'
 
-import { canUseDOM } from '@dacho/cms-core/utilities'
-import { defaultTheme, themeLocalStorageKey } from './shared'
+import {
+  darkSchemeQuery,
+  defaultPreference,
+  defaultTheme,
+  isThemedPath,
+  resolveTheme,
+  themeLocalStorageKey,
+} from './shared'
+import { preferenceIsValid } from './types'
 
 const initialContext: ThemeContextType = {
-  setTheme: () => null,
+  preference: defaultPreference,
+  setPreference: () => null,
   theme: defaultTheme,
 }
 
 const ThemeContext = createContext(initialContext)
 
-export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [theme, setThemeState] = useState<Theme | undefined>(
-    canUseDOM ? ((document.documentElement.getAttribute('data-theme') as Theme) || 'light') : 'light',
-  )
+let memoryPreference: ThemePreference = defaultPreference
+const preferenceListeners = new Set<() => void>()
 
-  const setTheme = useCallback((_themeToSet: Theme | null) => {
-    setThemeState('light')
-    window.localStorage.setItem(themeLocalStorageKey, 'light')
-    document.documentElement.setAttribute('data-theme', 'light')
-  }, [])
+const readPreference = (): ThemePreference => {
+  try {
+    const stored = window.localStorage.getItem(themeLocalStorageKey)
+    return preferenceIsValid(stored) ? stored : memoryPreference
+  } catch {
+    return memoryPreference
+  }
+}
+
+const subscribePreference = (onChange: () => void) => {
+  preferenceListeners.add(onChange)
+  window.addEventListener('storage', onChange)
+  return () => {
+    preferenceListeners.delete(onChange)
+    window.removeEventListener('storage', onChange)
+  }
+}
+
+const subscribeSystem = (onChange: () => void) => {
+  const query = window.matchMedia(darkSchemeQuery)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
+}
+
+const readSystemIsDark = () => window.matchMedia(darkSchemeQuery).matches
+
+export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
+  const pathname = usePathname()
+  const preference = useSyncExternalStore(subscribePreference, readPreference, () => defaultPreference)
+  const systemIsDark = useSyncExternalStore(subscribeSystem, readSystemIsDark, () => false)
+
+  const theme = isThemedPath(pathname) ? resolveTheme(preference, systemIsDark) : defaultTheme
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', 'light')
+    document.documentElement.setAttribute('data-theme', theme)
+    document.documentElement.style.colorScheme = theme
+  }, [theme])
+
+  const setPreference = useCallback((next: ThemePreference) => {
+    memoryPreference = next
+    try {
+      window.localStorage.setItem(themeLocalStorageKey, next)
+    } catch {
+      // Storage can be blocked; the choice still applies for this visit.
+    }
+    preferenceListeners.forEach((listener) => listener())
   }, [])
 
-  return <ThemeContext value={{ setTheme, theme }}>{children}</ThemeContext>
+  const value = useMemo(() => ({ preference, setPreference, theme }), [preference, setPreference, theme])
+
+  return <ThemeContext value={value}>{children}</ThemeContext>
 }
 
 export const useTheme = (): ThemeContextType => use(ThemeContext)

@@ -255,7 +255,7 @@ export function ApplicantLettersView({ initialLetters, state = 'default', canCom
 
 
       {/* Card — Figma node 33:3926: white, grey-200 border, rounded-16, 16px padding, 848px tall */}
-      <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-background p-3 sm:p-4">
         <ScrollArea className="min-h-0 flex-1">
         <div className="min-h-[320px]">
         {state === 'loading' ? (

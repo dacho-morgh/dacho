@@ -29,7 +29,7 @@ export function RequestsListTable({
 
   return (
     <div
-      className={`mt-4 flex min-h-0 w-full flex-1 flex-col rounded-2xl border border-neutral-200 bg-white p-4 ${className}`}
+      className={`mt-4 flex min-h-0 w-full flex-1 flex-col rounded-2xl border border-neutral-200 bg-background p-4 ${className}`}
     >
       <ScrollArea className="min-h-0 w-full min-w-0 flex-1">
         {/* Loading Skeleton State (Figma Screen 13) - no table headers */}

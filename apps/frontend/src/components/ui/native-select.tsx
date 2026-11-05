@@ -20,7 +20,7 @@ const NativeSelect = React.forwardRef<
       data-slot="native-select"
       className={cn(
         typographyVariants({ variant: '16/regular', color: 'neutral-600' }),
-        'w-full min-w-0 cursor-pointer appearance-none rounded-lg border border-neutral-100 bg-white py-1 pr-2 pl-9 text-right outline-none transition-colors hover:border-brand-500 focus-visible:border-brand-500 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-400 aria-invalid:border-error-100 aria-invalid:focus-visible:border-error-500',
+        'w-full min-w-0 cursor-pointer appearance-none rounded-lg border border-neutral-100 dark:border-neutral-300 bg-background py-1 pr-2 pl-9 text-right outline-none transition-colors hover:border-brand-500 focus-visible:border-brand-500 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-400 aria-invalid:border-error-100 aria-invalid:focus-visible:border-error-500',
         selectSize === 'sm' ? 'h-9' : selectSize === 'lg' ? 'h-12' : 'h-10',
         className,
       )}

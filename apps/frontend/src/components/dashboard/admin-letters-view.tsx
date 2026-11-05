@@ -280,7 +280,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="start"
-              className="w-52 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-md"
+              className="w-52 rounded-xl border border-neutral-100 bg-background p-1.5 shadow-md"
             >
               {(
                 [
@@ -318,7 +318,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
 
 
       {/* Table card — Figma frame 30852:17813 */}
-      <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-white p-3 sm:p-4">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-background p-3 sm:p-4">
         <ScrollArea className="min-h-0 flex-1">
         <div className="min-h-[320px] lg:flex lg:flex-row-reverse lg:items-start lg:justify-end">
         {isLoading ? (
@@ -344,7 +344,7 @@ export function AdminLettersView({ initialLetters, state = 'default' }: AdminLet
                     <DropdownMenuContent
                       align="start"
                       sideOffset={6}
-                      className="flex w-[164px] min-w-[164px] flex-col gap-[4px] rounded-[12px] border-0 bg-white p-[4px] shadow-[0px_2px_4px_rgba(21,21,21,0.1)]"
+                      className="flex w-[164px] min-w-[164px] flex-col gap-[4px] rounded-[12px] border-0 bg-background p-[4px] shadow-[0px_2px_4px_rgba(21,21,21,0.1)]"
                     >
                       {item.source === 'ticket' ? (
                         <DropdownMenuItem asChild className="h-8 rounded-[10px] px-1.5">

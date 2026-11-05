@@ -139,7 +139,7 @@ function RowActions({
       <DropdownMenuContent
         align="end"
         sideOffset={6}
-        className="flex w-[164px] min-w-[164px] flex-col gap-1 rounded-xl border-0 bg-white p-1 shadow-[0px_2px_4px_rgba(21,21,21,0.1)] ring-0"
+        className="flex w-[164px] min-w-[164px] flex-col gap-1 rounded-xl border-0 bg-background p-1 shadow-[0px_2px_4px_rgba(21,21,21,0.1)] ring-0"
       >
         <DropdownMenuItem asChild className={menuItemClass}>
           <Link href={href}>
@@ -363,7 +363,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
 
 
         {/* Table card — Figma frame 30722:2460 */}
-        <div className="relative flex min-h-[420px] flex-1 flex-col rounded-2xl border border-neutral-200 bg-white p-4">
+        <div className="relative flex min-h-[420px] flex-1 flex-col rounded-2xl border border-neutral-200 bg-background p-4">
           {loading ? (
             <EmployeesSkeleton />
           ) : error !== null ? (
@@ -377,7 +377,7 @@ export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
           ) : (
             <ScrollArea className="min-h-0 flex-1">
               <table className="w-full min-w-[860px] border-collapse text-right">
-                <thead className="sticky top-0 z-10 bg-white">
+                <thead className="sticky top-0 z-10 bg-background">
                   <tr>
                     <HeaderCell label="نام کارمند" />
                     <HeaderCell label="نقش" className="w-[200px]" />

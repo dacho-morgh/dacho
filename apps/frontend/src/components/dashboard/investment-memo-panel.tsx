@@ -94,7 +94,7 @@ export function InvestmentMemoPanel({
   const canSend = Boolean(latest && !latest.sentAt && latest.body === trimmed)
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-brand-600 bg-white p-6">
+    <section className="flex flex-col gap-4 rounded-2xl border border-brand-600 bg-background p-6">
       <Typography as="h2" variant="20/bold" color="neutral-900">یادداشت سرمایه‌گذاری</Typography>
       {state === 'loading' ? (
         <Typography role="status" variant="14/regular" color="neutral-500">در حال بارگذاری…</Typography>

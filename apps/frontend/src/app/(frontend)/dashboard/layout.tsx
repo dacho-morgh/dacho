@@ -35,7 +35,7 @@ export const metadata: Metadata = {
 function AccessState({ denied, href = '/dashboard' }: { denied: boolean; href?: string }) {
   return (
     <main className="flex min-h-svh items-center justify-center bg-neutral-50 p-5" dir="rtl">
-      <section className="w-full max-w-lg space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm">
+      <section className="w-full max-w-lg space-y-4 rounded-2xl border border-neutral-200 bg-background p-6 text-center shadow-sm">
         <Typography as="h1" variant="24/bold" color="neutral-800">
           {denied ? 'دسترسی به این بخش مجاز نیست' : 'دریافت دسترسی انجام نشد'}
         </Typography>
@@ -105,7 +105,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       >
         <a
           href="#dashboard-content"
-          className="sr-only rounded-lg bg-white p-3 text-brand-600 focus:not-sr-only focus:absolute focus:top-2 focus:right-2 focus:z-50"
+          className="sr-only rounded-lg bg-background p-3 text-brand-600 focus:not-sr-only focus:absolute focus:top-2 focus:right-2 focus:z-50"
         >
           <Typography as="span" variant="14/semibold" className="text-inherit">
             پرش به محتوای اصلی

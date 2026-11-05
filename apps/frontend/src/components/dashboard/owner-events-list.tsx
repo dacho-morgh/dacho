@@ -150,7 +150,7 @@ function RowActions({ row }: { row: Row }) {
       <DropdownMenuContent
         align="end"
         sideOffset={6}
-        className="flex w-[220px] min-w-[220px] flex-col gap-1 rounded-xl border-0 bg-white p-1 shadow-[0px_2px_4px_rgba(21,21,21,0.1)] ring-0"
+        className="flex w-[220px] min-w-[220px] flex-col gap-1 rounded-xl border-0 bg-background p-1 shadow-[0px_2px_4px_rgba(21,21,21,0.1)] ring-0"
       >
         <DropdownMenuItem asChild className={menuItemClass}>
           <Link href={row.editHref}>
@@ -390,7 +390,7 @@ export function OwnerEventsList() {
           </Button>
         </div>
 
-        <div className="relative flex min-h-[420px] flex-1 flex-col rounded-2xl border border-neutral-200 bg-white p-4">
+        <div className="relative flex min-h-[420px] flex-1 flex-col rounded-2xl border border-neutral-200 bg-background p-4">
           {loading ? (
             <ListSkeleton />
           ) : error !== null ? (
@@ -412,7 +412,7 @@ export function OwnerEventsList() {
           ) : (
             <ScrollArea className="min-h-0 flex-1">
               <table className="w-full min-w-[1040px] border-collapse text-right">
-                <thead className="sticky top-0 z-10 bg-white">
+                <thead className="sticky top-0 z-10 bg-background">
                   <tr>
                     <HeaderCell label="عنوان" />
                     <HeaderCell label="نوع" className="w-[120px]" />

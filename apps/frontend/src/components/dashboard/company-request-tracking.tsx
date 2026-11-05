@@ -48,7 +48,7 @@ export function CompanyRequestTracking({
       <section
         aria-labelledby="tracking-heading"
         data-testid="company-tracking"
-        className="flex min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6"
+        className="flex min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6"
       >
         <Typography as="h2" id="tracking-heading" variant="20/bold" color="neutral-900">پیگیری درخواست</Typography>
         <dl className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
@@ -123,7 +123,7 @@ export function CompanyRequestTracking({
           دریافت نتیجه پرونده انجام نشد. صفحه را دوباره بارگذاری کنید.
         </Typography>
       ) : result && resultShownElsewhere ? null : result ? (
-        <section data-testid="published-result" className="flex min-w-0 flex-col gap-2 rounded-2xl border border-brand-600 bg-white p-4 sm:p-6">
+        <section data-testid="published-result" className="flex min-w-0 flex-col gap-2 rounded-2xl border border-brand-600 bg-background p-4 sm:p-6">
           <Typography as="h2" variant="20/bold" className="text-neutral-900">نتیجه پرونده</Typography>
           <Typography variant="12/regular" className="text-neutral-500">تاریخ انتشار: {formatDate(result.publishedAt)}</Typography>
           <Typography variant="16/regular" className="whitespace-pre-wrap break-words text-neutral-800">{result.body}</Typography>

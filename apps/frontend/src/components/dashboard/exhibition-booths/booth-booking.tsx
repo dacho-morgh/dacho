@@ -122,7 +122,7 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
 
       {loading ? (
         <div
-          className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-5"
+          className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-background p-5"
           aria-busy="true"
         >
           <Skeleton className="h-12 w-full rounded-xl" />
@@ -132,7 +132,7 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
       ) : loadError ? (
         <div
           role="alert"
-          className="flex flex-col items-start gap-3 rounded-2xl border border-neutral-200 bg-white p-5"
+          className="flex flex-col items-start gap-3 rounded-2xl border border-neutral-200 bg-background p-5"
         >
           <Typography variant="16/regular" color="neutral-700">
             {loadError}
@@ -145,7 +145,7 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
         <>
           <section
             aria-labelledby="my-booth-requests"
-            className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5"
+            className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-5"
           >
             <Typography as="h2" id="my-booth-requests" variant="20/bold" color="neutral-800">
               درخواست‌های غرفه من
@@ -172,7 +172,7 @@ export function BoothBooking({ exhibition }: { exhibition: BoothExhibitionInfo }
 
           <section
             aria-labelledby="booth-catalogue"
-            className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5"
+            className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-5"
           >
             <Typography as="h2" id="booth-catalogue" variant="20/bold" color="neutral-800">
               غرفه‌های نمایشگاه

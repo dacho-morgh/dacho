@@ -157,7 +157,7 @@ export function BoothRequestsQueue({ exhibition }: { exhibition: BoothExhibition
 
       <section
         aria-labelledby="booth-requests"
-        className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5"
+        className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-5"
       >
         <Typography as="h2" id="booth-requests" variant="20/bold" color="neutral-800">
           درخواست‌های غرفه

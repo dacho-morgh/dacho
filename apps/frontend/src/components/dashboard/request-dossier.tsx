@@ -157,7 +157,7 @@ export function RequestDossier({
         ) : null}
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-3">
+      <div className="grid gap-3 rounded-2xl border border-neutral-200 bg-background p-4 sm:grid-cols-3">
         <Field label="کد پیگیری" value={request.trackingCode} mono />
         <Field label="وضعیت" value={STATUS_LABELS[request.status] ?? request.status} />
         <Field label="مرحله" value={isCompany ? companyStageLabel(request) : stageLabel(request.reviewStage, request.currentStep)} />
@@ -185,7 +185,7 @@ export function RequestDossier({
 
       {profile !== null ? <ProfileSnapshot profile={profile} /> : null}
 
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <section className="rounded-2xl border border-neutral-200 bg-background p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">اطلاعات درخواست</Typography>
         {proposal === 'failed' ? (
           <Typography role="alert" variant="14/regular" color="error" className="mt-2">
@@ -232,7 +232,7 @@ export function RequestDossier({
         ) : null}
       </section>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">مدارک درخواست</Typography>
         {seesFinancial ? (
           <Typography variant="14/regular" color="neutral-500">
@@ -290,7 +290,7 @@ export function RequestDossier({
       {followUp && !financialStageOpen ? followUp : null}
       {actions.includes('assign') ? <RequestAssignmentPanel id={id} /> : null}
 
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <section className="rounded-2xl border border-neutral-200 bg-background p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">روند بررسی</Typography>
         {workflow.length ? (
           <ol className="mt-4 space-y-3">
@@ -315,7 +315,7 @@ export function RequestDossier({
         )}
       </section>
 
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <section className="rounded-2xl border border-neutral-200 bg-background p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">تاریخچه</Typography>
         {timeline.length ? (
           <ol className="mt-4 space-y-3">
@@ -357,7 +357,7 @@ const PROFILE_FIELDS: [section: 'company' | 'dossier', key: string, label: strin
  */
 function ProfileSnapshot({ profile }: { profile: DossierPart<RequestVerificationDto> }) {
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+    <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
       <Typography as="h2" variant="20/bold" color="neutral-900">اطلاعات شرکت در زمان ثبت</Typography>
       {profile === 'failed' ? (
         <Typography role="alert" variant="14/regular" color="error">

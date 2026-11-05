@@ -170,7 +170,7 @@ function Sidebar({
       <div
         data-slot="sidebar"
         className={cn(
-          "bg-white text-neutral-800 flex h-full w-(--sidebar-width) flex-col border-l border-neutral-200",
+          "bg-background text-neutral-800 flex h-full w-(--sidebar-width) flex-col border-l border-neutral-200",
           className
         )}
         {...props}
@@ -187,7 +187,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="bg-white text-neutral-800 w-(--sidebar-width) p-0 [&>button]:hidden"
+          className="bg-background text-neutral-800 w-(--sidebar-width) p-0 [&>button]:hidden"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -244,7 +244,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="bg-white group-data-[variant=floating]:border-neutral-200 flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+          className="bg-background group-data-[variant=floating]:border-neutral-200 flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
         >
           {children}
         </div>
@@ -475,7 +475,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[12px] px-3 py-2 text-start font-sans text-base leading-7 ring-sidebar-ring outline-hidden transition-all group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-2! hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-2 active:bg-neutral-200 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:bg-[#eef2ff] data-active:font-semibold data-active:text-[#2563eb] data-active:hover:bg-[#dbeafe] data-active:hover:text-[#2563eb] [&_svg]:size-6 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[12px] px-3 py-2 text-start font-sans text-base leading-7 ring-sidebar-ring outline-hidden transition-all group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-2! hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-2 active:bg-neutral-200 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:bg-brand-50 data-active:font-semibold data-active:text-brand-600 data-active:hover:bg-brand-100 data-active:hover:text-brand-600 [&_svg]:size-6 [&_svg]:shrink-0 [&>span:last-child]:truncate",
   {
     variants: {
       variant: {

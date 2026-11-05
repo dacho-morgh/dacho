@@ -447,7 +447,7 @@ export function CompanyDetailView({ id }: { id: string }) {
         </Typography>
       </div>
 
-      <div className="flex min-h-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:min-h-[912px] lg:flex-row">
+      <div className="flex min-h-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-background p-4 lg:min-h-[912px] lg:flex-row">
         <nav className="order-first flex w-full shrink-0 flex-row flex-wrap gap-2 border-b border-neutral-200 pb-4 lg:order-none lg:w-[200px] lg:flex-col lg:border-b-0 lg:border-l lg:pl-5">
           <Typography
             variant="16/semibold"
@@ -522,7 +522,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                 {identityEdits.map((item) => (
                   <div
                     key={item.label}
-                    className="rounded-lg border border-amber-200 bg-white/70 p-2.5 text-xs text-amber-950"
+                    className="rounded-lg border border-amber-200 bg-background/70 p-2.5 text-xs text-amber-950"
                   >
                     <span className="font-semibold">{item.label}:</span>{' '}
                     <span className="text-neutral-500">نسخه احراز:</span>{' '}
@@ -537,7 +537,7 @@ export function CompanyDetailView({ id }: { id: string }) {
           )}
 
           {/* Secretariat Verification Decision Workbench */}
-          <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-xs">
+          <section className="rounded-xl border border-brand-200 bg-background p-5 shadow-xs">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-3">
               <div>
                 <Typography variant="16/semibold" color="neutral-900">
@@ -628,7 +628,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                   placeholder="دلیل تصمیم، نواقص مدارک یا توضیحات لازم را اینجا وارد کنید..."
                   value={decisionReason}
                   onChange={(e) => handleReasonChange(e.target.value)}
-                  className="rounded-lg border-neutral-300 bg-white p-3 text-sm"
+                  className="rounded-lg border-neutral-300 bg-background p-3 text-sm"
                   disabled={decisionSubmitting}
                 />
                 {decisionReason.trim().length > 0 && (

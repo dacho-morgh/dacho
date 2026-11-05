@@ -496,7 +496,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
       <fieldset
         id="company-basic"
         disabled={isSavingBasic}
-        className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6"
+        className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6"
       >
         <div className="flex items-center justify-between">
           <Typography as="h2" variant="20/bold" color="neutral-600">
@@ -641,7 +641,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
                   onChange={(e) => setDossierForm({ ...dossierForm, website: e.target.value })}
                   containerClassName={
                     isEditingBasic
-                      ? 'bg-white'
+                      ? 'bg-background'
                       : 'border-transparent bg-transparent p-0 hover:border-transparent'
                   }
                 />
@@ -682,7 +682,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
                   }
                   containerClassName={
                     isEditingBasic
-                      ? 'bg-white'
+                      ? 'bg-background'
                       : 'border-transparent bg-transparent p-0 hover:border-transparent'
                   }
                 />
@@ -731,7 +731,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
                   }}
                   containerClassName={
                     isEditingBasic
-                      ? 'bg-white'
+                      ? 'bg-background'
                       : 'border-transparent bg-transparent p-0 hover:border-transparent'
                   }
                 />
@@ -742,7 +742,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
       </fieldset>
 
       {/* مدارک رسمی شرکت */}
-      <section id="company-documents" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section id="company-documents" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <div className="flex flex-col gap-1">
           <Typography as="h2" variant="20/bold" color="neutral-600">
             مدارک رسمی شرکت
@@ -803,7 +803,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
       </section>
 
       {/* آدرس‌ها */}
-      <section id="company-addresses" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section id="company-addresses" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <Typography as="h2" variant="20/bold" color="neutral-600">
             آدرس ها
@@ -859,7 +859,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
       </section>
 
       {/* اشخاص و مدیران */}
-      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <Typography as="h2" variant="20/bold" color="neutral-600">
             اشخاص

@@ -129,7 +129,7 @@ export function EventApplicationWorkspace({
       />
 
       {load.status === 'loading' ? (
-        <div role="status" className="rounded-2xl border border-neutral-200 bg-white p-4">
+        <div role="status" className="rounded-2xl border border-neutral-200 bg-background p-4">
           <Typography variant="14/regular" color="neutral-500">در حال دریافت زیرعنوان‌ها و پیش‌نویس‌های شما…</Typography>
         </div>
       ) : null}
@@ -477,7 +477,7 @@ function ApplicationCard({
     <section
       aria-labelledby={headingId}
       data-testid={`application-${subtopic.id}`}
-      className="flex min-w-0 flex-col gap-5 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6"
+      className="flex min-w-0 flex-col gap-5 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6"
     >
       <header className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-col gap-1">

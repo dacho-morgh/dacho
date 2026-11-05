@@ -26,7 +26,7 @@ export function KpiCard({
   accessory,
 }: KpiCardProps) {
   return (
-    <Card className="flex flex-col gap-2 rounded-[10px] border-neutral-200 bg-white px-6 py-5 shadow-none">
+    <Card className="flex flex-col gap-2 rounded-[10px] border-neutral-200 bg-background px-6 py-5 shadow-none">
       <div className="flex items-center justify-between gap-3">
         <Typography variant="14/light" color="neutral-500">
           {label}

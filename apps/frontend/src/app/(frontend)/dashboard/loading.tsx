@@ -11,7 +11,7 @@ export default function DashboardLoading() {
       <div className="flex flex-col gap-6" aria-hidden="true">
         <Skeleton className="h-8 w-64 max-w-full rounded-lg bg-neutral-200 motion-reduce:animate-none" />
         <Skeleton className="h-12 w-full rounded-xl bg-neutral-100 motion-reduce:animate-none" />
-        <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-4">
+        <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4">
           {[0, 1, 2, 3, 4].map((row) => (
             <Skeleton key={row} className="h-10 w-full rounded-lg bg-neutral-100 motion-reduce:animate-none" />
           ))}

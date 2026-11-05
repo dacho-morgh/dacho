@@ -159,7 +159,7 @@ function RowMenu({
       <DropdownMenuContent
         align="start"
         sideOffset={6}
-        className="flex w-[180px] min-w-[180px] flex-col gap-1 rounded-xl border border-neutral-100 bg-white p-1 shadow-xs"
+        className="flex w-[180px] min-w-[180px] flex-col gap-1 rounded-xl border border-neutral-100 bg-background p-1 shadow-xs"
       >
         {row.canReply && (
           <DropdownMenuItem asChild className={menuItemClass}>
@@ -319,7 +319,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
                 <FilterIcon />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 rounded-xl border border-neutral-100 bg-white p-1.5 shadow-xs">
+            <DropdownMenuContent align="start" className="w-56 rounded-xl border border-neutral-100 bg-background p-1.5 shadow-xs">
               <DropdownMenuLabel>
                 <Typography as="span" variant="12/regular" className="text-neutral-500">
                   وضعیت
@@ -407,7 +407,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
       </div>
 
       {/* Table card, Figma 30852:17813 */}
-      <section className="relative mt-4 flex min-h-0 w-full flex-1 flex-col overflow-auto rounded-2xl border border-neutral-200 bg-white p-4">
+      <section className="relative mt-4 flex min-h-0 w-full flex-1 flex-col overflow-auto rounded-2xl border border-neutral-200 bg-background p-4">
         {pending ? (
           <InboxSkeleton />
         ) : (
@@ -420,7 +420,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
                 <col className="w-[120px]" />
                 <col className="w-[148px]" />
               </colgroup>
-              <thead className="sticky top-0 bg-white">
+              <thead className="sticky top-0 bg-background">
                 <tr className="h-11 border-b border-neutral-100">
                   {['نوع نامه', 'عنوان', counterpartHeader, 'تاریخ ارسال'].map((label) => (
                     <th key={label} scope="col" className="px-4 py-3 font-normal">

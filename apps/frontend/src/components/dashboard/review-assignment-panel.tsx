@@ -127,7 +127,7 @@ export function ReviewAssignmentPanel({
     evaluations === 'failed' || evaluations === null ? null : (finals.get(slot.userId) ?? 'pending')
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6" aria-labelledby={`${id}-reviewers`}>
+    <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6" aria-labelledby={`${id}-reviewers`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Typography id={`${id}-reviewers`} as="h2" variant="20/bold" color="neutral-900">داوران پرونده</Typography>
         {current ? (

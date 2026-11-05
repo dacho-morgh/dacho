@@ -101,7 +101,7 @@ export function SecretariatFollowUpPanel({
 
   if (state === 'loading' || state === 'error') {
     return (
-      <section className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-6">
+      <section className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-background p-6">
         <Typography as="h2" variant="20/bold" color="neutral-900">پیگیری دبیرخانه و انتشار نتیجه</Typography>
         {state === 'loading' ? (
           <Typography role="status" variant="14/regular" color="neutral-500">در حال بارگذاری…</Typography>
@@ -128,7 +128,7 @@ export function SecretariatFollowUpPanel({
   const code = trackingCode ? <bdi dir="ltr">{trackingCode}</bdi> : '—'
 
   return (
-    <section className="flex flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6" data-testid="secretariat-follow-up">
+    <section className="flex flex-col gap-6 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6" data-testid="secretariat-follow-up">
       <Typography as="h2" variant="20/bold" color="neutral-900">پیگیری دبیرخانه و انتشار نتیجه</Typography>
       {followUp.published ? (
         <FinancialBanner tone="success" title="نتیجه این پرونده منتشر شده است">
