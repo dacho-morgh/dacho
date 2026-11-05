@@ -124,10 +124,10 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const profile = await profileRepo.getProfile(target.id)
-      const currentVerif = profile.companyId
-        ? await verificationStore.findCurrentByCompanyId(profile.companyId)
-        : null
+      // One company read serves the profile and the logo; the user was read above.
+      const company = await deps.companyStore.findByRepresentative(target.id)
+      const profile = profileRepo.profileFor(target, company)
+      const currentVerif = company ? await verificationStore.findCurrentByCompanyId(company.id) : null
       const allowedActions = currentVerif?.status === 'pending' && target.id !== actor.id && currentVerif.representativeId !== actor.id
         ? ['read', 'approve', 'return', 'reject']
         : ['read']
@@ -143,7 +143,7 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
         },
         companyId: profile.companyId,
         company: profile.company,
-        logo: logoOf(await deps.companyStore.findByRepresentative(target.id)),
+        logo: logoOf(company),
         executives: profile.executives,
         addresses: profile.addresses,
         allowedActions,
@@ -174,12 +174,12 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
       res.status(404).json({ error: 'not_found' })
       return null
     }
-    const profile = await profileRepo.getProfile(target.id)
-    if (!profile.companyId) {
+    const company = await deps.companyStore.findByRepresentative(target.id)
+    if (!company) {
       res.status(404).json({ error: 'company_not_found' })
       return null
     }
-    return { target, profile, companyId: profile.companyId }
+    return { target, profile: profileRepo.profileFor(target, company), companyId: company.id }
   }
 
   router.patch('/admin/companies/:id', async (req, res, next) => {

@@ -62,6 +62,11 @@ export class ProfileRepository {
     }
   }
 
+  /** The profile of a user and company the caller has already read, without reading them again. */
+  profileFor(user: Parameters<typeof fromUserAndCompany>[0], company: Company | undefined): UserProfile {
+    return fromUserAndCompany(user, company)
+  }
+
   async getProfile(userId: string): Promise<UserProfile> {
     const user = await this.users.findById(userId)
     if (!user) return structuredClone(EMPTY_PROFILE)
