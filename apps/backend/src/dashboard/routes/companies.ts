@@ -3,8 +3,10 @@ import type { Router } from 'express'
 import type { NextFunction, Request, Response } from 'express'
 import { operationalRoleOf } from '../../access/roles.js'
 import { actorOf } from '../proxy-auth.js'
-import { isCompanyAdministrator } from './route-helpers.js'
+import { isCompanyAdministrator, parsePositiveInt } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
+
+const MAX_COMPANY_PAGE_SIZE = 100
 
 export function registerCompanyRoutes(router: Router, ctx: DashboardContext): void {
   const { deps, profileRepo, verificationStore } = ctx
@@ -16,25 +18,40 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
         res.status(403).json({ error: 'forbidden' })
         return
       }
-      const users = await deps.userStore.list({
-        role: 'representative',
-        search: typeof req.query.search === 'string' ? req.query.search : undefined,
-      })
+      // Two reads for the whole list (accounts, companies), not one per account: each CMS call is slow.
+      const [accounts, companies] = await Promise.all([
+        deps.userStore.list({ role: 'representative' }),
+        deps.companyStore.list(),
+      ])
+      // A deactivated representative («حذف شرکت») leaves the list; the account is kept.
+      const users = accounts.filter((user) => user.isActive !== false)
+      const companyOf = new Map<string, (typeof companies)[number]>()
+      for (const company of companies) {
+        if (company.representativeId && !companyOf.has(company.representativeId)) companyOf.set(company.representativeId, company)
+      }
+      const verifications = await verificationStore.currentSummaries(
+        users.flatMap((user) => companyOf.get(user.id)?.id ?? []),
+      )
       const requestedStatus =
         typeof req.query.verificationStatus === 'string'
           ? req.query.verificationStatus
           : typeof req.query.status === 'string'
             ? req.query.status
             : undefined
+      const search = typeof req.query.search === 'string' ? req.query.search.trim().toLocaleLowerCase() : ''
+      // The overviews and the letter form read the whole list without paging; only a caller
+      // that asks for a `page` or `limit` (the companies table) gets a page.
+      const paged = req.query.page !== undefined || req.query.limit !== undefined
 
-      const allItems = await Promise.all(users.map(async (user) => {
-        const company = await deps.companyStore.findByRepresentative(user.id).catch(() => undefined)
-        const currentVerif = company ? await verificationStore.findCurrentByCompanyId(company.id) : null
-        return {
+      const enriched = users.map((user) => {
+        const company = companyOf.get(user.id)
+        const currentVerif = company ? verifications.get(company.id) : undefined
+        const item = {
           id: user.id,
           companyId: company?.id ?? null,
           name: user.name ?? null,
           phone: user.phone,
+          updatedAt: user.updatedAt ?? null,
           companyName: company?.name ?? null,
           companyType: company?.type ?? null,
           companyProvince: company?.province ?? null,
@@ -45,11 +62,32 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
           verificationRevision: currentVerif?.revision ?? 0,
           verificationSubmittedAt: currentVerif?.submittedAt ?? null,
         }
-      }))
-      const items = requestedStatus && requestedStatus !== 'all'
-        ? allItems.filter((item) => item.verificationStatus === requestedStatus)
-        : allItems
-      res.json({ items })
+        const text = [
+          item.companyName, item.name, item.phone, user.email, item.companyType, item.companyProvince,
+          item.companyCity, item.verificationStatus, ...item.executives.map((executive) => executive.name),
+        ].filter(Boolean).join(' ').toLocaleLowerCase()
+        return { item, text }
+      })
+      const matching = search ? enriched.filter(({ text }) => text.includes(search)).map(({ item }) => item) : enriched.map(({ item }) => item)
+      // The filter menu counts every queue of the search, not only the page on screen.
+      const counts: Record<string, number> = { all: matching.length, unsubmitted: 0, pending: 0, approved: 0, returned: 0, rejected: 0 }
+      for (const item of matching) counts[item.verificationStatus] = (counts[item.verificationStatus] ?? 0) + 1
+      const filtered = requestedStatus && requestedStatus !== 'all'
+        ? matching.filter((item) => item.verificationStatus === requestedStatus)
+        : matching
+      const limit = paged
+        ? Math.min(parsePositiveInt(req.query.limit, 10), MAX_COMPANY_PAGE_SIZE)
+        : Math.max(1, filtered.length)
+      const totalPages = Math.max(1, Math.ceil(filtered.length / limit))
+      const page = Math.min(parsePositiveInt(req.query.page, 1), totalPages)
+      res.json({
+        items: filtered.slice((page - 1) * limit, page * limit),
+        page,
+        limit,
+        totalDocs: filtered.length,
+        totalPages,
+        counts,
+      })
     } catch (error) { next(error) }
   })
 
