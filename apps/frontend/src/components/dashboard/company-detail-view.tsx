@@ -775,37 +775,31 @@ export function CompanyDetailView({ id, tab = 'profile' }: { id: string; tab?: C
             )}
           </DetailCard>
 
-          {/* General Private Documents Field (Upload Seam) */}
-          <DetailCard title="مدارک خصوصی بارگذاری‌شده">
-            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
-              {(
-                [
-                  ['articlesOfAssociation', 'اساس‌نامه'],
-                  ['establishmentNotices', 'آگهی تأسیس'],
-                  ['amendmentNotices', 'آگهی تغییرات'],
-                  ['catalogues', 'کاتالوگ محصولات'],
-                  ['certificatesLicenses', 'گواهی‌ها و مجوزها'],
-                ] as const
-              ).map(([category, label]) => (
-                <PrivateDocumentField
-                  key={category}
-                  category={category}
-                  label={label}
-                  companyId={data.companyId ?? undefined}
-                  canUpload
-                />
-              ))}
-            </div>
-          </DetailCard>
         </>
       )}
 
+      {/* General Private Documents Field (Upload Seam) */}
       {tab === 'resume' && (
-        <DetailCard title="رزومه شرکت">
-          {/* No admin read of a company's dossier exists yet, so there is nothing to show here. */}
-          <Typography variant="14/regular" color="muted">
-            رزومه شرکت هنوز در سرویس پشتیبانی نمی‌شود.
-          </Typography>
+        <DetailCard title="مدارک خصوصی بارگذاری‌شده">
+          <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+            {(
+              [
+                ['articlesOfAssociation', 'اساس‌نامه'],
+                ['establishmentNotices', 'آگهی تأسیس'],
+                ['amendmentNotices', 'آگهی تغییرات'],
+                ['catalogues', 'کاتالوگ محصولات'],
+                ['certificatesLicenses', 'گواهی‌ها و مجوزها'],
+              ] as const
+            ).map(([category, label]) => (
+              <PrivateDocumentField
+                key={category}
+                category={category}
+                label={label}
+                companyId={data.companyId ?? undefined}
+                canUpload
+              />
+            ))}
+          </div>
         </DetailCard>
       )}
 
