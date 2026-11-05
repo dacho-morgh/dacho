@@ -8,6 +8,7 @@ import {
   ProfileUserIcon,
 } from '@/components/icons'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
 
@@ -42,7 +43,10 @@ export function CompanyDetailShell({
   children: ReactNode
 }) {
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-4 p-4 pt-20 md:pt-10" dir="rtl">
+    <main
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pt-20 md:pt-10 lg:overflow-hidden"
+      dir="rtl"
+    >
       <nav aria-label="مسیر صفحه" className="flex flex-wrap items-center gap-2">
         <Typography as="h1" variant="24/bold" color="neutral-700">
           {companyName || '—'}
@@ -57,7 +61,7 @@ export function CompanyDetailShell({
         </Link>
       </nav>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 lg:flex-row lg:items-start">
+      <div className="flex shrink-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 lg:min-h-0 lg:flex-1 lg:flex-row">
         <nav
           aria-label="بخش‌های شرکت"
           className="flex w-full shrink-0 flex-row flex-wrap gap-2 border-b border-neutral-200 pb-4 lg:w-[200px] lg:flex-col lg:gap-4 lg:self-stretch lg:border-b-0 lg:border-l lg:pb-0 lg:pl-2"
@@ -104,7 +108,9 @@ export function CompanyDetailShell({
           </div>
         </nav>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-5">{children}</div>
+        <ScrollArea className="min-w-0 flex-1 lg:min-h-0">
+          <div className="flex flex-col gap-5">{children}</div>
+        </ScrollArea>
       </div>
     </main>
   )

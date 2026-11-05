@@ -19,10 +19,13 @@ const LIST_ROUTES = new Set([
   '/dashboard/follow-ups',
 ])
 
+/** A company's detail screens fill the page; their section tabs stay put and only the open section scrolls. */
+const COMPANY_DETAIL_PREFIX = '/dashboard/companies/'
+
 export function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname().replace(/\/$/, '')
 
-  if (LIST_ROUTES.has(pathname)) {
+  if (LIST_ROUTES.has(pathname) || pathname.startsWith(COMPANY_DETAIL_PREFIX)) {
     return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
   }
 
