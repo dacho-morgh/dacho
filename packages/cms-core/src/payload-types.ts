@@ -73,6 +73,7 @@ export interface Config {
     categories: Category;
     users: User;
     'personnel-files': PersonnelFile;
+    'company-logos': CompanyLogo;
     companies: Company;
     faq: Faq;
     reviews: Review;
@@ -106,6 +107,7 @@ export interface Config {
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'personnel-files': PersonnelFilesSelect<false> | PersonnelFilesSelect<true>;
+    'company-logos': CompanyLogosSelect<false> | CompanyLogosSelect<true>;
     companies: CompaniesSelect<false> | CompaniesSelect<true>;
     faq: FaqSelect<false> | FaqSelect<true>;
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
@@ -1358,6 +1360,22 @@ export interface Exhibition {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "company-logos".
+ */
+export interface CompanyLogo {
+  id: number;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "companies".
  */
 export interface Company {
@@ -1366,6 +1384,7 @@ export interface Company {
   nationalId: string;
   activityDomain?: string | null;
   registrationNumber?: string | null;
+  logo?: (number | null) | CompanyLogo;
   type?: ('سهامی خاص' | 'سهامی عام' | 'مسئولیت محدود' | 'دانش‌بنیان' | 'استارتاپ' | 'سایر') | null;
   province?: string | null;
   city?: string | null;
@@ -1770,6 +1789,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'personnel-files';
         value: number | PersonnelFile;
+      } | null)
+    | ({
+        relationTo: 'company-logos';
+        value: number | CompanyLogo;
       } | null)
     | ({
         relationTo: 'companies';
@@ -2290,6 +2313,21 @@ export interface PersonnelFilesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "company-logos_select".
+ */
+export interface CompanyLogosSelect<T extends boolean = true> {
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "companies_select".
  */
 export interface CompaniesSelect<T extends boolean = true> {
@@ -2297,6 +2335,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   nationalId?: T;
   activityDomain?: T;
   registrationNumber?: T;
+  logo?: T;
   type?: T;
   province?: T;
   city?: T;
