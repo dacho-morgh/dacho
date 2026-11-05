@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
@@ -16,6 +15,7 @@ import {
   DeleteAddressDialog,
   type CompanyAddress,
 } from '@/components/dashboard/company-detail/company-action-dialogs'
+import { CompanyLogoRow } from '@/components/dashboard/company-detail/company-logo-row'
 import { CompanyAccountTab } from '@/components/dashboard/company-detail/company-account-tab'
 import { DetailCard, InfoField } from '@/components/dashboard/company-detail/company-detail-parts'
 import {
@@ -96,6 +96,8 @@ export interface CompanyDetailResponse {
     updatedAt?: string | null
   }
   companyId?: string | null
+  /** The stored logo and its access-checked file route; null when the company has none. */
+  logo?: { id: string; url: string } | null
   company?: {
     name?: string
     establishmentDate?: string
@@ -473,27 +475,12 @@ export function CompanyDetailView({
     >
       {tab === 'profile' && (
         <>
-          {/* Logo: the server stores no company logo yet, so upload and removal stay inert. */}
-          <div className="flex flex-wrap items-center gap-4">
-            <Image
-              src="/figma/dashboard/profile-avatar.png"
-              alt={companyName || 'شرکت'}
-              width={80}
-              height={80}
-              className="size-20 rounded-2xl object-cover"
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button disabled variant="outline-gray" size="40" className="px-4">
-                <Typography as="span" variant="16/semibold" className="text-inherit">
-                  آپلود پروفایل جدید
-                </Typography>
-              </Button>
-              <Button disabled variant="gray" size="40" className="px-4">
-                <Typography as="span" variant="16/semibold" className="text-inherit">
-                  حذف پروفایل
-                </Typography>
-              </Button>
-            </div>
+          <CompanyLogoRow
+            companyId={id}
+            companyName={companyName}
+            logo={data.logo}
+            onChanged={loadData}
+          >
             <div className="ms-auto flex items-center gap-2">
               <Badge variant={badgeInfo.variant} size="md">
                 {badgeInfo.label}
@@ -504,7 +491,7 @@ export function CompanyDetailView({
                 </Typography>
               ) : null}
             </div>
-          </div>
+          </CompanyLogoRow>
 
           {/* Basic Company Info */}
           <DetailCard

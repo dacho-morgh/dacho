@@ -79,3 +79,28 @@ export async function updateRepresentativeAccount(
         : 'request_failed'
   throw new DashboardApiError(response.status, code)
 }
+
+export const COMPANY_LOGO_MAX_BYTES = 2_000_000
+export const COMPANY_LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+
+/**
+ * Stores the picture as a private CMS file, then points the company at it. When the second
+ * step fails the stored file is removed again so no orphan stays behind.
+ */
+export async function uploadCompanyLogo(companyId: string, file: File): Promise<void> {
+  const body = new FormData()
+  body.append('file', file)
+  const upload = await fetch('/api/company-logos', { method: 'POST', body, credentials: 'same-origin', cache: 'no-store' })
+  if (!upload.ok) throw new DashboardApiError(upload.status, upload.status === 413 ? 'logo_too_large' : 'upload_failed')
+  const { doc } = (await upload.json()) as { doc: { id: number | string } }
+  try {
+    await dashboardFetch<unknown>(`${company(companyId)}/logo`, json('PUT', { logoId: String(doc.id) }))
+  } catch (cause) {
+    await fetch(`/api/company-logos/${doc.id}`, { method: 'DELETE', credentials: 'same-origin' }).catch(() => undefined)
+    throw cause
+  }
+}
+
+export function removeCompanyLogo(companyId: string): Promise<void> {
+  return dashboardFetch<unknown>(`${company(companyId)}/logo`, json('DELETE')).then(() => undefined)
+}
