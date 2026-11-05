@@ -481,7 +481,7 @@ export function CompanyDetailView({
             logo={data.logo}
             onChanged={loadData}
           >
-            <div className="ms-auto flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Badge variant={badgeInfo.variant} size="md">
                 {badgeInfo.label}
               </Badge>
