@@ -52,7 +52,7 @@ export async function SecretariatOverview({ userName }: { userName?: string | nu
     serverDashboardFetchResult<RoleOverviewDto>('/stats/overview'),
     serverDashboardFetchResult<Paginated<ActivityDto>>('/activities?limit=4'),
     serverDashboardFetchResult<{ items: VerificationCompany[] }>(
-      '/admin/companies?verificationStatus=pending',
+      '/admin/companies?verificationStatus=pending&page=1&limit=5',
     ),
   ])
   const data = overview.kind === 'ok' ? overview.data : undefined

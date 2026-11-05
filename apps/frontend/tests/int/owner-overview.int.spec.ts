@@ -3,11 +3,6 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OwnerOverview } from '@/components/dashboard/owner-overview'
-import {
-  activeEmployees,
-  companyVerification,
-  openEvents,
-} from '@/components/dashboard/owner-overview/derive'
 import { activityTone } from '@/components/dashboard/owner-overview/tone'
 import { monthlyTrend, percentChange } from '@/utilities/dashboard-trend'
 
@@ -67,44 +62,7 @@ describe('monthlyTrend', () => {
   })
 })
 
-describe('owner overview derivations', () => {
-  it('counts verified companies, pending reviews, active staff by role and open events', () => {
-    expect(
-      companyVerification([
-        { verificationStatus: 'approved' },
-        { verificationStatus: 'pending' },
-        { verificationStatus: 'unsubmitted' },
-      ]),
-    ).toEqual({ total: 3, approved: 1, pending: 1 })
-    expect(
-      activeEmployees([
-        { operationalRole: 'reviewer', isActive: true },
-        { operationalRole: 'reviewer', isActive: false },
-        { operationalRole: 'chief-reviewer', isActive: true },
-        { operationalRole: 'investment-reviewer', isActive: true },
-      ]),
-    ).toEqual({ total: 3, reviewers: 1, chiefs: 1, employersAndExperts: 1 })
-    expect(
-      openEvents(
-        [
-          {
-            registrationOpenAt: '2026-10-01T00:00:00Z',
-            registrationCloseAt: '2026-12-01T00:00:00Z',
-          },
-          {
-            registrationOpenAt: '2026-10-01T00:00:00Z',
-            registrationCloseAt: '2026-11-02T08:00:00Z',
-          },
-          {
-            registrationOpenAt: '2026-12-01T00:00:00Z',
-            registrationCloseAt: '2027-01-01T00:00:00Z',
-          },
-        ],
-        NOW,
-      ),
-    ).toBe(1)
-  })
-
+describe('activity tone', () => {
   it('reads an activity tone from its server action key', () => {
     expect(activityTone('reject')).toBe('error')
     expect(activityTone('return_for_correction')).toBe('warning')
@@ -183,39 +141,13 @@ describe('OwnerOverview', () => {
           },
         }
       }
-      if (path === '/admin/companies') {
+      if (path === '/stats/owner-summary') {
         return {
           kind: 'ok',
           data: {
-            items: [
-              { verificationStatus: 'approved' },
-              { verificationStatus: 'approved' },
-              { verificationStatus: 'pending' },
-            ],
-          },
-        }
-      }
-      if (path === '/admin/employees') {
-        return {
-          kind: 'ok',
-          data: {
-            items: [
-              { operationalRole: 'reviewer', isActive: true },
-              { operationalRole: 'chief-reviewer', isActive: true },
-            ],
-          },
-        }
-      }
-      if (path === '/admin/events') {
-        return {
-          kind: 'ok',
-          data: {
-            items: [
-              {
-                registrationOpenAt: '2026-10-01T00:00:00Z',
-                registrationCloseAt: '2026-12-01T00:00:00Z',
-              },
-            ],
+            companies: { total: 3, approved: 2, pending: 1 },
+            staff: { total: 2, reviewers: 1, chiefs: 1, employersAndExperts: 0 },
+            events: { total: 1, open: 1 },
           },
         }
       }
@@ -256,7 +188,7 @@ describe('OwnerOverview', () => {
   it('shows a dash and a notice, never a zero, for a read that failed', async () => {
     const ok = backend.fetch.getMockImplementation()!
     backend.fetch.mockImplementation(async (path: string) =>
-      path === '/admin/companies' || path === '/activities?limit=4'
+      path === '/stats/owner-summary' || path === '/activities?limit=4'
         ? { kind: 'unavailable' }
         : ok(path),
     )

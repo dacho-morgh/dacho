@@ -4,12 +4,13 @@ import { actorOf } from '../proxy-auth.js'
 import { parseRequestFilters, parsePositiveInt, isCompanyAdministrator } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 import type { ChartSlice } from '../stats-repo.js'
+import { activeStaffCounts, companyVerificationCounts, openEventCounts } from '../owner-summary.js'
 
 /** Booth steps the Secretariat acts on; the others wait on the company or are done. */
 const SECRETARIAT_BOOTH_QUEUES: readonly string[] = ['attendance_pending', 'receipt_pending']
 
 export function registerStatsRoutes(router: Router, ctx: DashboardContext): void {
-  const { activities, stats, support, verificationStore, limitActivities, resolveScope } = ctx
+  const { deps, activities, stats, support, verificationStore, eventStore, limitActivities, resolveScope } = ctx
 
   router.get('/stats', async (req, res, next) => {
     try {
@@ -95,6 +96,51 @@ export function registerStatsRoutes(router: Router, ctx: DashboardContext): void
       charts: results.flatMap(({ section }) => (section?.chart ? [section.chart] : [])),
       unavailable: results.filter(({ section }) => !section).map(({ key }) => key),
     })
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * The owner overview's company, staff and event counts in one read. The overview used to fetch the
+   * full company, employee and event lists (three proxy round trips, each with its own CMS reads and
+   * the public event pages) only to count them. Each section reads on its own: one that fails is
+   * `null` instead of zero, and the others still arrive.
+   */
+  router.get('/stats/owner-summary', async (_req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isCompanyAdministrator(actor.operationalRole)) { res.status(403).json({ error: 'forbidden' }); return }
+      const read = async <T>(name: string, section: () => Promise<T>): Promise<T | null> => {
+        try { return await section() } catch (error) {
+          console.error(`stats/owner-summary: ${name} failed`, error)
+          return null
+        }
+      }
+      const [companies, staff, events] = await Promise.all([
+        // Same reads as the company list, so the counts match what that page shows.
+        read('companies', async () => {
+          const [accounts, records] = await Promise.all([
+            deps.userStore.list({ role: 'representative' }),
+            deps.companyStore.list(),
+          ])
+          const active = accounts.filter((user) => user.isActive !== false)
+          const companyOf = new Map<string, (typeof records)[number]>()
+          for (const company of records) {
+            if (company.representativeId && !companyOf.has(company.representativeId)) companyOf.set(company.representativeId, company)
+          }
+          const verifications = await verificationStore.currentSummaries(
+            active.flatMap((user) => companyOf.get(user.id)?.id ?? []),
+          )
+          return companyVerificationCounts(
+            active.map((user) => {
+              const company = companyOf.get(user.id)
+              return company ? verifications.get(company.id)?.status : undefined
+            }),
+          )
+        }),
+        read('staff', async () => activeStaffCounts(await deps.userStore.list())),
+        read('events', async () => openEventCounts(await eventStore.list(), new Date())),
+      ])
+      res.set('Cache-Control', 'private, no-store, max-age=0').json({ companies, staff, events })
     } catch (error) { next(error) }
   })
 

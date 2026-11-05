@@ -71,15 +71,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!user.operationalRole && user.contentEditor === true) redirect('/admin')
 
-  const capabilityResult = await serverDashboardFetchResult<DashboardNavigation>('/capabilities')
+  const requestedPath = requestHeaders.get('x-dacho-dashboard-path') || '/dashboard'
+  // The two reads do not depend on each other, so they run together instead of one after the other.
+  const [capabilityResult, accessResult] = await Promise.all([
+    serverDashboardFetchResult<DashboardNavigation>('/capabilities'),
+    serverDashboardFetchResult<{ allowed: boolean }>(`/access?path=${encodeURIComponent(requestedPath)}`),
+  ])
   if (capabilityResult.kind === 'unauthenticated') redirect(getLoginUrl(returnUrl, { expired: true }))
   if (capabilityResult.kind === 'denied') return <AccessState denied />
   if (capabilityResult.kind === 'unavailable') return <AccessState denied={false} />
 
-  const requestedPath = requestHeaders.get('x-dacho-dashboard-path') || '/dashboard'
-  const accessResult = await serverDashboardFetchResult<{ allowed: boolean }>(
-    `/access?path=${encodeURIComponent(requestedPath)}`,
-  )
   if (accessResult.kind === 'unauthenticated') redirect(getLoginUrl(returnUrl, { expired: true }))
   if (accessResult.kind === 'denied') return <AccessState denied />
   if (accessResult.kind === 'unavailable') return <AccessState denied={false} />
@@ -118,7 +119,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <SidebarInset id="dashboard-content" tabIndex={-1} className="flex h-svh min-w-0 flex-1 flex-col overflow-hidden bg-neutral-50 outline-none">
           <SidebarTrigger
             aria-label="باز کردن منو"
-            className="absolute top-6 left-6 z-30 size-10 rounded-[10px] text-neutral-800 md:hidden"
+            className="absolute top-6 left-6 z-30 size-10 rounded-[10px] bg-neutral-50/90 text-neutral-800 backdrop-blur-sm md:hidden"
           >
             <MenuIcon aria-hidden="true" className="size-6" />
           </SidebarTrigger>
