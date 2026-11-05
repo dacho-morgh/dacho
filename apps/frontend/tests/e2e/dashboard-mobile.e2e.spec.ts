@@ -252,33 +252,34 @@ test('separates management-list loading, empty, expired, denied, and unavailable
   test.setTimeout(90_000)
   await signIn(page, manager.phone)
 
+  // The first page of the table is read on the server, so the browser asks for companies only when
+  // the search changes. Each search below is one such request, answered with the state under test.
   let status = 503
-  let isFirstRequest = true
-  let releaseFirstResponse!: () => void
-  let markFirstRequestSeen!: () => void
-  const firstResponseGate = new Promise<void>((resolve) => { releaseFirstResponse = resolve })
-  const firstRequestSeen = new Promise<void>((resolve) => { markFirstRequestSeen = resolve })
+  let gate: Promise<void> | undefined
   await page.route('**/api/dashboard/admin/companies*', async (route) => {
-    if (isFirstRequest) {
-      isFirstRequest = false
-      markFirstRequestSeen()
-      await firstResponseGate
-    }
+    await gate
     await route.fulfill({ status, json: status === 200 ? { items: [] } : { error: 'test response' } })
   })
 
   await page.goto('http://localhost:3000/dashboard/companies')
-  await firstRequestSeen
-  await expect(page.getByRole('status').filter({ hasText: 'در حال دریافت اطلاعات' })).toBeVisible()
-  releaseFirstResponse()
+  const search = page.getByPlaceholder('جستجوی شرکت')
+  await expect(search).toBeVisible()
+
+  await search.fill('error-state')
   await expect(page.getByRole('alert').filter({ hasText: 'دریافت اطلاعات انجام نشد' })).toBeVisible()
 
+  // With no rows left on screen, the next search shows the loading line until its answer arrives.
   status = 200
-  await page.getByRole('button', { name: 'تلاش دوباره' }).click()
-  await expect(page.getByText('هنوز موردی برای نمایش وجود ندارد')).toBeVisible()
+  let releaseResponse!: () => void
+  gate = new Promise<void>((resolve) => { releaseResponse = resolve })
+  await search.fill('empty-state')
+  await expect(page.getByRole('status').filter({ hasText: 'در حال دریافت اطلاعات' })).toBeVisible()
+  releaseResponse()
+  gate = undefined
+  await expect(page.getByText('موردی پیدا نشد')).toBeVisible()
 
   status = 401
-  await page.reload()
+  await search.fill('expired-state')
   await expect(page.getByRole('alert').filter({ hasText: 'نشست شما پایان یافته است' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'ورود دوباره' })).toHaveAttribute(
     'href',
@@ -286,7 +287,7 @@ test('separates management-list loading, empty, expired, denied, and unavailable
   )
 
   status = 403
-  await page.reload()
+  await search.fill('denied-state')
   await expect(page.getByRole('alert').filter({ hasText: 'دسترسی به این اطلاعات مجاز نیست' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'بازگشت به پیشخوان' })).toHaveAttribute('href', '/dashboard')
 })
