@@ -100,7 +100,7 @@ export function CompanyLogoRow({
           disabled={busy !== null}
           onClick={() => input.current?.click()}
         >
-          <Typography as="span" variant="14/regular" className="text-inherit sm:hidden">
+          <Typography as="span" variant="16/semibold" className="text-inherit sm:hidden">
             آپلود جدید
           </Typography>
           <Typography as="span" variant="16/semibold" className="hidden text-inherit sm:inline">
@@ -118,7 +118,7 @@ export function CompanyLogoRow({
           disabled={!logo || busy !== null}
           onClick={() => void run('remove', () => removeCompanyLogo(companyId), 'لوگوی شرکت حذف شد.', 'حذف لوگو انجام نشد. دوباره تلاش کنید.')}
         >
-          <Typography as="span" variant="14/regular" className="text-inherit sm:hidden">
+          <Typography as="span" variant="16/semibold" className="text-inherit sm:hidden">
             حذف
           </Typography>
           <Typography as="span" variant="16/semibold" className="hidden text-inherit sm:inline">
