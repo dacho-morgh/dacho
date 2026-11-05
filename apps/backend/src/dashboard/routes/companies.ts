@@ -2,11 +2,25 @@
 import type { Router } from 'express'
 import type { NextFunction, Request, Response } from 'express'
 import { operationalRoleOf } from '../../access/roles.js'
+import { changesAddress, changesCompany, COMPANY_EDIT_REVERIFICATION_REASON } from '../company-edits.js'
+import type { CompanyInfo } from '../profile-repo.js'
 import { actorOf } from '../proxy-auth.js'
 import { isCompanyAdministrator, parsePositiveInt } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 
 const MAX_COMPANY_PAGE_SIZE = 100
+const MAX_COMPANY_FIELD_LENGTH = 200
+const EDITABLE_COMPANY_FIELDS = [
+  'name', 'establishmentDate', 'status', 'type', 'registrationNumber', 'economicCode',
+] as const satisfies readonly (keyof CompanyInfo)[]
+const ADDRESS_FIELDS = ['title', 'province', 'city', 'postalCode', 'address'] as const
+
+/** A trimmed string within the field limit, or undefined when the value is not one. */
+function shortText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const text = value.trim()
+  return text.length <= MAX_COMPANY_FIELD_LENGTH ? text : undefined
+}
 
 export function registerCompanyRoutes(router: Router, ctx: DashboardContext): void {
   const { deps, profileRepo, verificationStore } = ctx
@@ -118,6 +132,7 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
           phone: target.phone,
           email: target.email ?? null,
           position: target.position ?? null,
+          updatedAt: target.updatedAt ?? null,
         },
         companyId: profile.companyId,
         company: profile.company,
@@ -136,6 +151,136 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
             }
           : { status: 'unsubmitted', revision: 0 },
       })
+    } catch (error) { next(error) }
+  })
+
+  /** The representative a company detail URL names, after the administrator check; answers the refusal itself. */
+  const companyTarget = async (req: Request, res: Response) => {
+    const actor = actorOf(res)
+    if (!isCompanyAdministrator(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return null
+    }
+    const target = await deps.userStore.findById(req.params.id as string).catch(() => undefined)
+    if (!target || operationalRoleOf(target) !== 'representative') {
+      res.status(404).json({ error: 'not_found' })
+      return null
+    }
+    const profile = await profileRepo.getProfile(target.id)
+    if (!profile.companyId) {
+      res.status(404).json({ error: 'company_not_found' })
+      return null
+    }
+    return { target, profile, companyId: profile.companyId }
+  }
+
+  router.patch('/admin/companies/:id', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      const body = req.body?.company ?? req.body
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        res.status(400).json({ error: 'invalid_company' })
+        return
+      }
+      if (body.nationalId !== undefined && body.nationalId !== found.profile.company.nationalId) {
+        res.status(403).json({ error: 'protected_company_identity' })
+        return
+      }
+      const update: Partial<CompanyInfo> = {}
+      for (const field of EDITABLE_COMPANY_FIELDS) {
+        if (body[field] === undefined) continue
+        const text = shortText(body[field])
+        if (text === undefined || (field === 'name' && text === '')) {
+          res.status(400).json({ error: 'invalid_company' })
+          return
+        }
+        update[field] = text
+      }
+      if (Object.keys(update).length === 0) {
+        res.status(400).json({ error: 'invalid_company' })
+        return
+      }
+      if (changesCompany(found.profile, { company: update })) {
+        await verificationStore.invalidateApproval(found.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+      }
+      const profile = await profileRepo.updateBasicInfo(found.target.id, update)
+      res.json({ company: profile.company })
+    } catch (error) { next(error) }
+  })
+
+  const addressInput = (body: unknown, requireAll: boolean) => {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return null
+    const input: Partial<Record<(typeof ADDRESS_FIELDS)[number], string>> = {}
+    for (const field of ADDRESS_FIELDS) {
+      const value = (body as Record<string, unknown>)[field]
+      if (value === undefined) continue
+      const text = shortText(value)
+      if (text === undefined) return null
+      input[field] = text
+    }
+    if (requireAll ? !input.title || !input.address : input.title === '' || input.address === '') return null
+    return input
+  }
+
+  router.post('/admin/companies/:id/addresses', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      const input = addressInput(req.body, true)
+      if (!input) {
+        res.status(400).json({ error: 'invalid_address' })
+        return
+      }
+      await verificationStore.invalidateApproval(found.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+      const address = await profileRepo.addAddress(found.target.id, {
+        title: input.title ?? '',
+        province: input.province ?? '',
+        city: input.city ?? '',
+        postalCode: input.postalCode ?? '',
+        address: input.address ?? '',
+      })
+      res.status(201).json({ address })
+    } catch (error) { next(error) }
+  })
+
+  router.put('/admin/companies/:id/addresses/:addressId', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      const update = addressInput(req.body, false)
+      const current = found.profile.addresses.find((item) => item.id === req.params.addressId)
+      if (!update) {
+        res.status(400).json({ error: 'invalid_address' })
+        return
+      }
+      if (!current) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (changesAddress(current, update)) {
+        await verificationStore.invalidateApproval(found.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+      }
+      const address = await profileRepo.updateAddress(found.target.id, current.id, update)
+      if (!address) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      res.json({ address })
+    } catch (error) { next(error) }
+  })
+
+  router.delete('/admin/companies/:id/addresses/:addressId', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      if (!found.profile.addresses.some((item) => item.id === req.params.addressId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      await verificationStore.invalidateApproval(found.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+      await profileRepo.deleteAddress(found.target.id, req.params.addressId as string)
+      res.json({ success: true })
     } catch (error) { next(error) }
   })
 

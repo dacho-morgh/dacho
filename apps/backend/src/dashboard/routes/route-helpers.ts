@@ -27,6 +27,10 @@ export function parseRequestFilters(
     if (typeof query.eventId !== 'string' || !isUuid(query.eventId)) return 'invalid_event_id'
     filters.eventId = query.eventId
   }
+  if (query.ownerId !== undefined) {
+    if (typeof query.ownerId !== 'string' || !/^\d{1,10}$/.test(query.ownerId)) return 'invalid_owner_id'
+    filters.ownerId = query.ownerId
+  }
   if (query.stage !== undefined) {
     if (!REVIEW_STAGES.includes(query.stage)) return 'invalid_stage'
     filters.reviewStage = query.stage as ReviewStage
