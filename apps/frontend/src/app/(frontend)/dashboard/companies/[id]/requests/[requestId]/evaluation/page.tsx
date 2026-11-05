@@ -5,7 +5,7 @@ import { getPayload } from 'payload'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { loadCompanyRequestPage } from '@/components/dashboard/company-detail/company-request-data'
 import { CompanyEvaluationView } from '@/components/dashboard/company-detail/company-request-views'
-import { canReadCompanyDossiers } from '@/utilities/dashboard-server'
+import { canReadCompanyDossiers, dashboardOperationalRole } from '@/utilities/dashboard-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,5 +32,13 @@ export default async function CompanyRequestEvaluationPage({
     )
   }
 
-  return <CompanyEvaluationView companyId={id} company={data.company} detail={data.detail} fields={data.fields} />
+  return (
+    <CompanyEvaluationView
+      companyId={id}
+      company={data.company}
+      detail={data.detail}
+      fields={data.fields}
+      canManageAccount={dashboardOperationalRole(user) === 'system-owner'}
+    />
+  )
 }

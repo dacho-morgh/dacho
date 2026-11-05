@@ -3,14 +3,13 @@ import Link from 'next/link'
 import {
   ClipboardTextIcon,
   CompanyBuildingIcon,
-  DashboardTrashIcon,
   DocumentTextIcon,
   ProfileUserIcon,
 } from '@/components/icons'
-import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
+import { DeleteCompanyAccount } from './company-delete-account'
 
 export type CompanyTab = 'profile' | 'resume' | 'account' | 'requests'
 
@@ -35,11 +34,16 @@ export function CompanyDetailShell({
   id,
   companyName,
   active,
+  representativeUpdatedAt,
+  canManageAccount = false,
   children,
 }: {
   id: string
   companyName?: string
   active: CompanyTab
+  /** The representative account's version, which the account commands are guarded by. */
+  representativeUpdatedAt?: string | null
+  canManageAccount?: boolean
   children: ReactNode
 }) {
   return (
@@ -92,19 +96,12 @@ export function CompanyDetailShell({
           })}
           <div className="flex items-center gap-2 lg:w-full">
             <span aria-hidden="true" className="hidden h-7 w-1 shrink-0 lg:block" />
-            {/* The server has no account removal for a company yet, so the entry stays visible but inert. */}
-            <Button
-              disabled
-              variant="text-destructive"
-              size="40"
-              icon={<DashboardTrashIcon className="size-6" aria-hidden="true" />}
-              className="flex-1 justify-start rounded-xl"
-              title="حذف حساب شرکت هنوز در سرویس پشتیبانی نمی‌شود"
-            >
-              <Typography as="span" variant="16/regular" className="text-inherit">
-                حذف حساب شرکت
-              </Typography>
-            </Button>
+            <DeleteCompanyAccount
+              userId={id}
+              updatedAt={representativeUpdatedAt}
+              companyName={companyName}
+              canManage={canManageAccount}
+            />
           </div>
         </nav>
 

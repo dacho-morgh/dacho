@@ -16,6 +16,8 @@ interface RequestViewProps {
   company: CompanyDetailResponse
   detail: RequestDetail
   fields: RequestFormField[]
+  /** Only the System Owner may change or remove the representative's account. */
+  canManageAccount?: boolean
 }
 
 const answerText = (value: unknown): string => {
@@ -134,14 +136,20 @@ function EventInfoCard({ detail }: { detail: RequestDetail }) {
 }
 
 /** The company's view of one request (Figma 30950:9992 and 30950:17783). */
-export function CompanyRequestView({ companyId, company, detail, fields }: RequestViewProps) {
+export function CompanyRequestView({ companyId, company, detail, fields, canManageAccount }: RequestViewProps) {
   const { request } = detail
   const companyName = company.company?.name
   const canEvaluate = request.allowedActions?.some((action) => action === 'triage' || action === 'decideReview') ?? false
   const answers = requestAnswers({ detail, fields })
 
   return (
-    <CompanyDetailShell id={companyId} companyName={companyName} active="requests">
+    <CompanyDetailShell
+      id={companyId}
+      companyName={companyName}
+      active="requests"
+      representativeUpdatedAt={company.representative?.updatedAt}
+      canManageAccount={canManageAccount}
+    >
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Typography as="h2" variant="24/bold" color="neutral-700" className="min-w-0 flex-1 break-words">
           درخواست {companyName || '—'}
@@ -189,13 +197,19 @@ export function CompanyRequestView({ companyId, company, detail, fields }: Reque
 }
 
 /** The evaluation form of one request (Figma 30584:21543). */
-export function CompanyEvaluationView({ companyId, company, detail, fields }: RequestViewProps) {
+export function CompanyEvaluationView({ companyId, company, detail, fields, canManageAccount }: RequestViewProps) {
   const { request } = detail
   const answers = requestAnswers({ detail, fields })
   const requestHref = `/dashboard/companies/${encodeURIComponent(companyId)}/requests/${encodeURIComponent(request.id)}`
 
   return (
-    <CompanyDetailShell id={companyId} companyName={company.company?.name} active="requests">
+    <CompanyDetailShell
+      id={companyId}
+      companyName={company.company?.name}
+      active="requests"
+      representativeUpdatedAt={company.representative?.updatedAt}
+      canManageAccount={canManageAccount}
+    >
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center gap-2">
           <Typography as="h2" variant="24/bold" color="neutral-700">

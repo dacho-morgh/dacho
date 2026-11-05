@@ -10,6 +10,12 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
+import {
+  AddressDialog,
+  CompanyInfoDialog,
+  DeleteAddressDialog,
+  type CompanyAddress,
+} from '@/components/dashboard/company-detail/company-action-dialogs'
 import { CompanyAccountTab } from '@/components/dashboard/company-detail/company-account-tab'
 import { DetailCard, InfoField } from '@/components/dashboard/company-detail/company-detail-parts'
 import {
@@ -86,6 +92,8 @@ export interface CompanyDetailResponse {
     phone?: string | null
     email?: string | null
     position?: string | null
+    /** The account's version stamp, which the account commands are guarded by. */
+    updatedAt?: string | null
   }
   companyId?: string | null
   company?: {
@@ -100,7 +108,7 @@ export interface CompanyDetailResponse {
     city?: string
   }
   executives?: { role?: string; name?: string }[]
-  addresses?: { title: string; address: string; postalCode: string }[]
+  addresses?: { id?: string; title: string; province?: string; city?: string; address: string; postalCode: string }[]
   allowedActions?: ('read' | 'approve' | 'return' | 'reject')[]
   verification?: {
     id?: string
@@ -136,7 +144,22 @@ function verificationStatusBadge(status: VerificationStatus): {
   }
 }
 
-export function CompanyDetailView({ id, tab = 'profile' }: { id: string; tab?: CompanyTab }) {
+type CompanyDialog =
+  | { kind: 'info' }
+  | { kind: 'address'; address?: CompanyAddress }
+  | { kind: 'delete-address'; address: CompanyAddress }
+
+export function CompanyDetailView({
+  id,
+  tab = 'profile',
+  canManageAccount = false,
+}: {
+  id: string
+  tab?: CompanyTab
+  /** Only the System Owner may change or remove the representative's account. */
+  canManageAccount?: boolean
+}) {
+  const [dialog, setDialog] = useState<CompanyDialog | null>(null)
   const [data, setData] = useState<CompanyDetailResponse | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   // Each load gets a sequence number so a slower, older response never overwrites a newer one.
@@ -441,7 +464,13 @@ export function CompanyDetailView({ id, tab = 'profile' }: { id: string; tab?: C
   const snapshotDocuments = verification?.snapshot?.documents ?? []
 
   return (
-    <CompanyDetailShell id={id} companyName={companyName} active={tab}>
+    <CompanyDetailShell
+      id={id}
+      companyName={companyName}
+      active={tab}
+      representativeUpdatedAt={data.representative?.updatedAt}
+      canManageAccount={canManageAccount}
+    >
       {tab === 'profile' && (
         <>
           {/* Logo: the server stores no company logo yet, so upload and removal stay inert. */}
@@ -481,8 +510,14 @@ export function CompanyDetailView({ id, tab = 'profile' }: { id: string; tab?: C
           <DetailCard
             title="اطلاعات پایه"
             action={
-              // Editing company identity as an admin is not offered by the server yet.
-              <Button disabled variant="gray" size="32" icon={<DashboardEditIcon />} className="px-3">
+              <Button
+                type="button"
+                variant="gray"
+                size="32"
+                icon={<DashboardEditIcon />}
+                className="px-3"
+                onClick={() => setDialog({ kind: 'info' })}
+              >
                 <Typography as="span" variant="14/regular" className="text-inherit">
                   ویرایش
                 </Typography>
@@ -496,11 +531,18 @@ export function CompanyDetailView({ id, tab = 'profile' }: { id: string; tab?: C
             </div>
           </DetailCard>
 
-          {/* Addresses: the server lists them for admins but has no admin write endpoints yet. */}
+          {/* Addresses */}
           <DetailCard
             title="آدرس ها"
             action={
-              <Button disabled variant="gray" size="32" icon={<DashboardAddIcon />} className="px-3">
+              <Button
+                type="button"
+                variant="gray"
+                size="32"
+                icon={<DashboardAddIcon />}
+                className="px-3"
+                onClick={() => setDialog({ kind: 'address' })}
+              >
                 <Typography as="span" variant="14/regular" className="text-inherit">
                   آدرس جدید
                 </Typography>
@@ -508,9 +550,9 @@ export function CompanyDetailView({ id, tab = 'profile' }: { id: string; tab?: C
             }
           >
             <div className="flex flex-col gap-5">
-              {addresses.map((address) => (
+              {addresses.map((address, index) => (
                 <div
-                  key={`${address.title}-${address.postalCode}`}
+                  key={address.id ?? `${index}-${address.title}`}
                   className="flex flex-col gap-3 rounded-lg border border-neutral-100 px-4 py-2"
                 >
                   <div className="flex items-start gap-3">
@@ -518,10 +560,26 @@ export function CompanyDetailView({ id, tab = 'profile' }: { id: string; tab?: C
                       {address.title}
                     </Typography>
                     <div className="flex items-center gap-2">
-                      <Button disabled variant="text-gray" size="icon-32" aria-label="ویرایش آدرس">
+                      <Button
+                        type="button"
+                        variant="text-gray"
+                        size="icon-32"
+                        aria-label={`ویرایش آدرس ${address.title}`}
+                        disabled={!address.id}
+                        onClick={() => address.id && setDialog({ kind: 'address', address: toCompanyAddress(address, address.id) })}
+                      >
                         <DashboardEditIcon />
                       </Button>
-                      <Button disabled variant="text-gray" size="icon-32" aria-label="حذف آدرس">
+                      <Button
+                        type="button"
+                        variant="text-gray"
+                        size="icon-32"
+                        aria-label={`حذف آدرس ${address.title}`}
+                        disabled={!address.id}
+                        onClick={() =>
+                          address.id && setDialog({ kind: 'delete-address', address: toCompanyAddress(address, address.id) })
+                        }
+                      >
                         <DashboardTrashIcon />
                       </Button>
                     </div>
@@ -803,7 +861,24 @@ export function CompanyDetailView({ id, tab = 'profile' }: { id: string; tab?: C
         </DetailCard>
       )}
 
-      {tab === 'account' && <CompanyAccountTab representative={data.representative} />}
+      {tab === 'account' && (
+        <CompanyAccountTab
+          userId={id}
+          representative={data.representative}
+          canManage={canManageAccount}
+          onChanged={loadData}
+        />
+      )}
+
+      {dialog?.kind === 'info' ? (
+        <CompanyInfoDialog companyId={id} company={company} onClose={() => setDialog(null)} onSaved={loadData} />
+      ) : null}
+      {dialog?.kind === 'address' ? (
+        <AddressDialog companyId={id} address={dialog.address} onClose={() => setDialog(null)} onSaved={loadData} />
+      ) : null}
+      {dialog?.kind === 'delete-address' ? (
+        <DeleteAddressDialog companyId={id} address={dialog.address} onClose={() => setDialog(null)} onSaved={loadData} />
+      ) : null}
 
       {tab === 'requests' && <CompanyRequestsTab companyId={id} />}
     </CompanyDetailShell>
@@ -839,6 +914,20 @@ function formatDate(iso: string): string {
     })
   } catch {
     return iso
+  }
+}
+
+function toCompanyAddress(
+  address: NonNullable<CompanyDetailResponse['addresses']>[number],
+  id: string,
+): CompanyAddress {
+  return {
+    id,
+    title: address.title,
+    province: address.province ?? '',
+    city: address.city ?? '',
+    postalCode: address.postalCode,
+    address: address.address,
   }
 }
 

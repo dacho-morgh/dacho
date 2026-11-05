@@ -17,10 +17,7 @@ import {
 
 type LoadState = 'loading' | 'ready' | 'unavailable'
 
-/**
- * The server has no per-company request filter yet, so this reads the newest page of the
- * admin list and keeps the rows this company's representative owns.
- */
+/** The newest requests of the company's representative; the server filters them by owner. */
 const REQUEST_PAGE_SIZE = 100
 
 const HEADERS = ['درخواست', 'وضعیت', 'تاریخ سررسید', 'تاریخ ثبت']
@@ -40,14 +37,14 @@ export function CompanyRequestsTab({ companyId }: { companyId: string }) {
 
   useEffect(() => {
     let current = true
-    fetch(`/api/dashboard/admin/requests?limit=${REQUEST_PAGE_SIZE}`, { cache: 'no-store' })
+    fetch(`/api/dashboard/admin/requests?ownerId=${encodeURIComponent(companyId)}&limit=${REQUEST_PAGE_SIZE}`, { cache: 'no-store' })
       .then(async (response) => {
         if (!response.ok) throw new Error('unavailable')
         return (await response.json()) as Paginated<RequestDto>
       })
       .then((page) => {
         if (!current) return
-        setRequests(page.items.filter((item) => item.ownerId === companyId))
+        setRequests(page.items)
         setState('ready')
       })
       .catch(() => {
