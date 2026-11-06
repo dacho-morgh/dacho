@@ -383,7 +383,7 @@ export function AdminListView<T>({
               <tr
                 key={getKey(item)}
                 data-state={selected.has(getKey(item)) ? 'selected' : undefined}
-                className="h-[72px] border-b border-neutral-100 last:border-0 data-[state=selected]:bg-brand-50/50"
+                className="h-[72px] border-b border-neutral-100 transition-colors last:border-0 hover:bg-neutral-50 has-[[data-state=open]]:bg-neutral-50 data-[state=selected]:bg-brand-50/50 data-[state=selected]:hover:bg-brand-50/70"
               >
                 {selectable && (
                   <td className="w-12 px-4">

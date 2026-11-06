@@ -6,40 +6,49 @@ import {
   type OperationalRole,
 } from '@cms-core/access/roles'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
-import { DecisionDialog } from '@/components/dashboard/decision-dialog'
-import { SearchField } from '@/components/dashboard/search-field'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+} from 'react'
+import { toast } from 'sonner'
+import {
+  AdminListView,
+  AdminRowActions,
+  type AdminBulkAction,
+  type AdminColumn,
+  type AdminListLoadState,
+} from '@/components/dashboard/admin-list-view'
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 import {
   DashboardAddIcon,
   DashboardEditIcon,
-  DashboardEyeIcon,
-  DashboardMoreVerticalIcon,
   DashboardTrashIcon,
-  EmptyInboxIllustration,
   TickCircleIcon,
 } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
-import { cn } from '@/utilities/ui'
-import { roleTag, setEmployeeActive, type Employee } from './employees/employee-data'
-import { RequestError, adminErrorMessage, adminRequest, loadPeople } from './owner-admin'
-import { toast } from 'sonner'
-import { ListFilterButton } from '@/components/dashboard/list-filter-button'
+import { AdminError } from './owner-admin'
+import { loadEmployees, roleTag, setEmployeeActive, type Employee } from './employees/employee-data'
 
 const SAVED_NOTICES: Record<string, string> = {
   created: 'کارمند جدید ثبت شد.',
   updated: 'اطلاعات کارمند ذخیره شد.',
 }
+
+const SEARCH_DEBOUNCE_MS = 300
+const PAGE_SIZE = 10
+const ROLE_OPTIONS = OPERATIONAL_ROLES.filter((role) => role !== 'representative')
+
+const faNumber = (value: number) => value.toLocaleString('fa-IR')
+const keyOf = (person: Employee) => String(person.id)
+const hrefOf = (person: Employee) => `/dashboard/employees/${encodeURIComponent(person.id)}`
 
 const searchText = (person: Employee) =>
   [
@@ -53,37 +62,78 @@ const searchText = (person: Employee) =>
     .join(' ')
     .toLocaleLowerCase('fa')
 
-/* Header cell — Figma "Table header cell" (32:8429): 44px, 14/SemiBold grey-400. */
-function HeaderCell({ label, className }: { label?: string; className?: string }) {
-  return (
-    <th className={cn('h-11 border-b border-neutral-100 px-4 py-3 text-right', className)}>
-      {label ? (
-        <Typography
-          as="span"
-          variant="14/semibold"
-          color="neutral-400"
-          className="whitespace-nowrap"
-        >
-          {label}
-        </Typography>
-      ) : (
-        <span className="sr-only">عملیات</span>
-      )}
-    </th>
+/** The URL's `role`, `page` and `search`, read the same way on every render. */
+function employeeParams(params: { role?: string | null; page?: string | null; search?: string | null }) {
+  return {
+    role: ROLE_OPTIONS.find((role) => role === params.role) ?? 'all',
+    page: Math.max(1, Number.parseInt(params.page ?? '', 10) || 1),
+    search: (params.search ?? '').trim(),
+  } as { role: OperationalRole | 'all'; page: number; search: string }
+}
+
+/** What an action does to the list once the server agrees; shown before it answers. */
+type ListChange = { ids: ReadonlySet<string>; isActive: boolean }
+
+function applyChange(people: Employee[], change: ListChange): Employee[] {
+  return people.map((person) =>
+    change.ids.has(keyOf(person)) ? { ...person, isActive: change.isActive } : person,
   )
 }
 
+/** Each account is switched through the same command as its dossier: nothing is erased. */
+async function switchEmployees(items: Employee[], isActive: boolean) {
+  const results = await Promise.allSettled(
+    items.map(async (item) => {
+      if (!item.updatedAt) throw new Error('missing_version')
+      await setEmployeeActive(item, isActive)
+    }),
+  )
+  const done = results.filter((result) => result.status === 'fulfilled').length
+  return { done, failed: results.length - done }
+}
+
+const deactivateAction: AdminBulkAction<Employee> = {
+  id: 'deactivate',
+  label: 'حذف کارمند',
+  icon: <DashboardTrashIcon aria-hidden="true" />,
+  destructive: true,
+  appliesTo: (item) => item.isActive,
+  title: 'حذف کارمند',
+  describe: (count, skipped) =>
+    `حساب ${faNumber(count)} کارمند غیرفعال می‌شود و دیگر نمی‌تواند وارد سامانه شود. سوابق و تاریخچه کارهای او حذف نمی‌شود.` +
+    (skipped > 0 ? ` ${faNumber(skipped)} کارمند انتخاب‌شده از قبل غیرفعال است و نادیده گرفته می‌شود.` : ''),
+  confirmLabel: 'حذف کارمند',
+  run: (items) => switchEmployees(items, false),
+}
+
+const activateAction: AdminBulkAction<Employee> = {
+  id: 'activate',
+  label: 'فعال‌سازی کارمند',
+  icon: <TickCircleIcon aria-hidden="true" />,
+  appliesTo: (item) => !item.isActive,
+  title: 'فعال‌سازی کارمند',
+  describe: (count, skipped) =>
+    `حساب ${faNumber(count)} کارمند دوباره فعال می‌شود و می‌تواند با نقش فعلی وارد سامانه شود.` +
+    (skipped > 0 ? ` ${faNumber(skipped)} کارمند انتخاب‌شده فعال است و نادیده گرفته می‌شود.` : ''),
+  confirmLabel: 'فعال‌سازی',
+  run: (items) => switchEmployees(items, true),
+}
+
+const text = (value: string) => (
+  <Typography variant="14/regular" color="secondary" className="max-sm:text-[13px]">
+    {value}
+  </Typography>
+)
+
 function Tag({ label, variant }: ReturnType<typeof roleTag>) {
   return (
-    <Badge variant={variant} size="md">
-      <Typography as="span" variant="14/regular" className="text-inherit">
-        {label}
-      </Typography>
+    <Badge variant={variant} size="sm">
+      {label}
     </Badge>
   )
 }
 
-/* Lead avatar cell — Figma 32:8690: 40px round avatar, 12px gap, 16/Regular grey-600. */
+/** Lead avatar cell: the name opens the dossier; an inactive account carries its own tag. */
 function NameCell({ person }: { person: Employee }) {
   const name = person.name || 'بدون نام'
   return (
@@ -97,398 +147,266 @@ function NameCell({ person }: { person: Employee }) {
         </Typography>
       </span>
       <Link
-        href={`/dashboard/employees/${encodeURIComponent(person.id)}`}
+        href={hrefOf(person)}
         className="min-w-0 truncate rounded-sm focus-visible:outline-2 focus-visible:outline-brand-500"
       >
-        <Typography
-          as="span"
-          variant="16/regular"
-          color="neutral-600"
-          className="whitespace-nowrap"
-        >
-          {name}
-        </Typography>
+        {text(name)}
       </Link>
       {!person.isActive && <Tag label="غیرفعال" variant="error" />}
     </div>
   )
 }
 
-const menuItemClass =
-  'flex h-8 w-full cursor-pointer items-center justify-start gap-2 rounded-[10px] px-1.5 py-2 text-neutral-700 focus:bg-neutral-100 data-[highlighted]:bg-neutral-100'
+function buildColumns(canManage: boolean, edit: (person: Employee) => void): AdminColumn<Employee>[] {
+  return [
+    { id: 'name', header: 'نام کارمند', render: (person) => <NameCell person={person} /> },
+    { id: 'role', header: 'نقش', render: (person) => <Tag {...roleTag(person.operationalRole)} /> },
+    {
+      id: 'activityField',
+      header: 'زمینه فعالیت',
+      render: (person) =>
+        person.activityField ? <Tag label={person.activityField} variant="primary" /> : text('—'),
+    },
+    { id: 'degree', header: 'مدرک دانشگاهی', render: (person) => text(person.degree || '—') },
+    {
+      id: 'actions',
+      header: '',
+      render: (person, { runAction }) => {
+        const toggle = person.isActive ? deactivateAction : activateAction
+        return (
+          <AdminRowActions
+            viewHref={hrefOf(person)}
+            actions={
+              canManage
+                ? [
+                    {
+                      id: 'edit',
+                      label: 'ویرایش',
+                      icon: <DashboardEditIcon aria-hidden="true" className="size-5" />,
+                      onSelect: () => edit(person),
+                    },
+                    {
+                      id: toggle.id,
+                      label: toggle.label,
+                      icon: toggle.icon,
+                      destructive: toggle.destructive,
+                      onSelect: () => runAction(toggle.id, person),
+                    },
+                  ]
+                : []
+            }
+          />
+        )
+      },
+    },
+  ]
+}
 
-/* Row actions — Figma dropdown 30722:2447 (مشاهده / ویرایش / حذف کارمند). */
-function RowActions({
-  person,
-  canManage,
-  onToggleActive,
+const failureState = (cause: unknown): AdminListLoadState =>
+  cause instanceof AdminError && cause.status === 401
+    ? 'unauthenticated'
+    : cause instanceof AdminError && cause.status === 403
+      ? 'denied'
+      : 'error'
+
+/**
+ * Staff list on the shared admin table, like the companies list. The role, page and search live in
+ * the URL (back, refresh and sharing reopen the same view); the owner may add, edit and switch
+ * accounts, one by one or selected together.
+ * `initial`: the list as the server read it, so the table opens with its rows.
+ */
+export function EmployeeList({
+  canManage = false,
+  initial,
 }: {
-  person: Employee
-  canManage: boolean
-  onToggleActive: (person: Employee) => void
+  canManage?: boolean
+  initial?: Employee[]
 }) {
-  const name = person.name || 'بدون نام'
-  const href = `/dashboard/employees/${encodeURIComponent(person.id)}`
-  return (
-    <DropdownMenu dir="rtl">
-      <DropdownMenuTrigger asChild>
-        <Button variant="text-gray" size="icon-32" aria-label={`عملیات ${name}`}>
-          <DashboardMoreVerticalIcon className="size-5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        sideOffset={6}
-        className="flex w-[164px] min-w-[164px] flex-col gap-1 rounded-xl border-0 bg-background p-1 shadow-[0px_2px_4px_rgba(21,21,21,0.1)] ring-0"
-      >
-        <DropdownMenuItem asChild className={menuItemClass}>
-          <Link href={href}>
-            <DashboardEyeIcon className="size-5 text-neutral-700" />
-            <Typography as="span" variant="14/regular" className="text-inherit">
-              مشاهده
-            </Typography>
-          </Link>
-        </DropdownMenuItem>
-        {canManage && (
-          <>
-            <DropdownMenuItem asChild className={menuItemClass}>
-              <Link href={`${href}/edit`}>
-                <DashboardEditIcon className="size-5 text-neutral-700" />
-                <Typography as="span" variant="14/regular" className="text-inherit">
-                  ویرایش
-                </Typography>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className={cn(menuItemClass, person.isActive && 'text-error-500')}
-              onSelect={() => onToggleActive(person)}
-            >
-              {person.isActive ? (
-                <DashboardTrashIcon className="size-5 text-error-500" />
-              ) : (
-                <TickCircleIcon className="size-5" />
-              )}
-              <Typography as="span" variant="14/regular" className="text-inherit">
-                {person.isActive ? 'حذف کارمند' : 'فعال‌سازی کارمند'}
-              </Typography>
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-/* Loading — Figma frame 33 (30722:2548): 4 columns × 5 bars, 40px high, 16px gaps. */
-function EmployeesSkeleton() {
-  return (
-    <div role="status" aria-label="در حال دریافت کارکنان" className="flex w-full gap-4">
-      {[0, 1, 2, 3].map((column) => (
-        <div key={column} className="flex min-w-0 flex-1 flex-col gap-4">
-          {[0, 1, 2, 3, 4].map((row) => (
-            <Skeleton
-              key={row}
-              className="h-10 w-full rounded-lg bg-neutral-100 motion-reduce:animate-none"
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/* Empty — Figma frame 32 (30722:2525). */
-function EmptyState({ canManage, noMatch }: { canManage: boolean; noMatch: boolean }) {
-  return (
-    <div className="flex w-[265px] max-w-full flex-col items-center gap-2 text-center">
-      <div className="flex flex-col items-center gap-1">
-        <EmptyInboxIllustration className="size-20" aria-hidden="true" />
-        <Typography variant="14/semibold" color="neutral-600">
-          {noMatch ? 'کارمندی با این مشخصات پیدا نشد' : 'کارمندی در این صفحه موجود نیست'}
-        </Typography>
-        <Typography variant="12/regular" color="neutral-500">
-          {noMatch
-            ? 'عبارت جستجو یا فیلتر نقش را تغییر دهید'
-            : canManage
-              ? 'اولین کارمند را اضافه کنید'
-              : 'هنوز کارمندی ثبت نشده است'}
-        </Typography>
-      </div>
-      {canManage && !noMatch && (
-        <Button asChild variant="text" size="40">
-          <Link href="/dashboard/employees/new">
-            <Typography as="span" variant="16/semibold" className="text-inherit">
-              کارمند جدید
-            </Typography>
-            <DashboardAddIcon className="size-6" />
-          </Link>
-        </Button>
-      )}
-    </div>
-  )
-}
-
-export function EmployeeList({ canManage = false }: { canManage?: boolean }) {
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [people, setPeople] = useState<Employee[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<unknown>(null)
-  const [attempt, setAttempt] = useState(0)
-  const [query, setQuery] = useState('')
-  const [roleFilter, setRoleFilter] = useState<OperationalRole | 'all'>('all')
-  const [pending, setPending] = useState<Employee | null>(null)
-  const [toggling, setToggling] = useState(false)
-  const [actionError, setActionError] = useState<unknown>(null)
+  const { role, page: requestedPage, search: urlSearch } = employeeParams({
+    role: searchParams?.get('role'),
+    page: searchParams?.get('page'),
+    search: searchParams?.get('search'),
+  })
+
+  const [people, setPeople] = useState<Employee[]>(initial ?? [])
+  const [loadState, setLoadState] = useState<AdminListLoadState>(initial ? 'ready' : 'loading')
+  // Switching accounts shows its outcome at once; the screen returns to the server's rows (with the same
+  // change if it succeeded, without it if it failed) when the transition ends.
+  const [shown, showChange] = useOptimistic(people, applyChange)
+  const [query, setQuery] = useState(urlSearch)
+  const latestLoad = useRef(0)
+  const lastWrittenSearch = useRef(urlSearch)
+  const hasRows = useRef(Boolean(initial))
+  const [refreshing, setRefreshing] = useState(false)
+
   // A save on the employee form redirects here with ?saved=…; confirm it once.
   const savedNotice = SAVED_NOTICES[searchParams?.get('saved') ?? '']
   useEffect(() => {
     if (savedNotice) toast.success(savedNotice)
   }, [savedNotice])
 
-  useEffect(() => {
-    let current = true
-    const request = canManage
-      ? loadPeople()
-      : adminRequest('/api/dashboard/admin/employees?limit=100').then(
-          (data) => data.items as Employee[],
-        )
-    request
-      .then((items) => {
-        // Company representatives are applicants, not staff.
-        if (current) setPeople(items.filter((item) => item.operationalRole !== 'representative'))
-      })
-      .catch((cause) => {
-        if (current) setError(cause)
-      })
-      .finally(() => {
-        if (current) setLoading(false)
-      })
-    return () => {
-      current = false
-    }
-  }, [attempt, canManage])
-
-  function refresh() {
-    setLoading(true)
-    setError(null)
-    setAttempt((value) => value + 1)
-  }
-
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase('fa')
-    return people.filter(
-      (person) =>
-        (roleFilter === 'all' || person.operationalRole === roleFilter) &&
-        (!needle || searchText(person).includes(needle)),
-    )
-  }, [people, query, roleFilter])
-
-  async function confirmToggle() {
-    if (!pending || toggling) return
-    setToggling(true)
-    setActionError(null)
-    try {
-      const updated = await setEmployeeActive(pending, !pending.isActive)
-      setPeople((current) => current.map((item) => (item.id === updated.id ? updated : item)))
-      toast.success(
-        updated.isActive
-          ? `حساب «${updated.name || 'بدون نام'}» دوباره فعال شد.`
-          : `«${updated.name || 'بدون نام'}» از کارکنان فعال حذف شد.`,
-      )
-      setPending(null)
-    } catch (cause) {
-      setActionError(cause)
-      toast.error('تغییر وضعیت کارمند انجام نشد.')
-    } finally {
-      setToggling(false)
-    }
-  }
-
-  const roleOptions = OPERATIONAL_ROLES.filter((role) => role !== 'representative')
-  const counts = people.reduce<Record<string, number>>(
-    (acc, person) => {
-      acc.all += 1
-      if (person.operationalRole) acc[person.operationalRole] = (acc[person.operationalRole] ?? 0) + 1
-      return acc
+  const writeUrl = useCallback(
+    (changes: Record<string, string | undefined>, mode: 'push' | 'replace' = 'push') => {
+      const next = new URLSearchParams(searchParams?.toString())
+      for (const [key, value] of Object.entries(changes)) {
+        if (value) next.set(key, value)
+        else next.delete(key)
+      }
+      const search = next.toString()
+      router[mode](search ? `${pathname}?${search}` : pathname)
     },
-    { all: 0 },
+    [pathname, router, searchParams],
   )
-  const ready = !loading && error === null
+
+  // `silent`: a reload after an action, which keeps the table as it is (no dimming) until the rows arrive.
+  const load = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      const current = ++latestLoad.current
+      if (!silent) {
+        if (hasRows.current) setRefreshing(true)
+        else setLoadState('loading')
+      }
+      try {
+        const items = await loadEmployees(canManage)
+        if (current !== latestLoad.current) return
+        hasRows.current = true
+        // In a transition, so the real rows land together with the end of an action's optimistic state.
+        startTransition(() => {
+          setPeople(items)
+          setRefreshing(false)
+          setLoadState('ready')
+        })
+      } catch (cause) {
+        if (current !== latestLoad.current) return
+        hasRows.current = false
+        setRefreshing(false)
+        setLoadState(failureState(cause))
+      }
+    },
+    [canManage],
+  )
+
+  useEffect(() => {
+    // The server already answered the first load.
+    if (initial) return
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load])
+
+  // Typing filters at once; the URL follows after a pause and starts again from page 1.
+  useEffect(() => {
+    if (query.trim() === urlSearch) return
+    const timer = setTimeout(() => {
+      lastWrittenSearch.current = query
+      writeUrl({ search: query.trim() || undefined, page: undefined }, 'replace')
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [query, urlSearch, writeUrl])
+
+  // Back and forward change the URL without typing: show the search it holds.
+  useEffect(() => {
+    if (urlSearch !== lastWrittenSearch.current) {
+      lastWrittenSearch.current = urlSearch
+      setQuery(urlSearch)
+    }
+  }, [urlSearch])
+
+  const needle = query.trim().toLocaleLowerCase('fa')
+  const filtered = useMemo(
+    () =>
+      shown.filter(
+        (person) =>
+          (role === 'all' || person.operationalRole === role) &&
+          (!needle || searchText(person).includes(needle)),
+      ),
+    [shown, role, needle],
+  )
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const page = Math.min(requestedPage, totalPages)
+  const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const counts = useMemo(
+    () =>
+      shown.reduce<Record<string, number>>(
+        (acc, person) => {
+          acc.all += 1
+          if (person.operationalRole) acc[person.operationalRole] = (acc[person.operationalRole] ?? 0) + 1
+          return acc
+        },
+        { all: 0 },
+      ),
+    [shown],
+  )
+
+  const filter = (
+    <ListFilterButton
+      label="فیلتر نقش"
+      groups={[
+        {
+          key: 'role',
+          label: 'نقش',
+          value: role === 'all' ? undefined : role,
+          options: [
+            { value: '', label: 'همه نقش‌ها', count: counts.all },
+            ...ROLE_OPTIONS.map((option) => ({
+              value: option,
+              label: OPERATIONAL_ROLE_LABELS[option],
+              count: counts[option] ?? 0,
+            })),
+          ],
+        },
+      ]}
+    />
+  )
+
+  const bulkActions = useMemo(() => {
+    if (!canManage) return undefined
+    const idsOf = (items: Employee[]) => new Set(items.map(keyOf))
+    return [
+      { ...deactivateAction, optimistic: (items: Employee[]) => showChange({ ids: idsOf(items), isActive: false }) },
+      { ...activateAction, optimistic: (items: Employee[]) => showChange({ ids: idsOf(items), isActive: true }) },
+    ]
+  }, [canManage, showChange])
+  const columns = useMemo(
+    () => buildColumns(canManage, (person) => router.push(`${hrefOf(person)}/edit`)),
+    [canManage, router],
+  )
 
   return (
-    <main dir="rtl" className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 p-4 lg:pt-10">
-      <Typography as="h1" variant="24/bold" color="neutral-700">
-        کارکنان
-      </Typography>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4">
-        {/* Toolbar — Figma frame 30722:2455 */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Phone: search and filter take their own row, so the add button wraps below instead of under them. */}
-          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-            <SearchField
-              aria-label="جستجوی کارمند"
-              placeholder="کارمند مورد نظر را جست و جو کنید"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <ListFilterButton
-              label="فیلتر نقش"
-              groups={[
-                {
-                  key: 'role',
-                  label: 'نقش',
-                  value: roleFilter === 'all' ? undefined : roleFilter,
-                  options: [
-                    { value: '', label: 'همه نقش‌ها', count: counts.all },
-                    ...roleOptions.map((role) => ({ value: role, label: OPERATIONAL_ROLE_LABELS[role], count: counts[role] ?? 0 })),
-                  ],
-                },
-              ]}
-              onChange={(_, value) => setRoleFilter((value as typeof roleFilter | undefined) ?? 'all')}
-            />
-          </div>
-          {canManage && (
-            <Button asChild size="48">
-              <Link href="/dashboard/employees/new">
-                <Typography as="span" variant="20/regular" className="text-inherit">
-                  کارمند جدید
-                </Typography>
-                <DashboardAddIcon className="size-[26px]" />
-              </Link>
-            </Button>
-          )}
-        </div>
-
-
-        {/* Table card — Figma frame 30722:2460 */}
-        <div className="relative flex min-h-[420px] flex-1 flex-col rounded-2xl border border-neutral-200 bg-background p-4">
-          {loading ? (
-            <EmployeesSkeleton />
-          ) : error !== null ? (
-            <div className="flex flex-1 items-center justify-center">
-              <RequestError error={error} returnTo="/dashboard/employees" retry={refresh} />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center">
-              <EmptyState canManage={canManage} noMatch={people.length > 0} />
-            </div>
-          ) : (
-            <ScrollArea className="min-h-0 flex-1">
-              <table className="w-full min-w-[860px] border-collapse text-right">
-                <thead className="sticky top-0 z-10 bg-background">
-                  <tr>
-                    <HeaderCell label="نام کارمند" />
-                    <HeaderCell label="نقش" className="w-[200px]" />
-                    <HeaderCell label="زمینه فعالیت" className="w-[200px]" />
-                    <HeaderCell label="مدرک دانشگاهی" className="w-[248px]" />
-                    <HeaderCell className="w-[52px]" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((person) => (
-                    <tr
-                      key={person.id}
-                      className="h-[72px] border-b border-neutral-100 transition-colors hover:bg-neutral-100 has-[[data-state=open]]:bg-neutral-100"
-                    >
-                      <td className="px-4">
-                        <NameCell person={person} />
-                      </td>
-                      <td className="px-4">
-                        <Tag {...roleTag(person.operationalRole)} />
-                      </td>
-                      <td className="px-4">
-                        {person.activityField ? (
-                          <Tag label={person.activityField} variant="primary" />
-                        ) : (
-                          <Typography as="span" variant="16/regular" color="neutral-400">
-                            —
-                          </Typography>
-                        )}
-                      </td>
-                      <td className="px-4">
-                        <Typography
-                          as="span"
-                          variant="16/regular"
-                          color={person.degree ? 'neutral-600' : 'neutral-400'}
-                          className="whitespace-nowrap"
-                        >
-                          {person.degree || '—'}
-                        </Typography>
-                      </td>
-                      <td className="px-2.5">
-                        <RowActions
-                          person={person}
-                          canManage={canManage}
-                          onToggleActive={(target) => {
-                            setActionError(null)
-                            setPending(target)
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollArea>
-          )}
-        </div>
-      </div>
-
-      {pending && ready && (
-        <DecisionDialog
-          title={pending.isActive ? 'حذف کارمند' : 'فعال‌سازی کارمند'}
-          description={
-            pending.isActive
-              ? `حساب «${pending.name || 'بدون نام'}» غیرفعال می‌شود و دیگر نمی‌تواند وارد سامانه شود. سوابق و تاریخچه کارهای او حذف نمی‌شود.`
-              : `حساب «${pending.name || 'بدون نام'}» دوباره فعال می‌شود و می‌تواند با نقش فعلی وارد سامانه شود.`
-          }
-          onClose={() => {
-            if (!toggling) setPending(null)
-          }}
-          actions={
-            <>
-              <Button
-                type="button"
-                size="40"
-                variant={pending.isActive ? 'destructive' : 'default'}
-                loading={toggling}
-                onClick={() => void confirmToggle()}
-              >
-                {pending.isActive ? 'حذف کارمند' : 'فعال‌سازی'}
-              </Button>
-              <Button
-                type="button"
-                size="40"
-                variant="outline-gray"
-                disabled={toggling}
-                onClick={() => setPending(null)}
-              >
-                انصراف
-              </Button>
-            </>
-          }
-        >
-          {actionError !== null && (
-            <div className="flex flex-col gap-2">
-              <Typography role="alert" variant="14/regular" color="error">
-                {adminErrorMessage(actionError)}
+    <AdminListView
+      title="کارکنان"
+      addAction={
+        canManage ? (
+          <Button asChild size="48" className="w-full min-w-0 shrink sm:w-auto sm:shrink-0">
+            <Link href="/dashboard/employees/new">
+              <DashboardAddIcon className="size-5 sm:size-6" />
+              <Typography as="span" variant="16/regular" color="white" className="max-sm:text-sm">
+                کارمند جدید
               </Typography>
-              <Button
-                type="button"
-                size="32"
-                variant="outline-gray"
-                onClick={() => {
-                  setPending(null)
-                  refresh()
-                }}
-              >
-                دریافت دوباره فهرست
-              </Button>
-            </div>
-          )}
-        </DecisionDialog>
-      )}
-    </main>
+            </Link>
+          </Button>
+        ) : undefined
+      }
+      searchPlaceholder="جستجوی کارمند"
+      items={visible}
+      getSearchText={() => ''}
+      query={query}
+      onQueryChange={setQuery}
+      pagination={{
+        page,
+        totalPages,
+        onPageChange: (next) => writeUrl({ page: next > 1 ? String(next) : undefined }),
+      }}
+      bulkActions={bulkActions}
+      getKey={keyOf}
+      columns={columns}
+      loadState={loadState}
+      refreshing={refreshing}
+      filter={filter}
+      onRetry={() => load({ silent: true })}
+    />
   )
 }
