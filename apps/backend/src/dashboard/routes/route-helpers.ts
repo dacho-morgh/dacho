@@ -103,6 +103,13 @@ export function safeOwner(user: User | undefined | null) {
   return user ? { id: user.id, name: user.name ?? null } : null
 }
 
+/** The logo the admin pages show: its id and the access-checked file route. Null when the company has none. */
+export function logoOf(company: { logo?: { id: string; filename: string | null } | null } | undefined) {
+  const logo = company?.logo
+  if (!logo?.filename) return null
+  return { id: logo.id, url: `/api/company-logos/file/${encodeURIComponent(logo.filename)}` }
+}
+
 /** Adds the download routes to a case file's proposal and RFP; each route still authorizes its reader. */
 export function withDownloadUrls(requestId: string, found: Pick<ReviewCaseFile, 'proposal' | 'rfp'>) {
   return {

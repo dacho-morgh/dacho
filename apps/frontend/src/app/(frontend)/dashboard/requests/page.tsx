@@ -5,6 +5,11 @@ import { getPayload } from 'payload'
 import React from 'react'
 import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import {
+  adminRequestsQuery,
+  toAdminRequestsPage,
+  type AdminRequestsApiResponse,
+} from '@/components/dashboard/admin-request-list-data'
+import {
   parseRequestStatus,
   RequestsListView,
   type RequestItem,
@@ -26,6 +31,7 @@ import {
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import {
+  canReadCompanyDossiers,
   dashboardOperationalRole,
   isInternalDashboardUser,
   serverDashboardFetchResult,
@@ -94,8 +100,20 @@ export default async function RequestsPage({
   )
 
   if (isInternal) {
+    // The page is read here, so the table opens with its rows instead of a skeleton and a loading line.
+    const adminQuery = adminRequestsQuery(status, page, filters)
+    const firstPage = await serverDashboardFetchResult<AdminRequestsApiResponse>(`/admin/requests?${adminQuery}`)
+    const initial = firstPage.kind === 'ok' ? toAdminRequestsPage(firstPage.data, page) : null
     return (
-      <AdminRequestList status={status} page={page} filters={filters} toolbar={filterForm} />
+      <AdminRequestList
+        status={status}
+        page={page}
+        filters={filters}
+        counts={counts}
+        events={overviewResult.kind === 'ok' ? (overviewResult.data.events ?? []) : []}
+        canViewCompany={canReadCompanyDossiers(user)}
+        initial={initial ? { ...initial, key: adminQuery } : undefined}
+      />
     )
   }
 

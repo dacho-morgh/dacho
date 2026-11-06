@@ -5,7 +5,7 @@ import { operationalRoleOf } from '../../access/roles.js'
 import { changesAddress, changesCompany, COMPANY_EDIT_REVERIFICATION_REASON } from '../company-edits.js'
 import type { CompanyInfo } from '../profile-repo.js'
 import { actorOf } from '../proxy-auth.js'
-import { isCompanyAdministrator, parsePositiveInt } from './route-helpers.js'
+import { isCompanyAdministrator, logoOf, parsePositiveInt } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 
 const MAX_COMPANY_PAGE_SIZE = 100
@@ -14,13 +14,6 @@ const EDITABLE_COMPANY_FIELDS = [
   'name', 'establishmentDate', 'status', 'type', 'registrationNumber', 'economicCode',
 ] as const satisfies readonly (keyof CompanyInfo)[]
 const ADDRESS_FIELDS = ['title', 'province', 'city', 'postalCode', 'address'] as const
-
-/** The logo the admin page shows: its id and the access-checked file route. Null when the company has none. */
-function logoOf(company: { logo?: { id: string; filename: string | null } | null } | undefined) {
-  const logo = company?.logo
-  if (!logo?.filename) return null
-  return { id: logo.id, url: `/api/company-logos/file/${encodeURIComponent(logo.filename)}` }
-}
 
 /** A trimmed string within the field limit, or undefined when the value is not one. */
 function shortText(value: unknown): string | undefined {
