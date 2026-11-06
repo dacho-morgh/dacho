@@ -92,6 +92,9 @@ const formatBytes = (bytes?: number | null) =>
     ? `${(bytes / 1_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} مگابایت`
     : ''
 
+/** Phones read the inputs and selects at 14px; from `sm` they return to the design's 16px. */
+const CONTROL_TEXT = 'max-sm:text-[14px] max-sm:leading-[24px]'
+
 /* Figma "Text field" (32:10126): 16/SemiBold grey-700 label, 8px gap, 40px control. */
 function FormField({
   id,
@@ -108,7 +111,7 @@ function FormField({
 }) {
   return (
     <div className={cn('flex min-w-0 flex-col gap-2', className)}>
-      <Typography as="label" htmlFor={id} variant="16/semibold" color="neutral-700">
+      <Typography as="label" htmlFor={id} variant="14/semibold" sm="16/semibold" color="neutral-700">
         {label}
       </Typography>
       <div className="flex flex-col gap-1">
@@ -136,7 +139,7 @@ function Section({
   return (
     <section className="grid grid-cols-1 gap-x-5 gap-y-8 rounded-2xl border border-neutral-200 bg-background p-4 md:grid-cols-2">
       <div className="flex items-center justify-between gap-3 md:col-span-2">
-        <Typography as="h2" variant="20/bold" color="neutral-600">
+        <Typography as="h2" variant="16/bold" sm="20/bold" color="neutral-600">
           {title}
         </Typography>
         {action}
@@ -248,17 +251,30 @@ function Breadcrumb({ title, action }: { title: string; action?: ReactNode }) {
         >
           <Typography
             as="span"
-            variant="16/regular"
+            variant="14/regular"
+            sm="16/regular"
             color="neutral-500"
             className="whitespace-nowrap"
           >
             کارکنان
           </Typography>
         </Link>
-        <Typography as="span" variant="16/regular" color="neutral-500" aria-hidden="true">
+        <Typography
+          as="span"
+          variant="14/regular"
+          sm="16/regular"
+          color="neutral-500"
+          aria-hidden="true"
+        >
           /
         </Typography>
-        <Typography as="h1" variant="24/bold" color="neutral-700" className="truncate">
+        <Typography
+          as="h1"
+          variant="16/bold"
+          sm="24/bold"
+          color="neutral-700"
+          className="truncate"
+        >
           {title}
         </Typography>
       </nav>
@@ -278,7 +294,7 @@ function EmployeeDetails({
 }) {
   const value = (id: string, label: string, text?: string | null, className?: string) => (
     <FormField id={id} label={label} className={className}>
-      <Input id={id} readOnly value={text || '—'} />
+      <Input id={id} readOnly value={text || '—'} className={CONTROL_TEXT} />
     </FormField>
   )
   const resume = (employee.resume ?? []).map(fileRef)
@@ -291,7 +307,7 @@ function EmployeeDetails({
           canManage && (
             <Button asChild size="48">
               <Link href={`/dashboard/employees/${encodeURIComponent(employee.id)}/edit`}>
-                <Typography as="span" variant="20/regular" className="text-inherit">
+                <Typography as="span" variant="14/regular" sm="20/regular" className="text-inherit">
                   ویرایش
                 </Typography>
                 <DashboardEditIcon className="size-[26px]" />
@@ -331,7 +347,7 @@ function EmployeeDetails({
         </Section>
         <Section title="آدرس ها">
           {addresses.length === 0 ? (
-            <Typography variant="14/regular" color="neutral-500" className="md:col-span-2">
+            <Typography variant="12/regular" sm="14/regular" color="neutral-500" className="md:col-span-2">
               آدرسی ثبت نشده است.
             </Typography>
           ) : (
@@ -366,7 +382,7 @@ function ResumeList({
         id={id}
         className="flex h-10 items-center rounded-lg border border-neutral-100 bg-background px-2"
       >
-        <Typography as="span" variant="16/light" color="neutral-400">
+        <Typography as="span" variant="14/light" sm="16/light" color="neutral-400">
           فایلی بارگذاری نشده است
         </Typography>
       </div>
@@ -558,6 +574,7 @@ function EmployeeEditor({
         aria-invalid={!!errors[name]}
         aria-describedby={errors[name] ? `${name}-error` : undefined}
         variant={errors[name] ? 'error' : 'default'}
+        className={CONTROL_TEXT}
         {...register(name)}
       />
     </FormField>
@@ -568,7 +585,14 @@ function EmployeeEditor({
       <Breadcrumb
         title={title}
         action={
-          <Button type="submit" form={formId} size="48" disabled={isSubmitting || stale}>
+          // Phones get the full-width button below the form instead.
+          <Button
+            type="submit"
+            form={formId}
+            size="48"
+            className="max-sm:hidden"
+            disabled={isSubmitting || stale}
+          >
             <Typography as="span" variant="20/regular" className="text-inherit">
               {isSubmitting ? 'در حال ثبت...' : 'ثبت اطلاعات'}
             </Typography>
@@ -646,6 +670,7 @@ function EmployeeEditor({
                 id="operationalRole"
                 aria-invalid={!!errors.operationalRole}
                 aria-describedby={errors.operationalRole ? 'operationalRole-error' : undefined}
+                className={CONTROL_TEXT}
                 {...register('operationalRole')}
               >
                 <option value="" disabled>
@@ -660,7 +685,7 @@ function EmployeeEditor({
             </FormField>
             {field('age', 'سن', { placeholder: 'مثلا: ۳۲', inputMode: 'numeric' })}
             <FormField id="gender" label="جنسیت" error={errors.gender?.message}>
-              <NativeSelect id="gender" {...register('gender')}>
+              <NativeSelect id="gender" className={CONTROL_TEXT} {...register('gender')}>
                 <option value="">انتخاب نشده</option>
                 {PERSONNEL_GENDERS.map((gender) => (
                   <option key={gender} value={gender}>
@@ -699,7 +724,7 @@ function EmployeeEditor({
                 className="self-start"
                 onClick={() => fileInput.current?.click()}
               >
-                <Typography as="span" variant="14/regular" className="text-inherit">
+                <Typography as="span" variant="12/regular" sm="14/regular" className="text-inherit">
                   افزودن فایل (PDF یا Word، حداکثر ۱۰ مگابایت)
                 </Typography>
                 <DashboardAddIcon className="size-5" />
@@ -717,7 +742,7 @@ function EmployeeEditor({
                 size="32"
                 onClick={() => addresses.append({ address: '' }, { shouldFocus: true })}
               >
-                <Typography as="span" variant="14/regular" className="text-inherit">
+                <Typography as="span" variant="12/regular" sm="14/regular" className="text-inherit">
                   آدرس جدید
                 </Typography>
                 <DashboardAddIcon className="size-5" />
@@ -734,6 +759,7 @@ function EmployeeEditor({
                   <Input
                     id={`address-${index}`}
                     placeholder="استان، شهر، خیابان، پلاک"
+                    className={CONTROL_TEXT}
                     {...register(`personnelAddresses.${index}.address`)}
                   />
                 </FormField>
@@ -750,6 +776,16 @@ function EmployeeEditor({
             ))}
           </Section>
         </fieldset>
+        <Button
+          type="submit"
+          size="48"
+          className="w-full sm:hidden"
+          disabled={isSubmitting || stale}
+        >
+          <Typography as="span" variant="16/regular" className="text-inherit">
+            {isSubmitting ? 'در حال ثبت...' : 'ثبت اطلاعات'}
+          </Typography>
+        </Button>
       </form>
     </>
   )
