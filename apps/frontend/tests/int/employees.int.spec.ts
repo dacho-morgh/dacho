@@ -49,6 +49,8 @@ const staff = [
 
 const staffRows = () => screen.getAllByRole('row').slice(1)
 const rowActions = (index: number) => screen.getAllByRole('button', { name: 'عملیات' })[index]!
+/** The form renders its submit button twice (beside the title from sm, below the form on phones); jsdom hides neither. */
+const submitButton = () => screen.getAllByRole('button', { name: 'ثبت اطلاعات' })[0]!
 
 /** A list that answers the PATCH like the server does: later reads show the new state. */
 function statefulFetch(options: { patchStatus?: number } = {}) {
@@ -289,14 +291,16 @@ describe('employee form', () => {
     fireEvent.submit(form)
     await waitFor(() => expect(writes).toBe(1))
     expect(
-      (screen.getByRole('button', { name: 'در حال ثبت...' }) as HTMLButtonElement).disabled,
+      (screen.getAllByRole('button', { name: 'در حال ثبت...' }) as HTMLButtonElement[]).every(
+        (button) => button.disabled,
+      ),
     ).toBe(true)
     finish(json({ errors: [{ data: { errors: [{ path: 'phone' }] } }] }, 400))
     await screen.findByText('این مقدار معتبر یا یکتا نیست.')
     expect((screen.getByLabelText('نام و نام خانوادگی') as HTMLInputElement).value).toBe(
       'کارفرمای نمونه',
     )
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await waitFor(() =>
       expect(navigation.push).toHaveBeenCalledWith('/dashboard/employees?saved=created'),
     )
@@ -319,7 +323,7 @@ describe('employee form', () => {
     const request = vi.fn()
     vi.stubGlobal('fetch', request)
     render(createElement(EmployeeForm, { mode: 'create' }))
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await screen.findByText('نام و نام خانوادگی را وارد کنید.')
     expect(screen.getByText('شماره تلفن همراه را وارد کنید.')).toBeTruthy()
     expect(screen.getByText('نقش در سیستم را انتخاب کنید.')).toBeTruthy()
@@ -356,7 +360,7 @@ describe('employee form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'آدرس جدید' }))
     fireEvent.change(screen.getByLabelText('آدرس ۱'), { target: { value: 'بوشهر، خیابان ساحلی' } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await screen.findByText('ذخیره یا دریافت اطلاعات انجام نشد. دوباره تلاش کنید.')
     await waitFor(() =>
       expect(
@@ -369,7 +373,7 @@ describe('employee form', () => {
     expect((upload[1]!.body as FormData).get('file')).toBeInstanceOf(File)
 
     failSave = false
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await waitFor(() => expect(navigation.push).toHaveBeenCalled())
     const save = request.mock.calls.filter(([url]) => url === '/api/users').at(-1)!
     expect(JSON.parse(save[1]!.body as string)).toMatchObject({
@@ -413,7 +417,7 @@ describe('employee form', () => {
     expect(screen.getByRole('link', { name: 'old.pdf' })).toBeTruthy()
     latest = { ...original, name: 'نسخه جدید', updatedAt: '2026-10-27T11:00:00.000Z' }
     fireEvent.change(screen.getByLabelText('نقش در سیستم'), { target: { value: 'chief-reviewer' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     expect((await screen.findByRole('alert')).textContent).toContain('اطلاعات تغییر کرده')
     expect((screen.getByLabelText('نام و نام خانوادگی') as HTMLInputElement).value).toBe(
       'نسخه قدیم',
@@ -425,7 +429,7 @@ describe('employee form', () => {
       ),
     )
     fireEvent.change(screen.getByLabelText('نقش در سیستم'), { target: { value: 'chief-reviewer' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await waitFor(() =>
       expect(navigation.push).toHaveBeenCalledWith('/dashboard/employees?saved=updated'),
     )
