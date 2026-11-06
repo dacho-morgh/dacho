@@ -206,7 +206,7 @@ export function ParticipationEligibilityPanel({
     <section
       aria-labelledby="participation-eligibility-title"
       aria-busy={load.kind === 'loading'}
-      className="flex w-full min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6"
+      className="flex w-full min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6"
       dir="rtl"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">

@@ -99,7 +99,7 @@ export function ListFilterButton({ groups, onChange, onClear, label = 'فیلت�
           {activeCount > 0 && (
             <span
               aria-hidden="true"
-              className="absolute -top-1 -left-1 flex min-w-5 items-center justify-center rounded-full bg-brand-500 px-1 text-white"
+              className="absolute -top-1 -left-1 flex min-w-5 items-center justify-center rounded-full bg-brand-500 px-1 text-white dark:bg-background dark:text-neutral-800 dark:shadow-xs dark:ring-1 dark:ring-neutral-200"
             >
               <Typography as="span" variant="12/regular" className="text-inherit">
                 {fa(activeCount)}

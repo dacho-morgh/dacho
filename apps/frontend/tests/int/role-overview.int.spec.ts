@@ -69,7 +69,7 @@ describe('RoleOverview', () => {
         ],
       }),
       '/activities?limit=4': feed,
-      '/admin/companies?verificationStatus=pending': ok({
+      '/admin/companies?verificationStatus=pending&page=1&limit=5': ok({
         items: [
           {
             id: 'c1',
@@ -359,7 +359,7 @@ describe('RoleOverview charts and next tasks (S3)', () => {
         unavailable: [],
       }),
       '/activities?limit=4': feed,
-      '/admin/companies?verificationStatus=pending': ok({ items: [] }),
+      '/admin/companies?verificationStatus=pending&page=1&limit=5': ok({ items: [] }),
     })
     await renderRole({ role: 'central-secretariat', userName: null })
 
@@ -387,7 +387,7 @@ describe('RoleOverview charts and next tasks (S3)', () => {
         unavailable: ['booth_requests'],
       }),
       '/activities?limit=4': feed,
-      '/admin/companies?verificationStatus=pending': ok({ items: [] }),
+      '/admin/companies?verificationStatus=pending&page=1&limit=5': ok({ items: [] }),
     })
     await renderRole({ role: 'central-secretariat', userName: null })
 

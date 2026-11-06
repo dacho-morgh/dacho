@@ -181,7 +181,10 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
     const items = await Promise.all(
       presented.map(async (item) => ({
         ...(await limitRequest(actor, item, false)),
-        owner: isReviewerRole(actor.operationalRole) ? null : safeOwner(await deps.userStore.findById(item.ownerId)),
+        // One owner the CMS cannot resolve (e.g. an old non-numeric id) must not fail the whole list.
+        owner: isReviewerRole(actor.operationalRole)
+          ? null
+          : safeOwner(await deps.userStore.findById(item.ownerId).catch(() => undefined)),
       })),
     )
     res.json({ ...result, items })

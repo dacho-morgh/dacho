@@ -108,6 +108,7 @@ export class PayloadUserStore implements UserStore {
       operationalRole: typeof d.operationalRole === 'string' ? d.operationalRole : null,
       isActive: d.isActive === true,
       backendService: d.backendService === true,
+      ...(typeof d.updatedAt === 'string' ? { updatedAt: d.updatedAt } : {}),
       roles: d.isActive === true && d.backendService !== true
         ? [d.operationalRole === 'system-owner' ? 'admin' : d.operationalRole === 'representative' ? 'representative' : d.operationalRole === 'reviewer' ? 'referee' : undefined, d.contentEditor === true ? 'editor' : undefined].filter((role): role is UserRole => role !== undefined)
         : [],

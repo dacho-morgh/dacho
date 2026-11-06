@@ -48,7 +48,7 @@ export default async function FollowUpsPage({
             <li key={item.requestId}>
               <Link
                 href={`/dashboard/requests/${encodeURIComponent(item.requestId)}`}
-                className="flex flex-col gap-1 rounded-2xl border border-neutral-200 bg-white p-4 hover:border-brand-600"
+                className="flex flex-col gap-1 rounded-2xl border border-neutral-200 bg-background p-4 hover:border-brand-600"
               >
                 <Typography variant="16/semibold" className="text-neutral-900">{item.title}</Typography>
                 <Typography variant="14/regular" className="text-neutral-500">
@@ -64,7 +64,7 @@ export default async function FollowUpsPage({
         </ul>
         </ScrollArea>
       ) : (
-        <Typography variant="14/regular" className="rounded-2xl border border-neutral-200 bg-white p-6 text-neutral-500">
+        <Typography variant="14/regular" className="rounded-2xl border border-neutral-200 bg-background p-6 text-neutral-500">
           هنوز یادداشتی به دبیرخانه نرسیده است.
         </Typography>
       )}

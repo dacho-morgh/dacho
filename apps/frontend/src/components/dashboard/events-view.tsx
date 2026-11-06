@@ -539,7 +539,7 @@ export function EventsView({
         {/* The route keeps the page fixed (list routes scroll their own region), so the details scroll here. */}
         <ScrollArea className="min-h-0 flex-1">
         {/* Slot 1: Event Summary Banner Card - Figma Frame 61 / Frame 46 / Frame 60 */}
-        <section className="relative mt-4 flex w-full flex-col gap-4 rounded-[16px] border border-[#e5e5e5] bg-white p-4 sm:p-6">
+        <section className="relative mt-4 flex w-full flex-col gap-4 rounded-[16px] border border-[#e5e5e5] bg-background p-4 sm:p-6">
           <div className="flex flex-col-reverse items-start justify-end gap-5 sm:flex-row">
             {/* Left Content column */}
             <div className="flex w-full flex-1 flex-col justify-between gap-4 py-1">
@@ -614,7 +614,7 @@ export function EventsView({
         ) : null}
 
         {/* Slot 2: Categories and Subtopics Tree Card - Figma Slot / Frame 156 */}
-        <section className="relative mt-4 flex w-full flex-col gap-5 rounded-[16px] border border-[#e5e5e5] bg-white p-4 sm:p-6">
+        <section className="relative mt-4 flex w-full flex-col gap-5 rounded-[16px] border border-[#e5e5e5] bg-background p-4 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 pb-4">
             <div className="flex items-center gap-2">
               <Layers className="size-6 text-brand-500" />
@@ -713,7 +713,7 @@ export function EventsView({
 
                     {/* Subtopics List */}
                     {isExpanded && (
-                      <div className="flex flex-col divide-y divide-neutral-100 bg-white">
+                      <div className="flex flex-col divide-y divide-neutral-100 bg-background">
                         {catSubtopics.length === 0 ? (
                           <div className="p-4 text-center text-[13px] text-neutral-400">
                             زیرعنوانی در این دسته موجود نیست.
@@ -781,7 +781,7 @@ export function EventsView({
                                           {rfp.version.files.map((file) => (
                                             <div
                                               key={file.id}
-                                              className="flex items-center justify-between rounded-md border border-neutral-200 bg-white p-2 text-[13px]"
+                                              className="flex items-center justify-between rounded-md border border-neutral-200 bg-background p-2 text-[13px]"
                                             >
                                               <div className="flex items-center gap-2 truncate">
                                                 <FileText className="size-4 shrink-0 text-brand-600" />
@@ -858,7 +858,6 @@ export function EventsView({
       <div className="mt-5 flex items-center justify-start">
         <div className="flex h-[48px] w-full items-center gap-[8px] sm:w-[458px]">
           <SearchField
-                className="flex-1 sm:w-[400px]"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="درخواست خود را جست و جو کنید"
@@ -884,7 +883,7 @@ export function EventsView({
       </div>
 
       {/* Main Events Card - Figma Frame 6 (56:13208) */}
-      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-[#e5e5e5] bg-white p-[16px]">
+      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-[#e5e5e5] bg-background p-[16px]">
         {isLoading ? (
           <EventsSkeleton />
         ) : (

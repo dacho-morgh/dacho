@@ -37,21 +37,21 @@ const buttonVariants = cva(
       variant: {
         // --- FILL STYLES ---
         default:
-          "border-transparent bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-900 disabled:bg-neutral-200 disabled:text-neutral-300",
+          "border-transparent dark:border-neutral-200 bg-fill-brand text-fill-brand-foreground hover:bg-fill-brand-hover active:bg-fill-brand-active disabled:bg-neutral-200 disabled:text-neutral-300",
         primary:
-          "border-transparent bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-900 disabled:bg-neutral-200 disabled:text-neutral-300",
+          "border-transparent dark:border-neutral-200 bg-fill-brand text-fill-brand-foreground hover:bg-fill-brand-hover active:bg-fill-brand-active disabled:bg-neutral-200 disabled:text-neutral-300",
         gray:
           "border-transparent bg-neutral-100 text-neutral-600 hover:bg-neutral-300 hover:text-neutral-700 active:bg-neutral-400 active:text-neutral-700 disabled:bg-neutral-100 disabled:text-neutral-300",
         secondary:
           "border-transparent bg-neutral-100 text-neutral-600 hover:bg-neutral-300 hover:text-neutral-700 active:bg-neutral-400 active:text-neutral-700 disabled:bg-neutral-100 disabled:text-neutral-300",
         white:
-          "border-transparent bg-white text-neutral-700 hover:bg-neutral-100 hover:border-white active:bg-neutral-200 disabled:bg-white disabled:text-neutral-300",
+          "border-transparent bg-background text-neutral-700 hover:bg-neutral-100 hover:border-background active:bg-neutral-200 disabled:bg-background disabled:text-neutral-300",
 
         // --- OUTLINE STYLES ---
         outline:
-          "border-brand-500 bg-transparent text-brand-500 hover:bg-white hover:border-brand-600 hover:text-brand-600 active:border-brand-700 active:text-brand-700 disabled:border-neutral-200 disabled:text-neutral-300 disabled:bg-transparent",
+          "border-brand-500 bg-transparent text-brand-500 hover:bg-background hover:border-brand-600 hover:text-brand-600 active:border-brand-700 active:text-brand-700 disabled:border-neutral-200 disabled:text-neutral-300 disabled:bg-transparent",
         "outline-primary":
-          "border-brand-500 bg-transparent text-brand-500 hover:bg-white hover:border-brand-600 hover:text-brand-600 active:border-brand-700 active:text-brand-700 disabled:border-neutral-200 disabled:text-neutral-300 disabled:bg-transparent",
+          "border-brand-500 bg-transparent text-brand-500 hover:bg-background hover:border-brand-600 hover:text-brand-600 active:border-brand-700 active:text-brand-700 disabled:border-neutral-200 disabled:text-neutral-300 disabled:bg-transparent",
         "outline-gray":
           "border-neutral-200 bg-transparent text-neutral-600 hover:bg-neutral-100 hover:border-neutral-300 hover:text-neutral-600 active:bg-neutral-200 active:border-neutral-400 active:text-neutral-600 disabled:border-neutral-200 disabled:text-neutral-300 disabled:bg-transparent",
         "outline-white":
@@ -59,11 +59,11 @@ const buttonVariants = cva(
 
         // --- TEXT / GHOST STYLES ---
         ghost:
-          "border-transparent bg-transparent text-brand-500 hover:bg-white hover:text-brand-600 active:text-brand-700 disabled:text-neutral-300 disabled:bg-transparent",
+          "border-transparent bg-transparent text-brand-500 hover:bg-background hover:text-brand-600 active:text-brand-700 disabled:text-neutral-300 disabled:bg-transparent",
         text:
-          "border-transparent bg-transparent text-brand-500 hover:bg-white hover:text-brand-600 active:text-brand-700 disabled:text-neutral-300 disabled:bg-transparent",
+          "border-transparent bg-transparent text-brand-500 hover:bg-background hover:text-brand-600 active:text-brand-700 disabled:text-neutral-300 disabled:bg-transparent",
         "text-primary":
-          "border-transparent bg-transparent text-brand-500 hover:bg-white hover:text-brand-600 active:text-brand-700 disabled:text-neutral-300 disabled:bg-transparent",
+          "border-transparent bg-transparent text-brand-500 hover:bg-background hover:text-brand-600 active:text-brand-700 disabled:text-neutral-300 disabled:bg-transparent",
         "text-gray":
           "border-transparent bg-transparent text-neutral-600 hover:bg-neutral-100 hover:text-neutral-600 active:bg-neutral-200 active:text-neutral-600 disabled:text-neutral-300 disabled:bg-transparent",
         "text-destructive":
@@ -73,7 +73,7 @@ const buttonVariants = cva(
 
         // --- UTILITY STYLES ---
         destructive:
-          "border-transparent bg-error-500 text-white hover:bg-error-700 active:bg-red-800 disabled:bg-neutral-200 disabled:text-neutral-300",
+          "border-transparent bg-fill-danger text-white hover:bg-fill-danger-hover active:bg-fill-danger-active disabled:bg-neutral-200 disabled:text-neutral-300",
         link:
           "border-transparent bg-transparent text-brand-500 underline-offset-4 hover:underline disabled:text-neutral-300 p-0 h-auto",
         "link-gray":
@@ -82,13 +82,14 @@ const buttonVariants = cva(
         // --- COMPOSITE CONTROLS ---
         // A tab inside a neutral-100 segmented bar; the selected tab turns white.
         segment:
-          "border-transparent bg-transparent text-neutral-600 hover:text-neutral-700 aria-pressed:bg-white aria-pressed:text-neutral-700 aria-selected:bg-white aria-selected:text-neutral-700 disabled:text-neutral-300",
+          "border-transparent bg-transparent text-neutral-600 hover:text-neutral-700 aria-pressed:bg-background aria-pressed:text-neutral-700 aria-selected:bg-background aria-selected:text-neutral-700 disabled:text-neutral-300",
         // The shared list filter trigger; data-active marks applied filters.
+        // Light: a white tile. Dark: it looks like the page's create button (the filled brand style).
         filter:
-          "border-transparent bg-white text-neutral-600 hover:bg-neutral-50 data-[active=true]:text-brand-600 data-[active=true]:ring-2 data-[active=true]:ring-brand-500/20 disabled:text-neutral-300",
+          "border-transparent bg-background text-neutral-600 hover:bg-neutral-50 data-[active=true]:text-brand-600 data-[active=true]:ring-2 data-[active=true]:ring-brand-500/20 disabled:text-neutral-300 dark:border-neutral-200 dark:bg-fill-brand dark:text-fill-brand-foreground dark:hover:bg-fill-brand-hover dark:active:bg-fill-brand-active dark:data-[active=true]:text-fill-brand-foreground dark:data-[active=true]:ring-brand-500/40 dark:disabled:bg-neutral-200 dark:disabled:text-neutral-300",
         // One choice in a group of options; the chosen one is aria-pressed.
         chip:
-          "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 aria-pressed:border-transparent aria-pressed:bg-brand-500 aria-pressed:text-white aria-pressed:hover:bg-brand-600 disabled:text-neutral-300",
+          "border-neutral-200 bg-background text-neutral-600 hover:bg-neutral-50 aria-pressed:border-transparent aria-pressed:bg-brand-500 aria-pressed:text-white aria-pressed:hover:bg-brand-600 dark:aria-pressed:border-neutral-300 dark:aria-pressed:bg-fill-brand dark:aria-pressed:text-fill-brand-foreground dark:aria-pressed:hover:bg-fill-brand-hover disabled:text-neutral-300",
         // A full-width disclosure header that opens a nested list.
         row:
           "w-full justify-between rounded-none border-transparent bg-transparent text-start text-neutral-800 hover:bg-neutral-100/70 disabled:text-neutral-300",

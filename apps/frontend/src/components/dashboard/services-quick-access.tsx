@@ -61,7 +61,7 @@ export function ServicesQuickAccess({ services = [] }: ServicesQuickAccessProps)
             <Link
               key={svc.key}
               href={`/dashboard/new-request?service=${svc.key}`}
-              className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-blue-300 hover:shadow-md"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-background p-5 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-blue-300 hover:shadow-md"
             >
               <div>
                 <div className="flex items-center justify-between">

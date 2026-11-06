@@ -1,15 +1,48 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
+import {
+  AddressDialog,
+  CompanyInfoDialog,
+  ContactDialog,
+  DeleteAddressDialog,
+  PasswordDialog,
+  describeCommandError,
+  type AddressValues,
+  type CompanyAddress,
+  type CompanyInfoValues,
+  type ContactValues,
+} from '@/components/dashboard/company-detail/company-action-dialogs'
+import {
+  addCompanyAddress,
+  deleteCompanyAddress,
+  removeCompanyLogo,
+  updateCompanyAddress,
+  updateCompanyInfo,
+  updateRepresentativeAccount,
+  uploadCompanyLogo,
+} from '@/components/dashboard/company-detail/company-admin-api'
+import {
+  mergeVerification,
+  verificationTargetId,
+  type VerificationDetailResponse,
+} from '@/components/dashboard/company-detail/company-detail-data'
+import { CompanyDetailSkeleton } from '@/components/dashboard/company-detail/company-detail-skeleton'
+import { CompanyLogoRow } from '@/components/dashboard/company-detail/company-logo-row'
+import { CompanyAccountTab } from '@/components/dashboard/company-detail/company-account-tab'
+import { DetailCard, InfoField } from '@/components/dashboard/company-detail/company-detail-parts'
+import {
+  CompanyDetailShell,
+  type CompanyTab,
+} from '@/components/dashboard/company-detail/company-detail-shell'
+import { CompanyRequestsTab } from '@/components/dashboard/company-detail/company-requests-tab'
 import { notFound } from 'next/navigation'
 import {
   DashboardAddIcon,
@@ -22,6 +55,7 @@ import {
   downloadDocument,
   formatDocumentSize,
 } from '@/utilities/document-api'
+import { DashboardApiError } from '@/utilities/dashboard-api'
 import { toast } from 'sonner'
 
 export type VerificationStatus =
@@ -79,8 +113,12 @@ export interface CompanyDetailResponse {
     phone?: string | null
     email?: string | null
     position?: string | null
+    /** The account's version stamp, which the account commands are guarded by. */
+    updatedAt?: string | null
   }
   companyId?: string | null
+  /** The stored logo and its access-checked file route; null when the company has none. */
+  logo?: { id: string; url: string } | null
   company?: {
     name?: string
     establishmentDate?: string
@@ -93,7 +131,7 @@ export interface CompanyDetailResponse {
     city?: string
   }
   executives?: { role?: string; name?: string }[]
-  addresses?: { title: string; address: string; postalCode: string }[]
+  addresses?: { id?: string; title: string; province?: string; city?: string; address: string; postalCode: string }[]
   allowedActions?: ('read' | 'approve' | 'return' | 'reject')[]
   verification?: {
     id?: string
@@ -129,9 +167,35 @@ function verificationStatusBadge(status: VerificationStatus): {
   }
 }
 
-export function CompanyDetailView({ id }: { id: string }) {
-  const [data, setData] = useState<CompanyDetailResponse | null>(null)
-  const [loadState, setLoadState] = useState<LoadState>('loading')
+/** An open dialog, with what was typed and the server's refusal when it is reopened after one. */
+type CompanyDialog =
+  | { kind: 'info'; values?: CompanyInfoValues; error?: string }
+  | { kind: 'address'; address?: CompanyAddress; values?: AddressValues; error?: string }
+  | { kind: 'delete-address'; address: CompanyAddress; error?: string }
+  | { kind: 'contact'; values?: ContactValues; error?: string }
+  | { kind: 'password'; error?: string }
+
+/** Optimistic addresses carry this id until the server has given them a real one. */
+const PENDING_ADDRESS = 'pending-'
+
+export function CompanyDetailView({
+  id,
+  tab = 'profile',
+  canManageAccount = false,
+  initial,
+}: {
+  id: string
+  tab?: CompanyTab
+  /** The case as the server read it, so the page opens with its content instead of a skeleton. */
+  initial?: CompanyDetailResponse
+  /** Only the System Owner may change or remove the representative's account. */
+  canManageAccount?: boolean
+}) {
+  const [dialog, setDialog] = useState<CompanyDialog | null>(null)
+  const [data, setData] = useState<CompanyDetailResponse | null>(initial ?? null)
+  const [loadState, setLoadState] = useState<LoadState>(initial ? 'ready' : 'loading')
+  const dataRef = useRef<CompanyDetailResponse | null>(initial ?? null)
+  const skipFirstLoad = useRef(Boolean(initial))
   // Each load gets a sequence number so a slower, older response never overwrites a newer one.
   const loadSequence = useRef(0)
 
@@ -161,36 +225,28 @@ export function CompanyDetailView({ id }: { id: string }) {
     writeDraft(draftKey, value)
   }
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (options: { quiet?: boolean } = {}) => {
     const sequence = ++loadSequence.current
     const isCurrent = () => sequence === loadSequence.current
     // Keep the loaded case on screen while refreshing after a decision or a stale revision.
     setLoadState((previous) => (previous === 'ready' ? 'ready' : 'loading'))
+    // A background refresh after a change never replaces the page with an error: what is shown stays.
+    const fail = (state: LoadState) => {
+      if (!options.quiet) setLoadState(state)
+    }
     try {
       const response = await fetch(`/api/dashboard/admin/companies/${encodeURIComponent(id)}`, {
         cache: 'no-store',
       })
       if (!isCurrent()) return
-      if (response.status === 401) {
-        setLoadState('expired')
-        return
-      }
-      if (response.status === 403) {
-        setLoadState('denied')
-        return
-      }
-      if (response.status === 404) {
-        setLoadState('missing')
-        return
-      }
-      if (!response.ok) {
-        setLoadState('unavailable')
-        return
-      }
-      const companyData = (await response.json()) as CompanyDetailResponse
+      if (response.status === 401) return fail('expired')
+      if (response.status === 403) return fail('denied')
+      if (response.status === 404) return fail('missing')
+      if (!response.ok) return fail('unavailable')
+      let companyData = (await response.json()) as CompanyDetailResponse
 
       // Try fetching detailed verification data (including full snapshot and history) if available
-      const verifTargetId = companyData.verification?.id || companyData.companyId
+      const verifTargetId = verificationTargetId(companyData)
       if (verifTargetId) {
         try {
           const verifRes = await fetch(
@@ -198,20 +254,7 @@ export function CompanyDetailView({ id }: { id: string }) {
             { cache: 'no-store' },
           )
           if (verifRes.ok) {
-            const verifJson = (await verifRes.json()) as {
-              verification?: CompanyDetailResponse['verification']
-              history?: VerificationHistoryItem[]
-              allowedActions?: ('read' | 'approve' | 'return' | 'reject')[]
-            }
-            if (verifJson.verification) {
-              companyData.verification = verifJson.verification
-            }
-            if (verifJson.history) {
-              companyData.history = verifJson.history
-            }
-            if (verifJson.allowedActions) {
-              companyData.allowedActions = verifJson.allowedActions
-            }
+            companyData = mergeVerification(companyData, (await verifRes.json()) as VerificationDetailResponse)
           }
         } catch {
           // Keep base verification projection from /admin/companies/:id
@@ -219,20 +262,175 @@ export function CompanyDetailView({ id }: { id: string }) {
       }
 
       if (!isCurrent()) return
+      dataRef.current = companyData
       setData(companyData)
       setLoadState('ready')
     } catch {
-      if (isCurrent()) setLoadState('unavailable')
+      if (isCurrent()) fail('unavailable')
     }
   }, [id])
 
   useEffect(() => {
+    // The server already read the case this page opened with.
+    if (skipFirstLoad.current) {
+      skipFirstLoad.current = false
+      return
+    }
     void loadData()
     return () => {
       // Ignore responses that arrive after unmount or after the id changes.
       loadSequence.current += 1
     }
   }, [loadData])
+
+  /**
+   * Shows a change on the page at once and rolls it back when the server refuses it. The dialog
+   * closes with the change; a refusal reopens it with what was typed and the reason.
+   */
+  const patchData = (patch: (current: CompanyDetailResponse) => CompanyDetailResponse) => {
+    const previous = dataRef.current
+    if (!previous) return () => undefined
+    const next = patch(previous)
+    dataRef.current = next
+    setData(next)
+    return () => {
+      dataRef.current = previous
+      setData(previous)
+    }
+  }
+
+  const mutate = async ({
+    reopen,
+    optimistic,
+    task,
+    success,
+    failure,
+  }: {
+    /** The dialog to reopen when the server refuses; none for a change made without one. */
+    reopen?: CompanyDialog
+    optimistic?: () => () => void
+    task: () => Promise<void>
+    success: string
+    failure: string
+  }) => {
+    const rollback = optimistic?.()
+    setDialog(null)
+    try {
+      await task()
+      toast.success(success)
+      await loadData({ quiet: true })
+    } catch (cause) {
+      rollback?.()
+      const reason = describeCommandError(cause, failure)
+      if (reopen) setDialog({ ...reopen, error: reason })
+      else toast.error(reason)
+    }
+  }
+
+  const infoInitial: CompanyInfoValues = {
+    name: data?.company?.name ?? '',
+    establishmentDate: data?.company?.establishmentDate ?? '',
+    status: data?.company?.status ?? '',
+    type: data?.company?.type ?? '',
+    registrationNumber: data?.company?.registrationNumber ?? '',
+    economicCode: data?.company?.economicCode ?? '',
+  }
+
+  const submitInfo = (values: CompanyInfoValues) => {
+    const changed = (Object.keys(infoInitial) as (keyof CompanyInfoValues)[]).filter(
+      (field) => values[field] !== infoInitial[field],
+    )
+    if (changed.length === 0) return setDialog(null)
+    void mutate({
+      reopen: { kind: 'info', values },
+      optimistic: () => patchData((current) => ({ ...current, company: { ...current.company, ...values } })),
+      task: () => updateCompanyInfo(id, Object.fromEntries(changed.map((field) => [field, values[field]]))),
+      success: 'اطلاعات شرکت ذخیره شد.',
+      failure: 'ذخیرهٔ اطلاعات شرکت انجام نشد. دوباره تلاش کنید.',
+    })
+  }
+
+  const submitAddress = (current: CompanyAddress | undefined, values: AddressValues) => {
+    if (current) {
+      void mutate({
+        reopen: { kind: 'address', address: current, values },
+        optimistic: () =>
+          patchData((state) => ({
+            ...state,
+            addresses: state.addresses?.map((item) => (item.id === current.id ? { ...item, ...values } : item)),
+          })),
+        task: () => updateCompanyAddress(id, current.id, values),
+        success: 'آدرس ذخیره شد.',
+        failure: 'ذخیرهٔ آدرس انجام نشد. دوباره تلاش کنید.',
+      })
+      return
+    }
+    const pendingId = `${PENDING_ADDRESS}${Date.now()}`
+    void mutate({
+      reopen: { kind: 'address', values },
+      optimistic: () =>
+        patchData((state) => ({ ...state, addresses: [...(state.addresses ?? []), { id: pendingId, ...values }] })),
+      task: () => addCompanyAddress(id, values),
+      success: 'آدرس افزوده شد.',
+      failure: 'افزودن آدرس انجام نشد. دوباره تلاش کنید.',
+    })
+  }
+
+  const removeAddress = (address: CompanyAddress) =>
+    void mutate({
+      reopen: { kind: 'delete-address', address },
+      optimistic: () =>
+        patchData((state) => ({ ...state, addresses: state.addresses?.filter((item) => item.id !== address.id) })),
+      task: () => deleteCompanyAddress(id, address.id),
+      success: 'آدرس حذف شد.',
+      failure: 'حذف آدرس انجام نشد. دوباره تلاش کنید.',
+    })
+
+  /** Changes the representative's account through the CMS command, guarded by the account's version. */
+  const accountTask = (fields: Parameters<typeof updateRepresentativeAccount>[2]) => async () => {
+    const version = dataRef.current?.representative?.updatedAt
+    if (!version) throw new DashboardApiError(409, 'stale_personnel')
+    await updateRepresentativeAccount(id, version, fields)
+  }
+
+  const submitContact = (values: ContactValues) => {
+    const current = data?.representative
+    const changed = (['name', 'phone', 'email'] as const).filter((field) => values[field] !== (current?.[field] ?? ''))
+    if (changed.length === 0) return setDialog(null)
+    void mutate({
+      reopen: { kind: 'contact', values },
+      optimistic: () =>
+        patchData((state) => ({ ...state, representative: { ...state.representative!, ...values } })),
+      task: accountTask(Object.fromEntries(changed.map((field) => [field, values[field]]))),
+      success: 'اطلاعات تماس ذخیره شد.',
+      failure: 'ذخیرهٔ اطلاعات تماس انجام نشد. دوباره تلاش کنید.',
+    })
+  }
+
+  const submitPassword = (password: string) =>
+    void mutate({
+      reopen: { kind: 'password' },
+      task: accountTask({ password }),
+      success: 'رمز عبور نماینده تغییر کرد.',
+      failure: 'تغییر رمز عبور انجام نشد. دوباره تلاش کنید.',
+    })
+
+  const uploadLogo = (file: File) =>
+    mutate({
+      optimistic: () =>
+        patchData((state) => ({ ...state, logo: { id: 'pending', url: URL.createObjectURL(file) } })),
+      task: () => uploadCompanyLogo(id, file),
+      success: 'لوگوی شرکت ذخیره شد.',
+      failure: 'ذخیرهٔ لوگو انجام نشد. دوباره تلاش کنید.',
+    })
+
+  const removeLogo = () =>
+    mutate({
+      optimistic: () => patchData((state) => ({ ...state, logo: null })),
+      task: () => removeCompanyLogo(id),
+      success: 'لوگوی شرکت حذف شد.',
+      failure: 'حذف لوگو انجام نشد. دوباره تلاش کنید.',
+    })
 
   // Handle secretariat verification decision (Approve / Return / Reject)
   const handleSubmitDecision = async (action: 'approve' | 'return' | 'reject') => {
@@ -398,17 +596,7 @@ export function CompanyDetailView({ id }: { id: string }) {
       </div>
     )
   }
-  if (loadState === 'loading' || !data) {
-    return (
-      <div className="flex w-full flex-col gap-5 p-6 pt-20 md:p-10" dir="rtl">
-        <Typography as="span" role="status" variant="14/regular" className="sr-only">
-          در حال دریافت اطلاعات شرکت
-        </Typography>
-        <Skeleton aria-hidden="true" className="h-6 w-48 rounded-lg bg-neutral-200 motion-reduce:animate-none" />
-        <Skeleton aria-hidden="true" className="h-96 w-full rounded-2xl bg-neutral-100 motion-reduce:animate-none" />
-      </div>
-    )
-  }
+  if (loadState === 'loading' || !data) return <CompanyDetailSkeleton />
 
   const company = data.company
   const companyName = company?.name
@@ -422,7 +610,7 @@ export function CompanyDetailView({ id }: { id: string }) {
 
   const fields: Array<[string, string | undefined]> = [
     ['نام شرکت', company?.name],
-    ['تاریخ تاسیس', company?.establishmentDate],
+    ['تاریخ تاسیس', establishmentLabel(company?.establishmentDate)],
     ['وضعیت شرکت', company?.status],
     ['نوع شرکت', company?.type],
     ['شماره ثبت', company?.registrationNumber],
@@ -434,102 +622,161 @@ export function CompanyDetailView({ id }: { id: string }) {
   const snapshotDocuments = verification?.snapshot?.documents ?? []
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-5 p-6 pt-20 md:p-10" dir="rtl">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2">
-        <Link href="/dashboard/companies">
-          <Typography variant="14/regular" color="brand-600">
-            شرکت ها
-          </Typography>
-        </Link>
-        <Typography variant="14/regular" color="muted">
-          / {companyName || '—'}
-        </Typography>
-      </div>
-
-      <div className="flex min-h-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 lg:min-h-[912px] lg:flex-row">
-        <nav className="order-first flex w-full shrink-0 flex-row flex-wrap gap-2 border-b border-neutral-200 pb-4 lg:order-none lg:w-[200px] lg:flex-col lg:border-b-0 lg:border-l lg:pl-5">
-          <Typography
-            variant="16/semibold"
-            color="brand-600"
-            className="rounded-xl bg-brand-50 p-3"
-          >
-            پروفایل شرکت
-          </Typography>
-          {['رزومه', 'اطلاعات حساب', 'درخواست‌ها'].map((item) => (
-            <Typography
-              key={item}
-              variant="16/regular"
-              color="secondary"
-              className="rounded-xl p-3"
-            >
-              {item}
-            </Typography>
-          ))}
-        </nav>
-
-        {/* Content Pane */}
-        <div className="flex w-full max-w-[892px] flex-col gap-6">
-          {/* Header */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-4">
-              <Image
-                src="/figma/dashboard/profile-avatar.png"
-                alt={companyName || 'شرکت'}
-                width={80}
-                height={80}
-                className="rounded-xl object-cover"
-              />
-              <div className="min-w-0 break-words">
-                <Typography variant="20/bold" color="neutral-900">
-                  {companyName || '—'}
+    <CompanyDetailShell
+      id={id}
+      companyName={companyName}
+      active={tab}
+      representativeUpdatedAt={data.representative?.updatedAt}
+      canManageAccount={canManageAccount}
+    >
+      {tab === 'profile' && (
+        <>
+          <CompanyLogoRow companyName={companyName} logo={data.logo} onUpload={uploadLogo} onRemove={removeLogo}>
+            <div className="order-last flex w-full items-center gap-2 sm:order-none sm:ms-auto sm:w-auto">
+              <Badge variant={badgeInfo.variant} size="md">
+                {badgeInfo.label}
+              </Badge>
+              {verification?.revision ? (
+                <Typography as="span" variant="12/regular" color="muted">
+                  نسخه {verification.revision.toLocaleString('fa-IR')}
                 </Typography>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <Typography variant="14/regular" color="muted">
-                    شناسه: {id}
-                  </Typography>
-                  <span className="text-neutral-300">•</span>
-                  <Badge variant={badgeInfo.variant} size="sm">
-                    {badgeInfo.label}
-                  </Badge>
-                  {verification?.revision ? (
-                    <Typography variant="12/regular" color="muted">
-                      (نسخه {verification.revision.toLocaleString('fa-IR')})
-                    </Typography>
-                  ) : null}
-                </div>
-              </div>
+              ) : null}
             </div>
-          </div>
+          </CompanyLogoRow>
+
+          {/* Basic Company Info */}
+          <DetailCard
+            title="اطلاعات پایه"
+            action={
+              <Button
+                type="button"
+                variant="gray"
+                size="32"
+                icon={<DashboardEditIcon />}
+                className="px-3"
+                onClick={() => setDialog({ kind: 'info' })}
+              >
+                <Typography as="span" variant="14/regular" className="text-inherit">
+                  ویرایش
+                </Typography>
+              </Button>
+            }
+          >
+            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+              {fields.map(([label, value]) => (
+                <InfoField key={label} label={label} value={value || '—'} />
+              ))}
+            </div>
+          </DetailCard>
+
+          {/* Addresses */}
+          <DetailCard
+            title="آدرس ها"
+            action={
+              <Button
+                type="button"
+                variant="gray"
+                size="32"
+                icon={<DashboardAddIcon />}
+                className="px-3"
+                onClick={() => setDialog({ kind: 'address' })}
+              >
+                <Typography as="span" variant="14/regular" className="text-inherit">
+                  آدرس جدید
+                </Typography>
+              </Button>
+            }
+          >
+            <div className="flex flex-col gap-5">
+              {addresses.map((address, index) => (
+                <div
+                  key={address.id ?? `${index}-${address.title}`}
+                  className="flex flex-col gap-3 rounded-lg border border-neutral-100 px-4 py-2"
+                >
+                  <div className="flex items-start gap-3">
+                    <Typography as="h3" variant="14/semibold" sm="16/bold" color="secondary" className="min-w-0 flex-1 break-words">
+                      {address.title}
+                    </Typography>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="text-gray"
+                        size="icon-32"
+                        aria-label={`ویرایش آدرس ${address.title}`}
+                        disabled={!isSavedAddress(address.id)}
+                        onClick={() => address.id && setDialog({ kind: 'address', address: toCompanyAddress(address, address.id) })}
+                      >
+                        <DashboardEditIcon />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="text-gray"
+                        size="icon-32"
+                        aria-label={`حذف آدرس ${address.title}`}
+                        disabled={!isSavedAddress(address.id)}
+                        onClick={() =>
+                          address.id && setDialog({ kind: 'delete-address', address: toCompanyAddress(address, address.id) })
+                        }
+                      >
+                        <DashboardTrashIcon />
+                      </Button>
+                    </div>
+                  </div>
+                  <Typography variant="14/semibold" sm="16/semibold" color="neutral-400">
+                    {address.address}
+                  </Typography>
+                  <Typography variant="14/semibold" sm="16/semibold" color="neutral-400">
+                    کد پستی: {address.postalCode || '—'}
+                  </Typography>
+                </div>
+              ))}
+              {addresses.length === 0 ? (
+                <Typography variant="14/regular" color="muted">
+                  آدرسی برای این شرکت ثبت نشده است.
+                </Typography>
+              ) : null}
+            </div>
+          </DetailCard>
 
           {/* Identity Edits Awaiting Re-verification Banner */}
           {identityEdits.length > 0 && (
             <section
-              className="rounded-xl border border-amber-300 bg-amber-50 p-4"
+              className="flex flex-col gap-3 rounded-2xl border border-warning-400 bg-warning-50 p-4"
               role="region"
               aria-label="تغییرات هویتی نیازمند احراز مجدد"
             >
-              <div className="flex items-center gap-2">
-                <Typography variant="16/semibold" color="secondary" className="text-amber-900">
-                  تغییرات هویتی جدید در انتظار احراز مجدد
-                </Typography>
-              </div>
-              <Typography variant="14/regular" color="secondary" className="mt-1 text-amber-800">
+              <Typography as="h2" variant="16/bold" sm="20/bold" className="text-warning-700">
+                تغییرات هویتی جدید در انتظار احراز مجدد
+              </Typography>
+              <Typography variant="14/regular" className="text-warning-700">
                 اطلاعات هویتی شرکت پس از ثبت تغییر یافته است. پرونده‌های قبلی نسخه تأییدشده زمان
                 ارسال را حفظ می‌کنند.
               </Typography>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {identityEdits.map((item) => (
                   <div
                     key={item.label}
-                    className="rounded-lg border border-amber-200 bg-white/70 p-2.5 text-xs text-amber-950"
+                    className="flex flex-col gap-1 rounded-lg border border-neutral-100 bg-background p-2"
                   >
-                    <span className="font-semibold">{item.label}:</span>{' '}
-                    <span className="text-neutral-500">نسخه احراز:</span>{' '}
-                    <span className="font-medium text-neutral-700">{item.snapVal}</span>{' '}
-                    <span className="text-amber-600 font-bold">←</span>{' '}
-                    <span className="text-neutral-500">جاری:</span>{' '}
-                    <span className="font-bold text-amber-900">{item.liveVal}</span>
+                    <Typography as="span" variant="12/semibold" sm="14/semibold" color="neutral-400">
+                      {item.label}
+                    </Typography>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Typography as="span" variant="12/regular" color="muted">
+                        نسخه احراز:
+                      </Typography>
+                      <Typography as="span" variant="14/regular" color="secondary">
+                        {item.snapVal}
+                      </Typography>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Typography as="span" variant="12/regular" color="muted">
+                        جاری:
+                      </Typography>
+                      <Typography as="span" variant="12/semibold" sm="14/semibold" color="secondary">
+                        {item.liveVal}
+                      </Typography>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -537,98 +784,71 @@ export function CompanyDetailView({ id }: { id: string }) {
           )}
 
           {/* Secretariat Verification Decision Workbench */}
-          <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-xs">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-3">
-              <div>
-                <Typography variant="16/semibold" color="neutral-900">
-                  میز کار بررسی و تصمیم احراز دبیرخانه
-                </Typography>
-                <Typography variant="12/regular" color="muted" className="mt-0.5">
-                  بررسی نسخه اطلاعات ثبتی، مدارک ارسالی و ثبت تأیید یا بازگرداندن پرونده
-                </Typography>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={badgeInfo.variant} size="md">
-                  {badgeInfo.label}
-                </Badge>
-                {verification?.revision ? (
-                  <span className="text-xs text-neutral-500">
-                    نسخه {verification.revision.toLocaleString('fa-IR')}
-                  </span>
-                ) : null}
-              </div>
-            </div>
+          <DetailCard
+            title="میز کار بررسی و تصمیم احراز دبیرخانه"
+            className="border-brand-400"
+            action={
+              <Badge variant={badgeInfo.variant} size="md">
+                {badgeInfo.label}
+              </Badge>
+            }
+          >
+            <Typography variant="14/regular" color="muted" className="-mt-3">
+              بررسی نسخه اطلاعات ثبتی، مدارک ارسالی و ثبت تأیید یا بازگرداندن پرونده
+            </Typography>
 
             {/* Notification / Feedback Alerts */}
             {staleNotice && (
-              <div
-                role="alert"
-                className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-              >
-                {staleNotice}
+              <div role="alert" className="rounded-lg border border-warning-400 bg-warning-50 p-3">
+                <Typography variant="14/regular" className="text-warning-700">
+                  {staleNotice}
+                </Typography>
               </div>
             )}
             {decisionError && (
-              <div
-                role="alert"
-                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-              >
-                {decisionError}
+              <div role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3">
+                <Typography variant="14/regular" color="error">
+                  {decisionError}
+                </Typography>
               </div>
             )}
 
             {/* Verification Metadata Summary */}
-            <div className="mb-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-neutral-50 p-3">
-                <Typography variant="12/regular" color="muted">
-                  تاریخ ارسال پرونده
-                </Typography>
-                <Typography variant="14/regular" color="secondary" className="mt-1">
-                  {verification?.submittedAt ? formatDate(verification.submittedAt) : '—'}
-                </Typography>
-              </div>
-              <div className="rounded-lg bg-neutral-50 p-3">
-                <Typography variant="12/regular" color="muted">
-                  تاریخ آخرین تصمیم
-                </Typography>
-                <Typography variant="14/regular" color="secondary" className="mt-1">
-                  {verification?.decidedAt ? formatDate(verification.decidedAt) : '—'}
-                </Typography>
-              </div>
-              <div className="rounded-lg bg-neutral-50 p-3">
-                <Typography variant="12/regular" color="muted">
-                  نماینده ثبت‌کننده
-                </Typography>
-                <Typography variant="14/regular" color="secondary" className="mt-1">
-                  {data.representative?.name || '—'} ({data.representative?.phone || '—'})
-                </Typography>
-              </div>
+            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-3">
+              <InfoField
+                label="تاریخ ارسال پرونده"
+                value={verification?.submittedAt ? formatDate(verification.submittedAt) : '—'}
+              />
+              <InfoField
+                label="تاریخ آخرین تصمیم"
+                value={verification?.decidedAt ? formatDate(verification.decidedAt) : '—'}
+              />
+              <InfoField
+                label="نماینده ثبت‌کننده"
+                value={`${data.representative?.name || '—'} (${data.representative?.phone || '—'})`}
+              />
             </div>
 
             {/* Previous return/rejection reason if available */}
             {verification?.reason && (
-              <div className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 text-sm">
-                <span className="font-semibold text-neutral-800">توضیحات و دلیل تصمیم قبلی:</span>{' '}
-                <span className="text-neutral-700">{verification.reason}</span>
-              </div>
+              <InfoField label="توضیحات و دلیل تصمیم قبلی" value={verification.reason} />
             )}
 
             {/* Decision Controls */}
             {isPending && canDecide && (
-              <div className="mt-4 flex flex-col gap-3">
-                <label htmlFor="decision-reason" className="text-sm font-medium text-neutral-800">
+              <div className="flex flex-col gap-3">
+                <Typography as="label" htmlFor="decision-reason" variant="14/semibold" sm="16/semibold" color="neutral-700">
                   توضیحات و دلیل تصمیم{' '}
-                  <span className="text-xs text-neutral-500 font-normal">
+                  <Typography as="span" variant="12/regular" color="muted">
                     (برای برگشت مدارک یا رد احراز الزامی است)
-                  </span>
-                </label>
+                  </Typography>
+                </Typography>
                 <Textarea
                   id="decision-reason"
                   rows={3}
                   placeholder="دلیل تصمیم، نواقص مدارک یا توضیحات لازم را اینجا وارد کنید..."
                   value={decisionReason}
                   onChange={(e) => handleReasonChange(e.target.value)}
-                  className="rounded-lg border-neutral-300 bg-white p-3 text-sm"
                   disabled={decisionSubmitting}
                 />
                 {decisionReason.trim().length > 0 && (
@@ -637,13 +857,14 @@ export function CompanyDetailView({ id }: { id: string }) {
                   </Typography>
                 )}
                 {/* Figma 02 (31650:7): actions sit at the row's end, approve last in reading order. */}
-                <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   <Button asChild size="40" variant="link">
                     <Link href="/dashboard/companies?status=pending">بازگشت به صف</Link>
                   </Button>
                   <Button
                     size="40"
                     variant="outline-gray"
+                    className="px-4"
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('return')}
                   >
@@ -652,6 +873,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                   <Button
                     size="40"
                     variant="destructive"
+                    className="px-4"
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('reject')}
                   >
@@ -660,6 +882,7 @@ export function CompanyDetailView({ id }: { id: string }) {
                   <Button
                     size="40"
                     variant="default"
+                    className="px-4"
                     disabled={decisionSubmitting}
                     onClick={() => void handleSubmitDecision('approve')}
                   >
@@ -670,78 +893,70 @@ export function CompanyDetailView({ id }: { id: string }) {
             )}
 
             {isSelf && (
-              <div
-                role="alert"
-                className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-              >
-                شما نماینده این شرکت هستید. تأیید یا تصمیم‌گیری برای شرکت خود مجاز نیست (ممنوعیت
-                تأیید خود).
+              <div role="alert" className="rounded-lg border border-warning-400 bg-warning-50 p-3">
+                <Typography variant="14/regular" className="text-warning-700">
+                  شما نماینده این شرکت هستید. تأیید یا تصمیم‌گیری برای شرکت خود مجاز نیست (ممنوعیت
+                  تأیید خود).
+                </Typography>
               </div>
             )}
 
             {!isPending && (
-              <div className="mt-2 text-xs text-neutral-500">
+              <Typography variant="12/regular" color="muted">
                 این پرونده در وضعیت{' '}
-                <span className="font-semibold text-neutral-700">{badgeInfo.label}</span> قرار دارد و
-                در این نسخه نهایی شده است.
-              </div>
+                <Typography as="span" variant="12/semibold" color="neutral-700">
+                  {badgeInfo.label}
+                </Typography>{' '}
+                قرار دارد و در این نسخه نهایی شده است.
+              </Typography>
             )}
-          </section>
-
+          </DetailCard>
           {/* Exact Submitted Verification Documents & Authorized Downloads */}
-          <section className="rounded-xl border border-neutral-200 p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <Typography variant="16/semibold" color="neutral-900">
-                  مدارک ارسالی در نسخه احراز
-                </Typography>
-                <Typography variant="12/regular" color="muted">
-                  مدارک رسمی ثبت‌شده در پرونده این نسخه با امکان دریافت فایل با مجوز معتبر
-                </Typography>
-              </div>
-            </div>
-
+          <DetailCard title="مدارک ارسالی در نسخه احراز">
+            <Typography variant="14/regular" color="muted" className="-mt-3">
+              مدارک رسمی ثبت‌شده در پرونده این نسخه با امکان دریافت فایل با مجوز معتبر
+            </Typography>
             {downloadError && (
-              <div
-                role="alert"
-                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-              >
-                {downloadError}
+              <div role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3">
+                <Typography variant="14/regular" color="error">
+                  {downloadError}
+                </Typography>
               </div>
             )}
             {snapshotDocuments.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
                 {snapshotDocuments.map((doc) => (
                   <div
                     key={doc.id}
-                    className="flex flex-col justify-between rounded-xl border border-neutral-200 bg-neutral-50/50 p-3.5"
+                    className="flex min-w-0 flex-col justify-between gap-3 rounded-lg border border-neutral-100 p-2"
                   >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="inline-block rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge variant="primary" size="sm">
                           {documentCategoryLabel(doc.category)}
-                        </span>
-                        <span className="text-xs text-neutral-500">
+                        </Badge>
+                        <Typography as="span" variant="12/regular" color="muted">
                           {formatDocumentSize(doc.sizeBytes)}
-                        </span>
+                        </Typography>
                       </div>
                       <Typography
                         variant="14/regular"
                         color="secondary"
-                        className="mt-2 truncate font-mono text-xs"
+                        className="truncate font-mono"
                         title={doc.filename}
                       >
                         {doc.filename}
                       </Typography>
                     </div>
-                    <div className="mt-3 flex justify-end">
+                    <div className="flex justify-end">
                       <Button
                         size="32"
                         variant="outline-gray"
+                        className="px-3"
                         disabled={downloadingDocId === doc.id}
                         onClick={() => void handleDownloadDocument(doc.id, doc.filename)}
                       >
-                        <Typography variant="12/regular">
+                        <Typography as="span" variant="14/regular" className="text-inherit">
                           {downloadingDocId === doc.id ? 'در حال دریافت...' : 'دانلود مدرک'}
                         </Typography>
                       </Button>
@@ -750,75 +965,100 @@ export function CompanyDetailView({ id }: { id: string }) {
                 ))}
               </div>
             ) : (
-              <Typography variant="14/regular" color="muted" className="py-2 text-center">
+              <Typography variant="14/regular" color="muted" className="text-center">
                 مدرکی در نسخه ارسالی احراز ثبت نشده است.
               </Typography>
             )}
-          </section>
+          </DetailCard>
 
-          {/* Basic Company Info */}
-          <InfoSection title="اطلاعات پایه" edit>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {fields.map(([label, value]) => (
-                <InfoField key={label} label={label} value={value || '—'} />
-              ))}
-            </div>
-          </InfoSection>
+        </>
+      )}
 
-          {/* Addresses */}
-          <InfoSection title="آدرس ها" add>
-            <div className="flex flex-col gap-3">
-              {addresses.map((address) => (
-                <div key={address.title} className="rounded-xl border border-neutral-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <Typography variant="14/semibold" color="secondary">
-                      {address.title}
-                    </Typography>
-                    <div className="flex gap-1">
-                      <Button disabled variant="text-gray" size="icon-sm" aria-label="ویرایش">
-                        <DashboardEditIcon className="size-5" />
-                      </Button>
-                      <Button disabled variant="text-gray" size="icon-sm" aria-label="حذف">
-                        <DashboardTrashIcon className="size-5" />
-                      </Button>
-                    </div>
-                  </div>
-                  <Typography variant="14/regular" color="secondary" className="mt-3">
-                    {address.address}
-                  </Typography>
-                  <Typography variant="12/regular" color="muted" className="mt-2">
-                    کد پستی: {address.postalCode || '—'}
-                  </Typography>
-                </div>
-              ))}
-            </div>
-          </InfoSection>
+      {/* General Private Documents Field (Upload Seam) */}
+      {tab === 'resume' && (
+        <DetailCard title="مدارک خصوصی بارگذاری‌شده">
+          <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+            {(
+              [
+                ['articlesOfAssociation', 'اساس‌نامه'],
+                ['establishmentNotices', 'آگهی تأسیس'],
+                ['amendmentNotices', 'آگهی تغییرات'],
+                ['catalogues', 'کاتالوگ محصولات'],
+                ['certificatesLicenses', 'گواهی‌ها و مجوزها'],
+              ] as const
+            ).map(([category, label]) => (
+              <PrivateDocumentField
+                key={category}
+                category={category}
+                label={label}
+                companyId={data.companyId ?? undefined}
+                canUpload
+              />
+            ))}
+          </div>
+        </DetailCard>
+      )}
 
-          {/* General Private Documents Field (Upload Seam) */}
-          <InfoSection title="مدارک خصوصی بارگذاری‌شده">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(
-                [
-                  ['articlesOfAssociation', 'اساس‌نامه'],
-                  ['establishmentNotices', 'آگهی تأسیس'],
-                  ['amendmentNotices', 'آگهی تغییرات'],
-                  ['catalogues', 'کاتالوگ محصولات'],
-                  ['certificatesLicenses', 'گواهی‌ها و مجوزها'],
-                ] as const
-              ).map(([category, label]) => (
-                <PrivateDocumentField
-                  key={category}
-                  category={category}
-                  label={label}
-                  companyId={data.companyId ?? undefined}
-                  canUpload
-                />
-              ))}
-            </div>
-          </InfoSection>
-        </div>
-      </div>
-    </main>
+      {tab === 'account' && (
+        <CompanyAccountTab
+          userId={id}
+          companyName={companyName}
+          representative={data.representative}
+          canManage={canManageAccount}
+          onEditContact={() => setDialog({ kind: 'contact' })}
+          onChangePassword={() => setDialog({ kind: 'password' })}
+        />
+      )}
+
+      {dialog?.kind === 'info' ? (
+        <CompanyInfoDialog
+          initial={dialog.values ?? infoInitial}
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onSubmit={submitInfo}
+        />
+      ) : null}
+      {dialog?.kind === 'address' ? (
+        <AddressDialog
+          isNew={!dialog.address}
+          initial={dialog.values ?? addressInitial(dialog.address)}
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onSubmit={(values) => submitAddress(dialog.address, values)}
+        />
+      ) : null}
+      {dialog?.kind === 'delete-address' ? (
+        <DeleteAddressDialog
+          address={dialog.address}
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onConfirm={() => removeAddress(dialog.address)}
+        />
+      ) : null}
+      {dialog?.kind === 'contact' ? (
+        <ContactDialog
+          initial={
+            dialog.values ?? {
+              name: data.representative?.name ?? '',
+              phone: data.representative?.phone ?? '',
+              email: data.representative?.email ?? '',
+            }
+          }
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onSubmit={submitContact}
+        />
+      ) : null}
+      {dialog?.kind === 'password' ? (
+        <PasswordDialog
+          error={dialog.error}
+          onClose={() => setDialog(null)}
+          onSubmit={(values) => submitPassword(values.password)}
+        />
+      ) : null}
+
+      {tab === 'requests' && <CompanyRequestsTab companyId={id} />}
+    </CompanyDetailShell>
   )
 }
 
@@ -854,47 +1094,50 @@ function formatDate(iso: string): string {
   }
 }
 
-function InfoSection({
-  title,
-  children,
-  edit,
-  add,
-}: {
-  title: string
-  children: React.ReactNode
-  edit?: boolean
-  add?: boolean
-}) {
-  return (
-    <section className="rounded-xl border border-neutral-200 p-4">
-      <div className="mb-5 flex items-center justify-between">
-        <Typography variant="16/semibold" color="neutral-900">
-          {title}
-        </Typography>
-        {edit ? (
-          <Button disabled variant="outline-gray" size="32" icon={<DashboardEditIcon className="size-5" />}>
-            <Typography variant="14/regular">ویرایش</Typography>
-          </Button>
-        ) : add ? (
-          <Button disabled variant="outline-gray" size="32" icon={<DashboardAddIcon className="size-5" />}>
-            <Typography variant="14/regular">افزودن آدرس</Typography>
-          </Button>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  )
+const isSavedAddress = (id: string | undefined): id is string => Boolean(id) && !id!.startsWith(PENDING_ADDRESS)
+
+const addressInitial = (address: CompanyAddress | undefined): AddressValues => ({
+  title: address?.title ?? '',
+  province: address?.province ?? '',
+  city: address?.city ?? '',
+  postalCode: address?.postalCode ?? '',
+  address: address?.address ?? '',
+})
+
+function toCompanyAddress(
+  address: NonNullable<CompanyDetailResponse['addresses']>[number],
+  id: string,
+): CompanyAddress {
+  return {
+    id,
+    title: address.title,
+    province: address.province ?? '',
+    city: address.city ?? '',
+    postalCode: address.postalCode,
+    address: address.address,
+  }
 }
 
-function InfoField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-neutral-50 p-3">
-      <Typography variant="12/regular" color="muted">
-        {label}
-      </Typography>
-      <Typography variant="16/regular" color="secondary" className="mt-1">
-        {value}
-      </Typography>
-    </div>
-  )
+const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹'
+const toLatinDigits = (value: string) => value.replace(/[۰-۹]/g, (digit) => String(PERSIAN_DIGITS.indexOf(digit)))
+const toPersianDigits = (value: string) => value.replace(/\d/g, (digit) => PERSIAN_DIGITS[Number(digit)] ?? digit)
+
+function currentJalaliYear(): number | undefined {
+  const year = new Intl.DateTimeFormat('en-u-ca-persian-nu-latn', { year: 'numeric' })
+    .formatToParts(new Date())
+    .find((part) => part.type === 'year')?.value
+  return year ? Number(year) : undefined
+}
+
+/** "۱۳۵۱/۰۴/۱۲ (۵۴ سال)": the establishment date as stored (Jalali) or converted (ISO), with the company's age. */
+function establishmentLabel(value?: string): string | undefined {
+  if (!value) return undefined
+  const match = /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/.exec(toLatinDigits(value))
+  if (!match) return value
+  const year = Number(match[1])
+  const isJalali = year >= 1200 && year <= 1600
+  const now = isJalali ? currentJalaliYear() : new Date().getFullYear()
+  const age = now ? now - year : undefined
+  const date = isJalali ? toPersianDigits(`${match[1]}/${match[2].padStart(2, '0')}/${match[3].padStart(2, '0')}`) : formatDate(value)
+  return age !== undefined && age >= 0 ? `${date} (${age.toLocaleString('fa-IR')} سال)` : date
 }

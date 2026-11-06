@@ -30,7 +30,7 @@ export function StatusBreakdown({ counts }: { counts: RequestStats }) {
   }
 
   return (
-    <Card className="rounded-[10px] border-neutral-200 bg-white px-6 py-5 shadow-none">
+    <Card className="rounded-[10px] border-neutral-200 bg-background px-6 py-5 shadow-none">
       <Typography as="h2" variant="title" color="neutral-800">
         وضعیت درخواست‌ها
       </Typography>

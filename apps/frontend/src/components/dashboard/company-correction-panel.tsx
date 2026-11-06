@@ -160,7 +160,7 @@ export function CompanyCorrectionPanel({ request, fields, after }: CompanyCorrec
     <section
       aria-labelledby="correction-heading"
       data-testid="company-correction"
-      className="flex min-w-0 flex-col gap-5 rounded-2xl border border-warning-400 bg-white p-4 sm:p-6"
+      className="flex min-w-0 flex-col gap-5 rounded-2xl border border-warning-400 bg-background p-4 sm:p-6"
     >
       <div className="flex min-w-0 flex-col gap-1">
         <Typography as="h2" id="correction-heading" variant="20/bold" color="neutral-900">

@@ -250,6 +250,8 @@ export interface RequestFilters {
   /** Matches the title and tracking code only, which every reader of the row already sees. */
   search?: string
   eventId?: string
+  /** The company's representative: requests the person owns. */
+  ownerId?: string
   reviewStage?: ReviewStage
   queue?: RequestWorkQueueFilter
 }
@@ -263,6 +265,10 @@ export function requestFilterClauses(filters: RequestFilters, params: unknown[])
   if (filters.eventId) {
     params.push(filters.eventId)
     clauses.push(`EXISTS (SELECT 1 FROM dashboard.request_rfps f WHERE f.request_id = r.id AND f.event_id = $${params.length})`)
+  }
+  if (filters.ownerId) {
+    params.push(filters.ownerId)
+    clauses.push(`r.owner_id = $${params.length}`)
   }
   if (filters.reviewStage) {
     params.push(filters.reviewStage)

@@ -34,7 +34,6 @@ export function RequestsFilters({
         {filters.stage && <input type="hidden" name="stage" value={filters.stage} />}
         {filters.queue && <input type="hidden" name="queue" value={filters.queue} />}
         <SearchField
-          className="sm:w-[400px]"
           name="search"
           defaultValue={filters.search ?? ''}
           maxLength={100}

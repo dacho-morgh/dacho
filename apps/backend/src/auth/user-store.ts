@@ -20,6 +20,8 @@ export interface User {
   operationalRole?: string | null
   isActive?: boolean
   backendService?: boolean
+  /** Version stamp of the account row, for the owner's compare-and-set commands. */
+  updatedAt?: string
   /**
    * The id of the company this user represents, resolved by the store from the
    * `companies.representative` relationship (the FK lives on the company).

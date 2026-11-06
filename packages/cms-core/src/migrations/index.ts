@@ -23,6 +23,7 @@ import * as migration_20261024_200000_single_operational_role from "./20261024_2
 import * as migration_20261026_100000_add_company_activity_domain from "./20261026_100000_add_company_activity_domain";
 import * as migration_20261026_120000_company_dossier from "./20261026_120000_company_dossier";
 import * as migration_20261102_120000_personnel_profile from "./20261102_120000_personnel_profile";
+import * as migration_20261105_120000_company_logo from "./20261105_120000_company_logo";
 
 export const migrations = [
   {
@@ -129,4 +130,5 @@ export const migrations = [
   { up: migration_20261026_100000_add_company_activity_domain.up, down: migration_20261026_100000_add_company_activity_domain.down, name: "20261026_100000_add_company_activity_domain" },
   { up: migration_20261026_120000_company_dossier.up, down: migration_20261026_120000_company_dossier.down, name: "20261026_120000_company_dossier" },
   { up: migration_20261102_120000_personnel_profile.up, down: migration_20261102_120000_personnel_profile.down, name: "20261102_120000_personnel_profile" },
+  { up: migration_20261105_120000_company_logo.up, down: migration_20261105_120000_company_logo.down, name: "20261105_120000_company_logo" },
 ];

@@ -238,7 +238,7 @@ export function PrivateDocumentField({
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-xl border border-neutral-100 bg-white p-4" dir="rtl">
+    <section className="flex flex-col gap-3 rounded-xl border border-neutral-100 bg-background p-4" dir="rtl">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Typography as="h3" variant="16/semibold" color="neutral-700">
           {label ?? documentCategoryLabel(category)}

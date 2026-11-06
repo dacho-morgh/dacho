@@ -27,7 +27,7 @@ export function QueueNotices({
         >
           <span
             aria-hidden="true"
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-brand-600 [&_svg]:size-5"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-background text-brand-600 [&_svg]:size-5"
           >
             <EventsIcon />
           </span>

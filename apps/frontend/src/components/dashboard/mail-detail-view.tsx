@@ -112,7 +112,7 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
           {mail?.title ?? 'عنوان نامه'}
         </Typography>
       </nav>
-      <article aria-busy={!mail} aria-label="متن نامه" className={`flex flex-col gap-6 rounded-2xl bg-white p-4 ring-1 ring-inset ring-neutral-200 ${supportReply ? '' : 'min-h-[calc(100dvh-112px)]'}`}>
+      <article aria-busy={!mail} aria-label="متن نامه" className={`flex flex-col gap-6 rounded-2xl bg-background p-4 ring-1 ring-inset ring-neutral-200 ${supportReply ? '' : 'min-h-[calc(100dvh-112px)]'}`}>
         {!mail && <>
           <Typography as="span" variant="14/regular" role="status" className="sr-only">در حال دریافت نامه</Typography>
           <div className="flex items-center gap-2" aria-hidden="true">

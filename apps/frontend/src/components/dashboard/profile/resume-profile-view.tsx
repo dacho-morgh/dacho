@@ -330,7 +330,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
 
 
       {/* 1. محصولات و خدمات */}
-      <section id="resume-products" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section id="resume-products" className="flex scroll-mt-6 flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-1">
             <Typography as="h2" variant="20/bold" color="neutral-600">
@@ -376,7 +376,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       </section>
 
       {/* 2. اعضای کلیدی */}
-      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-1">
             <Typography as="h2" variant="20/bold" color="neutral-600">
@@ -426,7 +426,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       </section>
 
       {/* 3. سوابق پروژه‌ها و مشتریان */}
-      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-col gap-1">
             <Typography as="h2" variant="20/bold" color="neutral-600">
@@ -505,7 +505,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       </section>
 
       {/* 4. خدمات مورد تقاضا */}
-      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-col gap-1">
             <Typography as="h2" variant="20/bold" color="neutral-600">
@@ -579,7 +579,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       </section>
 
       {/* 5. گواهی‌ها و مجوزها */}
-      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-col gap-1">
             <Typography as="h2" variant="20/bold" color="neutral-600">
@@ -670,7 +670,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       </section>
 
       {/* 6. کاتالوگ شرکت */}
-      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <section className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-col gap-1">
             <Typography as="h2" variant="20/bold" color="neutral-600">
@@ -750,7 +750,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={newProduct}
                 placeholder="عنوان محصول یا خدمت جدید…"
-                onChange={(e) => setNewProduct(e.target.value)} containerClassName="mt-1 bg-white"
+                onChange={(e) => setNewProduct(e.target.value)} containerClassName="mt-1 bg-background"
               />
             </Typography>
           </div>
@@ -792,7 +792,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={newRequestedService}
                 placeholder="خدمت مورد تقاضای جدید…"
-                onChange={(e) => setNewRequestedService(e.target.value)} containerClassName="mt-1 bg-white"
+                onChange={(e) => setNewRequestedService(e.target.value)} containerClassName="mt-1 bg-background"
               />
             </Typography>
           </div>
@@ -834,7 +834,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={memberForm.name}
                 placeholder="مثال: علی احمدی"
-                onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} containerClassName="mt-1 bg-white"
+                onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} containerClassName="mt-1 bg-background"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -842,7 +842,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={memberForm.role}
                 placeholder="مثال: مدیر فنی، سرپرست تحقیق و توسعه"
-                onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })} containerClassName="mt-1 bg-white"
+                onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })} containerClassName="mt-1 bg-background"
               />
             </Typography>
           </div>
@@ -884,7 +884,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={projectForm.project}
                 placeholder="مثال: طراحی و ساخت سامانه هوشمند پایش"
-                onChange={(e) => setProjectForm({ ...projectForm, project: e.target.value })} containerClassName="mt-1 bg-white"
+                onChange={(e) => setProjectForm({ ...projectForm, project: e.target.value })} containerClassName="mt-1 bg-background"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -892,7 +892,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={projectForm.customer ?? ''}
                 placeholder="مثال: شرکت پتروشیمی پارس"
-                onChange={(e) => setProjectForm({ ...projectForm, customer: e.target.value })} containerClassName="mt-1 bg-white"
+                onChange={(e) => setProjectForm({ ...projectForm, customer: e.target.value })} containerClassName="mt-1 bg-background"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -901,7 +901,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
                 value={projectForm.summary ?? ''}
                 placeholder="توضیح کوتاه درباره دستاورد یا محدوده پروژه…"
                 onChange={(e) => setProjectForm({ ...projectForm, summary: e.target.value })}
-                className="mt-1 bg-white"
+                className="mt-1 bg-background"
               />
             </Typography>
           </div>
@@ -943,7 +943,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={certForm.title}
                 placeholder="مثال: پروانه بهره‌برداری، ایزو ۹۰۰۱"
-                onChange={(e) => setCertForm({ ...certForm, title: e.target.value })} containerClassName="mt-1 bg-white"
+                onChange={(e) => setCertForm({ ...certForm, title: e.target.value })} containerClassName="mt-1 bg-background"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -951,7 +951,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={certForm.issuer ?? ''}
                 placeholder="مثال: وزارت صمت، سازمان استاندارد"
-                onChange={(e) => setCertForm({ ...certForm, issuer: e.target.value })} containerClassName="mt-1 bg-white"
+                onChange={(e) => setCertForm({ ...certForm, issuer: e.target.value })} containerClassName="mt-1 bg-background"
               />
             </Typography>
             <Typography as="label" variant="14/semibold" color="neutral-500">
@@ -959,7 +959,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               <Input
                 value={certForm.reference ?? ''}
                 placeholder="مثال: IR-1402-998"
-                onChange={(e) => setCertForm({ ...certForm, reference: e.target.value })} containerClassName="mt-1 bg-white"
+                onChange={(e) => setCertForm({ ...certForm, reference: e.target.value })} containerClassName="mt-1 bg-background"
               />
             </Typography>
           </div>

@@ -32,7 +32,7 @@ export function RecentActivities({ activityItems, notice }: RecentActivitiesProp
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       {/* Activity Timeline */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs lg:col-span-2">
+      <div className="rounded-2xl border border-slate-200/80 bg-background p-6 shadow-xs lg:col-span-2">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Bell className="h-4 w-4 text-blue-600" />
@@ -86,7 +86,7 @@ export function RecentActivities({ activityItems, notice }: RecentActivitiesProp
       {/* Upcoming deadlines */}
       <div className="space-y-6">
         {/* Deadlines */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs">
+        <div className="rounded-2xl border border-slate-200/80 bg-background p-6 shadow-xs">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
             سررسیدها و جلسات پیش‌رو
           </h2>

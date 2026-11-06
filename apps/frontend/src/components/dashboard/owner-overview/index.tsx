@@ -10,15 +10,8 @@ import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
 import { monthlyTrend, percentChange, type TrendDayDto } from '@/utilities/dashboard-trend'
 import { BreakdownCard } from '@/components/dashboard/role-overview/breakdown-card'
+import { greeting } from '@/components/dashboard/role-overview/shared'
 import { ActivityCard } from './activity-card'
-import {
-  activeEmployees,
-  companyVerification,
-  openEvents,
-  type CompanyRow,
-  type EmployeeRow,
-  type EventRow,
-} from './derive'
 import { KpiCard, Sparkline } from './kpi-card'
 import { QueueNotices } from './queue-notices'
 import { RecentRequestsCard, type RecentRequestRow } from './recent-requests-card'
@@ -28,18 +21,17 @@ import { TrendChart } from './trend-chart'
 const fa = (value: number) => value.toLocaleString('fa-IR')
 const UNAVAILABLE = '—'
 
-const todayFormat = new Intl.DateTimeFormat('fa-IR', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'Asia/Tehran',
-})
-
 const STAGE_LABELS: Record<string, string> = {
   chief_triage: 'بررسی اولیه سردبیر',
   triaged: 'داوری',
   advanced: 'مالی و سرمایه‌گذاری',
+}
+
+/** The owner's company, staff and event counts; a section that failed to read is `null`. */
+interface OwnerSummaryDto {
+  companies: { total: number; approved: number; pending: number } | null
+  staff: { total: number; reviewers: number; chiefs: number; employersAndExperts: number } | null
+  events: { total: number; open: number } | null
 }
 
 interface AdminRequestItem {
@@ -56,14 +48,12 @@ interface AdminRequestItem {
 /** The system owner's overview: every number is read from the dashboard API on each visit. */
 export async function OwnerOverview({ userName }: { userName?: string | null }) {
   const now = new Date()
-  const [overview, trend, requests, activities, companies, employees, events] = await Promise.all([
+  const [overview, trend, requests, activities, summary] = await Promise.all([
     serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview'),
     serverDashboardFetchResult<{ days: TrendDayDto[] }>('/stats/trend'),
     serverDashboardFetchResult<Paginated<AdminRequestItem>>('/admin/requests?limit=5&page=1'),
     serverDashboardFetchResult<Paginated<ActivityDto>>('/activities?limit=4'),
-    serverDashboardFetchResult<{ items: CompanyRow[] }>('/admin/companies'),
-    serverDashboardFetchResult<{ items: EmployeeRow[] }>('/admin/employees'),
-    serverDashboardFetchResult<{ items: EventRow[] }>('/admin/events'),
+    serverDashboardFetchResult<OwnerSummaryDto>('/stats/owner-summary'),
   ])
 
   const counts = overview.kind === 'ok' ? overview.data.counts : undefined
@@ -73,9 +63,9 @@ export async function OwnerOverview({ userName }: { userName?: string | null }) 
   const change =
     thisMonth && lastMonth ? percentChange(thisMonth.submitted, lastMonth.submitted) : undefined
 
-  const company = companies.kind === 'ok' ? companyVerification(companies.data.items) : undefined
-  const staff = employees.kind === 'ok' ? activeEmployees(employees.data.items) : undefined
-  const open = events.kind === 'ok' ? openEvents(events.data.items, now) : undefined
+  const company = (summary.kind === 'ok' ? summary.data.companies : null) ?? undefined
+  const staff = (summary.kind === 'ok' ? summary.data.staff : null) ?? undefined
+  const events = (summary.kind === 'ok' ? summary.data.events : null) ?? undefined
 
   const rows: RecentRequestRow[] | undefined =
     requests.kind === 'ok'
@@ -92,12 +82,12 @@ export async function OwnerOverview({ userName }: { userName?: string | null }) 
 
   return (
     <div className="flex flex-col gap-6 p-4 pb-10 sm:px-8 sm:pt-6">
-      <header className="flex flex-col gap-1 ps-14 md:ps-0">
+      <header className="flex flex-col gap-1 pe-14 md:pe-0">
         <Typography as="h1" variant="24/bold" color="neutral-800">
           داشبورد
         </Typography>
         <Typography as="p" variant="14/regular" color="neutral-500">
-          {userName ? `سلام ${userName}، ` : 'سلام، '}امروز {todayFormat.format(now)} است.
+          {greeting(userName, now)}
         </Typography>
       </header>
 
@@ -147,10 +137,10 @@ export async function OwnerOverview({ userName }: { userName?: string | null }) 
         <KpiCard
           label="رویدادهای باز"
           tone="warning"
-          value={open !== undefined ? fa(open) : UNAVAILABLE}
-          unit={events.kind === 'ok' ? `از ${fa(events.data.items.length)}` : undefined}
+          value={events ? fa(events.open) : UNAVAILABLE}
+          unit={events ? `از ${fa(events.total)}` : undefined}
           icon={<EventsIcon />}
-          meta={open !== undefined ? 'ثبت درخواست برای آن‌ها باز است' : 'دریافت اطلاعات انجام نشد'}
+          meta={events ? 'ثبت درخواست برای آن‌ها باز است' : 'دریافت اطلاعات انجام نشد'}
         />
         <KpiCard
           label="کارکنان فعال"

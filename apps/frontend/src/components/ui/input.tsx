@@ -20,8 +20,8 @@ const inputContainerVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border-neutral-100 hover:border-brand-500 focus-within:border-brand-500',
-        error: 'border-error-100 hover:border-error-200 focus-within:border-error-500',
+        default: 'border-neutral-100 dark:border-neutral-300 hover:border-brand-500 focus-within:border-brand-500',
+        error: 'border-error-100 dark:border-error-200 hover:border-error-200 focus-within:border-error-500',
       },
       inputSize: {
         sm: 'h-9',
@@ -30,7 +30,7 @@ const inputContainerVariants = cva(
         lg: 'h-12',
       },
       disabled: {
-        true: 'cursor-not-allowed border-neutral-100 bg-neutral-50',
+        true: 'cursor-not-allowed border-neutral-100 dark:border-neutral-300 bg-neutral-50',
       },
     },
     defaultVariants: {

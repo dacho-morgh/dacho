@@ -42,7 +42,7 @@ export default async function NewRequestPage({ searchParams }: { searchParams: P
       {query.eventTitle ? (
         <Typography variant="16/semibold" color="neutral-600" className="break-words">{query.eventTitle}</Typography>
       ) : null}
-      <section className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6">
+      <section className="min-w-0 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6">
         <NewRequestForm
           serviceId={String(service.id)}
           serviceKey={service.key ?? undefined}

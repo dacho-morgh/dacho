@@ -3,7 +3,7 @@ import { Typography } from '@/components/ui/typography'
 
 export function RequestsTableHeader() {
   return (
-    <thead className="sticky top-0 z-10 bg-white">
+    <thead className="sticky top-0 z-10 bg-background">
       <tr className="h-11 border-b border-neutral-100">
         <th scope="col" className="h-11 px-4 text-right font-normal">
           <Typography as="span" variant="14/semibold" className="text-neutral-400">

@@ -79,7 +79,7 @@ export function WorkQueueOverview({
                 </Typography>
               </>
             )
-            const box = 'flex h-full items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white p-4'
+            const box = 'flex h-full items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-background p-4'
             return (
               <li key={queue.key}>
                 {href ? (
@@ -94,7 +94,7 @@ export function WorkQueueOverview({
           })}
         </ul>
       ) : (
-        <Typography variant="14/regular" color="secondary" className="rounded-2xl border border-neutral-200 bg-white p-4">
+        <Typography variant="14/regular" color="secondary" className="rounded-2xl border border-neutral-200 bg-background p-4">
           در حال حاضر کاری در انتظار اقدام شما نیست.
         </Typography>
       )}

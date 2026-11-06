@@ -34,7 +34,7 @@ export function InlineProfileField({
           onChange={(event) => onChange(event.target.value)}
           containerClassName={
             editing
-              ? 'mt-2 bg-white'
+              ? 'mt-2 bg-background'
               : 'mt-2 border-transparent bg-transparent p-0 hover:border-transparent'
           }
           className="text-start font-[450] read-only:cursor-default"

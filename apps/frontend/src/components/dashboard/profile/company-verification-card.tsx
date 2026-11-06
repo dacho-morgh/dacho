@@ -134,7 +134,7 @@ export function CompanyVerificationCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-4 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6">
+      <div className="flex flex-col gap-4 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6">
         <Typography as="h3" variant="20/bold" color="neutral-800">
           {status === 'pending'
             ? 'اطلاعات ارسال‌شده'

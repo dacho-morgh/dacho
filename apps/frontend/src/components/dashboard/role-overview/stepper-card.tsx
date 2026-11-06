@@ -25,7 +25,7 @@ export function StepperCard({
   current: number
 }) {
   return (
-    <Card className="rounded-[10px] border-neutral-200 bg-white px-6 py-5 shadow-none">
+    <Card className="rounded-[10px] border-neutral-200 bg-background px-6 py-5 shadow-none">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Typography as="h2" variant="title" color="neutral-800">
@@ -53,7 +53,7 @@ export function StepperCard({
                   state === 'done' &&
                     'border-success-50 bg-success-50 text-success-700 [&_svg]:size-5',
                   state === 'current' && 'border-brand-600 bg-brand-50 text-brand-600',
-                  state === 'next' && 'border-neutral-200 bg-white text-neutral-400',
+                  state === 'next' && 'border-neutral-200 bg-background text-neutral-400',
                 )}
               >
                 {state === 'done' ? <TickCircleIcon /> : fa(index + 1)}

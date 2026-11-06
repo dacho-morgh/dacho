@@ -117,6 +117,13 @@ export const Companies: CollectionConfig = {
       type: 'text',
       label: 'شماره ثبت',
     },
+    // The logo shown on the company's detail page; the Secretariat and Owner set it.
+    {
+      name: 'logo',
+      type: 'upload',
+      relationTo: 'company-logos',
+      label: 'لوگو',
+    },
     {
       name: 'type',
       type: 'select',

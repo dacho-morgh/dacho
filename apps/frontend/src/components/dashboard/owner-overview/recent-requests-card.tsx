@@ -40,7 +40,7 @@ export function RecentRequestsCard({
   notice?: UnavailableReason
 }) {
   return (
-    <Card className="gap-0 overflow-hidden rounded-[10px] border-neutral-200 bg-white p-0 shadow-none">
+    <Card className="gap-0 overflow-hidden rounded-[10px] border-neutral-200 bg-background p-0 shadow-none">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5 pb-3">
         <div>
           <Typography as="h2" variant="title" color="neutral-800">

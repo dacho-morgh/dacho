@@ -12,7 +12,6 @@ import {
   LettersIcon,
   EventsIcon,
   PeopleIcon,
-  MoreOptionsIcon,
   SidebarCollapseIcon,
   SidebarExpandIcon,
   type SidebarIconProps,
@@ -32,6 +31,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
+import { UserMenu } from './user-menu'
 import type { DashboardNavigation } from './sidebar-shell'
 
 export interface NavItem {
@@ -50,7 +50,6 @@ const knownDestinations: Record<string, Omit<NavItem, 'href'>> = {
   '/dashboard/letters': { title: 'کارتابل نامه', icon: LettersIcon },
   '/dashboard/events': { title: 'رویدادها و نمایشگاه‌ها', icon: EventsIcon },
   '/dashboard/exhibitions': { title: 'مدیریت نمایشگاه‌ها', icon: EventsIcon },
-  '/dashboard/profile': { title: 'پروفایل', icon: MoreOptionsIcon },
 }
 
 export interface SidebarUser {
@@ -97,7 +96,7 @@ export function AppSidebar({
       side="right"
       variant="sidebar"
       collapsible="icon"
-      className={`border-l border-neutral-200 bg-white font-sans ${className || ''}`}
+      className={`border-l border-neutral-200 bg-background font-sans ${className || ''}`}
       {...props}
     >
       <div
@@ -117,7 +116,7 @@ export function AppSidebar({
                 title="باز کردن سایدبار (Ctrl+B)"
                 className="group/logo relative"
               >
-                <BrandSandoqLogomark className="h-8 w-[37px] shrink-0 transition-opacity group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0" />
+                <BrandSandoqLogomark className="h-8 w-[37px] shrink-0 dark:brightness-0 dark:invert transition-opacity group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0" />
                 <SidebarExpandIcon
                   aria-hidden="true"
                   className="absolute size-6 scale-x-[-1] text-neutral-600 opacity-0 transition-opacity group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100"
@@ -129,8 +128,8 @@ export function AppSidebar({
                 className="flex items-center justify-start gap-2 px-1 transition-opacity hover:opacity-90"
                 title="صفحه اصلی داشبورد"
               >
-                <BrandSandoqLogomark className="h-8 w-[37px] shrink-0" />
-                <BrandSandoqLogotype data-sidebar-anim className="h-8 w-[90px] shrink-0" />
+                <BrandSandoqLogomark className="h-8 w-[37px] shrink-0 dark:brightness-0 dark:invert" />
+                <BrandSandoqLogotype data-sidebar-anim className="h-8 w-[90px] shrink-0 dark:brightness-0 dark:invert" />
               </Link>
             )}
             {isMobile || isCollapsed ? null : (
@@ -239,14 +238,7 @@ export function AppSidebar({
               </span>
             </Link>
 
-            <Link
-              href="/dashboard/profile"
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 group-data-[collapsible=icon]:hidden transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-              title="تنظیمات و گزینه‌ها"
-            >
-              <MoreOptionsIcon className="size-6 text-neutral-600" />
-              <span className="sr-only">گزینه‌های بیشتر</span>
-            </Link>
+            <UserMenu onNavigate={() => isMobile && setOpenMobile(false)} />
           </div>
         </SidebarFooter>
       </div>

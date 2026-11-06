@@ -19,8 +19,8 @@ export type Person = {
   activityField?: string | null
 }
 export const controlClass =
-  'h-10 w-full min-w-0 rounded-lg border border-neutral-200 bg-white px-3 text-neutral-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100'
-export const cardClass = 'rounded-2xl border border-neutral-200 bg-white p-4'
+  'h-10 w-full min-w-0 rounded-lg border border-neutral-200 bg-background px-3 text-neutral-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100'
+export const cardClass = 'rounded-2xl border border-neutral-200 bg-background p-4'
 
 export function Field({
   name,

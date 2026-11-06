@@ -2,8 +2,9 @@ import configPromise from '@payload-config'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
-import React from 'react'
+import React, { Suspense } from 'react'
 import { RoleOverview } from '@/components/dashboard/role-overview'
+import { OverviewSkeleton } from '@/components/dashboard/role-overview/overview-skeleton'
 import { Typography } from '@/components/ui/typography'
 import { dashboardOperationalRole } from '@/utilities/dashboard-server'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
@@ -22,10 +23,6 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams
   const showDeniedNotice = params.access === 'denied'
-  const payload = await getPayload({ config: configPromise })
-  const requestHeaders = await headers()
-  const { user } = await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })
-  const role = dashboardOperationalRole(user)
 
   return (
     <>
@@ -34,9 +31,20 @@ export default async function DashboardPage({
           <DeniedNotice />
         </div>
       )}
-      {role ? <RoleOverview role={role} userName={user?.name} /> : null}
+      {/* Nothing above waits on data, so the frame opens at once and the overview streams into it. */}
+      <Suspense fallback={<OverviewSkeleton />}>
+        <Overview />
+      </Suspense>
     </>
   )
+}
+
+async function Overview() {
+  const payload = await getPayload({ config: configPromise })
+  const requestHeaders = await headers()
+  const { user } = await payload.auth({ headers: getPayloadAuthHeaders(requestHeaders) })
+  const role = dashboardOperationalRole(user)
+  return role ? <RoleOverview role={role} userName={user?.name} /> : null
 }
 
 function DeniedNotice() {

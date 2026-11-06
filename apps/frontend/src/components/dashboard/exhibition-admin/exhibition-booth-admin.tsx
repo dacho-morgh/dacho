@@ -284,7 +284,7 @@ export function ExhibitionBoothAdmin({
       )}
 
       {/* Section 1: Exhibition Settings (Cap & Guide Map) */}
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-100 bg-white p-5 shadow-2xs">
+      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-100 bg-background p-5 shadow-2xs">
         <div className="flex items-center gap-2 border-b border-neutral-100 pb-3">
           <FileText className="size-5 text-neutral-500" />
           <Typography as="h2" variant="16/semibold" color="neutral-700">
@@ -393,7 +393,6 @@ export function ExhibitionBoothAdmin({
           {/* Search & Status Filter */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <SearchField
-              className="sm:w-60"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="جستجو در غرفه‌ها..."
@@ -429,7 +428,7 @@ export function ExhibitionBoothAdmin({
 
         {/* Empty State */}
         {!loading && !error && filteredBooths.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-200 bg-white p-12 text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-200 bg-background p-12 text-center">
             <Store className="mb-3 size-12 text-neutral-300" />
             <Typography variant="16/semibold" color="neutral-600" className="mb-1">
               {searchQuery || statusFilter !== 'all'
@@ -449,7 +448,7 @@ export function ExhibitionBoothAdmin({
 
         {/* Booths Table / Cards */}
         {!loading && !error && filteredBooths.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-2xs">
+          <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-background shadow-2xs">
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-right text-sm">
                 <thead className="border-b border-neutral-100 bg-neutral-50/70 text-xs font-semibold text-neutral-500">

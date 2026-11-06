@@ -570,11 +570,14 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
     })
 
     it('does not widen the scope through query parameters', async () => {
-      const forged = `ownerId=${TEAM_B.company}&companyId=${caseB.companyId}&userId=owner&scope=all&role=system-owner`
+      const forged = `companyId=${caseB.companyId}&userId=owner&scope=all&role=system-owner`
       for (const user of [TEAM_A.company, TEAM_A.chief, TEAM_A.reviewers[0]!, TEAM_A.investment]) {
         const list = await get(user, `/requests?${forged}`)
         expect(list.body.items.map((item: { id: string }) => item.id), user).toEqual([caseA.id])
         expect((await get(user, `/stats?${forged}`)).body.total, user).toBe(1)
+        // The owner filter only narrows what the caller may already read; another owner's id finds nothing.
+        const narrowed = await get(user, '/requests?ownerId=999999999')
+        expect(narrowed.body.items, user).toEqual([])
       }
     })
   })

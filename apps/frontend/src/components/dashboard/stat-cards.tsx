@@ -78,7 +78,7 @@ export function StatCards({ data, notice, activeStatus }: StatCardsProps) {
             key={idx}
             href={stat.href}
             aria-current={isActive ? 'page' : undefined}
-            className={`relative overflow-hidden rounded-2xl border ${stat.borderColor} bg-white p-5 shadow-xs transition-all hover:shadow-md ${
+            className={`relative overflow-hidden rounded-2xl border ${stat.borderColor} bg-background p-5 shadow-xs transition-all hover:shadow-md ${
               isActive ? 'ring-2 ring-brand-500' : ''
             }`}
           >

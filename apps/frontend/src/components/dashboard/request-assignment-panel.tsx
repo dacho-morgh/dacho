@@ -128,7 +128,7 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6">
+    <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
       <Typography as="h2" variant="20/bold" color="neutral-900">
         انتساب پرونده
       </Typography>

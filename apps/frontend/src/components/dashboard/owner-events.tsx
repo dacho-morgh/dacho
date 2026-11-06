@@ -426,7 +426,7 @@ function RfpManager({
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-4">
+    <section className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-background p-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 pb-3">
         <Typography variant="16/semibold">مدیریت RFP: {subtopic.title}</Typography>
         <Button size="40" type="button" variant="outline-gray" onClick={onClose}>
@@ -461,7 +461,7 @@ function RfpManager({
               <div className="mt-2 flex flex-col gap-2">
                 <Typography variant="14/semibold">فایل‌های مستندات RFP:</Typography>
                 {version.files.map((file) => (
-                  <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-200 bg-white p-2">
+                  <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-200 bg-background p-2">
                     <div className="flex min-w-0 items-center gap-2">
                       <Typography as="span" variant="14/regular" className="break-all">
                         {file.filename}

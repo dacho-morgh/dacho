@@ -12,8 +12,15 @@ const todayFormat = new Intl.DateTimeFormat('fa-IR', {
   timeZone: 'Asia/Tehran',
 })
 
+/** "جمعه ۱۵ آبان ۱۴۰۵": the format's own order puts the year first, which reads backwards in Persian. */
+function todayLabel(now: Date): string {
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    todayFormat.formatToParts(now).find((item) => item.type === type)?.value ?? ''
+  return `${part('weekday')} ${part('day')} ${part('month')} ${part('year')}`
+}
+
 export function greeting(userName: string | null | undefined, now: Date): string {
-  return `${userName ? `سلام ${userName}، ` : 'سلام، '}امروز ${todayFormat.format(now)} است.`
+  return `${userName ? `سلام ${userName}، ` : 'سلام، '}امروز ${todayLabel(now)} است.`
 }
 
 /** A queue's count, or undefined when the overview could not be read (never a made-up zero). */

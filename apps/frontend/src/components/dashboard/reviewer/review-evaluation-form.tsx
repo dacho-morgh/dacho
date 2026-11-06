@@ -241,7 +241,7 @@ export function ReviewEvaluationForm({ requestId, caseItem, initial }: ReviewEva
         errorCount={Object.keys(errors).length}
       />
 
-      <section className="flex min-w-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6">
+      <section className="flex min-w-0 flex-col gap-6 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6">
         <nav aria-label="مراحل فرم داوری">
           <ol className="grid grid-cols-5 gap-1">
             {STEPS.map((label, index) => (
@@ -665,7 +665,7 @@ function ChoiceChip({ value, checked, label }: { value: string; checked: boolean
   return (
     <label
       className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 has-[:disabled]:cursor-not-allowed ${
-        checked ? 'border-brand-500 bg-brand-50' : 'border-neutral-200 bg-white'
+        checked ? 'border-brand-500 bg-brand-50' : 'border-neutral-200 bg-background'
       }`}
     >
       <RadioGroupItem value={value} />

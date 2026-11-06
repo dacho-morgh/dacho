@@ -65,8 +65,17 @@ export interface VerificationQueueItem {
   reason: string | null
 }
 
+/** What a list needs of a company's current verification (no snapshot). */
+export interface CurrentVerificationSummary {
+  status: VerificationStatus
+  revision: number
+  submittedAt: string
+}
+
 export interface VerificationStore {
   findCurrentByCompanyId(companyId: string): Promise<CompanyVerificationDto | null>
+  /** The current (highest revision) verification of each company, in one read. */
+  currentSummaries(companyIds: string[]): Promise<Map<string, CurrentVerificationSummary>>
   findById(id: string): Promise<CompanyVerificationDto | null>
   listHistory(companyId: string): Promise<CompanyVerificationDto[]>
   submit(input: SubmitVerificationInput): Promise<VerificationSubmitResult>
@@ -139,6 +148,31 @@ export class PostgresVerificationStore implements VerificationStore {
       [companyId],
     )
     return rows[0] ? mapRow(rows[0]) : null
+  }
+
+  async currentSummaries(companyIds: string[]): Promise<Map<string, CurrentVerificationSummary>> {
+    const summaries = new Map<string, CurrentVerificationSummary>()
+    if (companyIds.length === 0) return summaries
+    const { rows } = await this.pool.query<{
+      company_id: string
+      status: VerificationStatus
+      revision: number
+      submitted_at: Date
+    }>(
+      `SELECT DISTINCT ON (company_id) company_id, status, revision, submitted_at
+       FROM dashboard.company_verifications
+       WHERE company_id = ANY($1::text[])
+       ORDER BY company_id, revision DESC`,
+      [companyIds],
+    )
+    for (const row of rows) {
+      summaries.set(row.company_id, {
+        status: row.status,
+        revision: row.revision,
+        submittedAt: row.submitted_at.toISOString(),
+      })
+    }
+    return summaries
   }
 
   async findById(id: string): Promise<CompanyVerificationDto | null> {
@@ -422,6 +456,21 @@ export class InMemoryVerificationStore implements VerificationStore {
       .filter((item) => item.companyId === companyId)
       .sort((a, b) => b.revision - a.revision)
     return matching[0] ? structuredClone(matching[0]) : null
+  }
+
+  async currentSummaries(companyIds: string[]): Promise<Map<string, CurrentVerificationSummary>> {
+    const summaries = new Map<string, CurrentVerificationSummary>()
+    for (const companyId of companyIds) {
+      const current = await this.findCurrentByCompanyId(companyId)
+      if (current) {
+        summaries.set(companyId, {
+          status: current.status,
+          revision: current.revision,
+          submittedAt: current.submittedAt,
+        })
+      }
+    }
+    return summaries
   }
 
   async findById(id: string): Promise<CompanyVerificationDto | null> {

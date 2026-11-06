@@ -54,7 +54,7 @@ export function SupportTicketActions({ id, status, isAdmin, initialMessages, ini
   }
 
   return (
-    <section id="support-conversation" tabIndex={-1} className="mt-6 flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5" dir="rtl" aria-label="گفتگوی تیکت">
+    <section id="support-conversation" tabIndex={-1} className="mt-6 flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-5" dir="rtl" aria-label="گفتگوی تیکت">
       <Typography as="h2" variant="20/bold" className="text-neutral-700">گفتگوی تیکت</Typography>
       <div className="flex flex-col gap-3">
         {messages.filter((message) => message.id !== initialMessageId).map((message) => {

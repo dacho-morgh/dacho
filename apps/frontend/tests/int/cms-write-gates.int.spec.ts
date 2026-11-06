@@ -81,7 +81,10 @@ describe('CMS write gates', () => {
       //                internally; gating it would only break the sync.
       //   form-submissions — publicly creatable, because the site's contact
       //                forms are how a company reaches the Secretariat.
-      const EXEMPT = ['users', 'companies', 'search', 'form-submissions']
+      //   company-logos — the owner and Secretariat upload logos from the
+      //                dashboard, and the backend service removes a replaced
+      //                one; see collections/CompanyLogos.ts.
+      const EXEMPT = ['users', 'companies', 'search', 'form-submissions', 'company-logos']
       const offenders = sanitized.collections
         .filter((c) => !c.slug.startsWith('payload-') && !EXEMPT.includes(c.slug))
         .filter(
@@ -134,6 +137,15 @@ describe('CMS write gates', () => {
       // Not deletable or editable by another company, only by an admin or the
       // company's own representative.
       expect(companies.access?.update).not.toBe(adminOnly)
+
+      // Logos are never writable by a company representative or an editor.
+      const logos = sanitized.collections.find((c) => c.slug === 'company-logos')!
+      for (const op of ['create', 'update', 'delete'] as const) {
+        const gate = logos.access?.[op] as (args: { req: { user: User } }) => unknown
+        expect(gate({ req: { user: representative } }), op).toBe(false)
+        expect(gate({ req: { user: editor } }), op).toBe(false)
+        expect(gate({ req: { user: admin } }), op).toBe(true)
+      }
     })
 
     it('gates every global update on adminOnly or hasContentRole', async () => {

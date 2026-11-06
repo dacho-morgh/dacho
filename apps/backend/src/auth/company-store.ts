@@ -1,9 +1,16 @@
 import { isAbsenceField, type Address, type CompanyFields, type Executive, type User } from './user-store.js'
 
+export interface CompanyLogo {
+  id: string
+  /** The stored file's name, from which the private file route is built. */
+  filename: string | null
+}
+
 export interface Company extends CompanyFields {
   id: string
   /** The user acting as this company's representative (نماینده). */
   representativeId: string
+  logo?: CompanyLogo | null
 }
 
 export interface CompanyStore {
@@ -12,6 +19,8 @@ export interface CompanyStore {
   findByRepresentative(userId: string): Promise<Company | undefined>
   create(fields: CompanyFields & { representativeId: string }): Promise<Company>
   update(id: string, fields: CompanyFields): Promise<Company>
+  /** Points the company at an uploaded logo (or clears it) and discards the logo file it replaces. */
+  setLogo(id: string, logoId: string | null): Promise<Company>
   list(options?: { search?: string }): Promise<Company[]>
 }
 
@@ -33,7 +42,7 @@ export class PayloadCompanyStore implements CompanyStore {
   }
 
   async findById(id: string): Promise<Company | undefined> {
-    const res = await this.fetcher(`${this.baseUrl}/api/companies/${id}?depth=0`, {
+    const res = await this.fetcher(`${this.baseUrl}/api/companies/${id}?depth=1`, {
       headers: this.headers(),
     })
     if (res.status === 404) return undefined
@@ -45,7 +54,7 @@ export class PayloadCompanyStore implements CompanyStore {
     const params = new URLSearchParams({
       'where[representative][equals]': userId,
       limit: '1',
-      depth: '0',
+      depth: '1',
     })
     const res = await this.fetcher(`${this.baseUrl}/api/companies?${params.toString()}`, {
       headers: this.headers(),
@@ -80,6 +89,26 @@ export class PayloadCompanyStore implements CompanyStore {
     })
     const data = await this.ok(res)
     return this.toCompany(unwrap(data))
+  }
+
+  async setLogo(id: string, logoId: string | null): Promise<Company> {
+    const previous = (await this.findById(id))?.logo?.id
+    const numericId = logoId === null ? null : Number(logoId)
+    if (numericId !== null && !Number.isSafeInteger(numericId)) throw new Error(`Invalid logo id: ${logoId}`)
+    const res = await this.fetcher(`${this.baseUrl}/api/companies/${id}?depth=1`, {
+      method: 'PATCH',
+      headers: this.headers(),
+      body: JSON.stringify({ logo: numericId }),
+    })
+    const company = this.toCompany(unwrap(await this.ok(res)))
+    // The replaced file is no longer referenced; failing to delete it must not undo the change.
+    if (previous && previous !== logoId) {
+      await this.fetcher(`${this.baseUrl}/api/company-logos/${previous}`, {
+        method: 'DELETE',
+        headers: this.headers(),
+      }).catch(() => undefined)
+    }
+    return company
   }
 
   async list(options: { search?: string } = {}): Promise<Company[]> {
@@ -134,6 +163,9 @@ export class PayloadCompanyStore implements CompanyStore {
       ...(typeof d.insuredEmployeeCount === 'number'
         ? { insuredEmployeeCount: d.insuredEmployeeCount }
         : {}),
+      ...(d.logo !== undefined && d.logo !== null
+        ? { logo: toLogo(d.logo) }
+        : {}),
       ...(Array.isArray(d.executives) ? { executives: d.executives as Executive[] } : {}),
       ...(Array.isArray(d.addresses) ? { addresses: d.addresses as Address[] } : {}),
       ...(Array.isArray(d.productsServices)
@@ -176,6 +208,14 @@ const COMPANY_FIELDS = [
   'website',
   'centerEstablishment',
 ] as const
+
+function toLogo(value: unknown): CompanyLogo {
+  if (typeof value === 'object' && value !== null) {
+    const doc = value as { id?: unknown; filename?: unknown }
+    return { id: String(doc.id ?? ''), filename: typeof doc.filename === 'string' ? doc.filename : null }
+  }
+  return { id: String(value), filename: null }
+}
 
 function textEntry(value: unknown): string | undefined {
   if (typeof value === 'string') return value
@@ -301,6 +341,15 @@ export class InMemoryCompanyStore implements CompanyStore {
     const company = this.companies.get(id)
     if (!company) throw new Error(`Company not found: ${id}`)
     const updated: Company = { ...company, ...fields }
+    this.companies.set(id, updated)
+    return updated
+  }
+
+  async setLogo(id: string, logoId: string | null): Promise<Company> {
+    const company = this.companies.get(id)
+    if (!company) throw new Error(`Company not found: ${id}`)
+    const { logo: _previous, ...rest } = company
+    const updated: Company = logoId === null ? rest : { ...rest, logo: { id: logoId, filename: `logo-${logoId}.png` } }
     this.companies.set(id, updated)
     return updated
   }

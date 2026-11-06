@@ -2,9 +2,32 @@
 import type { Router } from 'express'
 import type { NextFunction, Request, Response } from 'express'
 import { operationalRoleOf } from '../../access/roles.js'
+import { changesAddress, changesCompany, COMPANY_EDIT_REVERIFICATION_REASON } from '../company-edits.js'
+import type { CompanyInfo } from '../profile-repo.js'
 import { actorOf } from '../proxy-auth.js'
-import { isCompanyAdministrator } from './route-helpers.js'
+import { isCompanyAdministrator, parsePositiveInt } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
+
+const MAX_COMPANY_PAGE_SIZE = 100
+const MAX_COMPANY_FIELD_LENGTH = 200
+const EDITABLE_COMPANY_FIELDS = [
+  'name', 'establishmentDate', 'status', 'type', 'registrationNumber', 'economicCode',
+] as const satisfies readonly (keyof CompanyInfo)[]
+const ADDRESS_FIELDS = ['title', 'province', 'city', 'postalCode', 'address'] as const
+
+/** The logo the admin page shows: its id and the access-checked file route. Null when the company has none. */
+function logoOf(company: { logo?: { id: string; filename: string | null } | null } | undefined) {
+  const logo = company?.logo
+  if (!logo?.filename) return null
+  return { id: logo.id, url: `/api/company-logos/file/${encodeURIComponent(logo.filename)}` }
+}
+
+/** A trimmed string within the field limit, or undefined when the value is not one. */
+function shortText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const text = value.trim()
+  return text.length <= MAX_COMPANY_FIELD_LENGTH ? text : undefined
+}
 
 export function registerCompanyRoutes(router: Router, ctx: DashboardContext): void {
   const { deps, profileRepo, verificationStore } = ctx
@@ -16,25 +39,40 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
         res.status(403).json({ error: 'forbidden' })
         return
       }
-      const users = await deps.userStore.list({
-        role: 'representative',
-        search: typeof req.query.search === 'string' ? req.query.search : undefined,
-      })
+      // Two reads for the whole list (accounts, companies), not one per account: each CMS call is slow.
+      const [accounts, companies] = await Promise.all([
+        deps.userStore.list({ role: 'representative' }),
+        deps.companyStore.list(),
+      ])
+      // A deactivated representative («حذف شرکت») leaves the list; the account is kept.
+      const users = accounts.filter((user) => user.isActive !== false)
+      const companyOf = new Map<string, (typeof companies)[number]>()
+      for (const company of companies) {
+        if (company.representativeId && !companyOf.has(company.representativeId)) companyOf.set(company.representativeId, company)
+      }
+      const verifications = await verificationStore.currentSummaries(
+        users.flatMap((user) => companyOf.get(user.id)?.id ?? []),
+      )
       const requestedStatus =
         typeof req.query.verificationStatus === 'string'
           ? req.query.verificationStatus
           : typeof req.query.status === 'string'
             ? req.query.status
             : undefined
+      const search = typeof req.query.search === 'string' ? req.query.search.trim().toLocaleLowerCase() : ''
+      // The overviews and the letter form read the whole list without paging; only a caller
+      // that asks for a `page` or `limit` (the companies table) gets a page.
+      const paged = req.query.page !== undefined || req.query.limit !== undefined
 
-      const allItems = await Promise.all(users.map(async (user) => {
-        const company = await deps.companyStore.findByRepresentative(user.id).catch(() => undefined)
-        const currentVerif = company ? await verificationStore.findCurrentByCompanyId(company.id) : null
-        return {
+      const enriched = users.map((user) => {
+        const company = companyOf.get(user.id)
+        const currentVerif = company ? verifications.get(company.id) : undefined
+        const item = {
           id: user.id,
           companyId: company?.id ?? null,
           name: user.name ?? null,
           phone: user.phone,
+          updatedAt: user.updatedAt ?? null,
           companyName: company?.name ?? null,
           companyType: company?.type ?? null,
           companyProvince: company?.province ?? null,
@@ -45,11 +83,32 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
           verificationRevision: currentVerif?.revision ?? 0,
           verificationSubmittedAt: currentVerif?.submittedAt ?? null,
         }
-      }))
-      const items = requestedStatus && requestedStatus !== 'all'
-        ? allItems.filter((item) => item.verificationStatus === requestedStatus)
-        : allItems
-      res.json({ items })
+        const text = [
+          item.companyName, item.name, item.phone, user.email, item.companyType, item.companyProvince,
+          item.companyCity, item.verificationStatus, ...item.executives.map((executive) => executive.name),
+        ].filter(Boolean).join(' ').toLocaleLowerCase()
+        return { item, text }
+      })
+      const matching = search ? enriched.filter(({ text }) => text.includes(search)).map(({ item }) => item) : enriched.map(({ item }) => item)
+      // The filter menu counts every queue of the search, not only the page on screen.
+      const counts: Record<string, number> = { all: matching.length, unsubmitted: 0, pending: 0, approved: 0, returned: 0, rejected: 0 }
+      for (const item of matching) counts[item.verificationStatus] = (counts[item.verificationStatus] ?? 0) + 1
+      const filtered = requestedStatus && requestedStatus !== 'all'
+        ? matching.filter((item) => item.verificationStatus === requestedStatus)
+        : matching
+      const limit = paged
+        ? Math.min(parsePositiveInt(req.query.limit, 10), MAX_COMPANY_PAGE_SIZE)
+        : Math.max(1, filtered.length)
+      const totalPages = Math.max(1, Math.ceil(filtered.length / limit))
+      const page = Math.min(parsePositiveInt(req.query.page, 1), totalPages)
+      res.json({
+        items: filtered.slice((page - 1) * limit, page * limit),
+        page,
+        limit,
+        totalDocs: filtered.length,
+        totalPages,
+        counts,
+      })
     } catch (error) { next(error) }
   })
 
@@ -65,10 +124,10 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
         res.status(404).json({ error: 'not_found' })
         return
       }
-      const profile = await profileRepo.getProfile(target.id)
-      const currentVerif = profile.companyId
-        ? await verificationStore.findCurrentByCompanyId(profile.companyId)
-        : null
+      // One company read serves the profile and the logo; the user was read above.
+      const company = await deps.companyStore.findByRepresentative(target.id)
+      const profile = profileRepo.profileFor(target, company)
+      const currentVerif = company ? await verificationStore.findCurrentByCompanyId(company.id) : null
       const allowedActions = currentVerif?.status === 'pending' && target.id !== actor.id && currentVerif.representativeId !== actor.id
         ? ['read', 'approve', 'return', 'reject']
         : ['read']
@@ -80,9 +139,11 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
           phone: target.phone,
           email: target.email ?? null,
           position: target.position ?? null,
+          updatedAt: target.updatedAt ?? null,
         },
         companyId: profile.companyId,
         company: profile.company,
+        logo: logoOf(company),
         executives: profile.executives,
         addresses: profile.addresses,
         allowedActions,
@@ -98,6 +159,159 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
             }
           : { status: 'unsubmitted', revision: 0 },
       })
+    } catch (error) { next(error) }
+  })
+
+  /** The representative a company detail URL names, after the administrator check; answers the refusal itself. */
+  const companyTarget = async (req: Request, res: Response) => {
+    const actor = actorOf(res)
+    if (!isCompanyAdministrator(actor.operationalRole)) {
+      res.status(403).json({ error: 'forbidden' })
+      return null
+    }
+    const target = await deps.userStore.findById(req.params.id as string).catch(() => undefined)
+    if (!target || operationalRoleOf(target) !== 'representative') {
+      res.status(404).json({ error: 'not_found' })
+      return null
+    }
+    const company = await deps.companyStore.findByRepresentative(target.id)
+    if (!company) {
+      res.status(404).json({ error: 'company_not_found' })
+      return null
+    }
+    return { target, profile: profileRepo.profileFor(target, company), companyId: company.id }
+  }
+
+  router.patch('/admin/companies/:id', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      const body = req.body?.company ?? req.body
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        res.status(400).json({ error: 'invalid_company' })
+        return
+      }
+      if (body.nationalId !== undefined && body.nationalId !== found.profile.company.nationalId) {
+        res.status(403).json({ error: 'protected_company_identity' })
+        return
+      }
+      const update: Partial<CompanyInfo> = {}
+      for (const field of EDITABLE_COMPANY_FIELDS) {
+        if (body[field] === undefined) continue
+        const text = shortText(body[field])
+        if (text === undefined || (field === 'name' && text === '')) {
+          res.status(400).json({ error: 'invalid_company' })
+          return
+        }
+        update[field] = text
+      }
+      if (Object.keys(update).length === 0) {
+        res.status(400).json({ error: 'invalid_company' })
+        return
+      }
+      if (changesCompany(found.profile, { company: update })) {
+        await verificationStore.invalidateApproval(found.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+      }
+      const profile = await profileRepo.updateBasicInfo(found.target.id, update)
+      res.json({ company: profile.company })
+    } catch (error) { next(error) }
+  })
+
+  router.put('/admin/companies/:id/logo', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      const logoId = req.body?.logoId
+      if (typeof logoId !== 'string' || !/^\d{1,10}$/.test(logoId)) {
+        res.status(400).json({ error: 'invalid_logo' })
+        return
+      }
+      const company = await deps.companyStore.setLogo(found.companyId, logoId)
+      res.json({ logo: logoOf(company) })
+    } catch (error) { next(error) }
+  })
+
+  router.delete('/admin/companies/:id/logo', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      await deps.companyStore.setLogo(found.companyId, null)
+      res.json({ logo: null })
+    } catch (error) { next(error) }
+  })
+
+  const addressInput = (body: unknown, requireAll: boolean) => {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return null
+    const input: Partial<Record<(typeof ADDRESS_FIELDS)[number], string>> = {}
+    for (const field of ADDRESS_FIELDS) {
+      const value = (body as Record<string, unknown>)[field]
+      if (value === undefined) continue
+      const text = shortText(value)
+      if (text === undefined) return null
+      input[field] = text
+    }
+    if (requireAll ? !input.title || !input.address : input.title === '' || input.address === '') return null
+    return input
+  }
+
+  router.post('/admin/companies/:id/addresses', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      const input = addressInput(req.body, true)
+      if (!input) {
+        res.status(400).json({ error: 'invalid_address' })
+        return
+      }
+      await verificationStore.invalidateApproval(found.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+      const address = await profileRepo.addAddress(found.target.id, {
+        title: input.title ?? '',
+        province: input.province ?? '',
+        city: input.city ?? '',
+        postalCode: input.postalCode ?? '',
+        address: input.address ?? '',
+      })
+      res.status(201).json({ address })
+    } catch (error) { next(error) }
+  })
+
+  router.put('/admin/companies/:id/addresses/:addressId', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      const update = addressInput(req.body, false)
+      const current = found.profile.addresses.find((item) => item.id === req.params.addressId)
+      if (!update) {
+        res.status(400).json({ error: 'invalid_address' })
+        return
+      }
+      if (!current) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (changesAddress(current, update)) {
+        await verificationStore.invalidateApproval(found.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+      }
+      const address = await profileRepo.updateAddress(found.target.id, current.id, update)
+      if (!address) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      res.json({ address })
+    } catch (error) { next(error) }
+  })
+
+  router.delete('/admin/companies/:id/addresses/:addressId', async (req, res, next) => {
+    try {
+      const found = await companyTarget(req, res)
+      if (!found) return
+      if (!found.profile.addresses.some((item) => item.id === req.params.addressId)) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      await verificationStore.invalidateApproval(found.companyId, COMPANY_EDIT_REVERIFICATION_REASON)
+      await profileRepo.deleteAddress(found.target.id, req.params.addressId as string)
+      res.json({ success: true })
     } catch (error) { next(error) }
   })
 

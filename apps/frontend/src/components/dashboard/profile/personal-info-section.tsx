@@ -102,7 +102,7 @@ export function PersonalInfoSection({
     <div className="flex flex-col gap-6" dir="rtl">
       <section
         aria-labelledby="personal-info-title"
-        className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6"
+        className="flex flex-col gap-5 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -187,7 +187,7 @@ export function PersonalInfoSection({
 
       <section
         aria-labelledby="password-title"
-        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-neutral-100 bg-white p-4 sm:p-6"
+        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-neutral-100 bg-background p-4 sm:p-6"
       >
         <div>
           <Typography as="h2" id="password-title" variant="20/bold" color="neutral-600">
