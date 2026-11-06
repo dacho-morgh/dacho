@@ -170,7 +170,7 @@ function buildColumns(canManage: boolean, edit: (person: Employee) => void): Adm
     { id: 'degree', header: 'مدرک دانشگاهی', render: (person) => text(person.degree || '—') },
     {
       id: 'actions',
-      header: '',
+      header: 'عملیات',
       render: (person, { runAction }) => {
         const toggle = person.isActive ? deactivateAction : activateAction
         return (
