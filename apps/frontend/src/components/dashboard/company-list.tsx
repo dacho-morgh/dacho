@@ -1,5 +1,6 @@
 'use client'
 import { startTransition, useCallback, useEffect, useMemo, useOptimistic, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -9,7 +10,7 @@ import {
   type AdminColumn,
   type AdminListLoadState,
 } from '@/components/dashboard/admin-list-view'
-import { DashboardTrashIcon, TickCircleIcon } from '@/components/icons'
+import { CompanyBuildingIcon, DashboardTrashIcon, TickCircleIcon } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { formatDate } from '@/utilities/dashboard-api'
 import { Typography } from '@/components/ui/typography'
@@ -104,18 +105,50 @@ const text = (value: string) => (
   </Typography>
 )
 
+/** The company's picture, or its building mark when none was uploaded. */
+function CompanyAvatar({ company }: { company: Company }) {
+  if (company.logoUrl) {
+    return (
+      <Image
+        src={company.logoUrl}
+        alt=""
+        width={40}
+        height={40}
+        // The file route is access-checked by the session cookie, which the image optimizer would not send.
+        unoptimized
+        className="size-10 shrink-0 rounded-full object-cover"
+      />
+    )
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600"
+    >
+      <CompanyBuildingIcon className="size-5" aria-hidden="true" />
+    </span>
+  )
+}
+
 const baseColumns: AdminColumn<Company>[] = [
   {
     id: 'name',
     header: 'نام شرکت',
-    render: (item) =>
-      item.optimistic ? (
-        text(item.name)
-      ) : (
-        <Link href={`/dashboard/companies/${item.id}`} className="flex items-center gap-2">
-          {text(item.name)}
-        </Link>
-      ),
+    render: (item) => (
+      <div className="flex items-center gap-3">
+        <CompanyAvatar company={item} />
+        {item.optimistic ? (
+          text(item.name)
+        ) : (
+          <Link
+            href={`/dashboard/companies/${item.id}`}
+            className="min-w-0 truncate rounded-sm focus-visible:outline-2 focus-visible:outline-brand-500"
+          >
+            {text(item.name)}
+          </Link>
+        )}
+      </div>
+    ),
   },
   { id: 'submittedAt', header: 'تاریخ ارسال', render: (item) => text(formatDate(item.submittedAt) || '—') },
   {
@@ -440,6 +473,7 @@ export function CompanyList({
                 company: {
                   id: `optimistic-${draft.phone}`,
                   name: draft.companyName,
+                  logoUrl: null,
                   ceo: draft.name,
                   companyType: draft.companyType || '—',
                   address: '—',

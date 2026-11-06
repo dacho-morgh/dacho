@@ -42,7 +42,7 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
       // Two reads for the whole list (accounts, companies), not one per account: each CMS call is slow.
       const [accounts, companies] = await Promise.all([
         deps.userStore.list({ role: 'representative' }),
-        deps.companyStore.list(),
+        deps.companyStore.list({ withLogos: true }),
       ])
       // A deactivated representative («حذف شرکت») leaves the list; the account is kept.
       const users = accounts.filter((user) => user.isActive !== false)
@@ -74,6 +74,7 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
           phone: user.phone,
           updatedAt: user.updatedAt ?? null,
           companyName: company?.name ?? null,
+          logo: logoOf(company),
           companyType: company?.type ?? null,
           companyProvince: company?.province ?? null,
           companyCity: company?.city ?? null,
