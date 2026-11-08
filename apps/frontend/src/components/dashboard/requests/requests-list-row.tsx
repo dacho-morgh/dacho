@@ -1,5 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
+import { ListRow } from '@/components/dashboard/list-table'
 import { Typography } from '@/components/ui/typography'
 import { RequestStatusBadge } from './request-status-badge'
 import { RequestRowActions } from './request-row-actions'
@@ -7,23 +8,17 @@ import type { RequestItem } from './types'
 
 export interface RequestsListRowProps {
   item: RequestItem
-  onView?: (id?: string) => void
-  onEdit?: (id?: string) => void
-  onCancel?: (id?: string) => void
 }
 
-export function RequestsListRow({
-  item,
-  onView,
-  onEdit,
-  onCancel,
-}: RequestsListRowProps) {
+/** One request; a click (or Enter) anywhere on the row opens its dossier, the link and the action keep their own. */
+export function RequestsListRow({ item }: RequestsListRowProps) {
+  const href = `/dashboard/requests/${encodeURIComponent(item.id)}`
   return (
-    <tr className="h-18 border-b border-neutral-100 transition-colors hover:bg-neutral-50">
+    <ListRow href={href}>
       {/* Column 1: Title (16/regular #525252) + tracking code */}
       <td className="h-18 px-4">
         <Typography variant="16/regular" className="truncate text-neutral-600">
-          <Link href={`/dashboard/requests/${encodeURIComponent(item.id)}`} className="hover:text-brand-600">
+          <Link href={href} className="hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500">
             {item.title}
           </Link>
         </Typography>
@@ -62,15 +57,10 @@ export function RequestsListRow({
         </Typography>
       </td>
 
-      {/* Column 5: Actions (32x32 button → Dropdown Frame 81) */}
-      <td className="h-18 px-2 text-center">
-        <RequestRowActions
-          requestId={item.id}
-          onView={onView}
-          onEdit={onEdit}
-          onCancel={onCancel}
-        />
+      {/* Column 5: Actions */}
+      <td className="h-18 px-2 text-end">
+        <RequestRowActions requestId={item.id} />
       </td>
-    </tr>
+    </ListRow>
   )
 }

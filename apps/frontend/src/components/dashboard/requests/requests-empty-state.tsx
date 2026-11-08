@@ -23,7 +23,7 @@ export function RequestsEmptyState({
 }: RequestsEmptyStateProps) {
   return (
     <div
-      className={`absolute inset-0 flex items-center justify-center px-4 text-center ${className}`}
+      className={`absolute inset-x-0 top-11 bottom-0 flex items-center justify-center px-4 text-center ${className}`}
     >
       <div className="flex flex-col items-center">
         <EmptyInboxIllustration className="size-20" />

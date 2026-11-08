@@ -1,8 +1,8 @@
 import React from 'react'
+import { ListToolbar } from '@/components/dashboard/list-toolbar'
 import { OfflineNotice, type UnavailableReason } from '@/components/dashboard/offline-notice'
 import { Typography } from '@/components/ui/typography'
 import { RequestsListTable } from './requests-list-table'
-import { RequestsToolbar } from './requests-toolbar'
 import type { RequestItem } from './types'
 
 export interface RequestsListViewProps {
@@ -12,14 +12,10 @@ export interface RequestsListViewProps {
   items?: RequestItem[]
   basePath?: string
   retryHref?: string
-  /** Search and the shared filter button (status, event and stage with counts). */
+  /** The search field and the shared filter button (RequestsFilters), shown on the right of the toolbar. */
   filterForm?: React.ReactNode
-  onFilterClick?: () => void
-  searchValue?: string
-  onSearchChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
-  onViewRequest?: (id?: string) => void
-  onEditRequest?: (id?: string) => void
-  onCancelRequest?: (id?: string) => void
+  /** A line under the title, such as the work queue the list is narrowed to. */
+  queueNote?: React.ReactNode
 }
 
 export function RequestsListView({
@@ -29,12 +25,7 @@ export function RequestsListView({
   basePath = '/dashboard/requests',
   retryHref = basePath,
   filterForm,
-  onFilterClick,
-  searchValue,
-  onSearchChange,
-  onViewRequest,
-  onEditRequest,
-  onCancelRequest,
+  queueNote,
 }: RequestsListViewProps) {
   const data = items ?? []
   const isLoading = state === 'loading'
@@ -46,27 +37,14 @@ export function RequestsListView({
         لیست درخواست ها
       </Typography>
 
-      {filterForm && <div className="mt-5">{filterForm}</div>}
+      {queueNote}
 
-      {(onSearchChange || onFilterClick) && (
-        <RequestsToolbar
-          searchValue={searchValue}
-          onSearchChange={onSearchChange}
-          onFilterClick={onFilterClick}
-        />
-      )}
+      {filterForm && <ListToolbar search={filterForm} className="mt-5" />}
 
       {notice ? (
         <OfflineNotice reason={notice} retryHref={retryHref} className="mt-4" />
       ) : (
-        <RequestsListTable
-          data={data}
-          isLoading={isLoading}
-          isEmpty={isEmpty}
-          onView={onViewRequest}
-          onEdit={onEditRequest}
-          onCancel={onCancelRequest}
-        />
+        <RequestsListTable data={data} isLoading={isLoading} isEmpty={isEmpty} />
       )}
     </div>
   )

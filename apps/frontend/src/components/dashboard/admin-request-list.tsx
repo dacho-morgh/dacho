@@ -97,12 +97,15 @@ export function AdminRequestList({
   page = 1,
   filters = {},
   toolbar,
+  notice,
 }: {
   status?: RequestStatus
   page?: number
   filters?: RequestQueueFilters
   /** Search and the shared filter button, rendered in the list's toolbar row. */
   toolbar?: React.ReactNode
+  /** A line under the title, such as the work queue the list is narrowed to. */
+  notice?: React.ReactNode
 } = {}) {
   const [requests, setRequests] = useState<Request[]>([])
   const [totalPages, setTotalPages] = useState(1)
@@ -146,6 +149,8 @@ export function AdminRequestList({
         items={requests}
         getSearchText={(item) => Object.values(item).join(' ')}
         getKey={(item) => item.id}
+        getRowHref={(item) => `/dashboard/requests/${encodeURIComponent(item.id)}`}
+        notice={notice}
         columns={columns}
         loadState={loadState}
         onRetry={() => void loadRequests()}

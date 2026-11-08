@@ -1,6 +1,8 @@
 'use client'
 import { SearchField } from '@/components/dashboard/search-field'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ListRow, ListTableFrame } from '@/components/dashboard/list-table'
+import { ListToolbar } from '@/components/dashboard/list-toolbar'
+import { RowActions } from '@/components/dashboard/list-row-actions'
 import { startTransition, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -10,8 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Typography } from '@/components/ui/typography'
 import { BulkActionButtons } from '@/components/dashboard/bulk-action-buttons'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { DashboardEyeIcon, DashboardMoreVerticalIcon } from '@/components/icons'
+import { DashboardEyeIcon } from '@/components/icons'
 import { getLoginUrl } from '@/utilities/auth-return-url'
 /** What a cell may ask of the list: run one of its `bulkActions` on this row alone (after the confirmation). */
 export type AdminRowHelpers<T> = { runAction: (actionId: string, item: T) => void }
@@ -71,9 +72,9 @@ export type AdminRowAction = {
   onSelect: () => void
 }
 /**
- * A row's actions always live in this popover (styled like the sidebar's profile popover) and its
- * column is the table's last one. «مشاهده» comes first; `viewLabel` renames it (e.g. «بررسی» for a
- * pending review) and `actions` adds the others (approve, delete…).
+ * A row's actions (the shared RowActions). «مشاهده» comes first; `viewLabel` renames it (e.g.
+ * «بررسی» for a pending review) and `actions` adds the others (approve, delete…). With more
+ * than one they live in the «more» menu; a row with only «مشاهده» shows it directly.
  */
 export function AdminRowActions({
   viewHref,
@@ -84,44 +85,14 @@ export function AdminRowActions({
   viewLabel?: string
   actions?: AdminRowAction[]
 }) {
-  const [open, setOpen] = useState(false)
   if (!viewHref) return null
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="text-gray" size="icon-32" aria-label="عملیات">
-          <DashboardMoreVerticalIcon className="size-5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent dir="rtl" align="start" className="flex w-48 flex-col gap-1">
-        <Button asChild variant="text-gray" size="40" className="w-full justify-start px-3">
-          <Link href={viewHref} onClick={() => setOpen(false)}>
-            <DashboardEyeIcon aria-hidden="true" className="size-5" />
-            <Typography as="span" variant="14/regular">
-              {viewLabel}
-            </Typography>
-          </Link>
-        </Button>
-        {actions.map((action) => (
-          <Button
-            key={action.id}
-            type="button"
-            variant={action.destructive ? 'text-destructive' : 'text-gray'}
-            size="40"
-            className="w-full justify-start px-3"
-            onClick={() => {
-              setOpen(false)
-              action.onSelect()
-            }}
-          >
-            {action.icon}
-            <Typography as="span" variant="14/regular">
-              {action.label}
-            </Typography>
-          </Button>
-        ))}
-      </PopoverContent>
-    </Popover>
+    <RowActions
+      actions={[
+        { id: 'view', label: viewLabel, href: viewHref, icon: <DashboardEyeIcon aria-hidden="true" className="size-5" /> },
+        ...actions,
+      ]}
+    />
   )
 }
 function ListPagination({
@@ -188,6 +159,7 @@ export function AdminListView<T>({
   pagination,
   bulkActions,
   isSelectable,
+  getRowHref,
 }: {
   title: string
   /** A status banner under the title, such as the verification queue's pending count. */
@@ -205,7 +177,7 @@ export function AdminListView<T>({
   onRetry?: () => void | Promise<void>
   /** The list's ListFilterButton (FE35); every filter lives inside it. */
   filter?: React.ReactNode
-  /** Replaces search and filter when the caller filters through the API (it brings its own). */
+  /** Replaces search and filter when the caller filters through the API (it brings its own search field and ListFilterButton). */
   toolbar?: React.ReactNode
   /** The caller filters through the API: a search over one page would misreport the list. */
   serverFiltered?: boolean
@@ -218,6 +190,8 @@ export function AdminListView<T>({
   bulkActions?: AdminBulkAction<T>[]
   /** Rows that cannot be selected (e.g. one that is still being created). */
   isSelectable?: (item: T) => boolean
+  /** The detail page of a row: a click (or Enter) on the row opens it, while its links and buttons keep their own action. */
+  getRowHref?: (item: T) => string | undefined
 }) {
   const [localQuery, setLocalQuery] = useState('')
   const [localPage, setLocalPage] = useState(1)
@@ -322,19 +296,12 @@ export function AdminListView<T>({
         {title}
       </Typography>
       {notice}
-      {/* On a phone the create action sits under search and filter, full width. */}
-      <div className="flex flex-col-reverse gap-3 sm:flex-row-reverse sm:flex-wrap sm:items-center sm:justify-between">
-        {addAction && (
-          <div className="flex w-full flex-row-reverse gap-2 sm:w-auto">
-            {actionsBesideCreate && bulkButtons}
-            {addAction}
-          </div>
-        )}
-        {toolbar}
-        {!serverFiltered && !toolbar && (
-          <div className="flex w-full flex-row-reverse gap-2 sm:w-auto">
-            {!actionsBesideCreate && bulkButtons}
-            {filter}
+      {/* Search and filter on the right, the create and bulk actions on the left; on a phone the
+          create action sits under search and filter, full width. */}
+      <ListToolbar
+        search={
+          toolbar ??
+          (!serverFiltered && (
             <SearchField
               value={searchValue}
               onChange={(event) => {
@@ -347,14 +314,26 @@ export function AdminListView<T>({
               placeholder={searchPlaceholder}
               aria-label={searchPlaceholder}
             />
-          </div>
-        )}
-      </div>
-      <ScrollArea
+          ))
+        }
+        filter={
+          <>
+            {toolbar ? null : filter}
+            {actionsBesideCreate ? null : bulkButtons}
+          </>
+        }
+        actions={
+          addAction ? (
+            <>
+              {actionsBesideCreate ? bulkButtons : null}
+              {addAction}
+            </>
+          ) : undefined
+        }
+      />
+      <ListTableFrame
         aria-busy={refreshing || undefined}
-        className={`min-h-0 min-w-0 flex-1 rounded-xl border border-neutral-200 bg-background transition-opacity ${
-          refreshing ? 'pointer-events-none opacity-60' : ''
-        }`}
+        className={`transition-opacity ${refreshing ? 'pointer-events-none opacity-60' : ''}`}
       >
         <table className="w-full min-w-[900px] border-collapse">
           <thead className="sticky top-0 z-10 bg-background">
@@ -380,13 +359,13 @@ export function AdminListView<T>({
           </thead>
           <tbody>
             {loadState === 'ready' && visible.map((item) => (
-              <tr
+              <ListRow
                 key={getKey(item)}
+                href={getRowHref?.(item)}
                 data-state={selected.has(getKey(item)) ? 'selected' : undefined}
-                className="h-[72px] border-b border-neutral-100 last:border-0 data-[state=selected]:bg-brand-50/50"
               >
                 {selectable && (
-                  <td className="w-12 px-4">
+                  <td className="w-12 px-4" data-row-ignore="">
                     <Checkbox
                       aria-label="انتخاب ردیف"
                       checked={selected.has(getKey(item))}
@@ -400,7 +379,7 @@ export function AdminListView<T>({
                     {column.render(item, rowHelpers)}
                   </td>
                 ))}
-              </tr>
+              </ListRow>
             ))}
             {loadState !== 'ready' && (
               <tr>
@@ -459,7 +438,7 @@ export function AdminListView<T>({
             )}
           </tbody>
         </table>
-      </ScrollArea>
+      </ListTableFrame>
       {loadState === 'ready' && (
         <ListPagination page={currentPage} totalPages={totalPages} onPageChange={changePage} />
       )}
