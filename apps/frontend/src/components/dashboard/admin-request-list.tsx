@@ -48,6 +48,13 @@ const STATUS_VARIANT: Record<RequestStatus, BadgeProps['variant']> = {
   rejected: 'red',
 }
 
+/** The tag of a case the Secretariat follows up (its investment memo was sent). */
+const FOLLOW_UP_LABEL = 'پیگیری سرمایه‌گذاری'
+
+/** A follow-up case waits on the Secretariat's result until it is published. */
+const pendingOf = (item: AdminRequestRow) =>
+  item.pending ?? (item.followUp && !item.followUp.published ? 'منتظر انتشار نتیجه' : null)
+
 const text = (value: string) => (
   <Typography variant="14/regular" color="secondary" className="max-sm:text-[13px]">
     {value}
@@ -97,9 +104,16 @@ function buildColumns(canViewCompany: boolean): AdminColumn<AdminRequestRow>[] {
       id: 'status',
       header: 'وضعیت',
       render: (item) => (
-        <Badge variant={STATUS_VARIANT[item.status] ?? 'gray'} size="sm">
-          {STATUS_LABELS[item.status] ?? item.status}
-        </Badge>
+        <span className="flex flex-wrap items-center gap-1.5">
+          <Badge variant={STATUS_VARIANT[item.status] ?? 'gray'} size="sm">
+            {STATUS_LABELS[item.status] ?? item.status}
+          </Badge>
+          {item.followUp ? (
+            <Badge variant="brand-solid" size="sm">
+              {FOLLOW_UP_LABEL}
+            </Badge>
+          ) : null}
+        </span>
       ),
     },
     {
@@ -108,9 +122,9 @@ function buildColumns(canViewCompany: boolean): AdminColumn<AdminRequestRow>[] {
       render: (item) => (
         <span className="flex flex-col gap-1">
           {text(item.stage)}
-          {item.pending ? (
+          {pendingOf(item) ? (
             <Typography variant="12/regular" color="brand-600">
-              {item.pending}
+              {pendingOf(item)}
             </Typography>
           ) : null}
         </span>
@@ -165,6 +179,7 @@ export function AdminRequestList({
   counts,
   events = [],
   canViewCompany = false,
+  canFollowUp = false,
   initial,
 }: {
   status?: RequestStatus
@@ -174,6 +189,8 @@ export function AdminRequestList({
   counts?: Partial<Record<RequestStatus | 'all', number>>
   events?: { id: string; title: string }[]
   canViewCompany?: boolean
+  /** The Secretariat and the owner may narrow the list to the follow-up cases. */
+  canFollowUp?: boolean
   /** The rows the server read for the query on screen, so the table opens with them. */
   initial?: InitialAdminRequests
 } = {}) {
@@ -262,9 +279,9 @@ export function AdminRequestList({
     <AdminListView
       title="درخواست ها"
       notice={
-        queueLabel ? (
+        queueLabel || filters.followUp ? (
           <Typography variant="14/regular" color="secondary">
-            صف: {queueLabel}
+            {queueLabel ? `صف: ${queueLabel}` : `${FOLLOW_UP_LABEL}: پرونده‌هایی که یادداشت سرمایه‌گذاری آن‌ها به دبیرخانه رسیده است`}
           </Typography>
         ) : undefined
       }
@@ -312,6 +329,19 @@ export function AdminRequestList({
               value: filters.stage,
               options: [{ value: '', label: 'همه مرحله‌ها' }, ...REVIEW_STAGE_OPTIONS],
             },
+            ...(canFollowUp
+              ? [
+                  {
+                    key: 'followUp',
+                    label: FOLLOW_UP_LABEL,
+                    value: filters.followUp ? '1' : undefined,
+                    options: [
+                      { value: '', label: 'همه درخواست‌ها' },
+                      { value: '1', label: 'فقط پرونده‌های پیگیری سرمایه‌گذاری' },
+                    ],
+                  },
+                ]
+              : []),
           ]}
         />
       }

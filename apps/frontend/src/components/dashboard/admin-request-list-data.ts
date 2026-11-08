@@ -27,6 +27,11 @@ export type AdminRequestRow = {
   /** The case can be evaluated by this person (initial review or the review decision). */
   canEvaluate: boolean
   createdAt: string | null
+  /**
+   * A Secretariat follow-up case (its investment memo was sent): whether the result is published.
+   * Null for every other case, and for readers who may not know about memos.
+   */
+  followUp: { published: boolean } | null
 }
 
 export type AdminRequestsPage = {
@@ -49,6 +54,8 @@ export type AdminRequestsApiResponse = {
     reviewStage?: string | null
     allowedActions?: RequestAction[]
     createdAt?: string | null
+    /** Sent only to the Secretariat and the owner; null when no memo was sent. */
+    followUp?: { latestMemoSentAt: string; publishedAt: string | null } | null
     owner?: {
       id?: string
       name?: string | null
@@ -91,6 +98,7 @@ export function toAdminRequestsPage(data: AdminRequestsApiResponse, requestedPag
       pending: PENDING_LABELS.find(([action]) => item.allowedActions?.includes(action))?.[1] ?? null,
       canEvaluate: item.allowedActions?.some((action) => action === 'triage' || action === 'decideReview') ?? false,
       createdAt: item.createdAt ?? null,
+      followUp: item.followUp ? { published: Boolean(item.followUp.publishedAt) } : null,
     })),
     page: data.page ?? requestedPage,
     totalPages: data.totalPages ?? 1,

@@ -254,6 +254,8 @@ export interface RequestFilters {
   ownerId?: string
   reviewStage?: ReviewStage
   queue?: RequestWorkQueueFilter
+  /** Cases with a sent investment memo: the Secretariat's follow-up cases. */
+  followUp?: boolean
 }
 
 export function requestFilterClauses(filters: RequestFilters, params: unknown[]): string[] {
@@ -275,6 +277,9 @@ export function requestFilterClauses(filters: RequestFilters, params: unknown[])
     clauses.push(`r.review_stage = $${params.length}`)
   }
   if (filters.queue) clauses.push(requestWorkQueueClause(filters.queue, params))
+  if (filters.followUp) {
+    clauses.push('EXISTS (SELECT 1 FROM dashboard.investment_memos m WHERE m.request_id = r.id AND m.sent_at IS NOT NULL)')
+  }
   return clauses
 }
 
