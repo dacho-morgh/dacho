@@ -451,12 +451,25 @@ describe('EventsView design QA #276 - shared list toolbar, card click and event 
     expect(group.querySelector('button[aria-label^="فیلتر رویدادها"]')).toBeTruthy()
   })
 
-  it('opens an event from a click anywhere on its card, but not a card without an action', async () => {
-    render(createElement(EventsView, { initialEventsList: [older, newer] }))
+  it('opens an event from a click anywhere on its card; only a card with no page behind it stays inert', async () => {
+    // An upcoming public page with no operational event takes no applications and has nowhere to go.
+    const idle: EventItem = {
+      ...mockEvent,
+      id: 'events-uuid-2',
+      rawId: undefined,
+      title: 'رویداد بدون پرونده عملیاتی',
+      badgeType: 'upcoming',
+      hasActionButton: false,
+      startTimestamp: 0,
+    }
+    render(createElement(EventsView, { initialEventsList: [idle, older, newer] }))
     const cards = screen.getAllByRole('article')
-    // Newest first: the card with the registration button.
+    // Newest first: the card with the registration button, then the ended one (its page is read-only).
     expect(cards[0]!.getAttribute('data-row-link')).not.toBeNull()
-    expect(cards[1]!.getAttribute('data-row-link')).toBeNull()
+    expect(cards[1]!.getAttribute('data-row-link')).not.toBeNull()
+    expect(cards[1]!.className).toContain('hover:bg-neutral-50')
+    expect(cards[2]!.getAttribute('data-row-link')).toBeNull()
+    expect(cards[2]!.className).not.toContain('hover:bg-neutral-50')
 
     fireEvent.click(within(cards[0]!).getByText('عسلویه، مرکز همایش‌های بین‌المللی'))
     expect(mockPush).toHaveBeenCalledWith(`/dashboard/events?eventId=${newer.rawId}`)

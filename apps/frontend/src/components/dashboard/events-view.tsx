@@ -81,17 +81,17 @@ function EventsSkeleton() {
           {/* Content skeleton on left */}
           <div className="flex h-[168px] w-full flex-1 flex-col justify-between py-1">
             <div>
-              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-[#f5f5f5]" />
-              <Skeleton className="mt-[16px] h-[32px] w-[400px] max-w-full rounded-[8px] bg-[#f5f5f5]" />
+              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-neutral-100" />
+              <Skeleton className="mt-[16px] h-[32px] w-[400px] max-w-full rounded-[8px] bg-neutral-100" />
             </div>
             <div className="space-y-[16px]">
-              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-[#f5f5f5]" />
-              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-[#f5f5f5]" />
+              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-neutral-100" />
+              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-neutral-100" />
             </div>
           </div>
 
           {/* Square thumbnail skeleton on right */}
-          <Skeleton className="size-[200px] shrink-0 rounded-[8px] bg-[#f5f5f5]" />
+          <Skeleton className="size-[200px] shrink-0 rounded-[8px] bg-neutral-100" />
         </div>
       ))}
     </div>
@@ -105,12 +105,12 @@ function TreeSkeleton() {
       {[1, 2, 3].map((i) => (
         <div key={i} className="flex flex-col gap-2 rounded-xl border border-neutral-100 p-3">
           <div className="flex items-center justify-between">
-            <Skeleton className="h-6 w-48 rounded-md bg-[#f5f5f5]" />
-            <Skeleton className="h-6 w-20 rounded-md bg-[#f5f5f5]" />
+            <Skeleton className="h-6 w-48 rounded-md bg-neutral-100" />
+            <Skeleton className="h-6 w-20 rounded-md bg-neutral-100" />
           </div>
           <div className="mr-6 flex flex-col gap-2 pt-2">
-            <Skeleton className="h-5 w-64 rounded-md bg-[#f5f5f5]" />
-            <Skeleton className="h-5 w-56 rounded-md bg-[#f5f5f5]" />
+            <Skeleton className="h-5 w-64 rounded-md bg-neutral-100" />
+            <Skeleton className="h-5 w-56 rounded-md bg-neutral-100" />
           </div>
         </div>
       ))}
@@ -126,10 +126,10 @@ function EventsEmptyState({ noMatch = false }: { noMatch?: boolean }) {
         <div className="flex size-[80px] items-center justify-center">
           <EmptyInboxIllustration className="size-[80px]" />
         </div>
-        <p className="mt-1 font-sans text-[14px] leading-[24px] font-semibold text-[#525252]">
+        <p className="mt-1 font-sans text-[14px] leading-[24px] font-semibold text-neutral-600">
           {noMatch ? 'نتیجه‌ای پیدا نشد' : 'رویداد و نمایشگاهی در سیستم موجود نیست'}
         </p>
-        <p className="font-sans text-[12px] leading-[20px] font-normal text-[#737373]">
+        <p className="font-sans text-[12px] leading-[20px] font-normal text-neutral-500">
           {noMatch ? 'عبارت جستجو یا فیلتر را تغییر دهید' : 'در صورت ایجاد رویداد یا نمایشگاه به شما اطلاع رسانی خواهیم کرد'}
         </p>
       </div>
@@ -517,6 +517,9 @@ export function EventsView({
   }
   const eventHasAction = (evt: EventItem) =>
     (isOwner && evt.serviceKey === 'exhibitions') || (!isOwner && Boolean(evt.hasActionButton))
+  // Every card with a page behind it is clickable: the ones with an action, and an ended event (its page
+  // is read-only). Only a card with no operational event behind it has nowhere to go and stays inert.
+  const eventHasTarget = (evt: EventItem) => eventHasAction(evt) || (!isOwner && evt.badgeType === 'ended')
 
   // Subtopics that pass the event page's search and filters; a category with none left is hidden.
   const subtopicQuery = subtopicSearch.trim()
@@ -584,16 +587,16 @@ export function EventsView({
         {/* The route keeps the page fixed (list routes scroll their own region), so the details scroll here. */}
         <ScrollArea className="min-h-0 flex-1">
         {/* Slot 1: Event Summary Banner Card - Figma Frame 61 / Frame 46 / Frame 60 */}
-        <section className="relative mt-4 flex w-full flex-col gap-4 rounded-[16px] border border-[#e5e5e5] bg-background p-4 sm:p-6">
+        <section className="relative mt-4 flex w-full flex-col gap-4 rounded-[16px] border border-neutral-200 bg-background p-4 sm:p-6">
           <div className="flex flex-col-reverse items-start justify-end gap-5 sm:flex-row">
             {/* Left Content column */}
             <div className="flex w-full flex-1 flex-col justify-between gap-4 py-1">
               {/* Badge + Title */}
               <div className="flex flex-col items-start gap-3">
-                <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-[#f5f5f5] px-3 py-1 font-sans text-[13px] leading-[24px] font-normal text-[#525252]">
+                <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-neutral-100 px-3 py-1 font-sans text-[13px] leading-[24px] font-normal text-neutral-600">
                   {selectedEvent.badgeText}
                 </span>
-                <h1 className="font-sans text-[20px] leading-[32px] font-bold text-[#404040] sm:text-[22px]">
+                <h1 className="font-sans text-[20px] leading-[32px] font-bold text-neutral-700 sm:text-[22px]">
                   {selectedEvent.title}
                 </h1>
               </div>
@@ -601,14 +604,14 @@ export function EventsView({
               {/* Dates & Location */}
               <div className="flex flex-col gap-2.5 pt-2">
                 <div className="flex items-center gap-2">
-                  <CalendarBulkIcon className="size-[24px] shrink-0 text-[#a3a3a3]" />
-                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-[#525252]">
+                  <CalendarBulkIcon className="size-[24px] shrink-0 text-neutral-400" />
+                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-neutral-600">
                     {selectedEvent.dates}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <LocationBulkIcon className="size-[24px] shrink-0 text-[#a3a3a3]" />
-                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-[#525252]">
+                  <LocationBulkIcon className="size-[24px] shrink-0 text-neutral-400" />
+                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-neutral-600">
                     {selectedEvent.location}
                   </span>
                 </div>
@@ -659,11 +662,11 @@ export function EventsView({
         ) : null}
 
         {/* Slot 2: Categories and Subtopics Tree Card - Figma Slot / Frame 156 */}
-        <section className="relative mt-4 flex w-full flex-col gap-5 rounded-[16px] border border-[#e5e5e5] bg-background p-4 sm:p-6">
+        <section className="relative mt-4 flex w-full flex-col gap-5 rounded-[16px] border border-neutral-200 bg-background p-4 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 pb-4">
             <div className="flex items-center gap-2">
               <Layers className="size-6 text-brand-500" />
-              <h2 className="font-sans text-[18px] leading-[32px] font-bold text-[#404040]">
+              <h2 className="font-sans text-[18px] leading-[32px] font-bold text-neutral-700">
                 عنوان ها و زیر عنوان های رویداد
               </h2>
             </div>
@@ -756,7 +759,7 @@ export function EventsView({
             <TreeSkeleton />
           ) : detailsError ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-              <p className="font-sans text-[14px] text-red-600">{detailsError}</p>
+              <p className="font-sans text-[14px] text-error-500">{detailsError}</p>
               <Button variant="outline-gray" size="32"
                 type="button"
                 onClick={loadEventHierarchy}
@@ -867,7 +870,7 @@ export function EventsView({
                                         <span>در حال دریافت فایل‌های RFP...</span>
                                       </div>
                                     ) : rfp.error ? (
-                                      <div className="text-[13px] text-red-600">{rfp.error}</div>
+                                      <div className="text-[13px] text-error-500">{rfp.error}</div>
                                     ) : !rfp.version || rfp.version.files.length === 0 ? (
                                       <div className="text-[13px] text-neutral-500">
                                         فایل RFP بارگذاری نشده است
@@ -952,7 +955,7 @@ export function EventsView({
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
       {/* Page Title - Figma node 56:13203 */}
-      <h1 className="font-sans text-[24px] leading-[36px] font-bold text-[#404040]">
+      <h1 className="font-sans text-[24px] leading-[36px] font-bold text-neutral-700">
         رویدادها و نمایشگاه‌ها
       </h1>
 
@@ -1002,7 +1005,7 @@ export function EventsView({
       />
 
       {/* Main Events Card - Figma Frame 6 (56:13208) */}
-      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-[#e5e5e5] bg-background p-[16px]">
+      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-background p-[16px]">
         {isLoading ? (
           <EventsSkeleton />
         ) : (
@@ -1013,9 +1016,9 @@ export function EventsView({
                   <article
                     key={evt.id}
                     className={`flex flex-col-reverse items-start justify-end gap-[16px] rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 sm:h-[200px] sm:flex-row ${
-                      eventHasAction(evt) ? 'cursor-pointer hover:bg-neutral-50' : ''
+                      eventHasTarget(evt) ? 'cursor-pointer hover:bg-neutral-50' : ''
                     }`}
-                    {...rowActivationProps(eventHasAction(evt) ? (newTab) => {
+                    {...rowActivationProps(eventHasTarget(evt) ? (newTab) => {
                       if (newTab) return
                       openEvent(evt)
                     } : undefined)}
@@ -1042,10 +1045,10 @@ export function EventsView({
                     <div className="flex h-[176px] w-full flex-1 flex-col justify-between py-1">
                       {/* Top Section: Tag and Title (Frame 41) */}
                       <div className="flex flex-col items-start gap-[16px]">
-                        <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-[#f5f5f5] px-[12px] py-[4px] font-sans text-[14px] leading-[24px] font-normal text-[#525252]">
+                        <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-neutral-100 px-[12px] py-[4px] font-sans text-[14px] leading-[24px] font-normal text-neutral-600">
                           {evt.badgeText}
                         </span>
-                        <h2 className="font-sans text-[18px] leading-[32px] font-bold text-[#404040] sm:text-[20px]">
+                        <h2 className="font-sans text-[18px] leading-[32px] font-bold text-neutral-700 sm:text-[20px]">
                           {evt.title}
                         </h2>
                       </div>
@@ -1058,14 +1061,14 @@ export function EventsView({
                           {/* Date and Location */}
                           <div className="flex flex-col gap-[16px]">
                             <div className="flex items-center gap-[8px]">
-                              <CalendarBulkIcon className="size-[28px] shrink-0 text-[#a3a3a3]" />
-                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-[#525252]">
+                              <CalendarBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
+                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
                                 {evt.dates}
                               </span>
                             </div>
                             <div className="flex items-center gap-[8px]">
-                              <LocationBulkIcon className="size-[28px] shrink-0 text-[#a3a3a3]" />
-                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-[#525252]">
+                              <LocationBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
+                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
                                 {evt.location}
                               </span>
                             </div>
@@ -1090,14 +1093,14 @@ export function EventsView({
                         /* Frame 44: Date and Location only */
                         <div className="flex flex-col gap-[16px]">
                           <div className="flex items-center gap-[8px]">
-                            <CalendarBulkIcon className="size-[28px] shrink-0 text-[#a3a3a3]" />
-                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-[#525252]">
+                            <CalendarBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
+                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
                               {evt.dates}
                             </span>
                           </div>
                           <div className="flex items-center gap-[8px]">
-                            <LocationBulkIcon className="size-[28px] shrink-0 text-[#a3a3a3]" />
-                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-[#525252]">
+                            <LocationBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
+                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
                               {evt.location}
                             </span>
                           </div>
