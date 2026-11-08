@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { getPayload } from 'payload'
 import config from '../../src/payload.config.js'
+import { validNationalId } from '../helpers/nationalId'
 
 test.use({ channel: 'chrome' })
 
@@ -50,7 +51,7 @@ test.afterAll(async () => {
 
 async function fillCompanyStep(page: Page) {
   await page.locator('#register-companyName').fill('شرکت نمونه تست')
-  await page.locator('#register-companyNationalId').fill('12345678901')
+  await page.locator('#register-companyNationalId').fill('10380284790')
   await page.locator('#register-activityDomain').fill('انرژی')
   await page.getByRole('button', { name: 'ادامه' }).click()
 }
@@ -141,7 +142,7 @@ test.describe('Register', () => {
     page,
   }) => {
     const suffix = `${Date.now()}`.slice(-9)
-    const nationalId = `3${suffix}`
+    const nationalId = validNationalId(`3${suffix}`)
     const first = await page.request.post('http://localhost:3000/api/users/self-signup', {
       headers: cookieRequestHeaders,
       data: {
@@ -247,7 +248,7 @@ test.describe('Register', () => {
         name: 'No domain',
         position: 'CEO',
         companyName: 'No domain company',
-        companyNationalId: `4${suffix}`,
+        companyNationalId: validNationalId(`4${suffix}`),
         activityDomain: '   ',
       },
     })
@@ -290,6 +291,8 @@ test.describe('Register', () => {
     const suffix = Date.now().toString().slice(-9)
     const phone = `09${suffix}`
     const email = `e2e-applicant-${suffix}@example.com`
+    // A leading zero must survive normalization; the ID carries a valid check digit.
+    const nationalId = validNationalId(`0${suffix}`)
 
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto(
@@ -303,7 +306,7 @@ test.describe('Register', () => {
 
     // Step 1 — company info
     await page.locator('#register-companyName').fill('شرکت نمونه تست')
-    await page.locator('#register-companyNationalId').fill(`۰${suffix}`)
+    await page.locator('#register-companyNationalId').fill(nationalId.replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]))
     await page.locator('#register-activityDomain').fill('انرژی')
     await page.getByRole('button', { name: 'ادامه' }).click()
 
@@ -325,7 +328,7 @@ test.describe('Register', () => {
     const registrationBody = await registrationResponse.json()
     registeredUserIds.push(registrationBody.user.id)
     registeredCompanyIds.push(registrationBody.company.id)
-    expect(registrationBody.company.nationalId).toBe(`0${suffix}`)
+    expect(registrationBody.company.nationalId).toBe(nationalId)
     expect(registrationBody.company.activityDomain).toBe('انرژی')
     // Company relationships expose IDs without hydrating authentication records.
     expect(registrationBody.user.roles).toEqual(['representative'])
@@ -397,7 +400,7 @@ test.describe('Register', () => {
         position: 'Company representative',
         companyName: 'Test company',
         activityDomain: 'Energy',
-        companyNationalId: `20${suffix}`,
+        companyNationalId: validNationalId(`2${suffix}`),
         companyRegistrationNumber: suffix,
         companyType: 'سهامی خاص',
         companyProvince: 'بوشهر',
@@ -414,6 +417,14 @@ test.describe('Register', () => {
     // admin session is active.
     expect(body.user.roles).toEqual(['representative'])
     expect(body.company.representative).toBe(body.user.id)
+    // #278: the signup response itself signs the new representative in,
+    // replacing the admin's session cookie, exactly as a login would.
+    expect(body.session).toMatchObject({ established: true })
+    expect(registration.headers()['set-cookie']).toMatch(/payload-token=/)
+    const signedIn = await page.request.get('http://localhost:3000/api/users/me', {
+      headers: cookieRequestHeaders,
+    })
+    expect((await signedIn.json()).user).toMatchObject({ id: body.user.id, operationalRole: 'representative' })
 
     const logout = await page.request.post('http://localhost:3000/api/users/logout', {
       headers: cookieRequestHeaders,

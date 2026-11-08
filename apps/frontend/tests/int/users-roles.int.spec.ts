@@ -3,6 +3,7 @@ import { Users } from '@cms-core/collections/Users'
 import { createLocalReq, getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import config from '@/payload.config'
+import { validNationalId } from '../helpers/nationalId'
 
 // Public signup must produce a `representative` and must be impossible to
 // self-elevate: any `role` supplied by an anonymous visitor is ignored and forced
@@ -23,7 +24,8 @@ const TEST_EMAILS = [
   'int-registration-admin@example.com',
   'int-registration-result@example.com',
 ]
-const TEST_COMPANY_NATIONAL_ID = '99000000001'
+// 11 digits with a valid legal-entity check digit (#278).
+const TEST_COMPANY_NATIONAL_ID = validNationalId('9900012345')
 
 let payload: Payload
 
@@ -142,6 +144,50 @@ describe('users roles & access control', () => {
     expect(body.company.establishmentDate).toBe('1375')
     expect(body.company.status).toBe('فعال')
     expect(body.company.economicCode).toBe('1234567890')
+
+    // #278: registration signs the new representative in through the same
+    // login operation and HttpOnly cookie as POST /api/users/login; the token
+    // is never echoed in the body.
+    const setCookie = response.headers.get('set-cookie') ?? ''
+    expect(setCookie).toMatch(/^payload-token=[^;]+;/)
+    expect(setCookie).toContain('HttpOnly')
+    expect((body as { session?: unknown }).session).toMatchObject({ established: true })
+    const token = setCookie.split(';')[0]!.slice('payload-token='.length)
+    expect(JSON.stringify(body)).not.toContain(token)
+    const session = await payload.auth({ headers: new Headers({ Authorization: `JWT ${token}` }) })
+    expect(session.user?.id).toBe(body.user.id)
+    expect(session.user?.collection).toBe('users')
+  })
+
+  it('rejects an invalid national ID with a stable reason and creates nothing', async () => {
+    const attemptedUser = { email: { equals: 'int-bad-national-id@example.com' } }
+    const req = await createLocalReq({}, payload)
+    Object.assign(req, {
+      json: async () => ({
+        email: 'int-bad-national-id@example.com',
+        password: 'int-test-password',
+        phone: TEST_PHONES[3],
+        name: 'شناسه نامعتبر',
+        position: 'مدیرعامل',
+        companyName: 'شرکت شناسه نامعتبر',
+        // Right length, wrong check digit.
+        companyNationalId: `${TEST_COMPANY_NATIONAL_ID.slice(0, 10)}${(Number(TEST_COMPANY_NATIONAL_ID[10]) + 1) % 10}`,
+        activityDomain: 'انرژی',
+      }),
+    })
+
+    const endpoint = Array.isArray(Users.endpoints)
+      ? Users.endpoints.find((candidate) => candidate.path === '/self-signup')
+      : undefined
+    const response = await endpoint!.handler(req)
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('set-cookie')).toBeNull()
+    const body = (await response.json()) as { errors: Array<{ code?: string; field?: string; reason?: string }> }
+    expect(body.errors).toEqual([
+      expect.objectContaining({ code: 'invalid_field', field: 'companyNationalId', reason: 'checksum' }),
+    ])
+    expect((await payload.count({ collection: 'users', where: attemptedUser })).totalDocs).toBe(0)
   })
 
   it('rejects a duplicate national id with 409 and creates no user', async () => {
@@ -179,6 +225,7 @@ describe('users roles & access control', () => {
     // Atomicity: the rejected signup must not leave a person behind.
     const after = await payload.count({ collection: 'users', where: attemptedUser })
     expect(after.totalDocs).toBe(0)
+    expect(response.headers.get('set-cookie')).toBeNull()
   })
 
   it('rejects a signup missing required fields with 400', async () => {

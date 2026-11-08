@@ -4,22 +4,28 @@ import {
   DuplicateNationalIdError,
   invalidSignupFields,
   isDuplicateNationalId,
+  isValidLegalEntityNationalId,
+  legalEntityCheckDigit,
   missingCompanyFields,
   missingUserFields,
+  nationalIdProblem,
   normalizeDigits,
   normalizeLoginIdentifier,
   pickCompanyFields,
   pickUserFields,
   runSelfSignup,
+  signupFieldProblems,
   type SelfSignupCompany,
   type SelfSignupResponse,
   type SelfSignupStore,
   type SelfSignupUser,
+  type SignupCredentials,
+  type SignupSession,
 } from '@dacho/cms-core/auth/self-signup'
 
 type StoredUser = SelfSignupUser & Record<string, unknown>
 type StoredCompany = SelfSignupCompany & Record<string, unknown>
-type StoreCall = 'precheck' | 'begin' | 'user' | 'company' | 'commit' | 'rollback'
+type StoreCall = 'precheck' | 'begin' | 'user' | 'company' | 'commit' | 'rollback' | 'session'
 
 function uniqueViolation(constraint: string): Error {
   return Object.assign(new Error(`duplicate key value violates unique constraint "${constraint}"`), {
@@ -100,7 +106,8 @@ const validBody = {
   name: 'نماینده شرکت',
   position: 'مدیرعامل',
   companyName: 'شرکت نمونه',
-  companyNationalId: '1234567890',
+  // A real-format legal-entity national ID (11 digits, valid check digit).
+  companyNationalId: '10380284790',
   activityDomain: 'انرژی‌های تجدیدپذیر',
 }
 
@@ -176,38 +183,79 @@ describe('self-signup contract (unit)', () => {
     expect(store.calls).toEqual(['precheck', 'begin', 'user', 'company', 'rollback'])
   })
 
-  it('rejects invalid phone and national-ID syntax before any write', async () => {
+  it('rejects invalid phone, email and national-ID syntax before any write, naming the rule', async () => {
     const store = new MemorySignupStore()
 
     const badPhone = await runSelfSignup({ ...validBody, phone: '12345' }, store)
     expect(badPhone.status).toBe(400)
-    expect(badPhone.body.errors?.[0]).toMatchObject({ code: 'invalid_field', field: 'phone' })
+    expect(badPhone.body.errors).toEqual([
+      expect.objectContaining({ code: 'invalid_field', field: 'phone', reason: 'mobile_format' }),
+    ])
+
+    const badEmail = await runSelfSignup({ ...validBody, email: 'person@example' }, store)
+    expect(badEmail.status).toBe(400)
+    expect(badEmail.body.errors).toEqual([
+      expect.objectContaining({ code: 'invalid_field', field: 'email', reason: 'email_format' }),
+    ])
 
     const badNationalId = await runSelfSignup(
-      { ...validBody, companyNationalId: '1234567890a' },
+      { ...validBody, companyNationalId: '1038028479a' },
       store,
     )
     expect(badNationalId.status).toBe(400)
-    expect(badNationalId.body.errors?.[0]).toMatchObject({
-      code: 'invalid_field',
-      field: 'companyNationalId',
-    })
+    expect(badNationalId.body.errors).toEqual([
+      expect.objectContaining({
+        code: 'invalid_field',
+        field: 'companyNationalId',
+        reason: 'digits_only',
+      }),
+    ])
 
     expect(store.users).toHaveLength(0)
     expect(store.companies).toHaveLength(0)
     expect(store.calls).toEqual([])
   })
 
-  it('accepts an 11-digit national ID because the T03 dictionary is pending', async () => {
+  it.each([
+    ['1038028479', 'length'],
+    ['103802847900', 'length'],
+    ['10380284792', 'checksum'],
+    ['00000000000', 'checksum'],
+  ])('rejects the national ID %s (%s) before any write', async (companyNationalId, reason) => {
+    const store = new MemorySignupStore()
+
+    const response = await runSelfSignup({ ...validBody, companyNationalId }, store)
+
+    expect(response.status).toBe(400)
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ code: 'invalid_field', field: 'companyNationalId', reason }),
+    ])
+    expect(store.calls).toEqual([])
+  })
+
+  it('reports every invalid field at once, in a stable order', async () => {
+    const response = await runSelfSignup(
+      { ...validBody, phone: '0912', email: 'no-at-sign', companyNationalId: '123' },
+      new MemorySignupStore(),
+    )
+
+    expect(response.body.errors?.map(({ field, reason }) => [field, reason])).toEqual([
+      ['phone', 'mobile_format'],
+      ['email', 'email_format'],
+      ['companyNationalId', 'length'],
+    ])
+  })
+
+  it('accepts a valid national ID typed with Persian digits and stores ASCII digits', async () => {
     const store = new MemorySignupStore()
 
     const response = await runSelfSignup(
-      { ...validBody, companyNationalId: '12345678901' },
+      { ...validBody, companyNationalId: '۱۰۳۸۰۲۸۴۷۹۰' },
       store,
     )
 
     expect(response.status).toBe(201)
-    expect(store.companies[0]?.nationalId).toBe('12345678901')
+    expect(store.companies[0]?.nationalId).toBe('10380284790')
   })
 
   it('does not turn a malformed national ID into a duplicate conflict', async () => {
@@ -250,6 +298,102 @@ describe('self-signup contract (unit)', () => {
   })
 })
 
+/** The public endpoint's store: it can also sign the new person in. */
+class SessionSignupStore extends MemorySignupStore {
+  sessions: SignupCredentials[] = []
+  failSession?: Error
+
+  async startSession(credentials: SignupCredentials): Promise<SignupSession> {
+    this.calls.push('session')
+    if (this.failSession) throw this.failSession
+    // Sign-in reads committed rows, exactly as the Payload login does.
+    const user = this.users.find((candidate) => candidate.email === credentials.email)
+    if (!user || user.password !== credentials.password) throw new Error('invalid credentials')
+    this.sessions.push(credentials)
+    return { exp: 1_900_000_000, headers: { 'Set-Cookie': 'payload-token=signed; Path=/; HttpOnly=true' } }
+  }
+}
+
+describe('self-signup session (#278 auto-login)', () => {
+  it('signs the new representative in only after the transaction commits', async () => {
+    const store = new SessionSignupStore()
+
+    const response = await runSelfSignup(
+      { ...validBody, email: ' Representative@Example.COM ', password: ' password123 ' },
+      store,
+    )
+
+    expect(response.status).toBe(201)
+    expect(store.calls).toEqual(['precheck', 'begin', 'user', 'company', 'commit', 'session'])
+    // The stored, normalized credentials are the ones used to sign in.
+    expect(store.sessions).toEqual([{ email: 'representative@example.com', password: 'password123' }])
+    expect(response.headers).toEqual({ 'Set-Cookie': 'payload-token=signed; Path=/; HttpOnly=true' })
+    expect(response.body.session).toEqual({ established: true, exp: 1_900_000_000 })
+    expect(response.body.user?.id).toBe(store.users[0]?.id)
+    // The token is carried by the cookie only.
+    expect(JSON.stringify(response.body)).not.toContain('payload-token')
+  })
+
+  it('keeps a committed signup successful when signing in fails', async () => {
+    const store = new SessionSignupStore()
+    store.failSession = new Error('session store unavailable')
+    const errors: unknown[] = []
+
+    const response = await runSelfSignup(validBody, store, (error) => errors.push(error))
+
+    expect(response.status).toBe(201)
+    expect(response.headers).toBeUndefined()
+    expect(response.body.session).toEqual({ established: false })
+    expect(response.body.company).toBeDefined()
+    expect(store.users).toHaveLength(1)
+    expect(store.companies).toHaveLength(1)
+    expect(errors).toEqual([store.failSession])
+  })
+
+  it.each([
+    ['a missing field', { ...validBody, name: '' }],
+    ['an invalid national ID', { ...validBody, companyNationalId: '10380284791' }],
+  ])('never signs anyone in for %s', async (_label, body) => {
+    const store = new SessionSignupStore()
+
+    const response = await runSelfSignup(body, store)
+
+    expect(response.status).toBe(400)
+    expect(response.headers).toBeUndefined()
+    expect(response.body.session).toBeUndefined()
+    expect(store.calls).not.toContain('session')
+  })
+
+  it('never signs anyone in for a duplicate company, an existing account or a rolled-back write', async () => {
+    const duplicate = new SessionSignupStore()
+    duplicate.companies.push({ id: 'c-existing', nationalId: validBody.companyNationalId })
+    expect((await runSelfSignup(validBody, duplicate)).status).toBe(409)
+
+    const existing = new SessionSignupStore()
+    existing.users.push({ id: 'u-existing', email: validBody.email, phone: '09120000000', password: 'other' })
+    const rejected = await runSelfSignup(validBody, existing)
+    expect(rejected.status).toBe(400)
+    expect(rejected.body.errors?.[0]?.code).toBe('signup_rejected')
+
+    const failing = new SessionSignupStore()
+    failing.failCompanyCreate = new Error('database unavailable')
+    expect((await runSelfSignup(validBody, failing)).status).toBe(500)
+
+    for (const store of [duplicate, existing, failing]) {
+      expect(store.calls).not.toContain('session')
+      expect(store.sessions).toEqual([])
+    }
+  })
+
+  it('omits the session entirely when the caller does not sign in (owner enrolment)', async () => {
+    const response = await runSelfSignup(validBody, new MemorySignupStore())
+
+    expect(response.status).toBe(201)
+    expect(response.body).not.toHaveProperty('session')
+    expect(response.headers).toBeUndefined()
+  })
+})
+
 describe('self-signup helpers', () => {
   it('keeps only person fields and normalizes email, phone and identifiers', () => {
     expect(pickUserFields({ ...validBody, phone: '۰۹۱۲۳۴۵۶۷۸۹', email: 'Rep@Example.COM' })).toEqual({
@@ -274,13 +418,49 @@ describe('self-signup helpers', () => {
     ).toEqual(['phone', 'companyNationalId'])
   })
 
-  it('applies no national-ID length gate until T03 publishes the dictionary', () => {
-    expect(invalidSignupFields({ ...validBody, companyNationalId: '1' })).toEqual([])
-    expect(invalidSignupFields({ ...validBody, companyNationalId: '12345678901' })).toEqual([])
-    expect(invalidSignupFields({ ...validBody, companyNationalId: '۱۲۳۴۵۶۷۸۹۰۱' })).toEqual([])
-    expect(invalidSignupFields({ ...validBody, companyNationalId: '1234a' })).toEqual([
-      'companyNationalId',
-    ])
+  it('validates the legal-entity national ID: 11 digits and the check digit', () => {
+    // Published real-format examples.
+    expect(nationalIdProblem('10380284790')).toBeUndefined()
+    expect(nationalIdProblem('14007650912')).toBeUndefined()
+    expect(nationalIdProblem('10100834460')).toBeUndefined()
+    expect(isValidLegalEntityNationalId(' ۱۴۰۰۷۶۵۰۹۱۲ ')).toBe(true)
+
+    expect(nationalIdProblem('1')).toBe('length')
+    expect(nationalIdProblem('1234567890')).toBe('length')
+    expect(nationalIdProblem('1234a')).toBe('digits_only')
+    expect(nationalIdProblem('14007650913')).toBe('checksum')
+    expect(nationalIdProblem('00000000000')).toBe('checksum')
+    // A zero six-digit serial is never issued, even when the digit would match.
+    expect(nationalIdProblem(`1020000000${legalEntityCheckDigit('1020000000')}`)).toBe('checksum')
+  })
+
+  it('computes the check digit, writing a remainder of 10 as 0', () => {
+    expect(legalEntityCheckDigit('1038028479')).toBe(0)
+    expect(legalEntityCheckDigit('1400765091')).toBe(2)
+    // The weighted sum of this prefix leaves a remainder of 10.
+    expect(legalEntityCheckDigit('1410234505')).toBe(0)
+    expect(nationalIdProblem('14102345050')).toBeUndefined()
+    expect(() => legalEntityCheckDigit('123')).toThrow()
+    // Every prefix maps to exactly one accepted ID.
+    for (const prefix of ['1410234501', '9917420100', '1010101010']) {
+      const valid = `${prefix}${legalEntityCheckDigit(prefix)}`
+      expect(nationalIdProblem(valid)).toBeUndefined()
+      const others = [...'0123456789'].filter((digit) => `${prefix}${digit}` !== valid)
+      for (const digit of others) expect(nationalIdProblem(`${prefix}${digit}`)).toBe('checksum')
+    }
+  })
+
+  it('validates the mobile and email shapes', () => {
+    const problems = (body: Record<string, string>) =>
+      signupFieldProblems({ ...validBody, ...body }).map((problem) => problem.reason)
+    expect(problems({ phone: '۰۹۱۲۳۴۵۶۷۸۹' })).toEqual([])
+    expect(problems({ phone: '9123456789' })).toEqual(['mobile_format'])
+    expect(problems({ phone: '+989123456789' })).toEqual(['mobile_format'])
+    expect(problems({ phone: '091234567890' })).toEqual(['mobile_format'])
+    expect(problems({ email: 'Person.Name+tag@Sub.Example.IR' })).toEqual([])
+    for (const email of ['person', 'person@', '@example.com', 'a b@example.com', 'a..b@example.com', 'a@example.c'])
+      expect(problems({ email })).toEqual(['email_format'])
+    expect(problems({ email: `${'a'.repeat(250)}@example.com` })).toEqual(['email_format'])
   })
 
   it('normalizes digits and login identifiers', () => {

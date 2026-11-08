@@ -146,22 +146,97 @@ export function missingUserFields(body: SelfSignupBody): string[] {
 }
 
 /**
- * Interim boundary syntax pending the T03 technical validation dictionary.
- * The national ID is only required to be non-empty digits after normalization;
- * no length or checksum rule is inferred. The phone shape matches the current
- * client, but the exact phone dictionary is also pending T03.
+ * Boundary syntax for the signup identifiers (design QA #278). After
+ * Persian/Arabic digits are normalized:
+ * - the company national ID (شناسه ملی شخص حقوقی) is exactly 11 ASCII digits
+ *   whose last digit is the legal-entity check digit;
+ * - the mobile number is an Iranian mobile `09` followed by nine digits;
+ * - the email has the shape Payload's own `email` field accepts, so a value
+ *   passing here is never rejected later as an opaque Payload error.
  */
 export const IRANIAN_MOBILE_RE = /^09\d{9}$/
 export const NATIONAL_ID_RE = /^\d+$/
+export const LEGAL_ENTITY_NATIONAL_ID_LENGTH = 11
+/** Mirrors Payload 3's `email` field validator. */
+export const EMAIL_RE =
+  /^(?!.*\.\.)[\w!#$%&'*+/=?^`{|}~-](?:[\w!#$%&'*+/=?^`{|}~.-]*[\w!#$%&'*+/=?^`{|}~-])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/i
+/** RFC 5321 path limit; longer values cannot be delivered to. */
+const EMAIL_MAX_LENGTH = 254
+
+const LEGAL_ENTITY_WEIGHTS = [29, 27, 23, 19, 17, 29, 27, 23, 19, 17] as const
+
+/**
+ * The legal-entity check digit for the first ten digits of a company national
+ * ID: every digit is offset by (tenth digit + 2), weighted by
+ * 29, 27, 23, 19, 17 (repeated), summed modulo 11, with a remainder of 10
+ * written as 0.
+ */
+export function legalEntityCheckDigit(firstTenDigits: string): number {
+  if (!/^\d{10}$/.test(firstTenDigits)) throw new Error('Expected exactly ten ASCII digits.')
+  const offset = Number(firstTenDigits[9]) + 2
+  let sum = 0
+  for (let index = 0; index < 10; index++) {
+    sum += (Number(firstTenDigits[index]) + offset) * LEGAL_ENTITY_WEIGHTS[index]!
+  }
+  const remainder = sum % 11
+  return remainder === 10 ? 0 : remainder
+}
+
+/** Why a normalized company national ID is rejected, if it is. */
+export type NationalIdProblem = 'digits_only' | 'length' | 'checksum'
+
+/**
+ * Checks an already digit-normalized company national ID. Besides the check
+ * digit, an all-zero ID or one whose six-digit serial (positions 4–9) is all
+ * zeroes is rejected, as no legal entity is issued such a number.
+ */
+export function nationalIdProblem(nationalId: string): NationalIdProblem | undefined {
+  if (!NATIONAL_ID_RE.test(nationalId)) return 'digits_only'
+  if (nationalId.length !== LEGAL_ENTITY_NATIONAL_ID_LENGTH) return 'length'
+  if (/^0+$/.test(nationalId) || /^0{6}$/.test(nationalId.slice(3, 9))) return 'checksum'
+  return legalEntityCheckDigit(nationalId.slice(0, 10)) === Number(nationalId[10])
+    ? undefined
+    : 'checksum'
+}
+
+export function isValidLegalEntityNationalId(nationalId: string): boolean {
+  return nationalIdProblem(normalizeDigits(nationalId.trim())) === undefined
+}
+
+/** The specific rule a present field failed. Stable values for client mapping. */
+export type SignupFieldReason = NationalIdProblem | 'mobile_format' | 'email_format'
+
+export interface SignupFieldProblem {
+  field: 'phone' | 'email' | 'companyNationalId'
+  reason: SignupFieldReason
+}
+
+/** Fields present but with the wrong normalized syntax, with the rule broken. */
+export function signupFieldProblems(body: SelfSignupBody): SignupFieldProblem[] {
+  const problems: SignupFieldProblem[] = []
+  const phone = digits(body.phone)
+  if (phone !== undefined && !IRANIAN_MOBILE_RE.test(phone))
+    problems.push({ field: 'phone', reason: 'mobile_format' })
+  const address = email(body.email)
+  if (address !== undefined && (address.length > EMAIL_MAX_LENGTH || !EMAIL_RE.test(address)))
+    problems.push({ field: 'email', reason: 'email_format' })
+  const nationalId = digits(body.companyNationalId)
+  const nationalIdReason = nationalId === undefined ? undefined : nationalIdProblem(nationalId)
+  if (nationalIdReason) problems.push({ field: 'companyNationalId', reason: nationalIdReason })
+  return problems
+}
 
 /** Fields present but with the wrong normalized syntax; missing fields win. */
 export function invalidSignupFields(body: SelfSignupBody): string[] {
-  const invalid: string[] = []
-  const phone = digits(body.phone)
-  if (phone !== undefined && !IRANIAN_MOBILE_RE.test(phone)) invalid.push('phone')
-  const nationalId = digits(body.companyNationalId)
-  if (nationalId !== undefined && !NATIONAL_ID_RE.test(nationalId)) invalid.push('companyNationalId')
-  return invalid
+  return signupFieldProblems(body).map((problem) => problem.field)
+}
+
+const INVALID_FIELD_MESSAGES: Record<SignupFieldReason, string> = {
+  mobile_format: 'Invalid mobile number: expected 09 followed by nine digits.',
+  email_format: 'Invalid email address.',
+  digits_only: 'Invalid national ID: only digits are allowed.',
+  length: 'Invalid national ID: a company national ID has exactly 11 digits.',
+  checksum: 'Invalid national ID: the check digit does not match.',
 }
 
 /** A national id that already belongs to a company. */
@@ -252,14 +327,43 @@ export interface SelfSignupStore {
   inTransaction<T>(run: () => Promise<T>): Promise<T>
   createUser(fields: Record<string, string>): Promise<SelfSignupUser>
   createCompany(fields: Record<string, string | number>): Promise<SelfSignupCompany>
+  /**
+   * Optional: signs the newly created person in through the ordinary password
+   * login, after the signup transaction has committed. Only the public
+   * `/self-signup` endpoint supplies it; an owner enrolling a company must not
+   * be switched into the representative's session.
+   */
+  startSession?(credentials: SignupCredentials): Promise<SignupSession>
+}
+
+export interface SignupCredentials {
+  /** The stored (lower-cased) email, the login identifier used. */
+  email: string
+  /** The password exactly as it was stored for the new account. */
+  password: string
+}
+
+export interface SignupSession {
+  /** The login token's expiry, in seconds since the epoch. */
+  exp?: number
+  /** Response headers that establish the session (the `Set-Cookie` header). */
+  headers: Record<string, string>
 }
 
 export interface SelfSignupResponse {
   status: number
+  /** Extra response headers, such as the session cookie. */
+  headers?: Record<string, string>
   body: {
     user?: SelfSignupUser
     company?: SelfSignupCompany
-    errors?: Array<{ code: string; field?: string; message: string }>
+    /**
+     * Present only when the endpoint tries to sign the person in. `false`
+     * means the account and company exist but the person must sign in
+     * themselves; the signup itself is never reported as failed for that.
+     */
+    session?: { established: boolean; exp?: number }
+    errors?: Array<{ code: string; field?: string; reason?: SignupFieldReason; message: string }>
   }
 }
 
@@ -334,15 +438,16 @@ export async function runSelfSignup(
     }
   }
 
-  const invalid = invalidSignupFields(body)
+  const invalid = signupFieldProblems(body)
   if (invalid.length > 0) {
     return {
       status: 400,
       body: {
-        errors: invalid.map((field) => ({
+        errors: invalid.map(({ field, reason }) => ({
           code: 'invalid_field',
           field,
-          message: field === 'phone' ? 'Invalid mobile number.' : 'Invalid national ID.',
+          reason,
+          message: INVALID_FIELD_MESSAGES[reason],
         })),
       },
     }
@@ -351,13 +456,14 @@ export async function runSelfSignup(
   const nationalId = normalizeDigits(String(body.companyNationalId).trim())
   if (await store.companyNationalIdExists(nationalId)) return duplicateNationalId()
 
+  const userFields = pickUserFields(body)
+  let result: { user: SelfSignupUser; company: SelfSignupCompany }
   try {
-    const result = await store.inTransaction(async () => {
-      const user = await store.createUser(pickUserFields(body))
+    result = await store.inTransaction(async () => {
+      const user = await store.createUser(userFields)
       const company = await store.createCompany(pickCompanyFields(body, user.id))
       return { user, company }
     })
-    return { status: 201, body: result }
   } catch (error) {
     if (isDuplicateNationalId(error)) return duplicateNationalId()
     onError?.(error)
@@ -370,5 +476,28 @@ export async function runSelfSignup(
         errors: [{ code: 'signup_failed', message: 'Registration failed. Please try again.' }],
       },
     }
+  }
+
+  if (!store.startSession) return { status: 201, body: result }
+
+  // The account is committed at this point. A failed sign-in must not turn a
+  // created account into an apparent failure (the person would retry and hit
+  // the duplicate checks), so it degrades to "sign in yourself".
+  try {
+    const session = await store.startSession({
+      email: userFields.email!,
+      password: userFields.password!,
+    })
+    return {
+      status: 201,
+      headers: session.headers,
+      body: {
+        ...result,
+        session: { established: true, ...(session.exp !== undefined ? { exp: session.exp } : {}) },
+      },
+    }
+  } catch (error) {
+    onError?.(error)
+    return { status: 201, body: { ...result, session: { established: false } } }
   }
 }
