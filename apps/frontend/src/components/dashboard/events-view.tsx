@@ -41,6 +41,8 @@ import type { Eligibility } from '@/utilities/participation-eligibility'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { ListFilterButton } from '@/components/dashboard/list-filter-button'
+import { ListToolbar } from '@/components/dashboard/list-toolbar'
+import { rowActivationProps } from '@/components/dashboard/list-table'
 
 export interface EventItem {
   id: string
@@ -297,6 +299,12 @@ export function EventsView({
   const [events] = useState<EventItem[]>(initialEventsList)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name'>('newest')
+
+  // The event page's own search and filter over its subtopics (the shared toolbar and filter template).
+  const [subtopicSearch, setSubtopicSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [selectionFilter, setSelectionFilter] = useState<'' | 'selected' | 'unselected'>('')
 
   // Find initial selected event if provided
   const foundInitial = useMemo(() => {
@@ -481,6 +489,43 @@ export function EventsView({
     })
   }, [events, searchQuery, filterType, state])
 
+  // The server lists the newest first; «قدیمی‌ترین» reverses it and the name order is Persian alphabetical.
+  const sortedEvents = useMemo(() => {
+    const list = [...filteredEvents]
+    if (sortOrder === 'name') return list.sort((a, b) => a.title.localeCompare(b.title, 'fa'))
+    const stamp = (item: EventItem) => item.startTimestamp
+    if (list.every((item) => stamp(item) !== undefined)) {
+      return list.sort((a, b) => (sortOrder === 'oldest' ? stamp(a)! - stamp(b)! : stamp(b)! - stamp(a)!))
+    }
+    return sortOrder === 'oldest' ? list.reverse() : list
+  }, [filteredEvents, sortOrder])
+
+  /** Where a card leads: the booth page of an exhibition, or the event's registration page. */
+  const openEvent = (evt: EventItem) => {
+    if (isOwner && evt.serviceKey === 'exhibitions') {
+      const rawId = evt.id.replace(/^exhibitions-/, '')
+      router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
+    } else if (evt.serviceKey === 'events') {
+      setSelectedEvent(evt)
+      const eventIdParam = evt.rawId || evt.id.replace(/^events-/, '')
+      router.push(`/dashboard/events?eventId=${encodeURIComponent(eventIdParam)}`)
+    } else {
+      // Booth requests replace the generic request form (S7, #245).
+      const rawId = evt.rawId || evt.id.replace(/^exhibitions-/, '')
+      router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
+    }
+  }
+  const eventHasAction = (evt: EventItem) =>
+    (isOwner && evt.serviceKey === 'exhibitions') || (!isOwner && Boolean(evt.hasActionButton))
+
+  // Subtopics that pass the event page's search and filters; a category with none left is hidden.
+  const subtopicQuery = subtopicSearch.trim()
+  const subtopicFiltered = Boolean(subtopicQuery || categoryFilter || selectionFilter)
+  const subtopicMatches = (sub: EventSubtopicDto) =>
+    (!subtopicQuery || sub.title.includes(subtopicQuery)) &&
+    (!categoryFilter || sub.categoryId === categoryFilter) &&
+    (!selectionFilter || (selectionFilter === 'selected') === selectedSubtopicIds.has(sub.id))
+
   const isLoading = state === 'loading'
   const isEmpty = !isLoading && filteredEvents.length === 0
 
@@ -657,6 +702,55 @@ export function EventsView({
             </div>
           </div>
 
+          {/* Search and the shared filter template over the subtopics (design QA #276) */}
+          {!loadingDetails && !detailsError && categories.length > 0 && (
+            <ListToolbar
+              search={
+                <SearchField
+                  value={subtopicSearch}
+                  onChange={(event) => setSubtopicSearch(event.target.value)}
+                  placeholder="جستجوی زیرعنوان"
+                  aria-label="جستجوی زیرعنوان‌ها"
+                  maxLength={100}
+                />
+              }
+              filter={
+                <ListFilterButton
+                  label="فیلتر زیرعنوان‌ها"
+                  groups={[
+                    ...(categories.length > 1
+                      ? [
+                          {
+                            key: 'category',
+                            label: 'عنوان',
+                            value: categoryFilter,
+                            options: [
+                              { value: '', label: 'همه عنوان‌ها' },
+                              ...categories.map((cat) => ({ value: cat.id, label: cat.title })),
+                            ],
+                          },
+                        ]
+                      : []),
+                    {
+                      key: 'selection',
+                      label: 'وضعیت انتخاب',
+                      value: selectionFilter,
+                      options: [
+                        { value: '', label: 'همه زیرعنوان‌ها' },
+                        { value: 'selected', label: 'انتخاب‌شده' },
+                        { value: 'unselected', label: 'انتخاب‌نشده' },
+                      ],
+                    },
+                  ]}
+                  onChange={(key, value) => {
+                    if (key === 'category') setCategoryFilter(value ?? '')
+                    else setSelectionFilter((value as 'selected' | 'unselected' | undefined) ?? '')
+                  }}
+                />
+              }
+            />
+          )}
+
           {/* Hierarchy Content */}
           {loadingDetails ? (
             <TreeSkeleton />
@@ -677,9 +771,17 @@ export function EventsView({
             </div>
           ) : (
             <div className="flex flex-col gap-3">
+              {subtopicFiltered &&
+                !categories.some((cat) => subtopics.some((sub) => sub.categoryId === cat.id && subtopicMatches(sub))) && (
+                  <div role="status" className="py-8 text-center font-sans text-[14px] text-neutral-500">
+                    زیرعنوانی با این جستجو یا فیلتر پیدا نشد.
+                  </div>
+                )}
               {categories.map((cat) => {
-                const catSubtopics = subtopics.filter((sub) => sub.categoryId === cat.id)
-                const isExpanded = expandedCategories[cat.id] ?? false
+                const catSubtopics = subtopics.filter((sub) => sub.categoryId === cat.id && subtopicMatches(sub))
+                // A category with nothing left under the search or filter is not worth showing.
+                if (subtopicFiltered && catSubtopics.length === 0) return null
+                const isExpanded = subtopicFiltered || (expandedCategories[cat.id] ?? false)
 
                 return (
                   <div
@@ -854,21 +956,24 @@ export function EventsView({
         رویدادها و نمایشگاه‌ها
       </h1>
 
-      {/* Action Bar - Figma Frame 1 (56:13205) */}
-      <div className="mt-5 flex items-center justify-start">
-        <div className="flex h-[48px] w-full items-center gap-[8px] sm:w-[458px]">
+      {/* Action Bar - Figma Frame 1 (56:13205): search and the filter template on the right */}
+      <ListToolbar
+        className="mt-5"
+        search={
           <SearchField
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="درخواست خود را جست و جو کنید"
-                aria-label="جستجوی رویدادها"
-              />
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="درخواست خود را جست و جو کنید"
+            aria-label="جستجوی رویدادها"
+          />
+        }
+        filter={
           <ListFilterButton
             label="فیلتر رویدادها"
             groups={[
               {
                 key: 'state',
-                label: 'وضعیت ثبت‌نام',
+                label: 'وضعیت رویداد',
                 value: filterType === 'all' ? undefined : filterType,
                 options: [
                   { value: '', label: 'همه رویدادها' },
@@ -876,11 +981,25 @@ export function EventsView({
                   { value: 'ended', label: 'تمام شده' },
                 ],
               },
+              {
+                key: 'sort',
+                label: 'مرتب سازی بر اساس',
+                kind: 'radio',
+                value: sortOrder === 'newest' ? undefined : sortOrder,
+                options: [
+                  { value: '', label: 'جدیدترین رویداد ها' },
+                  { value: 'oldest', label: 'قدیمی ترین رویداد ها' },
+                  { value: 'name', label: 'نام رویداد ( الف - ی)' },
+                ],
+              },
             ]}
-            onChange={(_, value) => setFilterType((value as typeof filterType | undefined) ?? 'all')}
+            onChange={(key, value) => {
+              if (key === 'sort') setSortOrder((value as 'oldest' | 'name' | undefined) ?? 'newest')
+              else setFilterType(value ?? 'all')
+            }}
           />
-        </div>
-      </div>
+        }
+      />
 
       {/* Main Events Card - Figma Frame 6 (56:13208) */}
       <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-[#e5e5e5] bg-background p-[16px]">
@@ -890,10 +1009,16 @@ export function EventsView({
           <ScrollArea className="min-h-0 flex-1">
             {!isEmpty && (
               <div className="flex flex-col gap-[32px]">
-                {filteredEvents.map((evt) => (
+                {sortedEvents.map((evt) => (
                   <article
                     key={evt.id}
-                    className="flex flex-col-reverse items-start justify-end gap-[16px] sm:h-[200px] sm:flex-row"
+                    className={`flex flex-col-reverse items-start justify-end gap-[16px] rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 sm:h-[200px] sm:flex-row ${
+                      eventHasAction(evt) ? 'cursor-pointer hover:bg-neutral-50' : ''
+                    }`}
+                    {...rowActivationProps(eventHasAction(evt) ? (newTab) => {
+                      if (newTab) return
+                      openEvent(evt)
+                    } : undefined)}
                   >
                     <div className="relative size-[200px] shrink-0 overflow-hidden rounded-[8px] bg-slate-100">
                       {evt.imageSrc ? (
@@ -949,20 +1074,7 @@ export function EventsView({
                           {/* Action Button */}
                           <Button size="40"
                             type="button"
-                            onClick={() => {
-                              if (isOwner && evt.serviceKey === 'exhibitions') {
-                                const rawId = evt.id.replace(/^exhibitions-/, '')
-                                router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
-                              } else if (evt.serviceKey === 'events') {
-                                setSelectedEvent(evt)
-                                const eventIdParam = evt.rawId || evt.id.replace(/^events-/, '')
-                                router.push(`/dashboard/events?eventId=${encodeURIComponent(eventIdParam)}`)
-                              } else {
-                                // Booth requests replace the generic request form (S7, #245).
-                                const rawId = evt.rawId || evt.id.replace(/^exhibitions-/, '')
-                                router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
-                              }
-                            }}
+                            onClick={() => openEvent(evt)}
                           >
                             <span className="font-sans text-[16px] leading-[28px] font-semibold">
                               {isOwner && evt.serviceKey === 'exhibitions'
