@@ -7,7 +7,8 @@ import { ListFilterButton, type ListFilterGroup } from '@/components/dashboard/l
 import { RowActions } from '@/components/dashboard/list-row-actions'
 import { ListRow, ListTableFrame } from '@/components/dashboard/list-table'
 import { ListToolbar } from '@/components/dashboard/list-toolbar'
-import { RequestsListView, type RequestItem } from '@/components/dashboard/requests'
+import { RequestsFilters, RequestsListView, type RequestItem } from '@/components/dashboard/requests'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 const nav = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -280,5 +281,84 @@ describe('the company request list', () => {
     const toolbar = container.querySelector('[data-slot="list-toolbar"]')!
     expect(toolbar.firstElementChild!.querySelector('input')).toBeTruthy()
     expect(container.querySelector('[data-slot="list-table-frame"]')!.className).toContain('flex-1')
+  })
+})
+
+describe('design QA round 2', () => {
+  it('keeps option keys unique when a real option is named «all»', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    render(
+      createElement(ListFilterButton, {
+        groups: [
+          {
+            key: 'view',
+            label: 'نمای صف',
+            options: [
+              { value: '', label: 'در انتظار' },
+              { value: 'closed', label: 'بسته‌شده' },
+              { value: 'all', label: 'همه' },
+            ],
+          },
+          {
+            key: 'sort',
+            label: 'مرتب سازی',
+            kind: 'radio',
+            options: [
+              { value: '', label: 'جدیدترین' },
+              { value: 'all', label: 'همه' },
+            ],
+          },
+        ],
+      }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: /فیلتر/ }))
+    const duplicate = errors.mock.calls.filter((call) => String(call[0]).includes('same key'))
+    errors.mockRestore()
+    expect(duplicate).toHaveLength(0)
+    // Radios keep their own ids too, so each label points at its own radio.
+    expect(screen.getByRole('radio', { name: 'همه' })).toBeTruthy()
+  })
+
+  it('wraps the toolbar so the search field keeps a full line on a phone', () => {
+    const { container } = render(
+      createElement(ListToolbar, {
+        search: createElement(RequestsFilters, { filters: {}, events: [] }),
+      }),
+    )
+    const group = container.querySelector('[data-slot="list-toolbar"]')!.firstElementChild!
+    expect(group.className).toContain('flex-wrap')
+    // The form around the search field takes the whole line below `sm`, never a shrinking flex share.
+    const form = group.querySelector('form[role="search"]')!
+    expect(form.className).toContain('w-full')
+    expect(form.className).not.toContain('flex-1')
+    expect(screen.getByRole('searchbox').getAttribute('placeholder')).toBe('درخواست خود را جست و جو کنید')
+  })
+
+  it('draws the radio as Figma 32291:40807: a white ring when off, a filled brand circle with a check when on', () => {
+    render(
+      createElement(
+        RadioGroup,
+        { defaultValue: 'a' },
+        createElement(RadioGroupItem, { value: 'a', 'aria-label': 'on' }),
+        createElement(RadioGroupItem, { value: 'b', 'aria-label': 'off' }),
+      ),
+    )
+    const on = screen.getByRole('radio', { name: 'on' })
+    const off = screen.getByRole('radio', { name: 'off' })
+    for (const radio of [on, off]) {
+      expect(radio.className).toContain('border-[1.5px]')
+      expect(radio.className).toContain('border-neutral-200')
+      expect(radio.className).toContain('data-[state=checked]:bg-brand-500')
+    }
+    expect(on.querySelector('svg')).toBeTruthy()
+    expect(off.querySelector('svg')).toBeNull()
+  })
+
+  it('opens the filter panel with the neutral-100 border and the Figma shadow token', () => {
+    render(createElement(ListFilterButton, { groups }))
+    fireEvent.click(screen.getByRole('button', { name: /فیلتر/ }))
+    const panel = screen.getByRole('dialog')
+    expect(panel.className).toContain('border-neutral-100')
+    expect(panel.className).toContain('shadow-filter-panel')
   })
 })

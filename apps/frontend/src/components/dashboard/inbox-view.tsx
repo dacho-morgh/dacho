@@ -318,7 +318,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
         search={
           <form
             role="search"
-            className="min-w-0 flex-1 sm:flex-none"
+            className="w-full min-w-0 sm:w-auto"
             onSubmit={(event) => {
               event.preventDefault()
               navigate({ q: search.trim() || undefined })

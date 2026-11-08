@@ -28,7 +28,7 @@ export function RequestsFilters({
 }) {
   return (
     <>
-      <form method="get" action={basePath} className="min-w-0 flex-1 sm:flex-none" role="search">
+      <form method="get" action={basePath} className="w-full min-w-0 sm:w-auto" role="search">
         {status && <input type="hidden" name="status" value={status} />}
         {filters.eventId && <input type="hidden" name="eventId" value={filters.eventId} />}
         {filters.stage && <input type="hidden" name="stage" value={filters.stage} />}
@@ -37,7 +37,7 @@ export function RequestsFilters({
           name="search"
           defaultValue={filters.search ?? ''}
           maxLength={100}
-          placeholder="جستجوی عنوان یا کد پیگیری"
+          placeholder="درخواست خود را جست و جو کنید"
           aria-label="جستجوی عنوان یا کد پیگیری"
         />
       </form>

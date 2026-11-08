@@ -105,7 +105,7 @@ export function ReviewerQueue({ view, page }: ReviewerQueueProps) {
   const counts = state.kind === 'ready' ? state.data.counts : undefined
 
   return (
-    <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 px-4 pt-6 pb-6 lg:pt-10" dir="rtl">
+    <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 px-4 pt-6 pb-4 lg:pt-10" dir="rtl">
       <div className="flex flex-col gap-1">
         <Typography as="h1" variant="h3" color="neutral-900">
           پرونده‌های ارجاع‌شده به شما
@@ -117,7 +117,7 @@ export function ReviewerQueue({ view, page }: ReviewerQueueProps) {
 
       <ListToolbar
         search={
-          <form role="search" className="min-w-0 flex-1 sm:flex-none" onSubmit={(event) => event.preventDefault()}>
+          <form role="search" className="w-full min-w-0 sm:w-auto" onSubmit={(event) => event.preventDefault()}>
             <SearchField
               value={search}
               onChange={(event) => setSearch(event.target.value)}

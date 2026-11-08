@@ -64,7 +64,10 @@ it('preserves the selected status across request pages and retries', async () =>
   expect(screen.getByRole('link', { name: 'صفحه قبل' }).getAttribute('href')).toBe(
     '/dashboard/requests?status=approved',
   )
-  expect(screen.queryByPlaceholderText('درخواست خود را جست و جو کنید')).toBeNull()
+  // The only search field is the real one: a GET form that keeps the status (Figma placeholder, design QA #276).
+  const search = screen.getByPlaceholderText('درخواست خود را جست و جو کنید')
+  expect(screen.getAllByPlaceholderText('درخواست خود را جست و جو کنید')).toHaveLength(1)
+  expect(search.closest('form')?.getAttribute('role')).toBe('search')
 })
 
 it('preserves page and status in an unavailable retry link', async () => {

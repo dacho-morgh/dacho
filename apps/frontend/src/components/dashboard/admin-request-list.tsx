@@ -157,8 +157,9 @@ export function AdminRequestList({
         serverFiltered
         toolbar={toolbar}
       />
-      {loadState === 'ready' && (
-        <div className="pb-4">
+      {/* Only when there is more than one page: an empty wrapper would add a second 16px gutter under the frame. */}
+      {loadState === 'ready' && (totalPages > 1 || page > 1) && (
+        <div className="px-4 pb-4">
           <RequestsPagination page={page} totalPages={totalPages} status={status} filters={filters} />
         </div>
       )}

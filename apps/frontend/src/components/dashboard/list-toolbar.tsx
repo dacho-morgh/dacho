@@ -7,7 +7,8 @@ import { cn } from '@/utilities/ui'
  * search and the filter button sit together on the right (the RTL start), the page's own
  * actions (create, bulk actions, box tabs) on the left. The filter button is the one
  * ListFilterButton template; callers pass the search field and the button, never their own.
- * On a phone the groups stack, search and filter first.
+ * On a phone the groups stack and the search field takes its own full line, the filter and
+ * tabs below it (forms around a search field must be `w-full sm:w-auto`).
  */
 export function ListToolbar({
   search,
@@ -28,7 +29,7 @@ export function ListToolbar({
       className={cn('flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between', className)}
     >
       {(search || filter) && (
-        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
           {search}
           {filter}
         </div>

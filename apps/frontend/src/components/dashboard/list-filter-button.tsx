@@ -139,7 +139,7 @@ export function ListFilterButton({ groups, onChange, label = 'فیلتر', links
         dir="rtl"
         align="start"
         aria-label={label}
-        className="flex max-h-[80svh] w-80 max-w-[calc(100vw-2rem)] flex-col gap-4 overflow-y-auto rounded-2xl border-neutral-100 p-4 shadow-lg"
+        className="flex max-h-[80svh] w-80 max-w-[calc(100vw-2rem)] flex-col gap-4 overflow-y-auto rounded-2xl border-neutral-100 p-4 shadow-filter-panel"
       >
         <div className="flex items-center justify-between">
           <Typography as="h2" variant="16/bold" color="neutral-700">
@@ -162,8 +162,8 @@ export function ListFilterButton({ groups, onChange, label = 'فیلتر', links
               value={draft[group.key] ?? ''}
               onChange={(event) => setDraft((current) => ({ ...current, [group.key]: event.target.value }))}
             >
-              {group.options.map((option) => (
-                <option key={option.value || 'all'} value={option.value}>
+              {group.options.map((option, index) => (
+                <option key={`${index}:${option.value}`} value={option.value}>
                   {optionText(option)}
                 </option>
               ))}
@@ -184,10 +184,10 @@ export function ListFilterButton({ groups, onChange, label = 'فیلتر', links
                 aria-labelledby={`${fieldId}-${group.key}-label`}
                 className="gap-4"
               >
-                {group.options.map((option) => {
-                  const id = `${fieldId}-${group.key}-${option.value || 'all'}`
+                {group.options.map((option, index) => {
+                  const id = `${fieldId}-${group.key}-${index}`
                   return (
-                    <div key={option.value || 'all'} className="flex items-center gap-2">
+                    <div key={`${index}:${option.value}`} className="flex items-center gap-2">
                       <RadioGroupItem id={id} value={option.value} />
                       <label htmlFor={id} className="flex-1 cursor-pointer">
                         <Typography as="span" variant="16/regular" color="neutral-700">
