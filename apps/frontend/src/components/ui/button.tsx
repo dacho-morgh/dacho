@@ -29,6 +29,10 @@ import { cn } from "@/utilities/ui"
  * | Single choice chip (aria-pressed)            | chip           | 32               |
  * | Inline link, breadcrumb                      | link, link-gray| clear            |
  * | Disclosure row (accordion header)            | row            | clear            |
+ *
+ * A filled primary/destructive label is always white (fill-brand-foreground), even when the
+ * label is wrapped in <Typography>. In a dialog or form footer the primary action comes FIRST in
+ * the DOM: the page is RTL, so the first item sits on the right (Figma, design QA #277).
  */
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center border font-sans whitespace-nowrap transition-colors outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-500/50 disabled:pointer-events-none disabled:cursor-not-allowed aria-disabled:pointer-events-none aria-disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -37,9 +41,9 @@ const buttonVariants = cva(
       variant: {
         // --- FILL STYLES ---
         default:
-          "border-transparent dark:border-neutral-200 bg-fill-brand text-fill-brand-foreground hover:bg-fill-brand-hover active:bg-fill-brand-active disabled:bg-neutral-200 disabled:text-neutral-300",
+          "border-transparent dark:border-neutral-200 bg-fill-brand text-fill-brand-foreground [&_.text-foreground]:text-fill-brand-foreground disabled:[&_.text-foreground]:text-neutral-300 hover:bg-fill-brand-hover active:bg-fill-brand-active disabled:bg-neutral-200 disabled:text-neutral-300",
         primary:
-          "border-transparent dark:border-neutral-200 bg-fill-brand text-fill-brand-foreground hover:bg-fill-brand-hover active:bg-fill-brand-active disabled:bg-neutral-200 disabled:text-neutral-300",
+          "border-transparent dark:border-neutral-200 bg-fill-brand text-fill-brand-foreground [&_.text-foreground]:text-fill-brand-foreground disabled:[&_.text-foreground]:text-neutral-300 hover:bg-fill-brand-hover active:bg-fill-brand-active disabled:bg-neutral-200 disabled:text-neutral-300",
         gray:
           "border-transparent bg-neutral-100 text-neutral-600 hover:bg-neutral-300 hover:text-neutral-700 active:bg-neutral-400 active:text-neutral-700 disabled:bg-neutral-100 disabled:text-neutral-300",
         secondary:
@@ -73,7 +77,7 @@ const buttonVariants = cva(
 
         // --- UTILITY STYLES ---
         destructive:
-          "border-transparent bg-fill-danger text-white hover:bg-fill-danger-hover active:bg-fill-danger-active disabled:bg-neutral-200 disabled:text-neutral-300",
+          "border-transparent bg-fill-danger text-white [&_.text-foreground]:text-white disabled:[&_.text-foreground]:text-neutral-300 hover:bg-fill-danger-hover active:bg-fill-danger-active disabled:bg-neutral-200 disabled:text-neutral-300",
         link:
           "border-transparent bg-transparent text-brand-500 underline-offset-4 hover:underline disabled:text-neutral-300 p-0 h-auto",
         "link-gray":

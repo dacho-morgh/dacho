@@ -23,19 +23,22 @@ const Form = FormProvider
 export type FormFieldControlProps<TValues extends FieldValues, TName extends FieldPath<TValues>> = {
   field: ControllerRenderProps<TValues, TName>
   fieldState: ControllerFieldState
-  /** Spread onto the control: id, aria-invalid and aria-describedby. */
-  controlProps: { id: string; "aria-invalid"?: true; "aria-describedby"?: string }
+  /** Spread onto the control: id, aria-invalid, aria-required and aria-describedby. */
+  controlProps: { id: string; "aria-invalid"?: true; "aria-required"?: true; "aria-describedby"?: string }
 }
 
 function FormField<TValues extends FieldValues, TName extends FieldPath<TValues>>({
   label,
   description,
+  required,
   className,
   render,
   ...props
 }: Omit<ControllerProps<TValues, TName>, "render"> & {
   label?: React.ReactNode
   description?: React.ReactNode
+  /** Marks the field with the shared `*` and sets aria-required on the control. */
+  required?: boolean
   className?: string
   render: (props: FormFieldControlProps<TValues, TName>) => React.ReactElement
 }) {
@@ -49,13 +52,14 @@ function FormField<TValues extends FieldValues, TName extends FieldPath<TValues>
         const describedBy = [descriptionId, errorId].filter(Boolean).join(" ") || undefined
         return (
           <Field invalid={Boolean(fieldState.error)} disabled={field.disabled} className={className}>
-            {label ? <FieldLabel htmlFor={id}>{label}</FieldLabel> : null}
+            {label ? <FieldLabel htmlFor={id} required={required}>{label}</FieldLabel> : null}
             {render({
               field,
               fieldState,
               controlProps: {
                 id,
                 "aria-invalid": fieldState.error ? true : undefined,
+                "aria-required": required ? true : undefined,
                 "aria-describedby": describedBy,
               },
             })}

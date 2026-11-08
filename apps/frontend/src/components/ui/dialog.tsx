@@ -88,6 +88,10 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return <div data-slot="dialog-header" className={cn("flex flex-col gap-1 pl-10", className)} {...props} />
 }
 
+/**
+ * Actions row. Put the primary action FIRST in the DOM: the dialog is RTL, so
+ * the first button sits on the right and the cancel button follows on its left.
+ */
 function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
