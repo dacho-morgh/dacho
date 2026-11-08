@@ -11,10 +11,13 @@ interface ProfileDialogProps {
   title: string
   onClose: () => void
   children: ReactNode
-  actions: ReactNode
+  /** The primary action (save / add). Rendered first, so it sits on the right in RTL. */
+  primary: ReactNode
+  /** The cancel action. Rendered after the primary one, so it sits on its left. */
+  secondary?: ReactNode
 }
 
-export function ProfileDialog({ title, onClose, children, actions }: ProfileDialogProps) {
+export function ProfileDialog({ title, onClose, children, primary, secondary }: ProfileDialogProps) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -34,7 +37,10 @@ export function ProfileDialog({ title, onClose, children, actions }: ProfileDial
           </DialogClose>
         </div>
         <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto pe-1">{children}</div>
-        <div className="flex items-center gap-2 pt-2">{actions}</div>
+        <div data-slot="dialog-footer" className="flex items-center gap-2 pt-2">
+          {primary}
+          {secondary}
+        </div>
       </DialogContent>
     </Dialog>
   )

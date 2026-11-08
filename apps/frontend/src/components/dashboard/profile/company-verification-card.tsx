@@ -213,7 +213,7 @@ export function CompanyVerificationCard({
         {status !== 'pending' && status !== 'approved' && status !== 'rejected' && missing.optional.length > 0 && (
           <div className="flex flex-col gap-2">
             <Typography variant="12/regular" color="neutral-500">
-              موارد اختیاری بدون پاسخ (می‌توانید تکمیل کنید یا گزینه «ندارم» را علامت بزنید):
+              موارد اختیاری بدون پاسخ (در صورت نداشتن، آن‌ها را خالی بگذارید):
             </Typography>
             <ul className="flex flex-wrap gap-1.5">
               {missing.optional.map((key) => (
