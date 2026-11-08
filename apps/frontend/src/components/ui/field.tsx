@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { Children, isValidElement, useMemo, type ReactNode } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { typographyVariants } from "@/components/ui/typography"
@@ -13,19 +13,27 @@ import { cn } from "@/utilities/ui"
  */
 /**
  * The shared required-field marker: a red asterisk after the label. It is
- * decorative (aria-hidden); the control itself carries aria-required.
+ * decorative (aria-hidden) and drawn with CSS so it never becomes part of the
+ * label text or its accessible name; the control itself carries aria-required.
  */
 function RequiredMark({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="required-marker"
       aria-hidden="true"
-      className={cn("text-error-500", className)}
+      className={cn("text-error-500 after:content-['*']", className)}
       {...props}
-    >
-      *
-    </span>
+    />
   )
+}
+
+/** True when a direct child control is flagged required (aria-required / required). */
+function hasRequiredControl(children: ReactNode): boolean {
+  return Children.toArray(children).some((child) => {
+    if (!isValidElement<Record<string, unknown>>(child)) return false
+    const flag = child.props["aria-required"] ?? child.props.required
+    return flag === true || flag === "true"
+  })
 }
 
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
@@ -153,4 +161,4 @@ function FieldError({
   )
 }
 
-export { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet, RequiredMark }
+export { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet, RequiredMark, hasRequiredControl }
