@@ -706,7 +706,7 @@ function TextField({ path, label, value, error, onChange }: { path: string; labe
   return (
     <label data-field={path} className="flex min-w-0 flex-col gap-2">
       <Typography as="span" variant="14/regular" color="neutral-800" className="break-words">{label}</Typography>
-      <Textarea value={value} onChange={(event) => onChange(event.target.value)} rows={3} aria-invalid={error ? true : undefined} className="border-neutral-100" />
+      <Textarea value={value} placeholder="توضیحات خود را بنویسید…" onChange={(event) => onChange(event.target.value)} rows={3} aria-invalid={error ? true : undefined} className="border-neutral-100" />
       <FieldError path={path} error={error} />
     </label>
   )

@@ -5,6 +5,7 @@ import { type ReactNode } from 'react'
 import { type FieldErrors, type FieldValues, type Resolver } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
+import { RequiredMark, hasRequiredControl } from '@/components/ui/field'
 import { Typography } from '@/components/ui/typography'
 
 export type Person = {
@@ -26,17 +27,23 @@ export function Field({
   name,
   label,
   error,
+  required,
   children,
 }: {
   name: string
   label: string
   error?: string
+  /** Defaults to whether the control inside is marked aria-required. */
+  required?: boolean
   children: ReactNode
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <Typography asChild variant="16/semibold">
-        <label htmlFor={name}>{label}</label>
+        <label htmlFor={name}>
+          {label}
+          {(required ?? hasRequiredControl(children)) ? <RequiredMark className="ms-0.5" /> : null}
+        </label>
       </Typography>
       {children}
       {error && (

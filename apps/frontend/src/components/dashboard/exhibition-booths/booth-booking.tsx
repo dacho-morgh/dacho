@@ -20,7 +20,8 @@ import {
 } from '@/utilities/dashboard-api'
 import { BoothPageHeader } from './booth-page-header'
 import { BoothRequestStageBadge, boothFailure, receiptStatusLabel } from './booth-status'
-import { FileInput } from '@/components/ui/file-input'
+import { RequiredMark } from '@/components/ui/field'
+import { FileInput, SelectedFile } from '@/components/ui/file-input'
 import { toast } from 'sonner'
 
 export interface BoothExhibitionInfo {
@@ -350,6 +351,7 @@ function ReceiptUploadForm({
   onUploaded: () => Promise<void>
 }) {
   const [file, setFile] = useState<File | null>(null)
+  const [fileKey, setFileKey] = useState(0)
   const [trackingCode, setTrackingCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -393,16 +395,31 @@ function ReceiptUploadForm({
         {formatToman(request.priceAmount)})
       </Typography>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label htmlFor={inputId} className="flex flex-1 flex-col gap-1">
+        <div className="flex flex-1 flex-col gap-1">
+          <label htmlFor={inputId} className="flex flex-col gap-1">
           <Typography as="span" variant="12/regular" color="neutral-500">
             فایل فیش (PDF یا Word، حداکثر ۱۰ مگابایت)
+            <RequiredMark className="ms-0.5" />
           </Typography>
           <FileInput
+            key={fileKey}
             id={inputId}
+            aria-required="true"
             accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="w-full"
           />
-        </label>
+          </label>
+          {file ? (
+            <SelectedFile
+              file={file}
+              disabled={submitting}
+              onRemove={() => {
+                setFile(null)
+                setFileKey((value) => value + 1)
+              }}
+            />
+          ) : null}
+        </div>
         <label className="flex flex-1 flex-col gap-1">
           <Typography as="span" variant="12/regular" color="neutral-500">
             کد پیگیری (اختیاری)
@@ -410,11 +427,12 @@ function ReceiptUploadForm({
           <Input
             value={trackingCode}
             onChange={(event) => setTrackingCode(parsePersianDigits(event.target.value))}
+            placeholder="مثال: ۱۲۳۴۵۶۷۸"
             inputMode="numeric"
           />
         </label>
-        <Button type="submit" size="40" variant="primary" disabled={submitting}>
-          {submitting ? 'در حال بارگذاری…' : 'ثبت فیش'}
+        <Button type="submit" size="40" variant="primary" loading={submitting}>
+          ثبت فیش
         </Button>
       </div>
       {error && (

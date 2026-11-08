@@ -204,6 +204,7 @@ export function SecretariatFollowUpPanel({
               <Typography variant="12/regular" color="neutral-500">متن درخواست</Typography>
               <Textarea
                 value={askBody}
+                placeholder="متن درخواست را بنویسید…"
                 onChange={(event) => setAskBody(event.target.value)}
                 maxLength={5000}
                 rows={3}
@@ -279,6 +280,7 @@ export function SecretariatFollowUpPanel({
               <Textarea
                 ref={resultBoxRef}
                 value={resultBody}
+                placeholder="متن نتیجه را بنویسید…"
                 onChange={(event) => setResultBody(event.target.value)}
                 maxLength={20000}
                 rows={6}

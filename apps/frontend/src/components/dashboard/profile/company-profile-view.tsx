@@ -707,8 +707,8 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {(
             [
-              ['articlesOfAssociation', 'اساس‌نامه (اجباری)', true],
-              ['establishmentNotices', 'آگهی تأسیس (اجباری)', true],
+              ['articlesOfAssociation', 'اساس‌نامه', true],
+              ['establishmentNotices', 'آگهی تأسیس', true],
               ['amendmentNotices', 'آگهی‌های آخرین تغییرات', false],
             ] as const
           ).map(([category, label, isRequired]) => (

@@ -15,6 +15,7 @@ import { useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { DashboardAddIcon, DashboardEditIcon, DashboardTrashIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
+import { RequiredMark } from '@/components/ui/field'
 import { FileInput } from '@/components/ui/file-input'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -97,12 +98,14 @@ function FormField({
   id,
   label,
   error,
+  required,
   children,
   className,
 }: {
   id: string
   label: string
   error?: string
+  required?: boolean
   children: ReactNode
   className?: string
 }) {
@@ -110,6 +113,7 @@ function FormField({
     <div className={cn('flex min-w-0 flex-col gap-2', className)}>
       <Typography as="label" htmlFor={id} variant="16/semibold" color="neutral-700">
         {label}
+        {required ? <RequiredMark className="ms-0.5" /> : null}
       </Typography>
       <div className="flex flex-col gap-1">
         {children}
@@ -546,9 +550,10 @@ function EmployeeEditor({
       placeholder: string
       autoComplete?: string
       inputMode?: 'numeric' | 'tel' | 'email'
+      required?: boolean
     },
   ) => (
-    <FormField id={name} label={label} error={errors[name]?.message}>
+    <FormField id={name} label={label} error={errors[name]?.message} required={extra?.required}>
       <Input
         id={name}
         type={extra?.type ?? 'text'}
@@ -556,6 +561,7 @@ function EmployeeEditor({
         autoComplete={extra?.autoComplete}
         inputMode={extra?.inputMode}
         aria-invalid={!!errors[name]}
+        aria-required={extra?.required ? true : undefined}
         aria-describedby={errors[name] ? `${name}-error` : undefined}
         variant={errors[name] ? 'error' : 'default'}
         {...register(name)}
@@ -621,6 +627,7 @@ function EmployeeEditor({
               placeholder: '۰۹۱۲۳۴۵۶۷۸۹',
               inputMode: 'tel',
               autoComplete: 'off',
+              required: true,
             })}
             {field('email', 'آدرس ایمیل', {
               type: 'email',
@@ -632,18 +639,21 @@ function EmployeeEditor({
               type: 'password',
               placeholder: employee ? 'برای تغییر، رمز جدید را وارد کنید' : 'حداقل ۳ نویسه',
               autoComplete: 'new-password',
+              required: !employee,
             })}
           </Section>
 
           <Section title="اطلاعات پایه">
-            {field('name', 'نام و نام خانوادگی', { placeholder: 'مثلا: علی محمدی' })}
+            {field('name', 'نام و نام خانوادگی', { placeholder: 'مثلا: علی محمدی', required: true })}
             <FormField
               id="operationalRole"
               label="نقش در سیستم"
               error={errors.operationalRole?.message}
+              required
             >
               <NativeSelect
                 id="operationalRole"
+                aria-required="true"
                 aria-invalid={!!errors.operationalRole}
                 aria-describedby={errors.operationalRole ? 'operationalRole-error' : undefined}
                 {...register('operationalRole')}

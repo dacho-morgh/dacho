@@ -163,6 +163,7 @@ export function CompanyCreateDialog({
       control={form.control}
       name={name}
       label={label}
+      required={Boolean(extra['aria-required'])}
       render={({ field, controlProps }) => <Input {...field} {...controlProps} {...extra} />}
     />
   )

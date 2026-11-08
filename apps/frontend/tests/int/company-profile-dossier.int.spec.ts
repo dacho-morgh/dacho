@@ -167,7 +167,8 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
     expect(screen.getByText('اطلاعات شرکت هنوز کامل نیست')).toBeTruthy()
     expect(screen.getByText('نوع شخصیت حقوقی')).toBeTruthy()
     expect(screen.getByText('سال تأسیس')).toBeTruthy()
-    expect(screen.getByText('اساس‌نامه')).toBeTruthy()
+    // The missing-item badge and the (now unsuffixed, `*`-marked) upload field share the label.
+    expect(screen.getAllByText('اساس‌نامه').length).toBeGreaterThan(0)
   })
 
   it('renders ResumeProfileView with repeatable items and absence states (FE04, FE29)', () => {
@@ -370,7 +371,7 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
       }),
     )
     fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0]!)
-    expect(screen.getAllByText('*', { selector: '[data-slot="required-marker"]' }).length).toBeGreaterThan(5)
+    expect(document.querySelectorAll('[data-slot="required-marker"]').length).toBeGreaterThan(5)
     expect(screen.getByPlaceholderText('نام شرکت را وارد کنید')).toBeTruthy()
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
   })

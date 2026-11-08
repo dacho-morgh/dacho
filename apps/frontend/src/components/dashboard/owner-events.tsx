@@ -30,7 +30,8 @@ import {
 } from './owner-admin'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Input } from '@/components/ui/input'
-import { FileInput } from '@/components/ui/file-input'
+import { RequiredMark } from '@/components/ui/field'
+import { FileInput, SelectedFile } from '@/components/ui/file-input'
 import { toast } from 'sonner'
 import { AdminBreadcrumb } from './owner-events-form'
 
@@ -107,6 +108,8 @@ function CategoryForm({
       <Field name="title" label="عنوان دسته فناوری" error={errors.title?.message}>
         <Input
           id="title"
+          aria-required="true"
+          placeholder="عنوان را وارد کنید"
           aria-invalid={!!errors.title}
           aria-describedby={errors.title ? 'title-error' : undefined}
           {...register('title')}
@@ -234,6 +237,7 @@ function SubtopicForm({
       <Field name="categoryId" label="دسته فناوری" error={errors.categoryId?.message}>
         <NativeSelect
           id="categoryId"
+          aria-required="true"
           aria-invalid={!!errors.categoryId}
           aria-describedby={errors.categoryId ? 'categoryId-error' : undefined}
           {...register('categoryId')}
@@ -250,6 +254,8 @@ function SubtopicForm({
       <Field name="title" label="عنوان زیرعنوان" error={errors.title?.message}>
         <Input
           id="title"
+          aria-required="true"
+          placeholder="عنوان را وارد کنید"
           aria-invalid={!!errors.title}
           aria-describedby={errors.title ? 'title-error' : undefined}
           {...register('title')}
@@ -259,6 +265,7 @@ function SubtopicForm({
       <Field name="employerId" label="کارفرمای مسئول" error={errors.employerId?.message}>
         <NativeSelect
           id="employerId"
+          aria-required="true"
           aria-invalid={!!errors.employerId}
           aria-describedby={errors.employerId ? 'employerId-error' : undefined}
           {...register('employerId')}
@@ -503,11 +510,16 @@ function RfpManager({
 
         <div className="flex min-w-0 flex-col gap-2">
           <Typography asChild variant="16/semibold">
-            <label htmlFor="rfp-reason">توضیحات و دلیل نسخه جدید</label>
+            <label htmlFor="rfp-reason">
+              توضیحات و دلیل نسخه جدید
+              <RequiredMark className="ms-0.5" />
+            </label>
           </Typography>
           <Input
             id="rfp-reason"
             aria-label="توضیحات و دلیل نسخه جدید"
+            aria-required="true"
+            placeholder="مثال: اصلاح بخش معیارهای ارزیابی"
             type="text"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -516,12 +528,16 @@ function RfpManager({
 
         <div className="flex min-w-0 flex-col gap-2">
           <Typography asChild variant="16/semibold">
-            <label htmlFor="rfp-files">انتخاب فایل‌های RFP</label>
+            <label htmlFor="rfp-files">
+              انتخاب فایل‌های RFP
+              <RequiredMark className="ms-0.5" />
+            </label>
           </Typography>
           <FileInput
             key={fileInputKey}
             id="rfp-files"
             aria-label="انتخاب فایل‌های RFP"
+            aria-required="true"
             multiple
             accept={DOCUMENT_ACCEPT}
             onChange={(e) => {
@@ -532,6 +548,17 @@ function RfpManager({
           <Typography variant="12/regular" color="muted">
             فرمت‌های مجاز: PDF, DOC, DOCX — حداکثر ۱۰ مگابایت برای مجموع فایل‌های هر نسخه
           </Typography>
+          {selectedFiles.map((file, index) => (
+            <SelectedFile
+              key={`${file.name}-${file.size}-${index}`}
+              file={file}
+              disabled={isSubmitting}
+              onRemove={() => {
+                setSelectedFiles((current) => current.filter((_, at) => at !== index))
+                setFileInputKey((value) => value + 1)
+              }}
+            />
+          ))}
         </div>
 
         {formError && (
@@ -561,11 +588,10 @@ function RfpManager({
         <div className="flex flex-wrap gap-3">
           <Button size="40"
             type="submit"
-            disabled={isSubmitting || loading || stale || loadError !== null}
+            loading={isSubmitting}
+            disabled={loading || stale || loadError !== null}
           >
-            <Typography variant="14/regular" color="white">
-              {isSubmitting ? 'در حال بارگذاری...' : 'بارگذاری نسخه جدید RFP'}
-            </Typography>
+            بارگذاری نسخه جدید RFP
           </Button>
         </div>
       </form>

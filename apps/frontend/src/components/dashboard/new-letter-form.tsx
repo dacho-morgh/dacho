@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
+import { RequiredMark } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -266,6 +267,7 @@ export function NewLetterForm({
         <div className="flex flex-col gap-2">
           <Typography as="label" htmlFor="letter-recipient" variant="16/semibold" className="text-neutral-700">
             گیرنده
+            {!isSupport ? <RequiredMark className="ms-0.5" /> : null}
           </Typography>
           {isSupport ? (
             <Input
@@ -318,6 +320,7 @@ export function NewLetterForm({
           <div className="flex flex-col gap-2">
             <Typography as="label" htmlFor="letter-title" variant="16/semibold" className="text-neutral-700">
               {isSupport ? 'موضوع پیام پشتیبانی' : 'عنوان نامه'}
+              <RequiredMark className="ms-0.5" />
             </Typography>
             <Input
               id="letter-title"
@@ -325,13 +328,14 @@ export function NewLetterForm({
               required
               disabled={saving}
               defaultValue={initialTitle}
-              placeholder={isSupport ? 'موضوع پیام خود را وارد کنید' : 'متن پلیس هولدر'}
+              placeholder={isSupport ? 'موضوع پیام خود را وارد کنید' : 'عنوان نامه را وارد کنید'}
               className="placeholder:font-[150]"
             />
           </div>
           <div className="flex flex-col gap-2">
             <Typography as="label" htmlFor="letter-type" variant="16/semibold" className="text-neutral-700">
               {isSupport ? 'میزان اهمیت' : 'نوع نامه'}
+              <RequiredMark className="ms-0.5" />
             </Typography>
             {isSupport ? (
               <NativeSelect
@@ -366,13 +370,14 @@ export function NewLetterForm({
         <div className="flex flex-col gap-2">
           <Typography as="label" htmlFor="letter-body" variant="16/semibold" className="text-neutral-700">
             {isSupport ? 'متن پیام' : 'متن نامه'}
+            <RequiredMark className="ms-0.5" />
           </Typography>
           <Textarea
             id="letter-body"
             name="body"
             required
             disabled={saving}
-            placeholder={isSupport ? 'متن پیام یا درخواست پشتیبانی خود را بنویسید...' : 'متن پلیس هولدر'}
+            placeholder={isSupport ? 'متن پیام یا درخواست پشتیبانی خود را بنویسید...' : 'متن نامه را بنویسید...'}
             className="h-[380px] min-h-[380px] resize-y"
           />
         </div>

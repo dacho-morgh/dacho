@@ -99,26 +99,29 @@ export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; on
               <FormField
                 control={form.control}
                 name="currentPassword"
+                required
                 label="رمز فعلی"
                 render={({ field, controlProps }) => (
-                  <Input {...field} {...controlProps} type="password" dir="ltr" autoComplete="current-password" aria-required="true" />
+                  <Input {...field} {...controlProps} type="password" dir="ltr" placeholder="رمز فعلی را وارد کنید" autoComplete="current-password" />
                 )}
               />
               <FormField
                 control={form.control}
                 name="newPassword"
+                required
                 label="رمز جدید"
                 description={`دست‌کم ${MIN_PASSWORD_LENGTH.toLocaleString('fa-IR')} نویسه`}
                 render={({ field, controlProps }) => (
-                  <Input {...field} {...controlProps} type="password" dir="ltr" autoComplete="new-password" aria-required="true" />
+                  <Input {...field} {...controlProps} type="password" dir="ltr" placeholder="رمز جدید را وارد کنید" autoComplete="new-password" />
                 )}
               />
               <FormField
                 control={form.control}
                 name="confirmPassword"
+                required
                 label="تکرار رمز جدید"
                 render={({ field, controlProps }) => (
-                  <Input {...field} {...controlProps} type="password" dir="ltr" autoComplete="new-password" aria-required="true" />
+                  <Input {...field} {...controlProps} type="password" dir="ltr" placeholder="رمز جدید را دوباره وارد کنید" autoComplete="new-password" />
                 )}
               />
             </fieldset>
