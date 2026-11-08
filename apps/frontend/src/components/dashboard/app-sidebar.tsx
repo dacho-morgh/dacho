@@ -149,7 +149,7 @@ export function AppSidebar({
           <div className="h-px w-full bg-neutral-200" />
 
           <SidebarContent className="overflow-visible p-0">
-            <SidebarMenu className="flex flex-col gap-2">
+            <SidebarMenu className="flex flex-col gap-4">
               {navItems.map((item) => {
                 const isActive = item.exact
                   ? pathname === item.href
@@ -190,7 +190,8 @@ export function AppSidebar({
                           <Typography
                             as="span"
                             variant="16/regular"
-                            className="truncate leading-7 group-data-[collapsible=icon]:hidden"
+                            // Typography defaults to text-foreground; inherit so the active label takes the button's brand-600.
+                            className="truncate text-inherit group-data-[collapsible=icon]:hidden"
                             data-sidebar-anim
                           >
                             {item.title}
