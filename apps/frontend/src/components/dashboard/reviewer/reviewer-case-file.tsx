@@ -3,6 +3,9 @@
 import Link from 'next/link'
 import { useCallback, useRef, useState } from 'react'
 
+import { DetailCard, InfoField, ReadonlyField } from '@/components/dashboard/company-detail/company-detail-parts'
+import { RequestCompanyCard } from '@/components/dashboard/request-detail/request-company-card'
+import { RequestDetailShell } from '@/components/dashboard/request-detail/request-detail-shell'
 import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
@@ -119,118 +122,129 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
   const { data, notice } = state
   const item = data.case
   const work = reviewWorkState(item)
+  const companyName = typeof data.company?.company?.name === 'string' ? data.company.company.name.trim() : ''
+  const companyFacts = [
+    ...new Set(
+      (['type', 'province', 'city'] as const).flatMap((key) => {
+        const value = data.company?.company?.[key]
+        return typeof value === 'string' && value.trim() ? [value.trim()] : []
+      }),
+    ),
+  ]
+  const evaluable = work === 'open' && item.evaluation?.state !== 'final'
 
   return (
-    <main className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-6 px-4 py-6 sm:p-10" dir="rtl">
-      <div className="flex flex-col gap-1">
-        <Link href="/dashboard/requests" className="self-start hover:underline">
-          <Typography as="span" variant="14/regular" color="brand-600">بازگشت به پرونده‌های من</Typography>
-        </Link>
-        <Typography as="h1" variant="24/bold" color="neutral-900" className="break-words">{item.title}</Typography>
-        <Typography variant="14/regular" color="neutral-500" className="break-words">
-          <span className="font-mono">{item.trackingCode}</span>
-          {item.event ? ` · ${item.event.title}${item.subtopic ? ` · ${item.subtopic.title}` : ''}` : ''}
-        </Typography>
-      </div>
-
-      {notice === 'changed' ? (
-        <Banner tone="warning">این پرونده پس از باز شدن صفحه تغییر کرده است. اطلاعات تازه نمایش داده می‌شود.</Banner>
-      ) : null}
-      {notice === 'unverified' ? (
-        <Banner tone="warning">بررسی دوباره دسترسی انجام نشد. اطلاعات ممکن است به‌روز نباشد؛ صفحه را دوباره بارگذاری کنید.</Banner>
-      ) : null}
-      {work !== 'open' ? <Banner tone="neutral">{REVIEW_WORK_STATE_LABELS[work]}. فقط نسخه‌ای که به شما ارجاع شده بود قابل مشاهده است.</Banner> : null}
-
-      <section aria-labelledby="review-info" className="grid gap-3 rounded-2xl border border-neutral-200 bg-background p-4 sm:grid-cols-3">
-        <Typography as="h2" id="review-info" variant="16/semibold" color="neutral-900" className="sm:col-span-3">اطلاعات داوری</Typography>
-        <Field label="نقش شما" value={reviewerRoleLabel(item)} />
-        <Field label="وضعیت داوری" value={REVIEW_WORK_STATE_LABELS[work]} />
-        <Field label="ارزیابی شما" value={ownEvaluationLabel(item.evaluation)} />
-        <Field label="نسخه پروپوزال مورد داوری" value={item.proposalRevision?.toLocaleString('fa-IR') ?? '—'} />
-        <Field label="تاریخ ارجاع" value={formatDate(item.assignment.assignedAt)} />
-        <Field label="تاریخ ثبت درخواست" value={formatDate(item.submissionDate) || 'ثبت نشده'} />
-      </section>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button asChild size="36" variant={work === 'open' && item.evaluation?.state !== 'final' ? 'default' : 'outline-gray'}>
+    <RequestDetailShell
+      title={companyName ? `درخواست ${companyName}` : item.title}
+      actions={
+        <Button asChild size="40" variant={evaluable ? 'default' : 'outline-gray'}>
           <Link href={`${path}/evaluation`}>
             <Typography as="span" variant="14/regular" className="text-inherit">
-              {work === 'open' && item.evaluation?.state !== 'final'
-                ? item.evaluation ? 'ادامه فرم ارزیابی' : 'شروع فرم ارزیابی'
-                : 'مشاهده فرم ارزیابی'}
+              {evaluable ? (item.evaluation ? 'ادامه فرم ارزیابی' : 'شروع فرم ارزیابی') : 'مشاهده فرم ارزیابی'}
             </Typography>
           </Link>
         </Button>
-      </div>
+      }
+      notices={
+        <>
+          {notice === 'changed' ? (
+            <Banner tone="warning">این پرونده پس از باز شدن صفحه تغییر کرده است. اطلاعات تازه نمایش داده می‌شود.</Banner>
+          ) : null}
+          {notice === 'unverified' ? (
+            <Banner tone="warning">بررسی دوباره دسترسی انجام نشد. اطلاعات ممکن است به‌روز نباشد؛ صفحه را دوباره بارگذاری کنید.</Banner>
+          ) : null}
+          {work !== 'open' ? <Banner tone="neutral">{REVIEW_WORK_STATE_LABELS[work]}. فقط نسخه‌ای که به شما ارجاع شده بود قابل مشاهده است.</Banner> : null}
+        </>
+      }
+    >
+      {companyName ? <RequestCompanyCard name={companyName} facts={companyFacts} /> : null}
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
-        <Typography as="h2" variant="20/bold" color="neutral-900">اطلاعات شرکت</Typography>
+      <DetailCard title="اطلاعات داوری">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <InfoField label="نقش شما" value={reviewerRoleLabel(item)} />
+          <InfoField label="وضعیت داوری" value={REVIEW_WORK_STATE_LABELS[work]} />
+          <InfoField label="ارزیابی شما" value={ownEvaluationLabel(item.evaluation)} />
+          <InfoField label="نسخه پروپوزال مورد داوری" value={item.proposalRevision?.toLocaleString('fa-IR') ?? '—'} />
+          <InfoField label="تاریخ ارجاع" value={formatDate(item.assignment.assignedAt)} />
+          <InfoField label="تاریخ ثبت درخواست" value={formatDate(item.submissionDate) || 'ثبت نشده'} />
+        </div>
+      </DetailCard>
+
+      <DetailCard title="اطلاعات شرکت">
         {data.company ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {PROFILE_FIELDS.map(([section, key, label]) => (
-              <Field key={`${section}.${key}`} label={label} value={answerText(data.company?.[section]?.[key])} />
+              <ReadonlyField key={`${section}.${key}`} label={label} value={answerText(data.company?.[section]?.[key])} />
             ))}
           </div>
         ) : (
           <Typography variant="14/regular" color="neutral-500">پروفایلی همراه این درخواست ثبت نشده است.</Typography>
         )}
-      </section>
+      </DetailCard>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
-        <Typography as="h2" variant="20/bold" color="neutral-900">پروپوزال</Typography>
+      <DetailCard title="اطلاعات و فرم رویداد">
+        <div className="flex min-w-0 flex-col gap-1">
+          <Typography as="h3" variant="16/semibold" color="neutral-900" className="break-words">{item.title}</Typography>
+          <Typography variant="14/regular" color="neutral-500" className="break-words">
+            <span className="font-mono">{item.trackingCode}</span>
+            {item.event ? ` · ${item.event.title}${item.subtopic ? ` · ${item.subtopic.title}` : ''}` : ''}
+          </Typography>
+        </div>
         {data.proposal ? (
           <>
             <Typography variant="14/regular" color="neutral-500">
               نسخه {data.proposal.revision.toLocaleString('fa-IR')} · ثبت در {formatDate(data.proposal.createdAt)}
             </Typography>
             {data.proposal.answers && Object.keys(data.proposal.answers).length ? (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 {Object.entries(data.proposal.answers)
                   .filter(([key]) => key !== 'applicationTeam')
                   .map(([key, value]) => (
-                    <Field key={key} label={key} value={answerText(value)} />
+                    <ReadonlyField key={key} label={key} value={answerText(value)} />
                   ))}
               </div>
             ) : null}
             {data.proposal.applicationTeam.length ? (
-              <>
+              <div className="flex flex-col gap-3">
                 <Typography as="h3" variant="16/semibold" color="neutral-900">تیم متقاضی</Typography>
                 <ul className="flex flex-col gap-2">
                   {data.proposal.applicationTeam.map((member, index) => (
-                    <li key={`${index}-${member.name}`} className="rounded-lg bg-neutral-50 p-3">
+                    <li key={`${index}-${member.name}`} className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
                       <Typography variant="14/regular" color="neutral-800" className="break-words">
                         {member.name} · {member.role}{member.relation ? ` · ${member.relation}` : ''}
                       </Typography>
                     </li>
                   ))}
                 </ul>
-              </>
+              </div>
             ) : null}
-            <Typography as="h3" variant="16/semibold" color="neutral-900">فایل‌های پروپوزال</Typography>
-            {data.proposal.documents.length ? (
-              <ul className="flex flex-col gap-2">
-                {data.proposal.documents.map((file) => (
-                  <li key={file.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg bg-neutral-50 p-3">
-                    <FileName name={file.filename} size={file.sizeBytes} />
-                    <PrivateDocumentDownload documentId={file.id} filename={file.filename} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <Typography variant="14/regular" color="neutral-500">فایلی برای این نسخه ثبت نشده است.</Typography>
-            )}
+            <div className="flex flex-col gap-3">
+              <Typography as="h3" variant="16/semibold" color="neutral-900">فایل‌های پروپوزال</Typography>
+              {data.proposal.documents.length ? (
+                <ul className="flex flex-col gap-2">
+                  {data.proposal.documents.map((file) => (
+                    <li key={file.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-neutral-50 p-3">
+                      <FileName name={file.filename} size={file.sizeBytes} />
+                      <PrivateDocumentDownload documentId={file.id} filename={file.filename} />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Typography variant="14/regular" color="neutral-500">فایلی برای این نسخه ثبت نشده است.</Typography>
+              )}
+            </div>
           </>
         ) : (
           <Typography variant="14/regular" color="neutral-500">نسخه ثبت‌شده‌ای از پروپوزال برای این پرونده وجود ندارد.</Typography>
         )}
-      </section>
+      </DetailCard>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
-        <Typography as="h2" variant="20/bold" color="neutral-900">RFP رویداد</Typography>
+      <DetailCard title="RFP رویداد">
         {data.rfp?.files.length ? (
           <>
             <ul className="flex flex-col gap-2">
               {data.rfp.files.map((file) => (
-                <li key={file.id} className="rounded-lg bg-neutral-50 p-3">
+                <li key={file.id} className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
                   <FileName name={file.filename} size={file.sizeBytes} />
                 </li>
               ))}
@@ -240,8 +254,8 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
         ) : (
           <Typography variant="14/regular" color="neutral-500">فایل RFP برای این پرونده ثبت نشده است.</Typography>
         )}
-      </section>
-    </main>
+      </DetailCard>
+    </RequestDetailShell>
   )
 }
 
@@ -327,14 +341,5 @@ function FileName({ name, size }: { name: string; size: number }) {
       <Typography as="span" variant="14/regular" color="neutral-800" className="break-all">{name}</Typography>
       <Typography as="span" variant="12/regular" color="neutral-500">{formatFileSize(size)}</Typography>
     </span>
-  )
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-lg bg-neutral-50 p-3">
-      <Typography variant="12/regular" color="neutral-500">{label}</Typography>
-      <Typography variant="16/regular" color="neutral-800" className="mt-1 break-words">{value}</Typography>
-    </div>
   )
 }

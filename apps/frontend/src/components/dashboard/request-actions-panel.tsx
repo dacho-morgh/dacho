@@ -177,8 +177,8 @@ export function RequestActionsPanel({
   if (!groups.length && !open) return null
 
   return (
-    <section className="flex flex-col gap-6 rounded-2xl border border-brand-600 bg-background p-4 sm:p-6">
-      <Typography as="h2" variant="20/bold" color="neutral-900">اقدام شما</Typography>
+    <section aria-label="اقدام شما" className="flex flex-col gap-5 rounded-2xl border border-neutral-200 bg-background p-4">
+      <Typography as="h2" variant="16/bold" sm="20/bold" color="neutral-800">اقدام شما</Typography>
       {groups.map((group) => (
         <div key={group.key} className="flex flex-col gap-3">
           <Typography as="h3" variant="16/semibold" color="neutral-900">{group.title}</Typography>
