@@ -4,6 +4,7 @@ import multer from 'multer'
 import type { Pool } from 'pg'
 
 import {
+  canDeleteCompanyDocument,
   canDeleteDocument,
   canReadDocument,
   canUploadOwnedDocument,
@@ -132,6 +133,11 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     const actions: ('download' | 'delete')[] = []
     if (allowed) actions.push('download')
     if (
+      !record.requestId &&
+      canDeleteCompanyDocument(role, record, companyId)
+    ) {
+      actions.push('delete')
+    } else if (
       record.requestId &&
       canDeleteDocument(
         role,
@@ -510,6 +516,52 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
     res.status(200).send(body)
   }))
 
+  /**
+   * A company dossier file (no request parent). Only the owning company's
+   * representative may remove it. Removing a dossier file is a company edit
+   * (T59), so an approved or pending verification is returned in the same
+   * transaction, exactly as uploading one does. The bytes are removed after the
+   * metadata commits, as for request files.
+   */
+  async function deleteCompanyDocument(
+    record: PrivateDocumentRecord,
+    actorId: string,
+    role: Parameters<typeof canReadDocument>[0],
+    res: Response,
+  ): Promise<void> {
+    const companyId = await actorCompanyId(actorId, role)
+    if (!canDeleteCompanyDocument(role, record, companyId)) {
+      // Someone who cannot read the file gets what an unknown id gets.
+      if (await authorizeRecord(record, actorId, role, companyId)) res.status(403).json({ error: 'forbidden' })
+      else res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const client = await deps.pool.connect()
+    let removed: PrivateDocumentRecord | undefined
+    try {
+      await client.query('BEGIN')
+      removed = await documents.delete(record.id, client)
+      // Recheck what was actually removed: a concurrent delete or a row that is
+      // no longer this company's dossier file must not commit.
+      if (!removed || removed.requestId !== null || removed.companyId !== companyId) {
+        await client.query('ROLLBACK')
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      if (deps.verificationStore) {
+        await deps.verificationStore.invalidateApproval(companyId as string, COMPANY_EDIT_REVERIFICATION_REASON, client)
+      }
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+    await storage.remove(removed.storageKey)
+    res.json({ success: true })
+  }
+
   router.delete('/documents/:id', asyncHandler(async (req: Request, res: Response) => {
     const actor = actorOf(res)
     const id = String(req.params.id)
@@ -518,8 +570,12 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       return
     }
     const record = await documents.findById(id)
-    if (!record || record.requestId === null) {
+    if (!record) {
       res.status(404).json({ error: 'not_found' })
+      return
+    }
+    if (record.requestId === null) {
+      await deleteCompanyDocument(record, actor.id, actor.operationalRole, res)
       return
     }
     const client = await deps.pool.connect()
