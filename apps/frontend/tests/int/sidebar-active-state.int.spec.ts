@@ -64,6 +64,9 @@ describe('main sidebar active state', () => {
     expect(active.className).toContain('text-inherit')
     expect(active.className).not.toContain('text-foreground')
     expect(active.closest('[data-active="true"]')?.className).toContain('text-brand-600')
+    expect(active.closest('[data-active="true"]')?.className).not.toContain('px-3')
+    expect(active.closest('a')?.className).toContain('gap-2')
+    expect(active.closest('a')?.className).not.toContain('gap-2.5')
     expect(inactive.closest('[data-active="false"]')?.className).toContain('text-neutral-600')
   })
 })
@@ -77,6 +80,7 @@ describe('profile sidebar', () => {
     expect(nav.getAttribute('dir')).toBe('rtl')
     expect(nav.className).toContain('lg:sticky')
     expect(nav.className).toContain('lg:self-start')
+    expect(nav.className).toContain('lg:w-[200px]')
     expect(nav.className).not.toMatch(/(?:^|\s)(?:left|right|pl|pr|ml|mr)-/)
 
     const active = screen.getByRole('link', { name: 'رزومه' })
@@ -90,6 +94,14 @@ describe('profile sidebar', () => {
     const inactive = screen.getByRole('link', { name: 'پروفایل شرکت' })
     expect(inactive.getAttribute('aria-current')).toBeNull()
     expect(inactive.className).toContain('text-neutral-600')
+    // Figma rows use 8px padding.
+    expect(inactive.className).toContain('p-2')
+    expect(inactive.className).not.toContain('px-3')
+
+    const logout = screen.getByRole('button', { name: 'خروج از حساب کاربری' })
+    expect(logout.className).toContain('font-[325]')
+    expect(logout.className).not.toContain('font-[450]')
+    expect(logout.className).not.toContain('px-3')
   })
 
   it('uses the same navigation for staff panels', () => {

@@ -44,7 +44,7 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
       <nav
         aria-label="بخش‌های پروفایل"
         dir="rtl"
-        className="grid shrink-0 grid-cols-2 gap-3 border-b border-neutral-100 pb-4 sm:grid-cols-4 lg:sticky lg:top-10 lg:flex lg:w-52 lg:flex-col lg:gap-4 lg:self-start lg:border-e lg:border-b-0 lg:pe-2 lg:pb-0"
+        className="grid shrink-0 grid-cols-2 gap-3 border-b border-neutral-100 pb-4 sm:grid-cols-4 lg:sticky lg:top-10 lg:flex lg:w-[200px] lg:flex-col lg:gap-4 lg:self-start lg:border-e lg:border-b-0 lg:pe-2 lg:pb-0"
       >
         {profileRoutes.map((route) => {
           const isActive = pathname === route.href
@@ -68,7 +68,7 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
                   href={route.href}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'flex min-h-10 w-full items-center rounded-xl px-3 py-2 text-start transition-colors',
+                    'flex min-h-10 w-full items-center rounded-xl p-2 text-start transition-colors',
                     isActive
                       ? 'bg-brand-50 hover:bg-brand-100'
                       : 'bg-transparent hover:bg-neutral-100 hover:text-neutral-900',
@@ -87,7 +87,7 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
               type="button"
               variant="text-destructive"
               size="40"
-              className="flex-1 justify-start rounded-xl px-3 text-start text-error-600"
+              className="flex-1 justify-start rounded-xl px-2 text-start font-[325] text-error-600"
               onClick={() => setLogoutError(null)}
             >
               خروج از حساب کاربری

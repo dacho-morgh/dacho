@@ -170,7 +170,7 @@ export function AppSidebar({
                         onClick={() => {
                           if (isMobile) setOpenMobile(false)
                         }}
-                        className={`group relative flex h-10 w-full flex-1 items-center rounded-xl px-3 py-2 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:rounded-xl transition-colors ${
+                        className={`group relative flex h-10 w-full flex-1 items-center rounded-xl p-2 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:rounded-xl transition-colors ${
                           isActive
                             ? 'bg-brand-50 font-normal text-brand-600 hover:bg-brand-100 hover:text-brand-600 active:bg-brand-200'
                             : 'bg-transparent font-normal text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
@@ -178,7 +178,7 @@ export function AppSidebar({
                       >
                         <Link
                           href={item.href}
-                          className="flex w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
+                          className="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
                           aria-label={isCollapsed ? item.title : undefined}
                         >
                           <Icon
