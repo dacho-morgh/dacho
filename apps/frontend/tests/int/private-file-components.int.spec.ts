@@ -267,6 +267,7 @@ describe('NewLetterForm correspondence attachments', () => {
     await waitFor(() => expect(uploadDocument).toHaveBeenCalledWith(
       expect.objectContaining({ category: 'correspondenceAttachment', requestId: CASE_ID }),
       expect.any(Function),
+      expect.any(AbortSignal),
     ))
     const submit = screen.getByRole('button', { name: 'ارسال نامه' }) as HTMLButtonElement
     await waitFor(() => expect(submit.disabled).toBe(true))
