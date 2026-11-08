@@ -27,6 +27,7 @@ import { cn } from "@/utilities/ui"
  * | List filter button (set data-active)         | filter         | icon-48          |
  * | Tab in a segmented bar (aria-pressed/selected) | segment      | 36               |
  * | Single choice chip (aria-pressed)            | chip           | 32               |
+ * | Day in a calendar grid (aria-pressed)        | day            | icon-36          |
  * | Inline link, breadcrumb                      | link, link-gray| clear            |
  * | Disclosure row (accordion header)            | row            | clear            |
  *
@@ -94,6 +95,9 @@ const buttonVariants = cva(
         // One choice in a group of options; the chosen one is aria-pressed.
         chip:
           "border-neutral-200 bg-background text-neutral-600 hover:bg-neutral-50 aria-pressed:border-transparent aria-pressed:bg-brand-500 aria-pressed:text-white aria-pressed:hover:bg-brand-600 dark:aria-pressed:border-neutral-300 dark:aria-pressed:bg-fill-brand dark:aria-pressed:text-fill-brand-foreground dark:aria-pressed:hover:bg-fill-brand-hover disabled:text-neutral-300",
+        // One day in a calendar grid; the chosen day is aria-pressed, today carries data-today.
+        day:
+          "border-transparent bg-transparent text-neutral-700 [&_.text-foreground]:text-current hover:bg-neutral-100 aria-pressed:bg-brand-500 aria-pressed:text-white aria-pressed:hover:bg-brand-600 data-[today=true]:border-brand-500 disabled:text-neutral-300 disabled:hover:bg-transparent",
         // A full-width disclosure header that opens a nested list.
         row:
           "w-full justify-between rounded-none border-transparent bg-transparent text-start text-neutral-800 hover:bg-neutral-100/70 disabled:text-neutral-300",

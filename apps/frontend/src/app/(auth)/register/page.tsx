@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import RegisterPage from '@/components/auth/register-page'
-import { getSafeReturnUrl } from '@/utilities/auth-return-url'
 import { createPageMetadata } from '@/utilities/siteMetadata'
 
 export const metadata: Metadata = createPageMetadata({
@@ -16,5 +15,7 @@ type Args = {
 
 export default async function Page({ searchParams }: Args) {
   const { returnUrl } = await searchParams
-  return <RegisterPage returnUrl={getSafeReturnUrl(returnUrl)} />
+  // The raw value: the form tells an explicit return URL (honoured after the
+  // automatic sign-in) from the default one (the role's own landing page).
+  return <RegisterPage returnUrl={returnUrl} />
 }

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Typography } from '@/components/ui/typography'
 import { getExplicitSafeReturnUrl, getSafeReturnUrl } from '@/utilities/auth-return-url'
+import { resolvePostSignInDestination } from '@/utilities/post-sign-in'
 
 type Notice = { kind: 'error' | 'info'; message: string } | null
 
@@ -61,57 +62,18 @@ export default function LoginPage({
       const payload = (await response.json().catch(() => null)) as {
         user?: { contentEditor?: boolean | null }
       } | null
-      const user = payload?.user
-      const capabilityResponse = await fetch('/api/dashboard/capabilities', { cache: 'no-store' })
-      if (capabilityResponse.status === 401) {
-        setNotice({ kind: 'error', message: 'نشست ورود تأیید نشد. دوباره وارد شوید.' })
+      const result = await resolvePostSignInDestination({
+        user: payload?.user,
+        explicitReturnUrl,
+      })
+      if ('error' in result) {
+        setNotice({ kind: 'error', message: result.error })
         return
-      }
-      if (capabilityResponse.status === 403) {
-        if (user?.contentEditor === true) {
-          window.location.replace('/admin')
-          return
-        }
-        setNotice({
-          kind: 'error',
-          message: 'ورود انجام شد، اما دسترسی فعالی برای ورود به پیشخوان پیدا نشد. با پشتیبانی سامانه تماس بگیرید.',
-        })
-        return
-      }
-      if (!capabilityResponse.ok) {
-        setNotice({ kind: 'error', message: 'ورود انجام شد، اما سرویس دسترسی پاسخ نداد. کمی بعد دوباره تلاش کنید.' })
-        return
-      }
-
-      const capabilities = (await capabilityResponse.json()) as {
-        destinations?: string[]
-      }
-      const landing = capabilities.destinations?.[0] ?? '/dashboard'
-      let destination = landing
-      if (explicitReturnUrl) {
-        const requestedPath = explicitReturnUrl.split(/[?#]/, 1)[0]
-        const accessResponse = await fetch(
-          `/api/dashboard/access?path=${encodeURIComponent(requestedPath)}`,
-          { cache: 'no-store' },
-        )
-        if (accessResponse.status === 401) {
-          setNotice({ kind: 'error', message: 'نشست ورود تأیید نشد. دوباره وارد شوید.' })
-          return
-        }
-        if (accessResponse.status === 403) {
-          destination = '/dashboard?access=denied'
-        } else if (!accessResponse.ok) {
-          setNotice({ kind: 'error', message: 'ورود انجام شد، اما بررسی نشانی درخواستی در دسترس نیست.' })
-          return
-        } else {
-          const access = (await accessResponse.json().catch(() => null)) as { allowed?: boolean } | null
-          destination = access?.allowed ? explicitReturnUrl : '/dashboard?access=denied'
-        }
       }
       // Authentication changes server-visible cookie state. A document-level
       // navigation guarantees that the protected route is requested with the
       // newly stored cookie instead of reusing an unauthenticated router cache.
-      window.location.replace(destination)
+      window.location.replace(result.destination)
     } catch {
       setNotice({
         kind: 'error',
