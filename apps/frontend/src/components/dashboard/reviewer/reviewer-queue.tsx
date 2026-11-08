@@ -3,7 +3,13 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
+import { RowActions } from '@/components/dashboard/list-row-actions'
+import { ListRow, ListTableFrame, useRowLink } from '@/components/dashboard/list-table'
+import { ListToolbar } from '@/components/dashboard/list-toolbar'
+import { SearchField } from '@/components/dashboard/search-field'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import { getLoginUrl } from '@/utilities/auth-return-url'
@@ -22,8 +28,6 @@ import {
 } from '@/utilities/reviewer-case'
 
 import { useRevalidateOnFocus } from './use-revalidate'
-import { ListFilterButton } from '@/components/dashboard/list-filter-button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 
 export type ReviewerQueueState =
   | { kind: 'loading' }
@@ -51,9 +55,14 @@ export interface ReviewerQueueProps {
  * scope of its own. A refresh on focus drops a case whose assignment ended while
  * the page was open, and a 401/403 clears the list instead of keeping it on screen.
  * Callers key it by view and page so each list starts from its loading state.
+ *
+ * The toolbar is the shared one (design QA #276): search and the filter template on
+ * the right. The queue API has no text search, so the search narrows only the rows
+ * of the page on screen.
  */
 export function ReviewerQueue({ view, page }: ReviewerQueueProps) {
   const [state, setState] = useState<ReviewerQueueState>({ kind: 'loading' })
+  const [search, setSearch] = useState('')
   const latest = useRef(0)
 
   // `initial` starts from the loading state the component mounts with; a retry shows it again.
@@ -106,54 +115,71 @@ export function ReviewerQueue({ view, page }: ReviewerQueueProps) {
         </Typography>
       </div>
 
-      <div className="flex justify-end">
-        {/* The default view (awaiting evaluation) is the unfiltered state of the shared filter (FE35). */}
-        <ListFilterButton
-          label="فیلتر پرونده‌های داوری"
-          groups={[
-            {
-              key: 'view',
-              label: 'نمای صف',
-              value: view === 'open' ? undefined : view,
-              options: REVIEW_QUEUE_VIEWS.map((option) => ({
-                value: option.value === 'open' ? '' : option.value,
-                label: option.label,
-                count: counts?.[option.value],
-              })),
-            },
-          ]}
-        />
-      </div>
+      <ListToolbar
+        search={
+          <form role="search" className="min-w-0 flex-1 sm:flex-none" onSubmit={(event) => event.preventDefault()}>
+            <SearchField
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="جستجو در پرونده‌های این صفحه"
+              aria-label="جستجو در پرونده‌های این صفحه"
+              maxLength={100}
+            />
+          </form>
+        }
+        filter={
+          /* The default view (awaiting evaluation) is the unfiltered state of the shared filter (FE35). */
+          <ListFilterButton
+            label="فیلتر پرونده‌های داوری"
+            groups={[
+              {
+                key: 'view',
+                label: 'نمای صف',
+                value: view === 'open' ? undefined : view,
+                options: REVIEW_QUEUE_VIEWS.map((option) => ({
+                  value: option.value === 'open' ? '' : option.value,
+                  label: option.label,
+                  count: counts?.[option.value],
+                })),
+              },
+            ]}
+          />
+        }
+      />
 
-      {/* Title and filter stay put; only the queue scrolls (FE36). */}
-      <ScrollArea className="min-h-0 flex-1">
-        <QueueBody state={state} view={view} page={page} onRetry={() => void load('retry')} />
-      </ScrollArea>
+      <QueueBody state={state} view={view} page={page} search={search} onRetry={() => void load('retry')} />
     </main>
   )
 }
+
+const searchText = (item: ReviewQueueItemDto) =>
+  [item.companyName, item.title, item.trackingCode, item.event?.title, item.subtopic?.title].filter(Boolean).join(' ')
 
 function QueueBody({
   state,
   view,
   page,
+  search,
   onRetry,
 }: {
   state: ReviewerQueueState
   view: ReviewQueueView
   page: number
+  search: string
   onRetry: () => void
 }) {
   if (state.kind === 'loading') {
     return (
-      <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-background p-4">
-        <Typography as="span" role="status" aria-live="polite" variant="14/regular" className="sr-only">
-          در حال دریافت پرونده‌ها
-        </Typography>
-        {[0, 1, 2, 3, 4].map((row) => (
-          <Skeleton key={row} aria-hidden="true" className="h-10 w-full rounded-lg bg-neutral-100 motion-reduce:animate-none" />
-        ))}
-      </div>
+      <ListTableFrame className="p-4">
+        <div className="flex flex-col gap-3">
+          <Typography as="span" role="status" aria-live="polite" variant="14/regular" className="sr-only">
+            در حال دریافت پرونده‌ها
+          </Typography>
+          {[0, 1, 2, 3, 4].map((row) => (
+            <Skeleton key={row} aria-hidden="true" className="h-10 w-full rounded-lg bg-neutral-100 motion-reduce:animate-none" />
+          ))}
+        </div>
+      </ListTableFrame>
     )
   }
   if (state.kind === 'expired') {
@@ -191,33 +217,43 @@ function QueueBody({
     )
   }
 
-  const { items, totalPages } = state.data
+  const { items: allItems, totalPages } = state.data
+  const needle = search.trim()
+  const items = needle ? allItems.filter((item) => searchText(item).includes(needle)) : allItems
   if (!items.length) {
     return (
-      <div className="flex min-h-60 flex-col items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-background p-6 text-center">
-        <Typography variant="16/regular" color="neutral-700">
-          {view === 'open' ? 'پرونده‌ای در انتظار ارزیابی شما نیست.' : 'پرونده‌ای در این بخش وجود ندارد.'}
-        </Typography>
-        <Typography variant="14/regular" color="neutral-500">
-          پرونده‌ها پس از ارجاع توسط سردبیر اینجا نمایش داده می‌شوند.
-        </Typography>
-      </div>
+      <ListTableFrame>
+        <div className="flex min-h-60 flex-col items-center justify-center gap-2 p-6 text-center">
+          <Typography variant="16/regular" color="neutral-700">
+            {needle
+              ? 'پرونده‌ای با این جستجو در این صفحه پیدا نشد.'
+              : view === 'open'
+                ? 'پرونده‌ای در انتظار ارزیابی شما نیست.'
+                : 'پرونده‌ای در این بخش وجود ندارد.'}
+          </Typography>
+          <Typography variant="14/regular" color="neutral-500">
+            {needle ? 'عبارت جستجو را تغییر دهید.' : 'پرونده‌ها پس از ارجاع توسط سردبیر اینجا نمایش داده می‌شوند.'}
+          </Typography>
+        </div>
+      </ListTableFrame>
     )
   }
 
   return (
     <>
       {/* Phone: one card per case. */}
-      <ul className="flex flex-col gap-3 md:hidden" aria-label="پرونده‌ها">
-        {items.map((item) => (
-          <li key={item.requestId}>
-            <QueueCard item={item} />
-          </li>
-        ))}
-      </ul>
-      {/* Tablet and up: the Figma table. */}
-      <div className="hidden min-w-0 rounded-xl border border-neutral-200 bg-background md:block">
-        <table className="w-full table-fixed border-collapse">
+      <ScrollArea className="min-h-0 flex-1 md:hidden">
+        <ul className="flex flex-col gap-3" aria-label="پرونده‌ها">
+          {items.map((item) => (
+            <li key={item.requestId}>
+              <QueueCard item={item} />
+            </li>
+          ))}
+        </ul>
+      </ScrollArea>
+      {/* Tablet and up: the Figma table, filling the height the page leaves. */}
+      <ListTableFrame className="hidden md:flex">
+        <table className="w-full min-w-[900px] table-fixed border-collapse">
           <thead className="sticky top-0 z-10 bg-background">
             <tr className="h-11 border-b border-neutral-200">
               {['نام شرکت', 'عنوان درخواست', 'رویداد', 'وضعیت', 'ارزیابی شما', 'تاریخ ارجاع'].map((header) => (
@@ -225,13 +261,16 @@ function QueueBody({
                   <Typography variant="14/semibold" color="secondary">{header}</Typography>
                 </th>
               ))}
+              <th scope="col" className="w-32 px-4">
+                <span className="sr-only">عملیات</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.requestId} className="h-[72px] border-b border-neutral-100 last:border-0">
+              <ListRow key={item.requestId} href={caseHref(item)}>
                 <td className="px-4">
-                  <Link href={`/dashboard/requests/${encodeURIComponent(item.requestId)}`} className="block truncate hover:underline">
+                  <Link href={caseHref(item)} className="block truncate hover:underline focus-visible:outline-2 focus-visible:outline-brand-500">
                     <Typography as="span" variant="14/regular" color="neutral-800">{item.companyName ?? '—'}</Typography>
                   </Link>
                 </td>
@@ -249,11 +288,14 @@ function QueueBody({
                 <td className="px-4">
                   <Typography variant="14/regular" color="secondary">{formatDate(item.assignment.assignedAt)}</Typography>
                 </td>
-              </tr>
+                <td className="px-4 text-end">
+                  <RowActions actions={[{ id: 'open', label: caseActionLabel(item), href: caseHref(item) }]} />
+                </td>
+              </ListRow>
             ))}
           </tbody>
         </table>
-      </div>
+      </ListTableFrame>
       {totalPages > 1 ? (
         <nav aria-label="صفحه‌بندی" className="flex items-center justify-center gap-3">
           {page > 1 ? (
@@ -279,14 +321,25 @@ function QueueBody({
   )
 }
 
+const caseHref = (item: ReviewQueueItemDto) => `/dashboard/requests/${encodeURIComponent(item.requestId)}`
+
+/** What the single row action says: evaluate, continue a draft, or just view a finished one (Figma 31650:23). */
+function caseActionLabel(item: ReviewQueueItemDto): string {
+  if (reviewWorkState(item) !== 'open') return 'مشاهده'
+  return item.evaluation ? (item.evaluation.state === 'final' ? 'مشاهده' : 'ادامه') : 'ارزیابی'
+}
+
 function QueueCard({ item }: { item: ReviewQueueItemDto }) {
+  const link = useRowLink(caseHref(item))
   return (
-    <Link
-      href={`/dashboard/requests/${encodeURIComponent(item.requestId)}`}
-      className="flex min-w-0 flex-col gap-2 rounded-xl border border-neutral-200 bg-background p-4 focus-visible:outline-2 focus-visible:outline-brand-500"
+    <div
+      className="flex min-w-0 cursor-pointer flex-col gap-2 rounded-xl border border-neutral-200 bg-background p-4 transition-colors hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-brand-500"
+      {...link}
     >
       <div className="flex min-w-0 items-start justify-between gap-2">
-        <Typography variant="14/semibold" color="neutral-900" className="min-w-0 break-words">{item.title}</Typography>
+        <Link href={caseHref(item)} className="min-w-0 focus-visible:outline-2 focus-visible:outline-brand-500">
+          <Typography variant="14/semibold" color="neutral-900" className="break-words">{item.title}</Typography>
+        </Link>
         <WorkStateBadge item={item} />
       </div>
       <Typography variant="12/regular" color="neutral-500" className="break-words">
@@ -295,7 +348,7 @@ function QueueCard({ item }: { item: ReviewQueueItemDto }) {
       <Typography variant="12/regular" color="neutral-500">
         {reviewerRoleLabel(item)} · {ownEvaluationLabel(item.evaluation)} · {formatDate(item.assignment.assignedAt)}
       </Typography>
-    </Link>
+    </div>
   )
 }
 
