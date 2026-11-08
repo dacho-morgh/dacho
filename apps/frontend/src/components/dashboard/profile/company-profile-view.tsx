@@ -21,7 +21,6 @@ import {
   fetchProfileDossier,
   submitCompanyVerification,
   toEnglishDigits,
-  type AbsenceField,
   type AddressDto,
   type CompanyDossierDto,
   type CompanyInfoDto,
@@ -31,7 +30,6 @@ import {
   type ProfileDto,
   updateAddress,
   updateProfile,
-  updateProfileDossier,
 } from '@/utilities/dashboard-api'
 import { buildCompanyDossierPatch } from '@/utilities/dossier-edits'
 import { CompanyVerificationCard, editWithdrawsVerification } from './company-verification-card'
