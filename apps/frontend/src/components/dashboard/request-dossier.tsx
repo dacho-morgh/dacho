@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 import { ChiefReviewSummary, type SummaryPart } from '@/components/dashboard/chief-review-summary'
 import { InvestmentDossierPanel } from '@/components/dashboard/investment-dossier-panel'
+import { InvestmentMemoPanel } from '@/components/dashboard/investment-memo-panel'
 import { RequestActionsPanel } from '@/components/dashboard/request-actions-panel'
 import { RequestAssignmentPanel } from '@/components/dashboard/request-assignment-panel'
 import { ReviewAssignmentPanel } from '@/components/dashboard/review-assignment-panel'
@@ -75,6 +76,13 @@ const STATUS_LABELS: Record<string, string> = {
 
 /** Each optional read: null when this role has no such read, `failed` when it did not arrive. */
 export type DossierPart<T> = T | null | 'failed'
+
+/** The company's name as pinned at submission, for the memo's confirm step. */
+function pinnedCompanyName(profile: DossierPart<RequestVerificationDto>): string | null {
+  if (!profile || profile === 'failed') return null
+  const name = profile.verification?.snapshot.company?.name
+  return typeof name === 'string' && name.trim() ? name : null
+}
 
 export interface RequestDossierProps {
   role: OperationalRole
@@ -178,6 +186,10 @@ export function RequestDossier({
         </ul>
       ) : null}
       {role === 'investment-reviewer' ? <InvestmentDossierPanel id={id} /> : null}
+      {/* The owner may write the investment memo on a handed-off case too; before the handoff the panel hides itself. */}
+      {role === 'system-owner' ? (
+        <InvestmentMemoPanel id={id} companyName={pinnedCompanyName(profile)} trackingCode={request.trackingCode} />
+      ) : null}
       {/* At the financial stage the follow-up is the Secretariat's main work (Figma 03, 04), so it leads. */}
       {followUp && financialStageOpen ? followUp : null}
 
