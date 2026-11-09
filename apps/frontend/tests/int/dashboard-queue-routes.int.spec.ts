@@ -54,27 +54,42 @@ afterEach(() => {
   vi.resetAllMocks()
 })
 
-it('preserves the selected status across request pages and retries', async () => {
-  backend.fetch.mockResolvedValue({
-    kind: 'ok',
-    data: { items: [], total: 100, page: 2, totalPages: 2 },
-  })
-  render(await RequestsPage({ searchParams: Promise.resolve({ status: 'approved', page: '2' }) }))
-  expect(backend.fetch).toHaveBeenCalledWith('/requests?limit=50&page=2&status=approved')
-  expect(screen.getByRole('link', { name: 'صفحه قبل' }).getAttribute('href')).toBe(
-    '/dashboard/requests?status=approved',
-  )
-  // The only search field is the real one: a GET form that keeps the status (Figma placeholder, design QA #276).
+const companyRequest = (index: number, extra: Record<string, unknown> = {}) => ({
+  id: `request-${index}`,
+  trackingCode: `T-${index}`,
+  title: `درخواست ${index}`,
+  status: 'in_review',
+  reviewStage: 'triaged',
+  createdAt: '2026-10-01T00:00:00.000Z',
+  ...extra,
+})
+
+it('pages the company list by its stage filter and keeps the stage on the links', async () => {
+  // 120 requests in review plus one finished: the stage filter and the pages are applied on the page.
+  const items = [
+    ...Array.from({ length: 120 }, (_, index) => companyRequest(index)),
+    companyRequest(900, { status: 'approved', reviewStage: 'advanced' }),
+  ]
+  backend.fetch.mockResolvedValue({ kind: 'ok', data: { items, total: items.length, page: 1, totalPages: 1 } })
+  render(await RequestsPage({ searchParams: Promise.resolve({ phase: 'reviewing', page: '2' }) }))
+  expect(backend.fetch).toHaveBeenCalledWith('/requests?limit=500&page=1')
+  // The API never sees the company's stage: it only knows real stages and statuses.
+  expect(backend.fetch.mock.calls.map(([path]) => String(path)).some((path) => path.includes('phase'))).toBe(false)
+  expect(screen.getByRole('link', { name: 'صفحه قبل' }).getAttribute('href')).toBe('/dashboard/requests?phase=reviewing')
+  expect(screen.getByRole('link', { name: 'صفحه بعد' }).getAttribute('href')).toBe('/dashboard/requests?page=3&phase=reviewing')
+  expect(screen.queryByText('درخواست 900')).toBeNull()
+  // The only search field is the real one: a GET form that keeps the stage (Figma placeholder, design QA #276).
   const search = screen.getByPlaceholderText('درخواست خود را جست و جو کنید')
   expect(screen.getAllByPlaceholderText('درخواست خود را جست و جو کنید')).toHaveLength(1)
   expect(search.closest('form')?.getAttribute('role')).toBe('search')
+  expect(search.closest('form')?.querySelector('input[name="phase"]')?.getAttribute('value')).toBe('reviewing')
 })
 
-it('preserves page and status in an unavailable retry link', async () => {
+it('preserves page and stage in an unavailable retry link', async () => {
   backend.fetch.mockResolvedValue({ kind: 'unavailable' })
-  render(await RequestsPage({ searchParams: Promise.resolve({ status: 'approved', page: '2' }) }))
+  render(await RequestsPage({ searchParams: Promise.resolve({ phase: 'finished', page: '2' }) }))
   expect(screen.getByRole('link', { name: 'تلاش دوباره' }).getAttribute('href')).toBe(
-    '/dashboard/requests?status=approved&page=2',
+    '/dashboard/requests?page=2&phase=finished',
   )
 })
 

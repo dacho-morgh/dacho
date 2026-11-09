@@ -114,13 +114,14 @@ afterEach(() => {
 })
 
 describe('tracking state of an own application', () => {
-  it('names each stage the server reports, never a raw key', () => {
-    expect(companyStageLabel(request({ status: 'draft', reviewStage: null }))).toBe('پیش‌نویس (ارسال نشده)')
-    expect(companyStageLabel(request())).toBe('بررسی اولیه')
-    expect(companyStageLabel(request({ reviewStage: 'triaged' }))).toBe('داوری')
-    expect(companyStageLabel(request({ reviewStage: 'advanced' }))).toBe('مالی و سرمایه‌گذاری')
-    expect(companyStageLabel(request({ status: 'action_needed' }))).toBe('بازگشت برای اصلاح')
-    expect(companyStageLabel(request({ status: 'rejected' }))).toBe('رد نهایی')
+  it('names each stage the server reports as one of the three company stages (design QA #280)', () => {
+    expect(companyStageLabel(request({ status: 'draft', reviewStage: null }))).toBe('احراز هویت')
+    expect(companyStageLabel(request())).toBe('احراز هویت')
+    expect(companyStageLabel(request({ reviewStage: 'triaged' }))).toBe('در حال داوری')
+    expect(companyStageLabel(request({ reviewStage: 'advanced' }))).toBe('در حال داوری')
+    expect(companyStageLabel(request({ status: 'action_needed' }))).toBe('احراز هویت')
+    expect(companyStageLabel(request({ status: 'approved' }))).toBe('تمام‌شده (نتیجهٔ نهایی)')
+    expect(companyStageLabel(request({ status: 'rejected' }))).toBe('تمام‌شده (نتیجهٔ نهایی)')
   })
 
   it('derives the next action only from the server-listed actions', () => {
@@ -134,9 +135,10 @@ describe('tracking state of an own application', () => {
 
   it('carries stage, next action and revision to the list row', () => {
     const item = mapRequestItem(request({ status: 'action_needed', allowedActions: ['read', 'correct'], revision: 4 }))
-    expect(item).toMatchObject({ stageLabel: 'بازگشت برای اصلاح', nextAction: 'اصلاح پرونده و ارسال دوباره', revision: 4 })
+    expect(item).toMatchObject({ statusLabel: 'احراز هویت', stage: 'verification', nextAction: 'اصلاح پرونده و ارسال دوباره', revision: 4 })
     render(createElement('table', null, createElement('tbody', null, createElement(RequestsListRow, { item }))))
-    expect(screen.getByTestId('row-stage').textContent).toBe('بازگشت برای اصلاح · نسخه ۴')
+    expect(screen.getByText('احراز هویت')).toBeTruthy()
+    expect(screen.getByTestId('row-stage').textContent).toBe('نسخه ۴')
     expect(screen.getByTestId('row-next-action').textContent).toContain('اصلاح پرونده و ارسال دوباره')
     expect(screen.getByText(/EV-1405-0007/)).toBeTruthy()
   })
@@ -184,7 +186,7 @@ describe('CompanyRequestTracking', () => {
 
   it('shows stage, required next action and the submitted proposal revision', () => {
     tracking({ request: request({ status: 'action_needed', allowedActions: ['read', 'correct'] }) })
-    expect(screen.getByTestId('tracking-stage').textContent).toBe('بازگشت برای اصلاح')
+    expect(screen.getByTestId('tracking-stage').textContent).toBe('احراز هویت')
     expect(screen.getByTestId('tracking-next').textContent).toBe('اصلاح پرونده و ارسال دوباره')
     expect(screen.getByTestId('tracking-proposal-revision').textContent).toBe('۲')
   })

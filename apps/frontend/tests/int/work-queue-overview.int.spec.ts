@@ -43,6 +43,16 @@ function mockReads() {
   })
 }
 
+const request = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  trackingCode: `T-${id}`,
+  title: `درخواست ${id}`,
+  status: 'in_review',
+  reviewStage: 'chief_triage',
+  createdAt: '2026-10-01T00:00:00.000Z',
+  ...extra,
+})
+
 const asUser = (operationalRole: string) =>
   backend.auth.mockResolvedValue({ user: { id: 'person', operationalRole, isActive: true } })
 
@@ -112,19 +122,46 @@ describe('RequestsPage', () => {
   const searchParams = Promise.resolve({ search: 'طرح', eventId: EVENT_ID, stage: 'triaged', queue: 'company_draft' })
   const query = `search=${encodeURIComponent('طرح')}&eventId=${EVENT_ID}&stage=triaged&queue=company_draft`
 
-  it('reads the list and its counts with the same filters and keeps them on the filter and pages', async () => {
+  it('reads the company list with its search and event filters and counts its three stages', async () => {
     asUser('representative')
-    render(await RequestsPage({ searchParams }))
+    backend.fetch.mockImplementation(async (path: string) =>
+      path.startsWith('/stats/overview')
+        ? { kind: 'ok', data: { counts: stats, queues: [], events: [{ id: EVENT_ID, title: 'رویداد نمونه' }] } }
+        : {
+            kind: 'ok',
+            data: {
+              items: [
+                request('a', { status: 'draft', reviewStage: null }),
+                request('b', { reviewStage: 'chief_triage' }),
+                request('c', { reviewStage: 'triaged' }),
+                request('d', { status: 'approved', reviewStage: 'advanced' }),
+              ],
+              total: 4,
+              page: 1,
+              totalPages: 1,
+            },
+          },
+    )
+    render(await RequestsPage({ searchParams: Promise.resolve({ search: 'طرح', eventId: EVENT_ID, phase: 'verification', queue: 'company_draft' }) }))
 
-    expect(backend.fetch).toHaveBeenCalledWith(`/requests?limit=50&page=1&${query}`)
-    expect(backend.fetch).toHaveBeenCalledWith(`/stats?${query}`)
-
-    expect(screen.getByRole('link', { name: 'صفحه بعد' }).getAttribute('href')).toBe(`/dashboard/requests?page=2&${query}`)
+    // The stage is applied on the page; the API gets the other filters, and no stats call is made for a company.
+    expect(backend.fetch).toHaveBeenCalledWith(`/requests?limit=500&page=1&search=${encodeURIComponent('طرح')}&eventId=${EVENT_ID}&queue=company_draft`)
+    expect(backend.fetch.mock.calls.some(([path]) => String(path).startsWith('/stats?'))).toBe(false)
     expect(screen.getByText('صف: پیش‌نویس‌های ارسال‌نشده')).toBeTruthy()
-    // Status (with its count), event and stage live in the shared filter button (FE35).
+    // Only the two requests in the verification stage are listed, each with the company stage label.
+    expect(screen.getAllByText('احراز هویت')).toHaveLength(2)
+    expect(screen.queryByText('در حال داوری')).toBeNull()
+
+    // The company filters by its three stages, with each stage's size, and by event.
     fireEvent.click(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }))
-    const statuses = await screen.findByRole('combobox', { name: 'وضعیت درخواست' })
-    expect(within(statuses).getByRole('option', { name: /تایید شده/ }).textContent).toContain((1).toLocaleString('fa-IR'))
+    const stages = await screen.findByRole('combobox', { name: 'مرحله درخواست' })
+    expect(within(stages).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      `همه (${(4).toLocaleString('fa-IR')})`,
+      `احراز هویت (${(2).toLocaleString('fa-IR')})`,
+      `در حال داوری (${(1).toLocaleString('fa-IR')})`,
+      `تمام‌شده (نتیجهٔ نهایی) (${(1).toLocaleString('fa-IR')})`,
+    ])
+    expect(screen.queryByRole('combobox', { name: 'وضعیت درخواست' })).toBeNull()
     expect(within(screen.getByRole('combobox', { name: 'رویداد' })).getByRole('option', { name: 'رویداد نمونه' })).toBeTruthy()
   })
 
@@ -152,9 +189,7 @@ describe('RequestsPage', () => {
     )
     render(await RequestsPage({ searchParams: Promise.resolve({}) }))
     fireEvent.click(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }))
-    const statuses = await screen.findByRole('combobox', { name: 'وضعیت درخواست' })
-    const all = within(statuses).getAllByRole('option').find((item) => /^همه\s*\(/.test(item.textContent ?? ''))
-    expect(all?.textContent).toContain((7).toLocaleString('fa-IR'))
+    await screen.findByRole('combobox', { name: 'مرحله درخواست' })
     expect(screen.queryByRole('option', { name: 'رویداد نمونه' })).toBeNull()
   })
 })

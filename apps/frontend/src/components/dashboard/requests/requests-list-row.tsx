@@ -34,11 +34,10 @@ export function RequestsListRow({ item }: RequestsListRowProps) {
 
       {/* Column 2: Status Badge */}
       <td className="h-18 px-4">
-        <RequestStatusBadge status={item.status} label={item.statusLabel} />
-        {item.stageLabel ? (
+        <RequestStatusBadge stage={item.stage ?? 'reviewing'} label={item.statusLabel} />
+        {item.revision ? (
           <Typography variant="12/regular" className="mt-1 truncate text-neutral-500" data-testid="row-stage">
-            {item.stageLabel}
-            {item.revision ? ` · نسخه ${item.revision.toLocaleString('fa-IR')}` : ''}
+            نسخه {item.revision.toLocaleString('fa-IR')}
           </Typography>
         ) : null}
       </td>

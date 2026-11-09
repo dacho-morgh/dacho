@@ -4,6 +4,7 @@ import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 import { SearchField } from '@/components/dashboard/search-field'
 import { workQueueLabel } from '@/components/dashboard/work-queue-overview'
 import { Typography } from '@/components/ui/typography'
+import { COMPANY_REQUEST_STAGE_FILTER_OPTIONS, type CompanyRequestStage } from '@/utilities/company-request-stage'
 import { REQUEST_STATUS_FILTER_OPTIONS, REVIEW_STAGE_OPTIONS, type RequestQueueFilters, type RequestStatus } from './types'
 
 /**
@@ -18,6 +19,8 @@ export function RequestsFilters({
   filters,
   events,
   counts,
+  audience = 'staff',
+  stageCounts,
 }: {
   basePath?: string
   status?: RequestStatus
@@ -25,11 +28,59 @@ export function RequestsFilters({
   events: { id: string; title: string }[]
   /** From `GET /stats` with the same filters, so each number is the size of the list it opens. */
   counts?: Partial<Record<RequestStatus | 'all', number>>
+  /**
+   * `company` filters by the three company stages only (design QA #280); `staff` keeps the real
+   * status and review-stage filters.
+   */
+  audience?: 'company' | 'staff'
+  /** Company only: the size of each stage's list. */
+  stageCounts?: Partial<Record<CompanyRequestStage | 'all', number>>
 }) {
+  const eventGroup = {
+    key: 'eventId',
+    label: 'رویداد',
+    value: filters.eventId,
+    options: [{ value: '', label: 'همه رویدادها' }, ...events.map((event) => ({ value: event.id, label: event.title }))],
+  }
+  const groups =
+    audience === 'company'
+      ? [
+          {
+            key: 'phase',
+            label: 'مرحله درخواست',
+            value: filters.phase,
+            options: COMPANY_REQUEST_STAGE_FILTER_OPTIONS.map((option) => ({
+              value: option.value === 'all' ? '' : option.value,
+              label: option.label,
+              count: stageCounts?.[option.value],
+            })),
+          },
+          eventGroup,
+        ]
+      : [
+          {
+            key: 'status',
+            label: 'وضعیت درخواست',
+            value: status,
+            options: REQUEST_STATUS_FILTER_OPTIONS.map((option) => ({
+              value: option.value === 'all' ? '' : option.value,
+              label: option.label,
+              count: counts?.[option.value],
+            })),
+          },
+          eventGroup,
+          {
+            key: 'stage',
+            label: 'مرحله',
+            value: filters.stage,
+            options: [{ value: '', label: 'همه مرحله‌ها' }, ...REVIEW_STAGE_OPTIONS],
+          },
+        ]
   return (
     <>
       <form method="get" action={basePath} className="w-full min-w-0 sm:w-auto" role="search">
         {status && <input type="hidden" name="status" value={status} />}
+        {filters.phase && <input type="hidden" name="phase" value={filters.phase} />}
         {filters.eventId && <input type="hidden" name="eventId" value={filters.eventId} />}
         {filters.stage && <input type="hidden" name="stage" value={filters.stage} />}
         {filters.queue && <input type="hidden" name="queue" value={filters.queue} />}
@@ -41,33 +92,7 @@ export function RequestsFilters({
           aria-label="جستجوی عنوان یا کد پیگیری"
         />
       </form>
-      <ListFilterButton
-        label="فیلتر درخواست‌ها"
-        groups={[
-          {
-            key: 'status',
-            label: 'وضعیت درخواست',
-            value: status,
-            options: REQUEST_STATUS_FILTER_OPTIONS.map((option) => ({
-              value: option.value === 'all' ? '' : option.value,
-              label: option.label,
-              count: counts?.[option.value],
-            })),
-          },
-          {
-            key: 'eventId',
-            label: 'رویداد',
-            value: filters.eventId,
-            options: [{ value: '', label: 'همه رویدادها' }, ...events.map((event) => ({ value: event.id, label: event.title }))],
-          },
-          {
-            key: 'stage',
-            label: 'مرحله',
-            value: filters.stage,
-            options: [{ value: '', label: 'همه مرحله‌ها' }, ...REVIEW_STAGE_OPTIONS],
-          },
-        ]}
-      />
+      <ListFilterButton label="فیلتر درخواست‌ها" groups={groups} />
     </>
   )
 }

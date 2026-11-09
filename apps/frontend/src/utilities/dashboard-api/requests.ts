@@ -1,6 +1,7 @@
 import type { RequestItem } from '@/components/dashboard/requests/types'
-import { companyNextAction, companyStageLabel } from '../request-tracking'
-import { type RequestStatus, type RequestDto, type ActivityDto, type Paginated, REQUEST_STATUS_LABELS, formatDate, dashboardFetch } from './core'
+import { companyRequestStage, companyRequestStageLabel } from '../company-request-stage'
+import { companyNextAction } from '../request-tracking'
+import { type RequestStatus, type RequestDto, type ActivityDto, type Paginated, formatDate, dashboardFetch } from './core'
 
 export function listRequests(params?: {
   status?: RequestStatus
@@ -167,9 +168,9 @@ export function mapRequestItem(dto: RequestDto): RequestItem {
     trackingCode: dto.trackingCode,
     title: dto.title,
     status: dto.status as RequestItem['status'],
-    statusLabel: REQUEST_STATUS_LABELS[dto.status],
+    statusLabel: companyRequestStageLabel(dto),
+    stage: companyRequestStage(dto),
     currentStep: dto.currentStep ?? '',
-    stageLabel: companyStageLabel(dto),
     nextAction: companyNextAction(dto),
     revision: dto.revision ?? null,
     allowedActions: dto.allowedActions ?? [],

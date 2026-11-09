@@ -14,6 +14,7 @@ import { RequestsPagination } from '@/components/dashboard/requests/requests-pag
 import {
   parseRequestFilters,
   parseRequestPage,
+  type RequestQueueFilters,
   requestFiltersQuery,
   requestQueueHref,
 } from '@/components/dashboard/requests/types'
@@ -24,6 +25,7 @@ import {
   type RequestDto,
   type RequestStats,
 } from '@/utilities/dashboard-api'
+import { companyRequestStage, type CompanyRequestStage } from '@/utilities/company-request-stage'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import {
   dashboardOperationalRole,
@@ -46,6 +48,7 @@ export default async function RequestsPage({
 }: {
   searchParams: Promise<{
     status?: string | string[]
+    phase?: string | string[]
     page?: string | string[]
     search?: string | string[]
     eventId?: string | string[]
@@ -57,12 +60,14 @@ export default async function RequestsPage({
   const query = await searchParams
   const status = parseRequestStatus(query.status)
   const page = parseRequestPage(query.page)
-  const filters = parseRequestFilters(query)
-  const filterQuery = requestFiltersQuery(filters)
+  // `phase` is the company's own stage filter; staff filter by the real status and stage.
+  const parsedFilters = parseRequestFilters(query)
 
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isInternal = isInternalDashboardUser(user)
+  const filters: RequestQueueFilters = isInternal ? { ...parsedFilters, phase: undefined } : parsedFilters
+  const filterQuery = requestFiltersQuery(filters)
 
   // Reviewers and employers work from their own assignment queue (T23), not the generic list.
   if (isReviewerRole(dashboardOperationalRole(user))) {
@@ -71,11 +76,14 @@ export default async function RequestsPage({
     return <ReviewerQueue key={`${view}-${reviewPage}`} view={view} page={reviewPage} />
   }
 
+  const overviewResult = await serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview')
+  const events = overviewResult.kind === 'ok' ? (overviewResult.data.events ?? []) : []
+  const queueNote = <RequestsQueueNote filters={filters} />
+
+  if (!isInternal) return companyRequestsList({ page, filters, filterQuery, events, queueNote })
+
   // Counts come from the same filters as the list, so a tab's number is the size of its list.
-  const [statsResult, overviewResult] = await Promise.all([
-    serverDashboardFetchResult<RequestStats>(`/stats${filterQuery.replace('&', '?')}`),
-    serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview'),
-  ])
+  const statsResult = await serverDashboardFetchResult<RequestStats>(`/stats${filterQuery.replace('&', '?')}`)
   const stats = statsResult.kind === 'ok' ? statsResult.data : undefined
   const counts = stats && {
     all: stats.total,
@@ -84,55 +92,64 @@ export default async function RequestsPage({
     approved: stats.approved,
     rejected: stats.rejected,
   }
-  const filterForm = (
-    <RequestsFilters
+  const filterForm = <RequestsFilters status={status} filters={filters} events={events} counts={counts} />
+
+  return (
+    <AdminRequestList
       status={status}
+      page={page}
       filters={filters}
-      events={overviewResult.kind === 'ok' ? (overviewResult.data.events ?? []) : []}
-      counts={counts}
+      toolbar={filterForm}
+      notice={queueNote}
     />
   )
+}
 
-  const queueNote = <RequestsQueueNote filters={filters} />
+const COMPANY_PAGE_SIZE = 50
+/** A company's own requests are few; the stage filter and its counts are computed over all of them. */
+const COMPANY_FETCH_LIMIT = 500
 
-  if (isInternal) {
-    return (
-      <AdminRequestList
-        status={status}
-        page={page}
-        filters={filters}
-        toolbar={filterForm}
-        notice={queueNote}
-      />
-    )
-  }
-
-  // The queue scope is server-side: `status` narrows an already authorized list
-  // and a failed read stays distinguishable from an empty one.
-  const result = await serverDashboardFetchResult<Paginated<RequestDto>>(
-    `/requests?limit=50&page=${page}${status ? `&status=${status}` : ''}${filterQuery}`,
-  )
+/**
+ * The company's list (a plain async function, so the page resolves it like any other branch). The company filters by its three stages (design QA #280), which fold the
+ * internal status and review stage; the API filters by the real ones, so the company's own scoped
+ * list is read once and filtered, counted and paged here.
+ */
+async function companyRequestsList({
+  page,
+  filters,
+  filterQuery,
+  events,
+  queueNote,
+}: {
+  page: number
+  filters: RequestQueueFilters
+  filterQuery: string
+  events: { id: string; title: string }[]
+  queueNote: React.ReactNode
+}) {
+  // `page` is applied here, so the API is always asked for the first (and only) page.
+  const result = await serverDashboardFetchResult<Paginated<RequestDto>>(`/requests?limit=${COMPANY_FETCH_LIMIT}&page=1${filterQuery}`)
   const notice = unavailableReasonFor(result)
-  const items: RequestItem[] = result.kind === 'ok' ? result.data.items.map(mapRequestItem) : []
+  const all = result.kind === 'ok' ? result.data.items : []
+  const stageCounts: Record<CompanyRequestStage | 'all', number> = { all: all.length, verification: 0, reviewing: 0, finished: 0 }
+  for (const dto of all) stageCounts[companyRequestStage(dto)] += 1
+  const matching = filters.phase ? all.filter((dto) => companyRequestStage(dto) === filters.phase) : all
+  const totalPages = Math.max(1, Math.ceil(matching.length / COMPANY_PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const items: RequestItem[] = matching.slice((currentPage - 1) * COMPANY_PAGE_SIZE, currentPage * COMPANY_PAGE_SIZE).map(mapRequestItem)
+  const filterForm = <RequestsFilters audience="company" filters={filters} events={events} stageCounts={stageCounts} />
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-neutral-50 px-4 pt-6 pb-4 sm:pt-10">
       <RequestsListView
         items={items}
         notice={notice}
-        retryHref={requestQueueHref('/dashboard/requests', status, page, filters)}
+        retryHref={requestQueueHref('/dashboard/requests', undefined, page, filters)}
         state={result.kind === 'ok' && items.length === 0 ? 'empty' : 'default'}
         filterForm={filterForm}
         queueNote={queueNote}
       />
-      {result.kind === 'ok' && (
-        <RequestsPagination
-          page={result.data.page}
-          totalPages={result.data.totalPages}
-          status={status}
-          filters={filters}
-        />
-      )}
+      {result.kind === 'ok' && <RequestsPagination page={currentPage} totalPages={totalPages} filters={filters} />}
     </div>
   )
 }
