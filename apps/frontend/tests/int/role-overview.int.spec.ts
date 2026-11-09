@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen, within } from '@testing-library/react'
-import type { ReactElement } from 'react'
+import { createElement, type ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RoleOverview } from '@/components/dashboard/role-overview'
+import { OverviewSkeleton } from '@/components/dashboard/role-overview/overview-skeleton'
+import { FIXED_CARD_HEIGHT } from '@/components/dashboard/role-overview/shared'
 
 const backend = vi.hoisted(() => ({ fetch: vi.fn() }))
 vi.mock('next/headers', () => ({
@@ -649,5 +651,21 @@ describe('RoleOverview charts and next tasks (S3)', () => {
     expect(within(funnel).getByRole('alert')).toBeTruthy()
     // The committee board has no "next tasks" card: its KPI cards already count the queues.
     expect(screen.queryByRole('heading', { name: 'کارهای بعدی' })).toBeNull()
+  })
+})
+
+describe('OverviewSkeleton', () => {
+  it('holds the KPI cards at their real 168px height and the section row at the fixed card height', () => {
+    const { container } = render(createElement(OverviewSkeleton))
+    const kpiRow = container.querySelector('[aria-hidden="true"] > div:nth-child(2)')!
+    expect(kpiRow.children.length).toBe(4)
+    for (const card of Array.from(kpiRow.children)) {
+      expect(card.className).toContain('h-[168px]')
+    }
+    const sectionRow = container.querySelector('[aria-hidden="true"] > div:nth-child(3)')!
+    expect(sectionRow.children.length).toBe(3)
+    for (const card of Array.from(sectionRow.children)) {
+      expect(card.className).toContain(FIXED_CARD_HEIGHT)
+    }
   })
 })

@@ -5,8 +5,10 @@ import { FIXED_CARD_HEIGHT } from './shared'
 const shimmer = 'motion-reduce:animate-none'
 
 /**
- * The overview before its numbers arrive. It has the real overview's frame (header, a row of KPI cards,
- * a row of three fixed-height section cards and a table card), so the data replaces it without moving anything.
+ * The overview before its numbers arrive. It has the real overview's frame (header, a row of KPI cards
+ * at their 168px height, a row of three fixed-height section cards and a table card), so the data
+ * replaces it without moving much. It does not know the role (the role is read behind it), so the
+ * rows below the KPIs are the shape the reviewer board has.
  */
 export function OverviewSkeleton() {
   return (
@@ -23,7 +25,7 @@ export function OverviewSkeleton() {
           {[0, 1, 2, 3].map((card) => (
             <Skeleton
               key={card}
-              className={`h-[136px] rounded-[10px] border border-neutral-200 bg-neutral-100 ${shimmer}`}
+              className={`h-[168px] rounded-[10px] border border-neutral-200 bg-neutral-100 ${shimmer}`}
             />
           ))}
         </div>
