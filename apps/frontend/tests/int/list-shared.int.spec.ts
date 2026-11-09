@@ -266,7 +266,7 @@ describe('the company request list', () => {
     expect(screen.queryByRole('button', { name: 'عملیات بیشتر' })).toBeNull()
     expect(screen.getAllByRole('link', { name: 'مشاهده' })[0]!.getAttribute('href')).toBe('/dashboard/requests/req-1')
 
-    fireEvent.click(screen.getByText('کد پیگیری: T-1'))
+    fireEvent.click(screen.getAllByText('کد پیگیری: T-1')[0]!)
     expect(nav.push).toHaveBeenCalledWith('/dashboard/requests/req-1')
   })
 

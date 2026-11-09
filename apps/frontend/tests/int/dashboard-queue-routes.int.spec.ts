@@ -78,7 +78,8 @@ it('pages the company list by its stage filter through the API and keeps the sta
   expect(backend.fetch).toHaveBeenCalledWith('/stats')
   expect(screen.getByRole('link', { name: 'صفحه قبل' }).getAttribute('href')).toBe('/dashboard/requests?phase=reviewing')
   expect(screen.getByRole('link', { name: 'صفحه بعد' }).getAttribute('href')).toBe('/dashboard/requests?page=3&phase=reviewing')
-  expect(screen.getByText('درخواست 50')).toBeTruthy()
+  // Each request renders as a table row and as a phone card (CSS shows one of them).
+  expect(screen.getAllByText('درخواست 50')).toHaveLength(2)
   // The only search field is the real one: a GET form that keeps the stage (Figma placeholder, design QA #276).
   const search = screen.getByPlaceholderText('درخواست خود را جست و جو کنید')
   expect(screen.getAllByPlaceholderText('درخواست خود را جست و جو کنید')).toHaveLength(1)

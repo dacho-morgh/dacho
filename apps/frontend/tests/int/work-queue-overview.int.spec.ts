@@ -150,7 +150,8 @@ describe('RequestsPage', () => {
     expect(backend.fetch).toHaveBeenCalledWith(`/stats?${filters}`)
     expect(backend.fetch.mock.calls.some(([path]) => String(path).includes('limit=500'))).toBe(false)
     expect(screen.getByText('صف: پیش‌نویس‌های ارسال‌نشده')).toBeTruthy()
-    expect(screen.getAllByText('احراز هویت')).toHaveLength(2)
+    // Two requests, each as a table row and as a phone card.
+    expect(screen.getAllByText('احراز هویت')).toHaveLength(4)
     expect(screen.queryByText('در حال داوری')).toBeNull()
     expect(screen.getByRole('link', { name: 'صفحه بعد' }).getAttribute('href')).toBe(`/dashboard/requests?page=2&phase=verification&${filters}`)
 
