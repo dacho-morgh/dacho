@@ -24,7 +24,8 @@ import {
   type ReviewRoundHistoryEntry,
 } from '@/utilities/dashboard-api'
 import { documentCategoryLabel, type DocumentCategory } from '@/utilities/document-categories'
-import { companyNextAction, companyStageLabel } from '@/utilities/request-tracking'
+import { companyRequestStage, companyRequestStageLabel, type CompanyRequestStage } from '@/utilities/company-request-stage'
+import { companyNextAction } from '@/utilities/request-tracking'
 
 const FINANCIAL_CATEGORIES: DocumentCategory[] = [
   'financialStatements',
@@ -71,7 +72,7 @@ const REVIEW_STAGE_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   draft: 'پیش‌نویس',
   in_review: 'در حال بررسی',
-  action_needed: 'نیازمند اصلاح',
+  action_needed: 'نیازمند اقدام',
   approved: 'تایید شده',
   rejected: 'رد شده',
 }
@@ -83,6 +84,13 @@ const STATUS_VARIANTS: Record<string, 'gray' | 'primary' | 'success' | 'warning'
   action_needed: 'warning',
   approved: 'success',
   rejected: 'error',
+}
+
+/** The company's tag colour of each stage (design QA #280), as the list's stage badge. */
+const COMPANY_STAGE_VARIANTS: Record<CompanyRequestStage, 'gray' | 'primary'> = {
+  verification: 'gray',
+  reviewing: 'primary',
+  finished: 'gray',
 }
 
 const plainText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
@@ -160,8 +168,9 @@ export function RequestDossier({
   // The company and the admin pages open with the application card and its stepper; the others keep the stepper in a fold below.
   const showsEventCard = isCompany || oversight
   const pageTitle = !isCompany && companyName ? `درخواست ${companyName}` : request.title
-  const statusLabel = STATUS_LABELS[request.status] ?? request.status
-  const statusVariant = STATUS_VARIANTS[request.status] ?? 'gray'
+  // A company reads its three stages only, never the internal status; staff keep the real one.
+  const statusLabel = isCompany ? companyRequestStageLabel(request) : (STATUS_LABELS[request.status] ?? request.status)
+  const statusVariant = isCompany ? COMPANY_STAGE_VARIANTS[companyRequestStage(request)] : (STATUS_VARIANTS[request.status] ?? 'gray')
   const snapshotCompany = profile && profile !== 'failed' ? profile.verification?.snapshot.company : null
   const companyFacts = [plainText(snapshotCompany?.type), plainText(snapshotCompany?.province), plainText(snapshotCompany?.city)]
   const submitted = formatDate(request.submissionDate)
@@ -239,7 +248,7 @@ export function RequestDossier({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {showsEventCard ? null : <InfoField label="کد پیگیری" value={<bdi className="font-mono">{request.trackingCode}</bdi>} />}
           <InfoField label="وضعیت" value={statusLabel} />
-          <InfoField label="مرحله" value={isCompany ? companyStageLabel(request) : stageLabel(request.reviewStage, request.currentStep)} />
+          {isCompany ? null : <InfoField label="مرحله" value={stageLabel(request.reviewStage, request.currentStep)} />}
           <InfoField label="نسخه پرونده" value={request.revision ? request.revision.toLocaleString('fa-IR') : '—'} />
           <InfoField label="اقدام بعدی شما" value={nextAction ?? 'اقدامی برای شما تعریف نشده است'} />
           {showsEventCard ? null : <InfoField label="تاریخ ثبت" value={submitted || 'ثبت نشده'} />}

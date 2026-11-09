@@ -10,7 +10,7 @@ export interface RequestStatusBadgeProps {
 }
 
 /**
- * Status Badge for Requests List (Figma Tag node 32:9838)
+ * Company stage badge of the requests list (Figma Medium tag: grey 32:9854, primary 32:9860)
  */
 export function RequestStatusBadge({
   stage,

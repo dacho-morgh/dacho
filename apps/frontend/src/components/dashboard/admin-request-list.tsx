@@ -18,7 +18,7 @@ type Request = {
   id: string
   company: string
   request: string
-  status: 'پیش‌نویس' | 'درحال بررسی' | 'نیازمند اصلاح' | 'تایید شده' | 'رد شده'
+  status: 'پیش‌نویس' | 'درحال بررسی' | 'نیازمند اقدام' | 'تایید شده' | 'رد شده'
   stage: string
   /** The next step the server lists for this person, if any. */
   pending: string | null
@@ -41,7 +41,7 @@ const statusStyle: Record<
   { color: 'brand-600' | 'error' | 'secondary' | 'success'; bg: string }
 > = {
   'درحال بررسی': { color: 'brand-600', bg: 'bg-brand-50' },
-  'نیازمند اصلاح': { color: 'secondary', bg: 'bg-warning-50' },
+  'نیازمند اقدام': { color: 'secondary', bg: 'bg-warning-50' },
   'تایید شده': { color: 'success', bg: 'bg-success-50' },
   'پیش‌نویس': { color: 'secondary', bg: 'bg-neutral-100' },
   'رد شده': { color: 'error', bg: 'bg-error-50' },
@@ -131,7 +131,7 @@ export function AdminRequestList({
         id: item.id,
         company: item.owner?.companyName || item.owner?.name || '—',
         request: item.title,
-        status: ({ draft: 'پیش‌نویس', in_review: 'درحال بررسی', action_needed: 'نیازمند اصلاح', approved: 'تایید شده', rejected: 'رد شده' }[item.status] ?? item.status) as Request['status'],
+        status: ({ draft: 'پیش‌نویس', in_review: 'درحال بررسی', action_needed: 'نیازمند اقدام', approved: 'تایید شده', rejected: 'رد شده' }[item.status] ?? item.status) as Request['status'],
         stage: (item.reviewStage && STAGE_LABELS[item.reviewStage]) || '—',
         pending: PENDING_LABELS.find(([action]) => item.allowedActions?.includes(action))?.[1] ?? null,
         date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fa-IR') : '—',

@@ -162,7 +162,7 @@ export interface DashboardOwnProfileDto {
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   draft: 'پیش‌نویس',
   in_review: 'درحال بررسی',
-  action_needed: 'نیاز به اقدام',
+  action_needed: 'نیازمند اقدام',
   approved: 'تایید شده',
   rejected: 'رد شده',
 }
