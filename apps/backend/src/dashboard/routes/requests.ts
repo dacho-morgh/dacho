@@ -9,9 +9,69 @@ import { AGREEMENT_TEXTS_APPROVED, CURRENT_EVENT_RULES_VERSION, CURRENT_NON_COMP
 import { isUuid } from '../../exhibitions/catalogue.js'
 import { parseRequestFilters, parsePositiveInt, parseRevisionQuery, acceptsAgreementVersion, isRepresentative, isCompanyAdministrator, safeOwner, requestWithActions, parseExpectedRevision, parseDecisionReason, missingRequiredFields } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
+import type { RequestScope } from '../../access/policy.js'
+import type { OperationalRole } from '../../access/roles.js'
+import type { RequestDto } from '../request-repo.js'
+import {
+  companyOfRequest,
+  eventWorkflow,
+  isSupervisoryRole,
+  ownCompanyProfile,
+  requestCompanyCard,
+  requestEvent,
+  withTimelineActors,
+} from '../request-detail.js'
 
 export function registerRequestRoutes(router: Router, ctx: DashboardContext): void {
-  const { deps, repo, activities, assignments, financialPackages, reviewCases, verificationStore, actorCompanyId, presentRequests, limitRequest, limitActivities, resolveScope, refuseCommand } = ctx
+  const { deps, repo, activities, assignments, financialPackages, reviewCases, verificationStore, followUps, publicRecords, actorCompanyId, presentRequests, limitRequest, limitActivities, resolveScope, refuseCommand } = ctx
+
+  /**
+   * The case page's read (#288): the case, its history with who did each step,
+   * the stages, the event, the company card and, for the company itself, its own
+   * profile and resume. `request/timeline/workflow/owner` keep their earlier
+   * projection per role; the new blocks are projected in `request-detail.ts`.
+   */
+  const requestDetail = async (
+    actor: { id: string; operationalRole: OperationalRole; user?: { name?: string } },
+    request: RequestDto,
+    scope: RequestScope,
+    companyId: string | null,
+  ) => {
+    const role = actor.operationalRole
+    // An assigned reviewer or employer opening the case leaves «مشاهده نشده» in the round's list.
+    if (isReviewerRole(role)) await assignments.markViewed(request.id, actor.id, role)
+    const [service, history, event, company] = await Promise.all([
+      deps.serviceCatalog.findById(request.serviceId),
+      activities.listForRequestScoped(request.id, scope),
+      requestEvent(deps.pool, publicRecords, request.id),
+      isReviewerRole(role) ? Promise.resolve(undefined) : companyOfRequest(deps.companyStore, request),
+    ])
+    const ownAccounts = role === 'representative'
+      ? [actor.id, request.ownerId, ...(company?.representativeId ? [company.representativeId] : [])]
+      : []
+    const timeline = await withTimelineActors(deps.userStore, role, limitActivities(actor, history), ownAccounts)
+
+    let workflow = service?.workflow ?? []
+    if (workflow.length === 0 && event) {
+      const resultPublished = request.reviewStage === 'advanced' && (await followUps.findPublished(request.id)) !== null
+      const decisions = history.filter((row) => row.action === 'chief_reject' || row.action === 'chief_review_reject')
+      workflow = eventWorkflow(request, { resultPublished, lastAction: decisions.at(-1)?.action ?? null })
+    }
+
+    return {
+      request: await limitRequest(actor, (await presentRequests(actor, [request], companyId))[0]!, true),
+      timeline,
+      workflow,
+      owner: isReviewerRole(role) ? null : safeOwner(await deps.userStore.findById(request.ownerId)),
+      event,
+      company: await requestCompanyCard(deps, role, request),
+      // Only the company reads its own live profile here; everyone else has the card above.
+      companyProfile:
+        role === 'representative' && company && company.representativeId === actor.id
+          ? ownCompanyProfile(company)
+          : null,
+    }
+  }
 
   router.post('/requests', async (req, res, next) => {
     try {
@@ -201,13 +261,7 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
     const { scope } = await resolveScope(actor.id, actor.operationalRole)
     const request = await repo.findByIdScoped(req.params.id, scope)
     if (!request) { res.status(404).json({ error: 'not_found' }); return }
-    const service = await deps.serviceCatalog.findById(request.serviceId)
-    res.json({
-      request: await limitRequest(actor, (await presentRequests(actor, [request]))[0]!, true),
-      owner: isReviewerRole(actor.operationalRole) ? null : safeOwner(await deps.userStore.findById(request.ownerId)),
-      timeline: limitActivities(actor, await activities.listForRequestScoped(request.id, scope)),
-      workflow: service?.workflow ?? [],
-    })
+    res.json(await requestDetail(actor, request, scope, null))
     } catch (error) { next(error) }
   })
 
@@ -221,14 +275,37 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
       return
     }
 
-    const service = await deps.serviceCatalog.findById(request.serviceId)
-    const timeline = limitActivities(actor, await activities.listForRequestScoped(request.id, scope))
-    res.json({
-      request: await limitRequest(actor, (await presentRequests(actor, [request], companyId))[0]!, true),
-      timeline,
-      workflow: service?.workflow ?? [],
-      owner: isReviewerRole(actor.operationalRole) ? null : safeOwner(await deps.userStore.findById(request.ownerId)),
-    })
+    res.json(await requestDetail(actor, request, scope, companyId))
+    } catch (error) { next(error) }
+  })
+
+  /**
+   * The company's logo for the case page's company card (#288). Only the roles
+   * that oversee a case receive it, and only for a case they can read; the bytes
+   * come through the backend so the private logo collection stays closed to them.
+   */
+  router.get('/requests/:id/company/logo', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (!isSupervisoryRole(actor.operationalRole)) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const { scope } = await resolveScope(actor.id, actor.operationalRole)
+      const request = await repo.findByIdScoped(req.params.id, scope)
+      if (!request) { res.status(404).json({ error: 'not_found' }); return }
+      const company = await companyOfRequest(deps.companyStore, request)
+      const logo = company && deps.companyStore.readLogo ? await deps.companyStore.readLogo(company) : undefined
+      if (!logo) { res.status(404).json({ error: 'not_found' }); return }
+      res
+        .set({
+          'Content-Type': logo.contentType,
+          'Content-Length': String(logo.body.length),
+          'Cache-Control': 'private, no-store, max-age=0',
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Disposition': 'inline',
+        })
+        .send(logo.body)
     } catch (error) { next(error) }
   })
 
