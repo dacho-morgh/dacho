@@ -77,6 +77,74 @@ function LetterAttachments({ letterId, attachments }: { letterId: string; attach
   )
 }
 
+/** Sender avatar, name and role: the right side of every letter header (Figma 31319:16047). */
+function LetterSender({ mail }: { mail: Pick<MailData, 'senderName' | 'senderRole' | 'senderAvatar'> }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      {mail.senderAvatar ? (
+        <Image src={mail.senderAvatar} alt="" width={40} height={40} className="size-10 shrink-0 rounded-full object-cover" />
+      ) : (
+        <Typography as="span" variant="14/semibold" aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600">
+          {mail.senderName.slice(0, 1)}
+        </Typography>
+      )}
+      <div className="min-w-0">
+        <Typography variant="16/semibold" className="break-words text-neutral-600">{mail.senderName}</Typography>
+        <Typography variant="14/regular" className="break-words text-neutral-500">{mail.senderRole}</Typography>
+      </div>
+    </div>
+  )
+}
+
+/** Weekday, date and time on one line: the left side of a replied letter's header (Figma 31319:16039). */
+function LetterStampInline({ mail }: { mail: Pick<MailData, 'dayOfWeek' | 'datePersian' | 'timeStr'> }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 text-neutral-400">
+      <div className="flex items-center gap-2">
+        <CalendarBulkIcon aria-hidden="true" className="size-6 shrink-0" />
+        <Typography as="span" variant="16/regular" className="text-neutral-400">{mail.dayOfWeek}</Typography>
+        <Typography as="span" variant="16/regular" className="text-neutral-400">{mail.datePersian}</Typography>
+      </div>
+      <div className="flex items-center gap-2">
+        <ClockBulkIcon aria-hidden="true" className="size-6 shrink-0" />
+        <Typography as="span" variant="16/regular" className="text-neutral-400">{mail.timeStr ? `ساعت ${mail.timeStr}` : '—'}</Typography>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The previously replied letters of the case, oldest first, above the open letter (Figma «with
+ * history», frame 31318:15820): each one is a header row (sender on the right, date and time on the
+ * left), a single-line excerpt that opens the letter, and a divider before the next.
+ */
+function RepliedLetters({ thread, notice }: { thread: MailData[]; notice?: string }) {
+  return (
+    <section aria-label="تاریخچه مکاتبات پرونده" className="flex flex-col gap-6">
+      <Typography as="h2" variant="14/semibold" className="sr-only">تاریخچه مکاتبات پرونده</Typography>
+      {notice && <Typography role="status" variant="14/regular" className="text-neutral-500">{notice}</Typography>}
+      {thread.map((message) => (
+        <div key={message.id} className="flex flex-col gap-6">
+          <article aria-label={message.title} className="flex flex-col gap-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <LetterSender mail={message} />
+              <LetterStampInline mail={message} />
+            </div>
+            <Typography asChild variant="16/regular" className="block min-w-0 truncate text-neutral-500 hover:text-brand-600">
+              <Link href={`/dashboard/letters/${encodeURIComponent(message.id)}`}>
+                <span className="sr-only">{message.title}</span>
+                {message.body && <span>{message.body}</span>}
+              </Link>
+            </Typography>
+            {!!message.attachments?.length && <LetterAttachments letterId={message.id} attachments={message.attachments} />}
+          </article>
+          <div role="separator" className="h-0 w-full border-t border-neutral-100" />
+        </div>
+      ))}
+    </section>
+  )
+}
+
 export function MailDetailView({ mail, showActions = false, supportReply = false, supportClosed = false, replyHref, canDelete = true }: MailDetailViewProps) {
   const router = useRouter()
   const deletingRef = useRef(false)
@@ -103,7 +171,7 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-5 text-right" dir="rtl">
-      <nav aria-label="مسیر نامه" className="flex min-h-9 flex-wrap items-center gap-2 pl-12 md:pl-0">
+      <nav aria-label="مسیر نامه" className="flex min-h-9 flex-wrap items-center gap-2 pe-12 md:pe-0">
         <Typography asChild variant="16/regular" className="shrink-0 text-neutral-500 hover:text-brand-600">
           <Link href="/dashboard/letters">کارتابل نامه</Link>
         </Typography>
@@ -134,20 +202,9 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
           {[0, 1, 2].map((line) => <Skeleton key={line} className="h-7 w-full rounded-lg bg-neutral-100 motion-reduce:animate-none" />)}
         </>}
         {mail && <>
+          {(!!mail.thread?.length || mail.threadNotice) && <RepliedLetters thread={mail.thread ?? []} notice={mail.threadNotice} />}
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-2">
-              {mail.senderAvatar ? (
-                <Image src={mail.senderAvatar} alt="" width={40} height={40} className="size-10 shrink-0 rounded-full object-cover" />
-              ) : (
-                <Typography as="span" variant="14/semibold" aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600">
-                  {mail.senderName.slice(0, 1)}
-                </Typography>
-              )}
-              <div className="min-w-0">
-                <Typography variant="16/semibold" className="break-words text-neutral-600">{mail.senderName}</Typography>
-                <Typography variant="14/regular" className="break-words text-neutral-500">{mail.senderRole}</Typography>
-              </div>
-            </div>
+            <LetterSender mail={mail} />
             {supportReply && !supportClosed && <Button type="button" variant="white" size="40" onClick={() => {
               const target = document.getElementById('support-reply') ?? document.getElementById('support-conversation')
               target?.scrollIntoView({ block: 'center' })
@@ -204,28 +261,6 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
           <Typography as="h2" variant="20/bold" className="break-words text-neutral-700">{mail.title}</Typography>
           {mail.body && <Typography variant="16/regular" className="whitespace-pre-wrap break-words text-neutral-500">{mail.body}</Typography>}
           {!!mail.attachments?.length && <LetterAttachments letterId={mail.id} attachments={mail.attachments} />}
-          {(!!mail.thread?.length || mail.threadNotice) && (
-            <section aria-label="تاریخچه مکاتبات پرونده" className="flex flex-col gap-4 border-t border-neutral-100 pt-4">
-              <Typography variant="14/semibold" className="text-neutral-600">تاریخچه مکاتبات پرونده</Typography>
-              {mail.threadNotice && <Typography role="status" variant="14/regular" className="text-neutral-500">{mail.threadNotice}</Typography>}
-              {mail.thread?.map((message) => (
-                <article key={message.id} className="flex flex-col gap-3 rounded-xl border border-neutral-100 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <Typography variant="14/semibold" className="break-words text-neutral-700">{message.senderName}</Typography>
-                      <Typography variant="12/regular" className="break-words text-neutral-500">{message.senderRole}</Typography>
-                    </div>
-                    <Typography variant="12/regular" className="text-neutral-400">
-                      {message.dayOfWeek} {message.datePersian} {message.timeStr && `ساعت ${message.timeStr}`}
-                    </Typography>
-                  </div>
-                  <Typography variant="14/semibold" className="break-words text-neutral-700">{message.title}</Typography>
-                  {message.body && <Typography variant="14/regular" className="whitespace-pre-wrap break-words text-neutral-600">{message.body}</Typography>}
-                  {!!message.attachments?.length && <LetterAttachments letterId={message.id} attachments={message.attachments} />}
-                </article>
-              ))}
-            </section>
-          )}
         </>}
         {notice && <Typography role="status" variant="14/regular" className="rounded-lg bg-neutral-100 p-3 text-neutral-600">{notice}</Typography>}
       </article>
