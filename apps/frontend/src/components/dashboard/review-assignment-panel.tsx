@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useId, useRef, useState } from 'react'
 
 import { DecisionDialog } from '@/components/dashboard/decision-dialog'
+import { PersonAvatar } from '@/components/dashboard/request-detail/person-avatar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -21,6 +22,7 @@ import {
   type ReviewCandidatesDto,
   type ReviewRoundDto,
   type ReviewRoundSlotDto,
+  type ReviewSlotStatus,
 } from '@/utilities/dashboard-api'
 import { NativeSelect } from '@/components/ui/native-select'
 import { toast } from 'sonner'
@@ -61,6 +63,16 @@ const SLOT_STATE: Record<SlotState, { label: string; className: string }> = {
   final: { label: 'ارزیابی نهایی شد', className: 'bg-success-50 text-success-700' },
   draft: { label: 'در حال ارزیابی', className: 'bg-brand-50 text-brand-700' },
   pending: { label: 'در انتظار ارزیابی', className: 'bg-neutral-100 text-neutral-600' },
+}
+
+/**
+ * The server's own status of a slot (#288, Figma «لیست داوران»): «مشاهده نشده» until the holder opens the
+ * case, «درحال بررسی» once opened or drafted, «نهایی» once the evaluation is final.
+ */
+const SLOT_STATUS: Record<ReviewSlotStatus, { label: string; className: string }> = {
+  not_viewed: { label: 'مشاهده نشده', className: 'bg-neutral-100 text-neutral-600' },
+  in_review: { label: 'درحال بررسی', className: 'bg-brand-50 text-brand-700' },
+  final: { label: 'نهایی', className: 'bg-success-50 text-success-700' },
 }
 
 export interface ReviewAssignmentPanelProps {
@@ -109,6 +121,8 @@ export function ReviewAssignmentPanel({
   if (round !== 'failed' && !current && !canStart) return null
 
   const nameOf = (userId: string | null | undefined, fallback: string) => (userId && people[userId]) || fallback
+  // The slot's own name (#288) leads; the account lookup the page makes only fills what it lacks.
+  const slotName = (slot: ReviewRoundSlotDto, fallback: string) => slot.name?.trim() || nameOf(slot.userId, fallback)
   const finals = new Map<string, SlotState>()
   if (evaluations && evaluations !== 'failed') {
     for (const item of evaluations.items) {
@@ -181,8 +195,10 @@ export function ReviewAssignmentPanel({
               {employerSlot ? (
                 <SlotRow
                   label="کارفرما (ثابت)"
-                  name={nameOf(employerSlot.userId, 'کارفرمای پرونده')}
+                  name={slotName(employerSlot, 'کارفرمای پرونده')}
                   state={stateOf(employerSlot)}
+                  status={employerSlot.status ?? null}
+                  named={Boolean(employerSlot.name?.trim() || people[employerSlot.userId])}
                   assignedAt={employerSlot.assignedAt}
                   replaceLabel={canReplaceEmployer && isCurrent ? 'جایگزینی کارفرما' : null}
                   onReplace={() => {
@@ -200,8 +216,10 @@ export function ReviewAssignmentPanel({
                   <SlotRow
                     key={slot.assignmentId}
                     label={`داور ${fa(index + 1)}`}
-                    name={nameOf(slot.userId, `داور ${fa(index + 1)}`)}
+                    name={slotName(slot, `داور ${fa(index + 1)}`)}
                     state={state}
+                    status={slot.status ?? null}
+                    named={Boolean(slot.name?.trim() || people[slot.userId])}
                     assignedAt={slot.assignedAt}
                     // Only an unfinished ordinary reviewer is replaceable; the server re-checks it under lock.
                     replaceLabel={canReplaceReviewer && isCurrent && state !== null && state !== 'final' ? 'جایگزینی داور' : null}
@@ -275,6 +293,8 @@ function SlotRow({
   label,
   name,
   state,
+  status,
+  named,
   assignedAt,
   replaceLabel,
   onReplace,
@@ -282,21 +302,29 @@ function SlotRow({
   label: string
   name: string
   state: SlotState | null
+  /** The server's status of the slot; older responses omit it and the evaluation list decides. */
+  status: ReviewSlotStatus | null
+  /** False when `name` is only the generic slot label, which has no initials worth drawing. */
+  named: boolean
   assignedAt: string
   replaceLabel: string | null
   onReplace: () => void
 }) {
+  const chip = status ? SLOT_STATUS[status] : state ? SLOT_STATE[state] : null
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-neutral-50 p-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <Typography variant="12/regular" color="neutral-500">{label}</Typography>
-        <Typography variant="16/regular" color="neutral-800" className="break-words">{name}</Typography>
-        <Typography variant="12/regular" color="neutral-400">منتسب از {formatDate(assignedAt)}</Typography>
+    <li className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-neutral-50 p-3" data-testid="review-slot">
+      <div className="flex min-w-0 items-center gap-3">
+        <PersonAvatar name={named ? name : null} />
+        <div className="flex min-w-0 flex-col gap-1">
+          <Typography variant="12/regular" color="neutral-500">{label}</Typography>
+          <Typography variant="16/regular" color="neutral-800" className="break-words">{name}</Typography>
+          <Typography variant="12/regular" color="neutral-400">منتسب از {formatDate(assignedAt)}</Typography>
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {state ? (
-          <Typography as="span" variant="12/regular" className={`rounded-full px-3 py-1 ${SLOT_STATE[state].className}`}>
-            {SLOT_STATE[state].label}
+        {chip ? (
+          <Typography as="span" variant="12/regular" className={`rounded-full px-3 py-1 ${chip.className}`} data-testid="review-slot-status">
+            {chip.label}
           </Typography>
         ) : null}
         {replaceLabel ? (

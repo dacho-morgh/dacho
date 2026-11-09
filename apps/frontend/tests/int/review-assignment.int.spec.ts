@@ -377,3 +377,48 @@ describe('controlled replacement', () => {
     expect((await within(dialog()).findByRole('alert')).textContent).toMatch(/ارتباط با سرور برقرار نشد/)
   })
 })
+
+describe('reviewer list with avatars and status chips (#288, Figma «لیست داوران»)', () => {
+  const named = (userId: string, kind: 'employer' | 'ordinary', name: string | null, status: ReviewRoundSlotDto['status']) =>
+    slot(userId, kind, { name, avatarUrl: null, viewedAt: null, status })
+
+  it('names each slot with its own name, draws initials and the server status chip', () => {
+    panel({
+      actions: ['read'],
+      // The account lookup knows nobody here: only the slots carry names.
+      people: {},
+      round: {
+        round: round({
+          slots: [
+            named('emp', 'employer', 'کارفرما یکم', 'final'),
+            named('r1', 'ordinary', 'داور الف', 'not_viewed'),
+            named('r2', 'ordinary', 'علی رضایی', 'in_review'),
+            named('r3', 'ordinary', null, 'not_viewed'),
+          ],
+        }),
+      },
+    })
+    const rows = screen.getAllByTestId('review-slot')
+    expect(rows).toHaveLength(4)
+    expect(within(rows[0]!).getByText('کارفرما یکم')).toBeTruthy()
+    expect(within(rows[0]!).getByTestId('review-slot-status').textContent).toBe('نهایی')
+    expect(within(rows[1]!).getByTestId('review-slot-status').textContent).toBe('مشاهده نشده')
+    expect(within(rows[2]!).getByTestId('review-slot-status').textContent).toBe('درحال بررسی')
+    // First and last initial, joined with a ZWNJ as Persian initials are.
+    expect(within(rows[2]!).getByTestId('person-avatar').textContent).toBe('ع‌ر')
+    expect(within(rows[1]!).getByTestId('person-avatar').textContent).toBe('د‌ا')
+    // A slot with no name falls back to its position, and draws no letters for it.
+    expect(within(rows[3]!).getAllByText('داور ۳').length).toBeGreaterThan(0)
+    expect(within(rows[3]!).getByTestId('person-avatar').textContent).toBe('?')
+  })
+
+  it('keeps the evaluation-derived chip when an older response has no slot status', () => {
+    panel({
+      round: { round: round() },
+      evaluations: evaluations([{ id: 'e1', userId: 'r1', variant: 'ordinary', state: 'final', finalizedAt: '2026-10-06T00:00:00.000Z' }]),
+    })
+    const chips = screen.getAllByTestId('review-slot-status').map((chip) => chip.textContent)
+    expect(chips).toContain('ارزیابی نهایی شد')
+    expect(chips).toContain('در انتظار ارزیابی')
+  })
+})

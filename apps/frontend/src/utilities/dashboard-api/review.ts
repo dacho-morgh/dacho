@@ -80,6 +80,9 @@ export function replaceEmployer(
 
 export type ReviewSlotKind = 'employer' | 'ordinary'
 
+/** `not_viewed` until the holder opens the case, `in_review` once opened or drafted, `final` once their evaluation is final. */
+export type ReviewSlotStatus = 'not_viewed' | 'in_review' | 'final'
+
 /** One assignment of a round; revoked ones stay as history. */
 export interface ReviewRoundSlotDto {
   assignmentId: string
@@ -90,6 +93,14 @@ export interface ReviewRoundSlotDto {
   assignedAt: string
   revokedAt: string | null
   revokeReason: string | null
+  /** The holder's display name (#288); null when the account has none. */
+  name?: string | null
+  /** Accounts carry no picture, so this is always null and the page draws initials. */
+  avatarUrl?: string | null
+  /** When the holder first opened the case; null before that. */
+  viewedAt?: string | null
+  /** Where this slot's work stands; older servers omit it. */
+  status?: ReviewSlotStatus
 }
 
 export interface ReviewReplacementDto {

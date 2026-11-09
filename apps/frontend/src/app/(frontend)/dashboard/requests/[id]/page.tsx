@@ -52,6 +52,16 @@ async function serviceFields(payload: Awaited<ReturnType<typeof getPayload>>, se
   }
 }
 
+/** The events service's form, for pages that know the case is an event application but not its service id. */
+async function eventServiceFields(payload: Awaited<ReturnType<typeof getPayload>>): Promise<RequestFormField[]> {
+  try {
+    const found = await payload.find({ collection: 'services', where: { key: { equals: 'events' } }, depth: 2, limit: 1 })
+    return serviceFormFields(found.docs[0])
+  } catch {
+    return []
+  }
+}
+
 function reviewerCaseInitial(result: DashboardFetchResult<ReviewCaseFileDto>): ReviewerCaseInitial {
   if (result.kind === 'ok') return { kind: 'ok', data: result.data }
   if (result.kind === 'unauthenticated') return { kind: 'expired' }
@@ -157,7 +167,10 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   // 404 for an unassigned, foreign-event or guessed id, which is a denied state, not a missing page.
   if (isReviewerRole(role)) {
     const caseResult = await serverDashboardFetchResult<ReviewCaseFileDto>(`/review/cases/${encodeURIComponent(id)}`)
-    return <ReviewerCaseFile key={id} requestId={id} initial={reviewerCaseInitial(caseResult)} />
+    // The case file names no service, and a reviewer reads nothing but it: the labels come from the events
+    // service's own form in the CMS (only event applications are reviewed); a failed read keeps the keys.
+    const labels = caseResult.kind === 'ok' ? await eventServiceFields(payload) : []
+    return <ReviewerCaseFile key={id} requestId={id} initial={reviewerCaseInitial(caseResult)} formFields={labels} />
   }
 
   const result = await serverDashboardFetchResult<RequestDetail>(path)
@@ -213,13 +226,16 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   // The correction form edits the service's fixed answers; an unreadable form leaves the team and files editable.
   const correcting = isCompany && (result.data.request.allowedActions ?? []).includes('correct')
-  const correctionFields = correcting ? await serviceFields(payload, result.data.request.serviceId) : []
+  // The service's form labels the stored answers on the page (and is the correction form's fields).
+  const formFields = await serviceFields(payload, result.data.request.serviceId)
+  const correctionFields = correcting ? formFields : []
   const outcome = isCompany ? trackingOutcome(result.data.request, result.data.timeline) : null
 
   return (
     <RequestDossier
       role={role}
       correctionHandled={correcting}
+      formFields={formFields}
       detail={result.data}
       proposal={proposal}
       round={round}

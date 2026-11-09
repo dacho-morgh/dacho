@@ -295,7 +295,9 @@ describe('chief intake snapshots', () => {
       }),
     )
     expect(screen.getByRole('heading', { name: 'اطلاعات شرکت' })).toBeTruthy()
-    expect(screen.getByText('آریانا فناوران')).toBeTruthy()
+    // The pinned name also heads the company card when the case carries no live company card.
+    expect(screen.getByRole('heading', { name: 'آریانا فناوران' })).toBeTruthy()
+    expect(screen.getAllByText('آریانا فناوران').length).toBe(2)
     expect(screen.getByText('10101010101')).toBeTruthy()
     expect(screen.getByText('توربین، پمپ')).toBeTruthy()
     expect(screen.getByText(/نسخه ۳ پروفایل تأییدشده/)).toBeTruthy()

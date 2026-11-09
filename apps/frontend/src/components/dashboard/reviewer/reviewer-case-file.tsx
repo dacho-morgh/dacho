@@ -6,6 +6,8 @@ import { useCallback, useRef, useState } from 'react'
 import { DetailCard, InfoField, ReadonlyField } from '@/components/dashboard/company-detail/company-detail-parts'
 import { RequestCompanyCard } from '@/components/dashboard/request-detail/request-company-card'
 import { RequestDetailShell } from '@/components/dashboard/request-detail/request-detail-shell'
+import { AnswerFields, answerEntries } from '@/components/dashboard/request-detail/request-fields'
+import type { RequestFormField } from '@/components/dashboard/request-form-field'
 import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
@@ -59,6 +61,8 @@ const PROFILE_FIELDS: [section: 'company' | 'dossier', key: string, label: strin
 export interface ReviewerCaseFileProps {
   requestId: string
   initial: ReviewerCaseInitial
+  /** The service's form fields, so stored answers show their labels; without them an answer shows its key. */
+  formFields?: RequestFormField[]
 }
 
 /**
@@ -71,7 +75,7 @@ export interface ReviewerCaseFileProps {
  * The page asks again on focus and on an interval. A 404/403/401 removes the
  * case from the page; a changed round or revision replaces it and says so.
  */
-export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) {
+export function ReviewerCaseFile({ requestId, initial, formFields = [] }: ReviewerCaseFileProps) {
   const [state, setState] = useState<ReviewerCaseState>(() => fromInitial(initial))
   const inFlight = useRef(false)
   const path = `/dashboard/requests/${encodeURIComponent(requestId)}`
@@ -132,6 +136,7 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
     ),
   ]
   const evaluable = work === 'open' && item.evaluation?.state !== 'final'
+  const answers = answerEntries(data.proposal?.answers, formFields)
 
   return (
     <RequestDetailShell
@@ -195,15 +200,7 @@ export function ReviewerCaseFile({ requestId, initial }: ReviewerCaseFileProps) 
             <Typography variant="14/regular" color="neutral-500">
               نسخه {data.proposal.revision.toLocaleString('fa-IR')} · ثبت در {formatDate(data.proposal.createdAt)}
             </Typography>
-            {data.proposal.answers && Object.keys(data.proposal.answers).length ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {Object.entries(data.proposal.answers)
-                  .filter(([key]) => key !== 'applicationTeam')
-                  .map(([key, value]) => (
-                    <ReadonlyField key={key} label={key} value={answerText(value)} />
-                  ))}
-              </div>
-            ) : null}
+            {answers.length ? <AnswerFields entries={answers} tone="readonly" /> : null}
             {data.proposal.applicationTeam.length ? (
               <div className="flex flex-col gap-3">
                 <Typography as="h3" variant="16/semibold" color="neutral-900">تیم متقاضی</Typography>

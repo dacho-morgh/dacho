@@ -96,6 +96,19 @@ The company's `correct` action is built (FE13): the company's case page shows a 
 - `admin-request-detail.tsx` is replaced. It showed all seven financial slots to every internal role, had no history, stage or tracking code, and showed "loading" forever after a failed read.
 - The raw event type and raw action keys no longer appear. The old `/evaluation` address still returns to the dossier.
 
+## Request page against the Figma frames (#289)
+
+The page now draws the data #288 added, per role, and nothing the response does not carry:
+
+- **Company card** (every role but the company): the company's own `company.name` (the pinned profile's name when the card is absent), never `owner.name`; the logo from `company.logo.url` (the neutral mark when null); the line «فعال | نوع | سن» from `status`, `type` and `ageYears`. A reader whose card has no status or age (reviewer, employer) sees type, province and city. The page title is «درخواست <نام شرکت>».
+- **Application card** (company, Secretariat, owner): the event's poster, held dates («۱۲–۱۵ بهمن ۱۴۰۵»), place and the event's own status tag; the case status stays on the card only when the CMS did not answer. The stepper follows `workflow[].state` (`done`, `current`, `upcoming`, `rejected`); `request.currentStep` only places a CMS-defined workflow without states.
+- **History**: «توسط <نام>» from `actorName`. The company gets «توسط کارکنان صندوق» for a Fund step (it is never told who), and reviewers and the employer get no line.
+- **Reviewer list**: initials avatar (accounts carry no picture), the slot's own `name` and the server `status` chip («مشاهده نشده»، «درحال بررسی»، «نهایی»). A response without `status` falls back to the evaluation-derived chip.
+- **«اطلاعات و فرم رویداد»**: answers are labelled by the service's CMS form (an answer the form no longer has keeps its key), the company sees them as the white fields of the design and staff as the grey read-only tile. A request with no answer and no team gets an empty state worded for a company draft, a company case and staff. A failed proposal read is not an empty form.
+- **«رزومه و اطلاعات شرکت»**: the company's own `companyProfile` (basic info, executives, addresses and the dossier lists), drawn for the company only.
+
+Left to the designer: the «اقدام شما» panel against the header's single button and ⋮ menu; the sections the design does not have («خلاصه پرونده»، «پیگیری دبیرخانه و انتشار نتیجه»، «پیگیری درخواست»، «مدارک درخواست», the collapsible «روند بررسی»); the company's own page frame; the step descriptions and the event description of the stepper and application card (no field carries them).
+
 ## Assumptions to confirm
 
 - **The chief sees each final evaluation's total as soon as it is final.** `GET /requests/:id/evaluations` already allows it. The full answers stay for FE18.

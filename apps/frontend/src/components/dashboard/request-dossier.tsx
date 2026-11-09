@@ -7,8 +7,11 @@ import { RequestActionsPanel } from '@/components/dashboard/request-actions-pane
 import { RequestAssignmentPanel } from '@/components/dashboard/request-assignment-panel'
 import { RequestCompanyCard } from '@/components/dashboard/request-detail/request-company-card'
 import { RequestDetailShell } from '@/components/dashboard/request-detail/request-detail-shell'
+import { RequestCompanyProfileCard } from '@/components/dashboard/request-detail/request-company-profile-card'
 import { RequestEventCard, RequestWorkflowStepper } from '@/components/dashboard/request-detail/request-event-card'
+import { AnswerFields, RequestFormEmptyState, answerEntries, answerText } from '@/components/dashboard/request-detail/request-fields'
 import { RequestCardRow, RequestHistoryCard } from '@/components/dashboard/request-detail/request-history-card'
+import type { RequestFormField } from '@/components/dashboard/request-form-field'
 import { ReviewAssignmentPanel } from '@/components/dashboard/review-assignment-panel'
 import { SecretariatFollowUpPanel } from '@/components/dashboard/secretariat-follow-up-panel'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
@@ -26,6 +29,7 @@ import {
 import { documentCategoryLabel, type DocumentCategory } from '@/utilities/document-categories'
 import { companyRequestStage, companyRequestStageLabel, type CompanyRequestStage } from '@/utilities/company-request-stage'
 import { companyNextAction } from '@/utilities/request-tracking'
+import { formatEventDateRange } from '@/utilities/event-dates'
 
 const FINANCIAL_CATEGORIES: DocumentCategory[] = [
   'financialStatements',
@@ -93,6 +97,15 @@ const COMPANY_STAGE_VARIANTS: Record<CompanyRequestStage, 'gray' | 'primary'> = 
   finished: 'gray',
 }
 
+/** The event's own status tag, as the events list draws it (design QA #281). */
+const EVENT_STATUS: Record<'upcoming' | 'ongoing' | 'past', { label: string; variant: 'secondary' | 'primary' | 'gray' }> = {
+  upcoming: { label: 'پیش‌رو', variant: 'secondary' },
+  ongoing: { label: 'در حال برگزاری', variant: 'primary' },
+  past: { label: 'تمام شده', variant: 'gray' },
+}
+
+const fa = (value: number) => value.toLocaleString('fa-IR')
+
 const plainText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
 
 /** Each optional read: null when this role has no such read, `failed` when it did not arrive. */
@@ -116,6 +129,8 @@ export interface RequestDossierProps {
   companySections?: React.ReactNode
   /** The company sections include the FE13 correction form, which owns the proposal upload while correcting. */
   correctionHandled?: boolean
+  /** The service's form fields, so stored answers show their labels; without them an answer shows its key. */
+  formFields?: RequestFormField[]
 }
 
 /**
@@ -135,8 +150,9 @@ export function RequestDossier({
   roundEmployerId = null,
   companySections,
   correctionHandled = false,
+  formFields = [],
 }: RequestDossierProps) {
-  const { request, owner, timeline, workflow } = detail
+  const { request, timeline, workflow, event, company, companyProfile } = detail
   const id = request.id
   const actions = request.allowedActions ?? []
   const isCompany = role === 'representative'
@@ -162,7 +178,10 @@ export function RequestDossier({
   ) : null
 
   const oversight = role === 'system-owner' || role === 'central-secretariat'
-  const companyName = plainText(owner?.name)
+  const snapshotCompany = profile && profile !== 'failed' ? profile.verification?.snapshot.company : null
+  // The company's own name, never the name of the representative who filed the request: reviewers and the
+  // employer are not told who that is, and the card is the company's.
+  const companyName = plainText(company?.name) || plainText(snapshotCompany?.name)
   const profileHref = oversight && request.ownerId ? `/dashboard/companies/${encodeURIComponent(request.ownerId)}` : null
   const showsCompanyCard = !isCompany && Boolean(companyName || profileHref)
   // The company and the admin pages open with the application card and its stepper; the others keep the stepper in a fold below.
@@ -171,19 +190,37 @@ export function RequestDossier({
   // A company reads its three stages only, never the internal status; staff keep the real one.
   const statusLabel = isCompany ? companyRequestStageLabel(request) : (STATUS_LABELS[request.status] ?? request.status)
   const statusVariant = isCompany ? COMPANY_STAGE_VARIANTS[companyRequestStage(request)] : (STATUS_VARIANTS[request.status] ?? 'gray')
-  const snapshotCompany = profile && profile !== 'failed' ? profile.verification?.snapshot.company : null
-  const companyFacts = [plainText(snapshotCompany?.type), plainText(snapshotCompany?.province), plainText(snapshotCompany?.city)]
+  // The event card's tag is the event's own, as in the design; a request whose event the CMS did not answer keeps the case status.
+  const eventStatus = event?.status ? EVENT_STATUS[event.status] : null
+  const companyType = plainText(company?.type) || plainText(snapshotCompany?.type)
+  const companyStatus = plainText(company?.status) || (company?.active === true ? 'فعال' : company?.active === false ? 'غیرفعال' : '')
+  const companyAge = typeof company?.ageYears === 'number' ? `${fa(company.ageYears)} سال` : ''
+  // «فعال | نوع | سن» (Figma 49:7968); a reader who gets no status or age (reviewer, employer) sees the type and place.
+  const companyFacts =
+    companyStatus || companyAge
+      ? [companyStatus, companyType, companyAge]
+      : [...new Set([companyType, plainText(company?.province) || plainText(snapshotCompany?.province), plainText(company?.city) || plainText(snapshotCompany?.city)])]
   const submitted = formatDate(request.submissionDate)
+  const heldDates = formatEventDateRange(event?.startDate, event?.endDate)
   const eventFacts = [
+    ...(heldDates ? [{ icon: 'calendar' as const, text: heldDates }] : []),
+    ...(event?.location ? [{ icon: 'location' as const, text: event.location }] : []),
     { icon: 'document' as const, text: `کد پیگیری: ${request.trackingCode}` },
     ...(submitted ? [{ icon: 'calendar' as const, text: `تاریخ ثبت: ${submitted}` }] : []),
   ]
+  // Names of the round's people come with the slots (#288); the account lookup only fills what a slot lacks.
+  const roundNames = slotNames(round, roundHistory)
+  const names = { ...people, ...roundNames }
+  const answers = answerEntries(request.answers, formFields)
+  const team = proposalDetail?.applicationTeam ?? []
+  const FormCard = isCompany ? CollapsibleCard : DetailCard
 
   return (
     <RequestDetailShell title={pageTitle}>
       {showsCompanyCard ? (
         <RequestCompanyCard
           name={companyName || 'شرکت متقاضی'}
+          logoUrl={company?.logo?.url ?? null}
           facts={companyFacts}
           profileHref={profileHref}
         />
@@ -191,10 +228,11 @@ export function RequestDossier({
 
       {showsEventCard ? (
         <RequestEventCard
-          title={request.title}
+          title={event?.title || request.title}
           titleAsHeading={!isCompany}
-          statusLabel={statusLabel}
-          statusVariant={statusVariant}
+          statusLabel={eventStatus?.label ?? statusLabel}
+          statusVariant={eventStatus?.variant ?? statusVariant}
+          image={event?.image ?? null}
           facts={eventFacts}
           workflow={workflow}
           currentStep={request.currentStep}
@@ -219,7 +257,12 @@ export function RequestDossier({
 
       {/* The history and the people of the round side by side (Figma 31885:6726); either one alone takes the row. */}
       <RequestCardRow>
-        <RequestHistoryCard timeline={timeline} statusLabel={statusLabel} statusVariant={statusVariant} />
+        <RequestHistoryCard
+          timeline={timeline}
+          statusLabel={statusLabel}
+          statusVariant={statusVariant}
+          staffLabel={isCompany ? 'کارکنان صندوق' : null}
+        />
         <ReviewAssignmentPanel
           id={id}
           actions={actions}
@@ -227,7 +270,7 @@ export function RequestDossier({
           proposalRevision={proposalDetail?.revision ?? null}
           round={round}
           evaluations={evaluations}
-          people={people}
+          people={names}
           employerId={roundEmployerId}
         />
       </RequestCardRow>
@@ -236,7 +279,7 @@ export function RequestDossier({
           round={round}
           evaluations={evaluations}
           history={roundHistory}
-          people={people}
+          people={names}
           canDecide={actions.includes('decideReview')}
         />
       ) : null}
@@ -258,7 +301,7 @@ export function RequestDossier({
 
       {profile !== null ? <ProfileSnapshot profile={profile} /> : null}
 
-      <DetailCard title="اطلاعات و فرم رویداد">
+      <FormCard title="اطلاعات و فرم رویداد">
         {proposal === 'failed' ? (
           <Typography role="alert" variant="14/regular" color="error">
             دریافت نسخه پروپوزال انجام نشد. صفحه را دوباره بارگذاری کنید.
@@ -278,18 +321,12 @@ export function RequestDossier({
             ) : null}
           </div>
         ) : null}
-        <div className="grid gap-4 sm:grid-cols-2">
-          {Object.entries(request.answers ?? {})
-            .filter(([key]) => key !== 'applicationTeam')
-            .map(([key, value]) => (
-              <ReadonlyField key={key} label={key} value={answerText(value)} />
-            ))}
-        </div>
-        {proposalDetail?.applicationTeam?.length ? (
+        {answers.length ? <AnswerFields entries={answers} tone={isCompany ? 'input' : 'readonly'} /> : null}
+        {team.length ? (
           <div className="flex flex-col gap-3">
             <Typography as="h3" variant="16/semibold" color="neutral-800">تیم متقاضی</Typography>
             <ul className="flex flex-col gap-2">
-              {proposalDetail.applicationTeam.map((member, index) => (
+              {team.map((member, index) => (
                 <li key={`${index}-${member.name}`} className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
                   <Typography variant="14/regular" color="neutral-800">
                     {member.name} · {member.role}{member.relation ? ` · ${member.relation}` : ''}
@@ -299,7 +336,12 @@ export function RequestDossier({
             </ul>
           </div>
         ) : null}
-      </DetailCard>
+        {!answers.length && !team.length && proposal !== 'failed' ? (
+          <RequestFormEmptyState audience={!isCompany ? 'staff' : request.status === 'draft' ? 'company-draft' : 'company'} />
+        ) : null}
+      </FormCard>
+
+      {isCompany && companyProfile ? <RequestCompanyProfileCard profile={companyProfile} /> : null}
 
       <DetailCard title="مدارک درخواست">
         {seesFinancial ? (
@@ -389,9 +431,14 @@ function stageLabel(stage: string | null | undefined, step: string | null | unde
   return (stage && REVIEW_STAGE_LABELS[stage]) || step || 'ثبت نشده'
 }
 
-function answerText(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
-  if (typeof value === 'boolean') return value ? 'بله' : 'خیر'
-  if (Array.isArray(value) && value.every((item) => typeof item !== 'object')) return value.join('، ')
-  return typeof value === 'object' ? JSON.stringify(value) : String(value)
+/** Display names the round responses carry on their slots (#288), current round and earlier ones. */
+function slotNames(
+  round: DossierPart<{ round: ReviewRoundDto | null }>,
+  history: SummaryPart<ReviewRoundHistoryEntry[]>,
+): Record<string, string> {
+  const slots = [
+    ...(round && round !== 'failed' ? (round.round?.slots ?? []) : []),
+    ...(history && typeof history === 'object' ? history.flatMap((entry) => entry.round.slots ?? []) : []),
+  ]
+  return Object.fromEntries(slots.flatMap((slot) => (slot.name?.trim() ? [[slot.userId, slot.name.trim()]] : [])))
 }

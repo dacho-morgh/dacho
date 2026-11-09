@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 
 import { CompanyBuildingIcon } from '@/components/icons'
@@ -5,17 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 
 /**
- * The company strip that opens the oversight, reviewer and investment pages (Figma 31881:32837):
- * the mark and name on the reading side, the profile link opposite. The request payload
- * carries no logo, so the neutral company mark stands in for it.
+ * The company strip that opens the oversight, reviewer and investment pages (Figma 31881:32837, 49:7968):
+ * the logo and name on the reading side with the «فعال | نوع | سن» line under it, the profile link opposite.
+ * The logo comes from the access-checked case route; without one the neutral company mark stands in.
  */
 export function RequestCompanyCard({
   name,
+  logoUrl,
   facts = [],
   profileHref,
 }: {
   name: string
-  /** What the page knows about the company (type, place…), joined with the design's bar. */
+  /** `/api/dashboard/requests/:id/company/logo`; only roles allowed to read the case's logo get one. */
+  logoUrl?: string | null
+  /** What the page knows about the company (status, type, age…), joined with the design's bar. */
   facts?: string[]
   /** Only roles allowed on the company screens get the link. */
   profileHref?: string | null
@@ -28,9 +32,21 @@ export function RequestCompanyCard({
       className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-background p-4"
     >
       <div className="flex min-w-0 items-center gap-4">
-        <span className="flex size-20 shrink-0 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-400">
-          <CompanyBuildingIcon className="size-8" aria-hidden="true" />
-        </span>
+        {logoUrl ? (
+          <Image
+            src={logoUrl}
+            alt={`لوگوی ${name}`}
+            width={80}
+            height={80}
+            // The route is access-checked by the session cookie, which the image optimizer would not send.
+            unoptimized
+            className="size-20 shrink-0 rounded-2xl bg-neutral-100 object-cover"
+          />
+        ) : (
+          <span className="flex size-20 shrink-0 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-400">
+            <CompanyBuildingIcon className="size-8" aria-hidden="true" />
+          </span>
+        )}
         <div className="flex min-w-0 flex-col gap-2">
           <Typography as="h2" variant="16/bold" sm="20/bold" color="neutral-800" dir="auto" className="break-words">
             {name}
