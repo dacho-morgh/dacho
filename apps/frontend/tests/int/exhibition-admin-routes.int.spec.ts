@@ -78,6 +78,17 @@ it.each(['chief-reviewer', 'reviewer', 'investment-reviewer'])(
     expect(backend.findByID).not.toHaveBeenCalled()
   },
 )
+it('pads the exhibition pages 16px at the sides and 40px at the top (design QA #281)', async () => {
+  backend.auth.mockResolvedValue({ user: { operationalRole: 'representative', isActive: true } })
+  const detail = render(await ExhibitionAdminPage({ params: Promise.resolve({ id: '17' }) }))
+  expect(detail.container.firstElementChild!.className).toMatch(/\bpx-4\b.*\bpt-10\b/)
+  cleanup()
+  const list = render(await OwnerExhibitionsPage())
+  const main = list.container.querySelector('main')!
+  expect(main.className).toMatch(/\bpx-4\b/)
+  expect(main.className).toMatch(/\bpt-10\b/)
+  expect(main.className).not.toMatch(/\bp-4\b/)
+})
 it('gives the Secretariat the booth request queue instead of booth administration', async () => {
   backend.auth.mockResolvedValue({ user: { operationalRole: 'central-secretariat', isActive: true } })
   render(await ExhibitionAdminPage({ params: Promise.resolve({ id: '17' }) }))

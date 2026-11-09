@@ -59,7 +59,7 @@ export default async function ExhibitionAdminPage({ params }: PageProps) {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center bg-neutral-50 px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">
+    <div className="flex min-h-screen w-full flex-col items-center bg-neutral-50 px-4 pt-10 pb-12">
       {role === 'system-owner' ? (
         <ExhibitionBoothAdmin exhibition={exhibition} />
       ) : role === 'central-secretariat' ? (

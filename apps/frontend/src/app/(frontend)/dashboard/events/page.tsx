@@ -46,7 +46,7 @@ export default async function EventsPage(props: PageProps = {}) {
   ].sort((left, right) => left.startTimestamp - right.startTimestamp)
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center bg-[#fafafa] px-4 pt-6 pb-4 sm:px-6 sm:pt-10 lg:px-8">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center bg-neutral-50 px-4 pt-10 pb-4">
       <EventsView
         initialEventsList={events}
         isOwner={isOwner}

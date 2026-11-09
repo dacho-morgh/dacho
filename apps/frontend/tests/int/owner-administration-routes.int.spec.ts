@@ -46,6 +46,15 @@ it('routes the active owner to the one events and exhibitions list (S5)', async 
   // The list loads its own data; the page reads nothing from the CMS for the owner.
   expect(backend.find).not.toHaveBeenCalled()
 })
+it('pads the company events page 16px at the sides and 40px at the top (design QA #281)', async () => {
+  backend.auth.mockResolvedValue({ user: { operationalRole: 'representative', isActive: true } })
+  const { container } = render(await EventsPage())
+  const page = container.firstElementChild!
+  expect(page.className).toContain('px-4')
+  expect(page.className).toContain('pt-10')
+  expect(page.className).not.toMatch(/(^|\s)(sm:|lg:)?(px|pt)-(6|8)(\s|$)/)
+  expect(page.className).not.toContain('#')
+})
 it.each(['employees', 'events'])(
   'preserves owner cookie authentication on mobile HTTP navigation to %s',
   async (route) => {
