@@ -14,6 +14,11 @@ interface InlineProfileFieldProps {
   /** Marks the label with the shared `*`. Only shown while editing. */
   required?: boolean
   placeholder?: string
+  /** Number inputs only. */
+  min?: number
+  step?: number
+  /** Shows «ندارد» instead of an input (an optional value saved as absent). */
+  absent?: boolean
   onChange: (value: string) => void
 }
 
@@ -25,15 +30,28 @@ export function InlineProfileField({
   type = 'text',
   required = false,
   placeholder,
+  min,
+  step,
+  absent = false,
   onChange,
 }: InlineProfileFieldProps) {
   return (
-    <div className="flex flex-col items-start gap-2 rounded-lg border border-neutral-100 p-2 text-start">
+    <div
+      data-slot="profile-field"
+      className="flex h-full min-w-0 flex-col items-start gap-2 rounded-lg border border-neutral-100 p-2 text-start"
+    >
       <Typography as="label" variant="14/semibold" color="neutral-400" className="w-full">
         {label}
         {required && editing ? <RequiredMark className="ms-0.5" /> : null}
+        {absent ? (
+          <Typography as="span" variant="14/regular" color="neutral-400" className="mt-2 block py-2">
+            ندارد
+          </Typography>
+        ) : (
         <Input
           type={type}
+          min={min}
+          step={step}
           dir={dir}
           value={value}
           readOnly={!editing}
@@ -48,6 +66,7 @@ export function InlineProfileField({
           }
           className="text-start font-[450] read-only:cursor-default"
         />
+        )}
       </Typography>
     </div>
   )

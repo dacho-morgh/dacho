@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { SelectField } from '@/components/ui/select-field'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -31,12 +32,18 @@ import {
   updateAddress,
   updateProfile,
 } from '@/utilities/dashboard-api'
+import { citiesOfProvince, IRAN_PROVINCES } from '@/data/iran-locations'
 import { buildCompanyDossierPatch } from '@/utilities/dossier-edits'
 import { CompanyVerificationCard, editWithdrawsVerification } from './company-verification-card'
 import { InlineProfileField } from './inline-profile-field'
 import { ProfileDialog } from './profile-dialog'
 import { useReverificationConfirm } from './use-reverification-confirm'
 import { toast } from 'sonner'
+
+/** A value saved before the dropdowns existed (free text) stays selectable until changed. */
+function withCurrent(options: readonly string[], current: string): readonly string[] {
+  return current && !options.includes(current) ? [current, ...options] : options
+}
 
 const emptyAddress: Omit<AddressDto, 'id'> = {
   title: '',
@@ -197,6 +204,14 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
     dossierAtEdit.current = dossier
     setError(null)
     setIsEditingBasic(true)
+  }
+
+  const cancelBasicEdit = () => {
+    if (basicSaveLock.current) return
+    setBasicForm({ ...profile.company })
+    setDossierForm({ ...dossier })
+    setError(null)
+    setIsEditingBasic(false)
   }
 
   /**
@@ -408,6 +423,11 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
     }
   }
 
+  const provinceOptions = withCurrent(
+    IRAN_PROVINCES.map((province) => province.name),
+    addressForm.province,
+  )
+  const cityOptions = withCurrent(citiesOfProvince(addressForm.province), addressForm.city)
   const displayedDossier = isEditingBasic ? dossierForm : dossier
   const isWebsiteAbsent = !isEditingBasic && displayedDossier.notAvailable.includes('website')
   const isCenterAbsent = !isEditingBasic && displayedDossier.notAvailable.includes('centerEstablishment')
@@ -465,227 +485,167 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
           <Typography as="h2" variant="20/bold" color="neutral-600">
             اطلاعات پایه
           </Typography>
-          <Button
-            type="button"
-            variant={isEditingBasic ? 'primary' : 'gray'}
-            size="32"
-            loading={isSavingBasic}
-            disabled={documentsPending}
-            onClick={isEditingBasic ? saveBasic : startBasicEdit}
-          >
-            {!isEditingBasic && <DashboardEditIcon className="size-5" />}
-            <Typography>{isEditingBasic ? 'ذخیره' : 'ویرایش'}</Typography>
-          </Button>
+          {!isEditingBasic && (
+            <Button
+              type="button"
+              variant="gray"
+              size="32"
+              disabled={documentsPending}
+              onClick={startBasicEdit}
+            >
+              <DashboardEditIcon className="size-5" />
+              <Typography>ویرایش</Typography>
+            </Button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-4">
-            <InlineProfileField
-              label="نام شرکت"
-              required
-              placeholder="نام شرکت را وارد کنید"
-              value={basicForm.name}
-              editing={isEditingBasic}
-              onChange={(name) => setBasicForm({ ...basicForm, name })}
-            />
-            <InlineProfileField
-              label="شناسه ملی"
-              value={basicForm.nationalId}
-              editing={false}
-              dir="ltr"
-              onChange={() => {}}
-            />
-            <InlineProfileField
-              label="شماره ثبت"
-              required
-              placeholder="شماره ثبت شرکت"
-              value={basicForm.registrationNumber}
-              editing={isEditingBasic}
-              dir="ltr"
-              onChange={(registrationNumber) => setBasicForm({ ...basicForm, registrationNumber })}
-            />
-            <InlineProfileField
-              label="کد اقتصادی"
-              placeholder="کد اقتصادی ۱۲ رقمی"
-              value={basicForm.economicCode}
-              editing={isEditingBasic}
-              dir="ltr"
-              onChange={(economicCode) => setBasicForm({ ...basicForm, economicCode })}
-            />
-            <InlineProfileField
-              label="وضعیت شرکت"
-              required
-              placeholder="مثال: فعال"
-              value={basicForm.status}
-              editing={isEditingBasic}
-              onChange={(status) => setBasicForm({ ...basicForm, status })}
-            />
-            <InlineProfileField
-              label="نوع شرکت (مرحله اول)"
-              placeholder="نوع شرکت"
-              value={basicForm.type}
-              editing={isEditingBasic}
-              onChange={(type) => setBasicForm({ ...basicForm, type })}
-            />
-            <InlineProfileField
-              label="تاریخ تاسیس"
-              placeholder="مثال: ۱۳۸۵/۰۱/۱۵"
-              value={basicForm.establishmentDate}
-              editing={isEditingBasic}
-              dir="auto"
-              onChange={(establishmentDate) => setBasicForm({ ...basicForm, establishmentDate })}
-            />
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <InlineProfileField
-              label="نوع شخصیت حقوقی (سهامی خاص / عام / با مسئولیت محدود / ...)"
-              required
-              placeholder="مثال: سهامی خاص"
-              value={
-                isEditingBasic ? dossierForm.legalEntityType : dossier.legalEntityType || 'ثبت نشده'
-              }
-              editing={isEditingBasic}
-              onChange={(legalEntityType) => setDossierForm({ ...dossierForm, legalEntityType })}
-            />
-            <InlineProfileField
-              label="وضعیت دانش‌بنیانی (دانش‌بنیان نوع یک / دو / نوپا / غیر دانش‌بنیان)"
-              required
-              placeholder="مثال: دانش‌بنیان نوع یک"
-              value={
-                isEditingBasic
-                  ? dossierForm.knowledgeBasedStatus
-                  : dossier.knowledgeBasedStatus || 'ثبت نشده'
-              }
-              editing={isEditingBasic}
-              onChange={(knowledgeBasedStatus) =>
-                setDossierForm({ ...dossierForm, knowledgeBasedStatus })
-              }
-            />
-            <InlineProfileField
-              label="طبقه‌بندی شرکت (نوپا / فناور / صنعتی / ...)"
-              required
-              placeholder="مثال: فناور"
-              value={
-                isEditingBasic ? dossierForm.classification : dossier.classification || 'ثبت نشده'
-              }
-              editing={isEditingBasic}
-              onChange={(classification) => setDossierForm({ ...dossierForm, classification })}
-            />
-            <InlineProfileField
-              label="سال تأسیس (عدد ۴ رقمی مثلاً ۱۳۸۵)"
-              required
-              placeholder="مثال: ۱۳۸۵"
-              value={isEditingBasic ? dossierForm.foundingYear : dossier.foundingYear || 'ثبت نشده'}
-              editing={isEditingBasic}
-              dir="ltr"
-              onChange={(foundingYear) => setDossierForm({ ...dossierForm, foundingYear })}
-            />
-            <InlineProfileField
-              label="حوزه فعالیت اصلی"
-              required
-              placeholder="مثال: هوش مصنوعی"
-              value={
-                isEditingBasic ? dossierForm.activityDomain : dossier.activityDomain || 'ثبت نشده'
-              }
-              editing={isEditingBasic}
-              onChange={(activityDomain) => setDossierForm({ ...dossierForm, activityDomain })}
-            />
-
-            {/* وبسایت (اختیاری؛ در صورت نداشتن خالی بماند) */}
-            <div className="flex flex-col gap-1 rounded-lg border border-neutral-100 p-2">
-              <div className="flex items-center justify-between">
-                <Typography variant="14/semibold" color="neutral-500">
-                  وب‌سایت رسمی
-                </Typography>
-              </div>
-              {isWebsiteAbsent ? (
-                <Typography variant="14/regular" color="neutral-400" className="py-2">
-                  ندارد
-                </Typography>
-              ) : (
-                <Input
-                  dir="ltr"
-                  value={isEditingBasic ? dossierForm.website : dossier.website}
-                  readOnly={!isEditingBasic}
-                  placeholder="https://example.com"
-                  onChange={(e) => setOptionalDossierValue('website', e.target.value)}
-                  containerClassName={
-                    isEditingBasic
-                      ? 'bg-background'
-                      : 'border-transparent bg-transparent p-0 hover:border-transparent'
-                  }
-                />
-              )}
-            </div>
-
-            {/* استقرار در پارک/مرکز رشد */}
-            <div className="flex flex-col gap-1 rounded-lg border border-neutral-100 p-2">
-              <div className="flex items-center justify-between">
-                <Typography variant="14/semibold" color="neutral-500">
-                  استقرار در مرکز رشد / پارک علم و فناوری
-                </Typography>
-              </div>
-              {isCenterAbsent ? (
-                <Typography variant="14/regular" color="neutral-400" className="py-2">
-                  ندارد
-                </Typography>
-              ) : (
-                <Input
-                  value={
-                    isEditingBasic ? dossierForm.centerEstablishment : dossier.centerEstablishment
-                  }
-                  readOnly={!isEditingBasic}
-                  placeholder="نام پارک یا مرکز رشد…"
-                  onChange={(e) => setOptionalDossierValue('centerEstablishment', e.target.value)}
-                  containerClassName={
-                    isEditingBasic
-                      ? 'bg-background'
-                      : 'border-transparent bg-transparent p-0 hover:border-transparent'
-                  }
-                />
-              )}
-            </div>
-
-            {/* تعداد پرسنل بیمه‌شده */}
-            <div className="flex flex-col gap-1 rounded-lg border border-neutral-100 p-2">
-              <div className="flex items-center justify-between">
-                <Typography variant="14/semibold" color="neutral-500">
-                  تعداد کارکنان بیمه‌شده
-                </Typography>
-              </div>
-              {isInsuredAbsent ? (
-                <Typography variant="14/regular" color="neutral-400" className="py-2">
-                  ندارد
-                </Typography>
-              ) : (
-                <Input
-                  type="number"
-                  min={0}
-                  step={1}
-                  dir="ltr"
-                  value={
-                    isEditingBasic
-                      ? (dossierForm.insuredEmployeeCount ?? '')
-                      : (dossier.insuredEmployeeCount ?? '')
-                  }
-                  readOnly={!isEditingBasic}
-                  placeholder="مثال: ۱۰"
-                  onChange={(e) => {
-                    const parsed =
-                      e.target.value === '' ? null : Number(toEnglishDigits(e.target.value))
-                    setOptionalDossierValue('insuredEmployeeCount', parsed)
-                  }}
-                  containerClassName={
-                    isEditingBasic
-                      ? 'bg-background'
-                      : 'border-transparent bg-transparent p-0 hover:border-transparent'
-                  }
-                />
-              )}
-            </div>
-          </div>
+        {/* One grid: every field is a cell, and the cells of a row share the row's height. */}
+        <div data-slot="basic-info-grid" className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+          <InlineProfileField
+            label="نام شرکت"
+            required
+            placeholder="نام شرکت را وارد کنید"
+            value={basicForm.name}
+            editing={isEditingBasic}
+            onChange={(name) => setBasicForm({ ...basicForm, name })}
+          />
+          <InlineProfileField
+            label="شناسه ملی"
+            value={basicForm.nationalId}
+            editing={false}
+            dir="ltr"
+            onChange={() => {}}
+          />
+          <InlineProfileField
+            label="شماره ثبت"
+            required
+            placeholder="شماره ثبت شرکت"
+            value={basicForm.registrationNumber}
+            editing={isEditingBasic}
+            dir="ltr"
+            onChange={(registrationNumber) => setBasicForm({ ...basicForm, registrationNumber })}
+          />
+          <InlineProfileField
+            label="کد اقتصادی"
+            placeholder="کد اقتصادی ۱۲ رقمی"
+            value={basicForm.economicCode}
+            editing={isEditingBasic}
+            dir="ltr"
+            onChange={(economicCode) => setBasicForm({ ...basicForm, economicCode })}
+          />
+          <InlineProfileField
+            label="وضعیت شرکت"
+            required
+            placeholder="مثال: فعال"
+            value={basicForm.status}
+            editing={isEditingBasic}
+            onChange={(status) => setBasicForm({ ...basicForm, status })}
+          />
+          <InlineProfileField
+            label="نوع شرکت (مرحله اول)"
+            placeholder="نوع شرکت"
+            value={basicForm.type}
+            editing={isEditingBasic}
+            onChange={(type) => setBasicForm({ ...basicForm, type })}
+          />
+          <InlineProfileField
+            label="تاریخ تاسیس"
+            placeholder="مثال: ۱۳۸۵/۰۱/۱۵"
+            value={basicForm.establishmentDate}
+            editing={isEditingBasic}
+            dir="auto"
+            onChange={(establishmentDate) => setBasicForm({ ...basicForm, establishmentDate })}
+          />
+          <InlineProfileField
+            label="نوع شخصیت حقوقی (سهامی خاص / عام / با مسئولیت محدود / ...)"
+            required
+            placeholder="مثال: سهامی خاص"
+            value={isEditingBasic ? dossierForm.legalEntityType : dossier.legalEntityType || 'ثبت نشده'}
+            editing={isEditingBasic}
+            onChange={(legalEntityType) => setDossierForm({ ...dossierForm, legalEntityType })}
+          />
+          <InlineProfileField
+            label="وضعیت دانش‌بنیانی (دانش‌بنیان نوع یک / دو / نوپا / غیر دانش‌بنیان)"
+            required
+            placeholder="مثال: دانش‌بنیان نوع یک"
+            value={
+              isEditingBasic
+                ? dossierForm.knowledgeBasedStatus
+                : dossier.knowledgeBasedStatus || 'ثبت نشده'
+            }
+            editing={isEditingBasic}
+            onChange={(knowledgeBasedStatus) => setDossierForm({ ...dossierForm, knowledgeBasedStatus })}
+          />
+          <InlineProfileField
+            label="طبقه‌بندی شرکت (نوپا / فناور / صنعتی / ...)"
+            required
+            placeholder="مثال: فناور"
+            value={isEditingBasic ? dossierForm.classification : dossier.classification || 'ثبت نشده'}
+            editing={isEditingBasic}
+            onChange={(classification) => setDossierForm({ ...dossierForm, classification })}
+          />
+          <InlineProfileField
+            label="سال تأسیس (عدد ۴ رقمی مثلاً ۱۳۸۵)"
+            required
+            placeholder="مثال: ۱۳۸۵"
+            value={isEditingBasic ? dossierForm.foundingYear : dossier.foundingYear || 'ثبت نشده'}
+            editing={isEditingBasic}
+            dir="ltr"
+            onChange={(foundingYear) => setDossierForm({ ...dossierForm, foundingYear })}
+          />
+          <InlineProfileField
+            label="حوزه فعالیت اصلی"
+            required
+            placeholder="مثال: هوش مصنوعی"
+            value={isEditingBasic ? dossierForm.activityDomain : dossier.activityDomain || 'ثبت نشده'}
+            editing={isEditingBasic}
+            onChange={(activityDomain) => setDossierForm({ ...dossierForm, activityDomain })}
+          />
+          {/* Optional: left empty when the company has none. */}
+          <InlineProfileField
+            label="وب‌سایت رسمی"
+            placeholder="https://example.com"
+            value={isEditingBasic ? dossierForm.website : dossier.website}
+            editing={isEditingBasic}
+            absent={isWebsiteAbsent}
+            dir="ltr"
+            onChange={(website) => setOptionalDossierValue('website', website)}
+          />
+          <InlineProfileField
+            label="استقرار در مرکز رشد / پارک علم و فناوری"
+            placeholder="نام پارک یا مرکز رشد…"
+            value={isEditingBasic ? dossierForm.centerEstablishment : dossier.centerEstablishment}
+            editing={isEditingBasic}
+            absent={isCenterAbsent}
+            onChange={(center) => setOptionalDossierValue('centerEstablishment', center)}
+          />
+          <InlineProfileField
+            label="تعداد کارکنان بیمه‌شده"
+            type="number"
+            min={0}
+            step={1}
+            placeholder="مثال: ۱۰"
+            value={String((isEditingBasic ? dossierForm.insuredEmployeeCount : dossier.insuredEmployeeCount) ?? '')}
+            editing={isEditingBasic}
+            absent={isInsuredAbsent}
+            dir="ltr"
+            onChange={(count) =>
+              setOptionalDossierValue('insuredEmployeeCount', count === '' ? null : Number(toEnglishDigits(count)))
+            }
+          />
         </div>
+
+        {isEditingBasic && (
+          <div data-slot="basic-info-actions" className="flex items-center gap-2">
+            {/* Primary first in the DOM: it sits on the right in RTL, as in the dialogs. */}
+            <Button type="button" variant="primary" size="40" loading={isSavingBasic} onClick={saveBasic}>
+              <Typography>ذخیره</Typography>
+            </Button>
+            <Button type="button" variant="outline-gray" size="40" onClick={cancelBasicEdit}>
+              <Typography>انصراف</Typography>
+            </Button>
+          </div>
+        )}
       </fieldset>
 
       {/* مدارک رسمی شرکت */}
@@ -704,7 +664,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             </Typography>
           )}
         </div>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
           {(
             [
               ['articlesOfAssociation', 'اساس‌نامه', true],
@@ -712,7 +672,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
               ['amendmentNotices', 'آگهی‌های آخرین تغییرات', false],
             ] as const
           ).map(([category, label, isRequired]) => (
-            <div key={category} className="flex flex-col gap-3">
+            <div key={category} className="flex h-full flex-col gap-3">
                 <PrivateDocumentField
                   category={category}
                   label={label}
@@ -868,16 +828,22 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             value={addressForm.title}
             onChange={(event) => setAddressForm({ ...addressForm, title: event.target.value })}
           />
-          <Input
+          <SelectField
             label="استان"
-            placeholder="مثال: تهران"
+            placeholder="استان را انتخاب کنید"
+            options={provinceOptions}
             value={addressForm.province}
-            onChange={(event) => setAddressForm({ ...addressForm, province: event.target.value })}
+            onChange={(event) =>
+              // A city of the old province must not survive a change of province.
+              setAddressForm({ ...addressForm, province: event.target.value, city: '' })
+            }
           />
-          <Input
+          <SelectField
             label="شهر"
-            placeholder="مثال: تهران"
+            placeholder="شهر را انتخاب کنید"
+            options={cityOptions}
             value={addressForm.city}
+            disabled={!addressForm.province}
             onChange={(event) => setAddressForm({ ...addressForm, city: event.target.value })}
           />
           <Input

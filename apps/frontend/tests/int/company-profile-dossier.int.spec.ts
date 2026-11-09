@@ -375,4 +375,73 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
     expect(screen.getByPlaceholderText('نام شرکت را وارد کنید')).toBeTruthy()
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
   })
+
+  it('lays the basic fields out in one equal-height grid and saves with a primary button on the right', () => {
+    render(
+      createElement(CompanyProfileView, { initialProfile: mockProfile, initialDossier: mockDossierResponse }),
+    )
+    const grid = document.querySelector('[data-slot="basic-info-grid"]')!
+    expect(grid.className).toContain('grid')
+    expect(grid.className).toContain('md:grid-cols-2')
+    const cells = grid.querySelectorAll(':scope > [data-slot="profile-field"]')
+    expect(cells.length).toBe(15)
+    cells.forEach((cell) => expect(cell.className).toContain('h-full'))
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0]!)
+    const actions = document.querySelector('[data-slot="basic-info-actions"]')!
+    const buttons = Array.from(actions.querySelectorAll('button'))
+    // Primary first in the DOM, so it is on the right in RTL.
+    expect(buttons.map((button) => button.textContent)).toEqual(['ذخیره', 'انصراف'])
+    fireEvent.click(buttons[1]!)
+    expect(document.querySelector('[data-slot="basic-info-actions"]')).toBeNull()
+  })
+
+  it('address dialog: province and city are selects, every field has a placeholder, save is first', () => {
+    render(
+      createElement(CompanyProfileView, { initialProfile: mockProfile, initialDossier: mockDossierResponse }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'آدرس جدید' }))
+    const province = screen.getByLabelText('استان') as HTMLSelectElement
+    const city = screen.getByLabelText('شهر') as HTMLSelectElement
+    expect(province.tagName).toBe('SELECT')
+    expect(city.tagName).toBe('SELECT')
+    expect(city.disabled).toBe(true)
+    expect(screen.getByRole('option', { name: 'استان را انتخاب کنید' })).toBeTruthy()
+
+    fireEvent.change(province, { target: { value: 'بوشهر' } })
+    expect(city.disabled).toBe(false)
+    fireEvent.change(city, { target: { value: 'بوشهر' } })
+    expect(city.value).toBe('بوشهر')
+    // Changing the province drops the old city.
+    fireEvent.change(province, { target: { value: 'اصفهان' } })
+    expect(city.value).toBe('')
+
+    expect(screen.getByPlaceholderText('مثال: دفتر مرکزی')).toBeTruthy()
+    expect(screen.getByPlaceholderText('مثال: 1234567890')).toBeTruthy()
+    expect(screen.getByPlaceholderText('نشانی کامل را وارد کنید…')).toBeTruthy()
+
+    const footer = document.querySelector('[data-slot="dialog-footer"]')!
+    expect(Array.from(footer.querySelectorAll('button')).map((button) => button.textContent)).toEqual(['ذخیره', 'لغو'])
+  })
+
+  it('keeps a legacy free-text province selectable when editing a saved address', () => {
+    const legacy: ProfileDto = {
+      ...mockProfile,
+      addresses: [{ ...mockProfile.addresses[0]!, province: 'استان قدیمی', city: 'شهر قدیمی' }],
+    }
+    render(createElement(CompanyProfileView, { initialProfile: legacy, initialDossier: mockDossierResponse }))
+    fireEvent.click(screen.getByTitle('ویرایش آدرس'))
+    expect((screen.getByLabelText('استان') as HTMLSelectElement).value).toBe('استان قدیمی')
+    expect((screen.getByLabelText('شهر') as HTMLSelectElement).value).toBe('شهر قدیمی')
+  })
+
+  it('resume certificates have no ready-made file slot, only the add button', () => {
+    render(
+      createElement(ResumeProfileView, { initialDossier: mockDossierResponse, companyId: 'comp-1' }),
+    )
+    expect(screen.queryByText('فایل گواهی‌ها و مجوزها')).toBeNull()
+    expect(screen.getByRole('button', { name: 'افزودن' })).toBeTruthy()
+    // The catalogue upload is a different section and stays.
+    expect(screen.getByText('فایل کاتالوگ')).toBeTruthy()
+  })
 })

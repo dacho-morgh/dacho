@@ -517,7 +517,7 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           </div>
           <Button type="button" variant="gray" size="32" onClick={() => setCertDialog(true)}>
             <DashboardAddIcon className="size-4" />
-            مجوز جدید
+            <Typography>افزودن</Typography>
           </Button>
         </div>
 
@@ -551,25 +551,6 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               </Button>
             </div>
           ))}
-
-          {/* فایل مدارک گواهی‌ها */}
-          <div className="pt-2">
-            <PrivateDocumentField
-              category="certificatesLicenses"
-              label="فایل گواهی‌ها و مجوزها"
-              companyId={companyId ?? undefined}
-              canUpload={Boolean(companyId)}
-              canDelete
-              disabled={isSaving}
-              onPendingChange={(pending) =>
-                setPendingDocuments((current) =>
-                  current.certificatesLicenses === pending
-                    ? current
-                    : { ...current, certificatesLicenses: pending },
-                )
-              }
-            />
-          </div>
         </div>
       </section>
 

@@ -32,6 +32,60 @@ export function dossierFieldLabel(key: string): string {
   return DOSSIER_FIELD_LABELS[key] ?? key
 }
 
+/** Where a dossier field is filled in: the profile page and the section on it. */
+export interface DossierFieldLocation {
+  page: string
+  section: string
+}
+
+const COMPANY_PAGE = 'پروفایل شرکت'
+const RESUME_PAGE = 'رزومه'
+
+export const DOSSIER_FIELD_LOCATIONS: Record<string, DossierFieldLocation> = {
+  registrationNumber: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  status: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  legalEntityType: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  knowledgeBasedStatus: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  classification: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  foundingYear: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  activityDomain: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  website: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  centerEstablishment: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  insuredEmployeeCount: { page: COMPANY_PAGE, section: 'اطلاعات پایه' },
+  articlesOfAssociation: { page: COMPANY_PAGE, section: 'مدارک رسمی شرکت' },
+  establishmentNotices: { page: COMPANY_PAGE, section: 'مدارک رسمی شرکت' },
+  amendmentNotices: { page: COMPANY_PAGE, section: 'مدارک رسمی شرکت' },
+  addresses: { page: COMPANY_PAGE, section: 'آدرس‌ها' },
+  productsServices: { page: RESUME_PAGE, section: 'محصولات و خدمات' },
+  pastProjectsCustomers: { page: RESUME_PAGE, section: 'سوابق پروژه‌ها و مشتریان' },
+  requestedServices: { page: RESUME_PAGE, section: 'خدمات مورد تقاضا' },
+  certificatesLicenses: { page: RESUME_PAGE, section: 'گواهی‌ها و مجوزها' },
+  catalogues: { page: RESUME_PAGE, section: 'کاتالوگ و معرفی شرکت' },
+}
+
+const UNKNOWN_LOCATION: DossierFieldLocation = { page: COMPANY_PAGE, section: 'سایر اطلاعات' }
+
+export interface MissingItemGroup {
+  page: string
+  section: string
+  keys: string[]
+}
+
+/**
+ * Groups missing dossier keys by the page and section where the form lives, in
+ * the order the keys first appear.
+ */
+export function groupMissingByLocation(keys: readonly string[]): MissingItemGroup[] {
+  const groups: MissingItemGroup[] = []
+  for (const key of keys) {
+    const { page, section } = DOSSIER_FIELD_LOCATIONS[key] ?? UNKNOWN_LOCATION
+    const group = groups.find((item) => item.page === page && item.section === section)
+    if (group) group.keys.push(key)
+    else groups.push({ page, section, keys: [key] })
+  }
+  return groups
+}
+
 export interface KeyMemberDto {
   name: string
   role: string
