@@ -122,44 +122,46 @@ describe('RequestsPage', () => {
   const searchParams = Promise.resolve({ search: 'طرح', eventId: EVENT_ID, stage: 'triaged', queue: 'company_draft' })
   const query = `search=${encodeURIComponent('طرح')}&eventId=${EVENT_ID}&stage=triaged&queue=company_draft`
 
-  it('reads the company list with its search and event filters and counts its three stages', async () => {
+  it('reads the company list and its stage counts from the API with the same filters', async () => {
     asUser('representative')
+    // Counts beyond any single page: the numbers come from `/stats`, never from the listed rows.
+    const companyStats = { ...stats, total: 1240, phases: { verification: 610, reviewing: 400, finished: 230 } }
     backend.fetch.mockImplementation(async (path: string) =>
       path.startsWith('/stats/overview')
         ? { kind: 'ok', data: { counts: stats, queues: [], events: [{ id: EVENT_ID, title: 'رویداد نمونه' }] } }
-        : {
-            kind: 'ok',
-            data: {
-              items: [
-                request('a', { status: 'draft', reviewStage: null }),
-                request('b', { reviewStage: 'chief_triage' }),
-                request('c', { reviewStage: 'triaged' }),
-                request('d', { status: 'approved', reviewStage: 'advanced' }),
-              ],
-              total: 4,
-              page: 1,
-              totalPages: 1,
+        : path.startsWith('/stats')
+          ? { kind: 'ok', data: companyStats }
+          : {
+              kind: 'ok',
+              data: {
+                // The API has already narrowed the list to the stage.
+                items: [request('a', { status: 'draft', reviewStage: null }), request('b', { reviewStage: 'chief_triage' })],
+                total: 610,
+                page: 1,
+                totalPages: 13,
+              },
             },
-          },
     )
     render(await RequestsPage({ searchParams: Promise.resolve({ search: 'طرح', eventId: EVENT_ID, phase: 'verification', queue: 'company_draft' }) }))
 
-    // The stage is applied on the page; the API gets the other filters, and no stats call is made for a company.
-    expect(backend.fetch).toHaveBeenCalledWith(`/requests?limit=500&page=1&search=${encodeURIComponent('طرح')}&eventId=${EVENT_ID}&queue=company_draft`)
-    expect(backend.fetch.mock.calls.some(([path]) => String(path).startsWith('/stats?'))).toBe(false)
+    // The list is one API page filtered by `phase`; the counts read every stage under the other filters.
+    const filters = `search=${encodeURIComponent('طرح')}&eventId=${EVENT_ID}&queue=company_draft`
+    expect(backend.fetch).toHaveBeenCalledWith(`/requests?limit=50&page=1&phase=verification&${filters}`)
+    expect(backend.fetch).toHaveBeenCalledWith(`/stats?${filters}`)
+    expect(backend.fetch.mock.calls.some(([path]) => String(path).includes('limit=500'))).toBe(false)
     expect(screen.getByText('صف: پیش‌نویس‌های ارسال‌نشده')).toBeTruthy()
-    // Only the two requests in the verification stage are listed, each with the company stage label.
     expect(screen.getAllByText('احراز هویت')).toHaveLength(2)
     expect(screen.queryByText('در حال داوری')).toBeNull()
+    expect(screen.getByRole('link', { name: 'صفحه بعد' }).getAttribute('href')).toBe(`/dashboard/requests?page=2&phase=verification&${filters}`)
 
     // The company filters by its three stages, with each stage's size, and by event.
     fireEvent.click(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }))
     const stages = await screen.findByRole('combobox', { name: 'مرحله درخواست' })
     expect(within(stages).getAllByRole('option').map((option) => option.textContent)).toEqual([
-      `همه (${(4).toLocaleString('fa-IR')})`,
-      `احراز هویت (${(2).toLocaleString('fa-IR')})`,
-      `در حال داوری (${(1).toLocaleString('fa-IR')})`,
-      `تمام‌شده (نتیجهٔ نهایی) (${(1).toLocaleString('fa-IR')})`,
+      `همه (${(1240).toLocaleString('fa-IR')})`,
+      `احراز هویت (${(610).toLocaleString('fa-IR')})`,
+      `در حال داوری (${(400).toLocaleString('fa-IR')})`,
+      `تمام‌شده (نتیجهٔ نهایی) (${(230).toLocaleString('fa-IR')})`,
     ])
     expect(screen.queryByRole('combobox', { name: 'وضعیت درخواست' })).toBeNull()
     expect(within(screen.getByRole('combobox', { name: 'رویداد' })).getByRole('option', { name: 'رویداد نمونه' })).toBeTruthy()

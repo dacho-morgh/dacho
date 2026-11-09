@@ -25,7 +25,7 @@ import {
   type RequestDto,
   type RequestStats,
 } from '@/utilities/dashboard-api'
-import { companyRequestStage, type CompanyRequestStage } from '@/utilities/company-request-stage'
+import type { CompanyRequestStage } from '@/utilities/company-request-stage'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import {
   dashboardOperationalRole,
@@ -105,14 +105,10 @@ export default async function RequestsPage({
   )
 }
 
-const COMPANY_PAGE_SIZE = 50
-/** A company's own requests are few; the stage filter and its counts are computed over all of them. */
-const COMPANY_FETCH_LIMIT = 500
-
 /**
- * The company's list (a plain async function, so the page resolves it like any other branch). The company filters by its three stages (design QA #280), which fold the
- * internal status and review stage; the API filters by the real ones, so the company's own scoped
- * list is read once and filtered, counted and paged here.
+ * The company's list (a plain async function, so the page resolves it like any other branch). The
+ * company filters by its three stages (design QA #280); the API folds status and review stage into
+ * the same `phase`, so the list, its pages and each stage's count all come from the server.
  */
 async function companyRequestsList({
   page,
@@ -127,16 +123,16 @@ async function companyRequestsList({
   events: { id: string; title: string }[]
   queueNote: React.ReactNode
 }) {
-  // `page` is applied here, so the API is always asked for the first (and only) page.
-  const result = await serverDashboardFetchResult<Paginated<RequestDto>>(`/requests?limit=${COMPANY_FETCH_LIMIT}&page=1${filterQuery}`)
+  // The counts read every stage under the other filters, as the staff tabs read every status.
+  const [result, statsResult] = await Promise.all([
+    serverDashboardFetchResult<Paginated<RequestDto>>(`/requests?limit=50&page=${page}${filterQuery}`),
+    serverDashboardFetchResult<RequestStats>(`/stats${requestFiltersQuery({ ...filters, phase: undefined }).replace('&', '?')}`),
+  ])
   const notice = unavailableReasonFor(result)
-  const all = result.kind === 'ok' ? result.data.items : []
-  const stageCounts: Record<CompanyRequestStage | 'all', number> = { all: all.length, verification: 0, reviewing: 0, finished: 0 }
-  for (const dto of all) stageCounts[companyRequestStage(dto)] += 1
-  const matching = filters.phase ? all.filter((dto) => companyRequestStage(dto) === filters.phase) : all
-  const totalPages = Math.max(1, Math.ceil(matching.length / COMPANY_PAGE_SIZE))
-  const currentPage = Math.min(page, totalPages)
-  const items: RequestItem[] = matching.slice((currentPage - 1) * COMPANY_PAGE_SIZE, currentPage * COMPANY_PAGE_SIZE).map(mapRequestItem)
+  const items: RequestItem[] = result.kind === 'ok' ? result.data.items.map(mapRequestItem) : []
+  const phases = statsResult.kind === 'ok' ? statsResult.data.phases : undefined
+  const stageCounts: Partial<Record<CompanyRequestStage | 'all', number>> | undefined =
+    statsResult.kind === 'ok' ? { all: statsResult.data.total, ...phases } : undefined
   const filterForm = <RequestsFilters audience="company" filters={filters} events={events} stageCounts={stageCounts} />
 
   return (
@@ -149,7 +145,9 @@ async function companyRequestsList({
         filterForm={filterForm}
         queueNote={queueNote}
       />
-      {result.kind === 'ok' && <RequestsPagination page={currentPage} totalPages={totalPages} filters={filters} />}
+      {result.kind === 'ok' && (
+        <RequestsPagination page={result.data.page} totalPages={result.data.totalPages} filters={filters} />
+      )}
     </div>
   )
 }

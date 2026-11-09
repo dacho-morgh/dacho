@@ -1,3 +1,5 @@
+import type { CompanyRequestStage } from '../company-request-stage'
+
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 export type LetterType = 'rejected' | 'approved' | 'needs_fix' | 'official' | 'notification'
 
@@ -85,6 +87,11 @@ export interface RequestStats {
   approved: number
   action_needed: number
   rejected: number
+  /**
+   * The same rows by company-facing stage (#280), folded by the server with the table of
+   * `company-request-stage.ts`. Optional so an older server reads as "no count", never as zero.
+   */
+  phases?: Record<CompanyRequestStage, number>
 }
 
 /** A queue the backend counts for the current role; an unknown key is never shown. */

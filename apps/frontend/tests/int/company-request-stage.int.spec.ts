@@ -64,13 +64,22 @@ describe('company-facing request stages (design QA #280)', () => {
     expect(companyRequestStage({ status: 'toString' })).toBe('reviewing')
   })
 
-  it('keeps only valid stages from the URL and carries them through list links but not to the API', () => {
+  it('keeps only valid stages from the URL and carries them through list links and to the API', () => {
     expect(parseCompanyRequestStage('finished')).toBe('finished')
     expect(parseCompanyRequestStage('chief_triage')).toBeUndefined()
     expect(parseCompanyRequestStage(['finished'])).toBeUndefined()
     const filters = parseRequestFilters({ phase: 'reviewing', search: 'x' })
     expect(filters).toEqual({ phase: 'reviewing', search: 'x' })
     expect(requestQueueHref('/dashboard/requests', undefined, 2, filters)).toBe('/dashboard/requests?page=2&phase=reviewing&search=x')
-    expect(requestFiltersQuery(filters)).toBe('&search=x')
+    // The API folds status and review stage into `phase` with the same table (#280).
+    expect(requestFiltersQuery(filters)).toBe('&phase=reviewing&search=x')
+  })
+
+  it('is the table the backend filters and counts with', () => {
+    // apps/backend/tests/company-request-phase.spec.ts asserts the two agree for every combination;
+    // this guards that the backend module the test reads still exists and lists the same phases.
+    const source = readFileSync(resolve(__dirname, '../../../backend/src/dashboard/company-request-phase.ts'), 'utf8')
+    const declared = /export const COMPANY_REQUEST_PHASES = \[([^\]]+)\]/.exec(source)?.[1].match(/'([a-z_]+)'/g)?.map((value) => value.slice(1, -1))
+    expect(declared).toEqual([...COMPANY_REQUEST_STAGES])
   })
 })

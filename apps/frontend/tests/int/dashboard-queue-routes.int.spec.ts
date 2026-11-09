@@ -64,20 +64,21 @@ const companyRequest = (index: number, extra: Record<string, unknown> = {}) => (
   ...extra,
 })
 
-it('pages the company list by its stage filter and keeps the stage on the links', async () => {
-  // 120 requests in review plus one finished: the stage filter and the pages are applied on the page.
-  const items = [
-    ...Array.from({ length: 120 }, (_, index) => companyRequest(index)),
-    companyRequest(900, { status: 'approved', reviewStage: 'advanced' }),
-  ]
-  backend.fetch.mockResolvedValue({ kind: 'ok', data: { items, total: items.length, page: 1, totalPages: 1 } })
+it('pages the company list by its stage filter through the API and keeps the stage on the links', async () => {
+  // Page 2 of 3 of the requests in review, already filtered and paged by the API.
+  const items = Array.from({ length: 50 }, (_, index) => companyRequest(50 + index))
+  backend.fetch.mockImplementation(async (path: string) =>
+    path.startsWith('/requests')
+      ? { kind: 'ok', data: { items, total: 120, page: 2, totalPages: 3 } }
+      : { kind: 'unavailable' },
+  )
   render(await RequestsPage({ searchParams: Promise.resolve({ phase: 'reviewing', page: '2' }) }))
-  expect(backend.fetch).toHaveBeenCalledWith('/requests?limit=500&page=1')
-  // The API never sees the company's stage: it only knows real stages and statuses.
-  expect(backend.fetch.mock.calls.map(([path]) => String(path)).some((path) => path.includes('phase'))).toBe(false)
+  expect(backend.fetch).toHaveBeenCalledWith('/requests?limit=50&page=2&phase=reviewing')
+  // The counts read every stage, so the stage is not passed to them.
+  expect(backend.fetch).toHaveBeenCalledWith('/stats')
   expect(screen.getByRole('link', { name: 'صفحه قبل' }).getAttribute('href')).toBe('/dashboard/requests?phase=reviewing')
   expect(screen.getByRole('link', { name: 'صفحه بعد' }).getAttribute('href')).toBe('/dashboard/requests?page=3&phase=reviewing')
-  expect(screen.queryByText('درخواست 900')).toBeNull()
+  expect(screen.getByText('درخواست 50')).toBeTruthy()
   // The only search field is the real one: a GET form that keeps the stage (Figma placeholder, design QA #276).
   const search = screen.getByPlaceholderText('درخواست خود را جست و جو کنید')
   expect(screen.getAllByPlaceholderText('درخواست خود را جست و جو کنید')).toHaveLength(1)

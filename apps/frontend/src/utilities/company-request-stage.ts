@@ -6,6 +6,10 @@
  *
  * It is a pure naming of what the server already recorded (status + review
  * stage); it never decides a transition.
+ *
+ * The API filters and counts by the same table (`phase` on `GET /requests` and `GET /stats`,
+ * `apps/backend/src/dashboard/company-request-phase.ts`). The backend test
+ * `company-request-phase.spec.ts` imports this file and fails when the two disagree: change both.
  */
 
 /** The request statuses the server knows (`dashboard.requests.status`). */

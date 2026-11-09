@@ -5,7 +5,7 @@ import { Typography } from '@/components/ui/typography'
 import { REQUEST_STATUS_LABELS, type RequestStats } from '@/utilities/dashboard-api'
 
 const ROWS: {
-  key: keyof Omit<RequestStats, 'total'> | 'draft'
+  key: keyof Omit<RequestStats, 'total' | 'phases'> | 'draft'
   variant: BadgeProps['variant']
   bar: string
 }[] = [

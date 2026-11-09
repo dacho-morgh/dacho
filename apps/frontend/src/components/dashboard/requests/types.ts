@@ -72,9 +72,9 @@ export function parseRequestFilters(query: {
   return filters
 }
 
-function appendFilters(query: URLSearchParams, filters: RequestQueueFilters, { api = false } = {}) {
-  // `phase` only narrows the company's own list on the page; the API knows real stages.
-  if (filters.phase && !api) query.set('phase', filters.phase)
+function appendFilters(query: URLSearchParams, filters: RequestQueueFilters) {
+  // The API folds status and review stage into `phase` with the same table (#280).
+  if (filters.phase) query.set('phase', filters.phase)
   if (filters.search) query.set('search', filters.search)
   if (filters.eventId) query.set('eventId', filters.eventId)
   if (filters.stage) query.set('stage', filters.stage)
@@ -84,7 +84,7 @@ function appendFilters(query: URLSearchParams, filters: RequestQueueFilters, { a
 /** The API query string of the filters, starting with `&`, or nothing without any. */
 export function requestFiltersQuery(filters: RequestQueueFilters): string {
   const query = new URLSearchParams()
-  appendFilters(query, filters, { api: true })
+  appendFilters(query, filters)
   return query.size ? `&${query}` : ''
 }
 
