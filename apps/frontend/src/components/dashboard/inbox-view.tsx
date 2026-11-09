@@ -18,7 +18,6 @@ import { RowActions } from '@/components/dashboard/list-row-actions'
 import { ListRow, ListTableFrame, useRowLink } from '@/components/dashboard/list-table'
 import { ListToolbar } from '@/components/dashboard/list-toolbar'
 import { SearchField } from '@/components/dashboard/search-field'
-import { SupportModal } from '@/components/dashboard/support-modal'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
@@ -254,6 +253,9 @@ function InboxEmpty({ filtered, sent }: { filtered: boolean; sent: boolean }) {
   )
 }
 
+/** The new-letter page's support mode: the one place a company writes to support. */
+const SUPPORT_LETTER_HREF = '/dashboard/letters/new?mode=support'
+
 const STATUS_OPTIONS: Array<{ value: InboxQuery['status']; label: string }> = [
   { value: undefined, label: 'همه نامه‌ها' },
   { value: 'unread', label: 'خوانده‌نشده' },
@@ -266,7 +268,6 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
   const [pending, startTransition] = useTransition()
   const [rows, setRows] = useState(initialRows)
   const [search, setSearch] = useState(query.q ?? '')
-  const [supportOpen, setSupportOpen] = useState(false)
 
   // A new server render (another tab, page or filter) replaces the rows.
   const [shownRows, setShownRows] = useState(initialRows)
@@ -395,11 +396,14 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
               </Link>
             </Button>
           ) : (
-            <Button type="button" size="48" className="shrink-0" onClick={() => setSupportOpen(true)}>
-              <Typography as="span" variant="20/regular" className="text-inherit">
-                پیام به پشتیبانی
-              </Typography>
-              <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
+            // Support opens the new-letter page in its support mode (design QA #280), not a modal.
+            <Button asChild size="48" className="shrink-0">
+              <Link href={SUPPORT_LETTER_HREF}>
+                <Typography as="span" variant="20/regular" className="text-inherit">
+                  پیام به پشتیبانی
+                </Typography>
+                <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
+              </Link>
             </Button>
           )
         }
@@ -483,17 +487,6 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
             </Button>
           )}
         </nav>
-      )}
-
-      {!canCompose && (
-        <SupportModal
-          isOpen={supportOpen}
-          onClose={() => setSupportOpen(false)}
-          onSuccess={(code) => {
-            toast.success(`پیام شما با کد پیگیری ${code} برای پشتیبانی ارسال شد.`)
-            startTransition(() => router.refresh())
-          }}
-        />
       )}
     </div>
   )
