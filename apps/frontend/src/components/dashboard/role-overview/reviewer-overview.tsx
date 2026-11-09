@@ -1,13 +1,12 @@
 import { ActivityCard } from '@/components/dashboard/owner-overview/activity-card'
 import { KpiCard } from '@/components/dashboard/owner-overview/kpi-card'
-import { EditIcon, RequestsIcon, ClockBulkIcon, TickCircleIcon } from '@/components/icons'
+import { RequestsIcon, ClockBulkIcon, TickCircleIcon } from '@/components/icons'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 import { formatDate, type ActivityDto, type Paginated } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
 import {
   ownEvaluationLabel,
-  reviewWorkState,
   type ReviewQueueDto,
   type ReviewQueueItemDto,
 } from '@/utilities/reviewer-case'
@@ -16,7 +15,14 @@ import { EVALUATION_ROWS } from './chart-rows'
 import { CaseCell, DataTableCard, RowAction } from './data-table-card'
 import { NextTasksCard } from './next-tasks-card'
 import { KpiGrid, OverviewShell } from './overview-shell'
-import { READ_FAILED, chartOf, fa, greeting, type RoleOverviewDto } from './shared'
+import {
+  FIXED_CARD_HEIGHT,
+  READ_FAILED,
+  chartOf,
+  fa,
+  greeting,
+  type RoleOverviewDto,
+} from './shared'
 
 function evaluationBadge(item: ReviewQueueItemDto): {
   label: string
@@ -53,7 +59,6 @@ export async function ReviewerOverview({
   const actionable = items?.filter((item) => item.actionable) ?? []
   const drafts = actionable.filter((item) => item.evaluation?.state === 'draft').length
   const finalized = items?.filter((item) => item.evaluation?.state === 'final').length
-  const superseded = items?.filter((item) => reviewWorkState(item) === 'superseded').length
   const waiting = counts?.open
   const roleLabel = role === 'employer-reviewer' ? 'کارفرما' : 'داور'
 
@@ -68,7 +73,6 @@ export async function ReviewerOverview({
       <KpiGrid>
         <KpiCard
           label="در انتظار ثبت نهایی"
-          tone="warning"
           value={waiting === undefined ? '—' : fa(waiting)}
           icon={<ClockBulkIcon />}
           meta={
@@ -79,7 +83,6 @@ export async function ReviewerOverview({
         />
         <KpiCard
           label="ارزیابی‌های نهایی‌شده"
-          tone="success"
           value={finalized === undefined ? '—' : fa(finalized)}
           icon={<TickCircleIcon />}
           meta={items ? `نقش شما: ${roleLabel}` : READ_FAILED}
@@ -90,15 +93,9 @@ export async function ReviewerOverview({
           icon={<RequestsIcon />}
           meta={counts ? `از ${fa(counts.all)} پرونده ارجاع‌شده` : READ_FAILED}
         />
-        <KpiCard
-          label="نسخه جدیدتر ثبت‌شده"
-          value={superseded === undefined ? '—' : fa(superseded)}
-          icon={<EditIcon />}
-          meta={items ? 'ارزیابی پیشین در دور جدید شمرده نمی‌شود' : READ_FAILED}
-        />
       </KpiGrid>
 
-      <div className="grid items-start gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         <BreakdownCard
           title="پیشرفت ارزیابی‌های شما"
           subtitle="دور جاری هر پرونده ارجاع‌شده"
@@ -106,14 +103,17 @@ export async function ReviewerOverview({
           values={chartOf(overview.kind === 'ok' ? overview.data : undefined, 'own_evaluations')}
           notice={unavailableReasonFor(overview)}
           emptyText="هنوز پرونده‌ای به شما ارجاع نشده است."
+          className={FIXED_CARD_HEIGHT}
         />
         <NextTasksCard
           queues={overview.kind === 'ok' ? overview.data.queues : undefined}
           notice={unavailableReasonFor(overview)}
+          className={FIXED_CARD_HEIGHT}
         />
         <ActivityCard
           items={activities.kind === 'ok' ? activities.data.items : undefined}
           notice={unavailableReasonFor(activities)}
+          className={FIXED_CARD_HEIGHT}
         />
       </div>
 

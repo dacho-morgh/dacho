@@ -18,9 +18,8 @@ import { monthlyTrend, type TrendDayDto } from '@/utilities/dashboard-trend'
 import { STATUS_VARIANT, STAGE_LABELS, type CaseListItem } from './case-list'
 import { CaseCell, DataTableCard, RowAction } from './data-table-card'
 import { FunnelCard } from './funnel-card'
-import { NextTasksCard } from './next-tasks-card'
 import { KpiGrid, OverviewShell } from './overview-shell'
-import { READ_FAILED, countText, fa, greeting, queueCount } from './shared'
+import { FIXED_CARD_HEIGHT, READ_FAILED, countText, fa, greeting, queueCount } from './shared'
 
 /** First command the chief can run on a case, most specific first. */
 const CHIEF_ACTIONS: { action: RequestAction; label: string }[] = [
@@ -54,7 +53,6 @@ export async function ChiefOverview({ userName }: { userName?: string | null }) 
       <KpiGrid>
         <KpiCard
           label="در انتظار بررسی اولیه"
-          tone="warning"
           value={countText(queueCount(queues, 'chief_triage'))}
           icon={<EyeIcon />}
           meta={queues ? 'پرونده‌های رویدادهای شما' : READ_FAILED}
@@ -67,7 +65,6 @@ export async function ChiefOverview({ userName }: { userName?: string | null }) 
         />
         <KpiCard
           label="داوری کامل، در انتظار تصمیم"
-          tone="success"
           value={countText(queueCount(queues, 'chief_decide'))}
           icon={<TickCircleIcon />}
           meta={queues ? 'تصمیم پیشروی یا رد با شماست' : READ_FAILED}
@@ -81,10 +78,11 @@ export async function ChiefOverview({ userName }: { userName?: string | null }) 
         />
       </KpiGrid>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <FunnelCard
           title="مسیر درخواست‌ها در رویداد"
           subtitle="تعداد پرونده‌هایی که به هر مرحله رسیده‌اند"
+          className={FIXED_CARD_HEIGHT}
           steps={
             funnelReady
               ? [
@@ -95,13 +93,12 @@ export async function ChiefOverview({ userName }: { userName?: string | null }) 
               : undefined
           }
         />
-        <NextTasksCard queues={queues} notice={unavailableReasonFor(overview)} />
+        <ActivityCard
+          items={activities.kind === 'ok' ? activities.data.items : undefined}
+          notice={unavailableReasonFor(activities)}
+          className={FIXED_CARD_HEIGHT}
+        />
       </div>
-
-      <ActivityCard
-        items={activities.kind === 'ok' ? activities.data.items : undefined}
-        notice={unavailableReasonFor(activities)}
-      />
 
       <DataTableCard
         title="لیست درخواست‌های در جریان"

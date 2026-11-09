@@ -2,6 +2,14 @@ import type { DashboardOverviewDto, WorkQueueCountDto } from '@/utilities/dashbo
 
 export const fa = (value: number) => value.toLocaleString('fa-IR')
 export const UNAVAILABLE = '—'
+
+/**
+ * The row of three section cards on the reviewer and chief boards shares one fixed height, so the
+ * row stays level whatever the data holds. Content that does not fit scrolls inside its card.
+ */
+export const FIXED_CARD_HEIGHT = 'h-[360px]'
+/** The scrolling body of a fixed-height card, below the title. */
+export const CARD_BODY = 'min-h-0 flex-1 overflow-y-auto'
 export const READ_FAILED = 'دریافت اطلاعات انجام نشد'
 
 const todayFormat = new Intl.DateTimeFormat('fa-IR', {
