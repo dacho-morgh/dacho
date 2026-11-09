@@ -1,6 +1,7 @@
 'use client'
 
 import { SearchField } from '@/components/dashboard/search-field'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   CalendarBulkIcon,
   EmptyInboxIllustration,
@@ -69,10 +70,53 @@ export interface EventsViewProps {
   initialSubtopicIds?: string[]
 }
 
+/**
+ * The status tag of an event (design QA #281, Figma Tag 45:1243): «پیش‌رو» is the secondary (amber) tag,
+ * «در حال برگزاری» the primary (blue) one and «تمام‌شده» the gray one.
+ */
+export const EVENT_TAG_VARIANT = {
+  upcoming: 'secondary',
+  active: 'primary',
+  ended: 'gray',
+} as const satisfies Record<EventItem['badgeType'], 'secondary' | 'primary' | 'gray'>
+
+function EventStatusTag({ type, children }: { type: EventItem['badgeType']; children: ReactNode }) {
+  return (
+    <Badge variant={EVENT_TAG_VARIANT[type]} size="md" data-event-status={type}>
+      {children}
+    </Badge>
+  )
+}
+
+/**
+ * One line of an event card: the icon first, then the text (Figma 56:13490 / 56:13493). In the RTL page the
+ * first child sits on the right. The text is the 16/SemiBold body style in neutral-600.
+ */
+function EventMetaRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      {icon}
+      <Typography as="span" variant="16/semibold" color="neutral-600" className="min-w-0 flex-1 break-words">
+        {children}
+      </Typography>
+    </div>
+  )
+}
+
+/** Date and place of an event card: a 16px gap between the two lines (Figma 56:13489 / 56:13527). */
+function EventMeta({ dates, location }: { dates: string; location: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-4">
+      <EventMetaRow icon={<CalendarBulkIcon className="size-[28px] shrink-0 text-neutral-400" />}>{dates}</EventMetaRow>
+      <EventMetaRow icon={<LocationBulkIcon className="size-[28px] shrink-0 text-neutral-400" />}>{location}</EventMetaRow>
+    </div>
+  )
+}
+
 // Skeleton state matching Figma node 56:13600
 function EventsSkeleton() {
   return (
-    <div role="status" aria-label="در حال بارگذاری رویدادها" className="flex flex-col gap-[32px]">
+    <div role="status" aria-label="در حال بارگذاری رویدادها" className="flex flex-col gap-4">
       {[1, 2, 3].map((i) => (
         <div
           key={i}
@@ -108,7 +152,7 @@ function TreeSkeleton() {
             <Skeleton className="h-6 w-48 rounded-md bg-neutral-100" />
             <Skeleton className="h-6 w-20 rounded-md bg-neutral-100" />
           </div>
-          <div className="mr-6 flex flex-col gap-2 pt-2">
+          <div className="ms-6 flex flex-col gap-2 pt-2">
             <Skeleton className="h-5 w-64 rounded-md bg-neutral-100" />
             <Skeleton className="h-5 w-56 rounded-md bg-neutral-100" />
           </div>
@@ -540,7 +584,7 @@ export function EventsView({
     const selectedCount = selectedSubtopicIds.size
 
     return (
-      <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
+      <div className="flex min-h-0 w-full flex-1 flex-col text-start" dir="rtl">
         {/* Breadcrumbs and Top Action Header - Figma Frame 146 (node 31967:73802) */}
         <div className="flex flex-wrap items-center justify-between gap-4 py-2">
           {/* Breadcrumb path */}
@@ -572,14 +616,14 @@ export function EventsView({
               onClick={handleRegisterSelected}
               disabled={isEnded || selectedCount === 0 || !eligibility?.canParticipate}
             >
-              <span className="font-sans text-[15px] font-semibold">
+              <TickSquareIcon className="size-6 shrink-0 stroke-white" />
+              <Typography as="span" variant="16/semibold" className="text-inherit">
                 {isEnded
                   ? 'مهلت ثبت‌نام پایان یافته'
                   : selectedCount > 0
                     ? `ثبت درخواست (${toPersianDigits(selectedCount)} زیرعنوان)`
                     : 'ثبت‌نام در رویداد'}
-              </span>
-              <TickSquareIcon className="size-5 shrink-0 stroke-white" />
+              </Typography>
             </Button>
           </div>
         </div>
@@ -593,28 +637,15 @@ export function EventsView({
             <div className="flex w-full flex-1 flex-col justify-between gap-4 py-1">
               {/* Badge + Title */}
               <div className="flex flex-col items-start gap-3">
-                <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-neutral-100 px-3 py-1 font-sans text-[13px] leading-[24px] font-normal text-neutral-600">
-                  {selectedEvent.badgeText}
-                </span>
-                <h1 className="font-sans text-[20px] leading-[32px] font-bold text-neutral-700 sm:text-[22px]">
+                <EventStatusTag type={selectedEvent.badgeType}>{selectedEvent.badgeText}</EventStatusTag>
+                <Typography as="h1" variant="20/bold" color="neutral-700">
                   {selectedEvent.title}
-                </h1>
+                </Typography>
               </div>
 
               {/* Dates & Location */}
-              <div className="flex flex-col gap-2.5 pt-2">
-                <div className="flex items-center gap-2">
-                  <CalendarBulkIcon className="size-[24px] shrink-0 text-neutral-400" />
-                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-neutral-600">
-                    {selectedEvent.dates}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <LocationBulkIcon className="size-[24px] shrink-0 text-neutral-400" />
-                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-neutral-600">
-                    {selectedEvent.location}
-                  </span>
-                </div>
+              <div className="pt-2">
+                <EventMeta dates={selectedEvent.dates} location={selectedEvent.location} />
               </div>
             </div>
 
@@ -953,11 +984,11 @@ export function EventsView({
   // VIEW: EVENTS LIST VIEW (Figma node 56:14018)
   // -------------------------------------------------------------
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
+    <div className="flex min-h-0 w-full flex-1 flex-col text-start" dir="rtl">
       {/* Page Title - Figma node 56:13203 */}
-      <h1 className="font-sans text-[24px] leading-[36px] font-bold text-neutral-700">
+      <Typography as="h1" variant="24/bold" color="neutral-700">
         رویدادها و نمایشگاه‌ها
-      </h1>
+      </Typography>
 
       {/* Action Bar - Figma Frame 1 (56:13205): search and the filter template on the right */}
       <ListToolbar
@@ -1011,11 +1042,11 @@ export function EventsView({
         ) : (
           <ScrollArea className="min-h-0 flex-1">
             {!isEmpty && (
-              <div className="flex flex-col gap-[32px]">
+              <div className="flex flex-col gap-4">
                 {sortedEvents.map((evt) => (
                   <article
                     key={evt.id}
-                    className={`flex flex-col-reverse items-start justify-end gap-[16px] rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 sm:h-[200px] sm:flex-row ${
+                    className={`flex flex-col-reverse items-start justify-end gap-4 rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 sm:h-[200px] sm:flex-row sm:items-center ${
                       eventHasTarget(evt) ? 'cursor-pointer hover:bg-neutral-50' : ''
                     }`}
                     {...rowActivationProps(eventHasTarget(evt) ? (newTab) => {
@@ -1041,70 +1072,35 @@ export function EventsView({
                         </Typography>
                       )}
                     </div>
-                    {/* Content Column on Left (Frame 46) */}
-                    <div className="flex h-[176px] w-full flex-1 flex-col justify-between py-1">
-                      {/* Top Section: Tag and Title (Frame 41) */}
-                      <div className="flex flex-col items-start gap-[16px]">
-                        <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-neutral-100 px-[12px] py-[4px] font-sans text-[14px] leading-[24px] font-normal text-neutral-600">
-                          {evt.badgeText}
-                        </span>
-                        <h2 className="font-sans text-[18px] leading-[32px] font-bold text-neutral-700 sm:text-[20px]">
+                    {/* Content column (Figma Frame 46, 176px tall): tag and title, then date, place and the action */}
+                    <div className="flex w-full flex-1 flex-col justify-between gap-8 sm:h-[176px]">
+                      {/* Top Section: Tag and Title (Frame 41), 16px apart */}
+                      <div className="flex flex-col items-start gap-4">
+                        <EventStatusTag type={evt.badgeType}>{evt.badgeText}</EventStatusTag>
+                        <Typography as="h2" variant="20/bold" color="neutral-700">
                           {evt.title}
-                        </h2>
+                        </Typography>
                       </div>
 
-                      {/* Bottom Section: Details + Action Button */}
-                      {(isOwner && evt.serviceKey === 'exhibitions') ||
-                      (!isOwner && evt.hasActionButton) ? (
-                        /* Frame 91: Has Date/Location + Button */
+                      {/* Bottom Section: date and place, and the action button on the far side (Frame 91) */}
+                      {eventHasAction(evt) ? (
                         <div className="flex flex-wrap items-end justify-between gap-4">
-                          {/* Date and Location */}
-                          <div className="flex flex-col gap-[16px]">
-                            <div className="flex items-center gap-[8px]">
-                              <CalendarBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
-                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
-                                {evt.dates}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-[8px]">
-                              <LocationBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
-                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
-                                {evt.location}
-                              </span>
-                            </div>
-                          </div>
+                          <EventMeta dates={evt.dates} location={evt.location} />
 
-                          {/* Action Button */}
-                          <Button size="40"
-                            type="button"
-                            onClick={() => openEvent(evt)}
-                          >
-                            <span className="font-sans text-[16px] leading-[28px] font-semibold">
+                          {/* The tick icon comes first in the DOM, so in RTL it sits on the right of the label (Figma 56:14063). */}
+                          <Button size="40" type="button" onClick={() => openEvent(evt)}>
+                            <TickSquareIcon className="size-[24px] shrink-0 stroke-white" />
+                            <Typography as="span" variant="16/semibold" className="text-inherit">
                               {isOwner && evt.serviceKey === 'exhibitions'
                                 ? 'مدیریت غرفه‌ها'
                                 : evt.serviceKey === 'exhibitions'
                                   ? 'رزرو غرفه'
                                   : evt.actionButtonText || 'ثبت درخواست'}
-                            </span>
-                            <TickSquareIcon className="size-[24px] shrink-0 stroke-white" />
+                            </Typography>
                           </Button>
                         </div>
                       ) : (
-                        /* Frame 44: Date and Location only */
-                        <div className="flex flex-col gap-[16px]">
-                          <div className="flex items-center gap-[8px]">
-                            <CalendarBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
-                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
-                              {evt.dates}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-[8px]">
-                            <LocationBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
-                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
-                              {evt.location}
-                            </span>
-                          </div>
-                        </div>
+                        <EventMeta dates={evt.dates} location={evt.location} />
                       )}
                     </div>
                   </article>
