@@ -18,6 +18,7 @@ import {
   isSupervisoryRole,
   ownCompanyProfile,
   requestCompanyCard,
+  requestCompanyNames,
   requestEvent,
   withTimelineActors,
 } from '../request-detail.js'
@@ -214,10 +215,14 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
     if (typeof filters === 'string') { res.status(400).json({ error: filters }); return }
     const { scope, companyId } = await resolveScope(actor.id, actor.operationalRole)
     const result = await repo.listScoped(scope, { ...filters, status, page, limit })
+    const companyNames = await requestCompanyNames(deps, actor.operationalRole, result.items)
     res.json({
       ...result,
       items: await Promise.all(
-        (await presentRequests(actor, result.items, companyId)).map((item) => limitRequest(actor, item, false)),
+        (await presentRequests(actor, result.items, companyId)).map(async (item) => ({
+          ...(await limitRequest(actor, item, false)),
+          companyName: companyNames.get(item.id) ?? null,
+        })),
       ),
     })
     } catch (error) { next(error) }
@@ -241,14 +246,21 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
       limit: parsePositiveInt(req.query.limit, 25),
     })
     const presented = await presentRequests(actor, result.items)
+    const companyNames = await requestCompanyNames(deps, actor.operationalRole, result.items)
     const items = await Promise.all(
-      presented.map(async (item) => ({
-        ...(await limitRequest(actor, item, false)),
+      presented.map(async (item) => {
+        const companyName = companyNames.get(item.id) ?? null
         // One owner the CMS cannot resolve (e.g. an old non-numeric id) must not fail the whole list.
-        owner: isReviewerRole(actor.operationalRole)
+        const owner = isReviewerRole(actor.operationalRole)
           ? null
-          : safeOwner(await deps.userStore.findById(item.ownerId).catch(() => undefined)),
-      })),
+          : safeOwner(await deps.userStore.findById(item.ownerId).catch(() => undefined))
+        return {
+          ...(await limitRequest(actor, item, false)),
+          // The company's own name; `owner.companyName` repeats it for the readers who get an owner.
+          companyName,
+          owner: owner ? { ...owner, companyName } : null,
+        }
+      }),
     )
     res.json({ ...result, items })
     } catch (error) { next(error) }

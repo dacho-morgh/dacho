@@ -210,6 +210,47 @@ export async function requestCompanyCard(
   }
 }
 
+/**
+ * The company's own name for each listed case (#288 QA), never the
+ * representative's. Reviewers and employers get the name pinned at submission,
+ * which their queue already shows; every other reader of the list gets the live
+ * company record's name, falling back to the pinned one when the CMS has none.
+ */
+export async function requestCompanyNames(
+  deps: { pool: Pool; companyStore: CompanyStore },
+  role: OperationalRole,
+  requests: readonly Pick<RequestDto, 'id' | 'companyId' | 'ownerId'>[],
+): Promise<Map<string, string | null>> {
+  const ids = requests.map((item) => item.id).filter(isUuid)
+  const pinned = new Map<string, string | null>()
+  if (ids.length > 0) {
+    const { rows } = await deps.pool.query<{ request_id: string; name: string | null }>(
+      `SELECT request_id, snapshot -> 'company' ->> 'name' AS name
+       FROM dashboard.request_verifications WHERE request_id = ANY($1::uuid[])`,
+      [ids],
+    )
+    for (const row of rows) pinned.set(row.request_id, blank(row.name))
+  }
+  if (isReviewerRole(role)) return new Map(requests.map((item) => [item.id, pinned.get(item.id) ?? null]))
+
+  // One CMS read per distinct company (or representative without a company id), not per row.
+  const byCompany = new Map<string, Promise<Company | undefined>>()
+  const byOwner = new Map<string, Promise<Company | undefined>>()
+  for (const item of requests) {
+    if (item.companyId) {
+      if (!byCompany.has(item.companyId)) byCompany.set(item.companyId, deps.companyStore.findById(item.companyId).catch(() => undefined))
+    } else if (!byOwner.has(item.ownerId)) {
+      byOwner.set(item.ownerId, deps.companyStore.findByRepresentative(item.ownerId).catch(() => undefined))
+    }
+  }
+  const names = new Map<string, string | null>()
+  for (const item of requests) {
+    const company = await (item.companyId ? byCompany.get(item.companyId) : byOwner.get(item.ownerId))
+    names.set(item.id, blank(company?.name) ?? pinned.get(item.id) ?? null)
+  }
+  return names
+}
+
 /* ── The company's own profile and resume (representative only) ───────── */
 
 export interface OwnCompanyProfile {
@@ -253,6 +294,9 @@ export function ownCompanyProfile(company: Company): OwnCompanyProfile {
 
 /* ── History actors ────────────────────────────────────────────────────── */
 
+/** The actor id the backend records for steps it takes itself; not a CMS account. */
+export const SYSTEM_ACTOR_ID = 'system'
+
 const actorIdOf = (row: object): string | null => {
   const id = (row as { actorId?: unknown }).actorId
   return typeof id === 'string' && id !== '' ? id : null
@@ -272,7 +316,8 @@ export async function withTimelineActors<T extends object>(
   ownAccountIds: readonly string[],
 ): Promise<(T & { actorName: string | null; actorRole: OperationalRole | null })[] | T[]> {
   if (isReviewerRole(role)) return timeline
-  const ids = [...new Set(timeline.map(actorIdOf).filter((id): id is string => id !== null))]
+  // Automatic steps (the investment handoff) carry the actor `system`, which is no account: never look it up.
+  const ids = [...new Set(timeline.map(actorIdOf).filter((id): id is string => id !== null && id !== SYSTEM_ACTOR_ID))]
   const people = new Map<string, User | undefined>(
     await Promise.all(ids.map(async (id) => [id, await userStore.findById(id).catch(() => undefined)] as const)),
   )

@@ -64,6 +64,12 @@ The step keys never name the financial package, which the chief and reviewers ma
 
 The round's reviewer list (`GET /requests/:id/review-round`, `GET /requests/:id/review-rounds`) adds to each slot `name`, `avatarUrl` (always `null`), `viewedAt` and `status`: `not_viewed` («مشاهده نشده») until the holder first opens the case (`GET /review/cases/:id` or `GET /requests/:id`, recorded in `case_assignments.viewed_at`, migration `1780511400041`), `in_review` («درحال بررسی») once opened or with a draft, `final` («نهایی») once their evaluation of the round's revision is final. Oversight still sees all four slots and a reviewer or employer only their own; the company and the investment person still get `403`. Only the state is exposed, never draft answers.
 
+### Company name in the request lists
+
+`GET /requests` and `GET /admin/requests` items carry **`companyName`**: the company's own name, never the representative's. The owner, Secretariat, chief, investment person and the company get the live company record's name (the name pinned at submission when the CMS has none). Reviewers and the employer get the name pinned at submission, the same value their `/review/queue` shows, and still no `owner`. In `GET /admin/requests` the readers who receive an `owner` also get `owner.companyName` with the same value; new code should read the top-level `companyName`, which is present for every role. The review, investment and follow-up queues already return `companyName` from the pinned profile.
+
+History rows whose step the backend took itself (the investment handoff) have `actorId: 'system'` for the roles that receive actor ids, and `actorName`/`actorRole` `null`; the system actor is never looked up as an account.
+
 `apps/backend/tests/int/request-detail.int.spec.ts` proves each row of the table above per role, including that reviewers and the employer still receive no owner, representative, account id or staff name.
 
 ## Actions
@@ -79,14 +85,19 @@ The round's reviewer list (`GET /requests/:id/review-round`, `GET /requests/:id/
 
 Return and reject require a reason. Each command sends the case revision. A stale or closed command keeps what was typed, explains what happened and rereads the case.
 
-Allowed actions with no screen yet get a sentence and no button:
+Allowed actions with no screen yet get a sentence and no button (`UNBUILT_ACTION_NOTES` in `request-dossier.tsx`):
 
 | Action | Owner of the screen | Why it is not here |
 | --- | --- | --- |
 | `submit` | FE12 | Final submission lives on the event application workspace; acceptance uses the unapproved placeholder agreement versions until approved text is supplied |
-| `submitFinancialPackage` | FE19 | The file field cannot record a statement year yet, so a package could never complete |
-| `replaceReviewer`, `replaceEmployer` | FE15 | The round response had no names; since #288 each slot carries `name` and `status`, so this screen can now be built |
-| Evaluation form | FE17 | The fixed rubric form does not exist |
+
+Built since this table was first written (checked against the code for #288):
+
+| Action | Where |
+| --- | --- |
+| `replaceReviewer`, `replaceEmployer` | `review-assignment-panel.tsx` («لیست داوران و فرم‌های داوری»): «جایگزینی داور» on each unfinished ordinary slot of the current round and «جایگزینی کارفرما» on the employer slot, each opening a picker with a reason; `POST /requests/:id/review-round/reviewers/:userId/replace` and `/review-round/employer/replace` |
+| `submitFinancialPackage` | `financial-package-panel.tsx`: statement-year uploads and `POST /requests/:id/financial-package` |
+| Evaluation form | `reviewer/review-evaluation-form.tsx` at `/dashboard/requests/:id/evaluation` |
 
 The company's `correct` action is built (FE13): the company's case page shows a tracking section (stage, next action, submitted proposal revision, the chief's return or rejection reason, an owner's reopen and the published result) and, while the server lists `correct`, a correction form that patches the same case and calls `POST /requests/:id/resubmit`. That form owns the proposal upload while correcting. Acceptance is recorded with the server's current agreement versions, which remain unapproved placeholders until the approved text is supplied.
 

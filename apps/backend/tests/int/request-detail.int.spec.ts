@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Pool } from 'pg'
 import request from 'supertest'
 
@@ -468,6 +468,17 @@ describe('#288 request page data per role (int)', () => {
       expect(rowOf(timeline, 'chief_review_advance')).toMatchObject({ actorName: NAMES.chief })
     })
 
+    it('shows the automatic handoff as a system step and never looks the system actor up as an account', async () => {
+      const lookups = vi.spyOn(userStore, 'findById')
+      try {
+        const { timeline } = await detail('owner', investmentCase.id)
+        expect(rowOf(timeline, 'investment_handoff')).toMatchObject({ actorId: 'system', actorName: null, actorRole: null })
+        expect(lookups.mock.calls.map(([id]) => id)).not.toContain('system')
+      } finally {
+        lookups.mockRestore()
+      }
+    })
+
     it('names only its own account to the company and gives Fund staff as a role', async () => {
       const body = await detail('company-user-1', roundCase.id)
       expect(rowOf(body.timeline, 'submit')).toMatchObject({ actorName: NAMES['company-user-1'], actorRole: 'representative' })
@@ -528,6 +539,50 @@ describe('#288 request page data per role (int)', () => {
     it('still refuses the case to roles outside it', async () => {
       for (const user of ['chief-2', 'investment', 'investment-2', 'company-user-2'] as const) {
         expect((await get(user, `/requests/${roundCase.id}`)).status, user).toBe(404)
+      }
+    })
+  })
+
+  describe('company name in the request lists', () => {
+    type Item = { id: string; companyName: string | null; owner?: { companyName?: string | null } | null }
+    const itemOf = async (user: Person, path: string, id: string) => {
+      const res = await get(user, path)
+      expect(res.status, `${user} ${path}`).toBe(200)
+      return (res.body.items as Item[]).find((item) => item.id === id)!
+    }
+
+    it('names the company, not its representative, for every role that lists the case', async () => {
+      for (const [user, id] of [
+        ['owner', roundCase.id], ['secretariat', roundCase.id], ['chief', roundCase.id], ['investment', investmentCase.id],
+      ] as const) {
+        const admin = await itemOf(user, '/admin/requests?limit=100', id)
+        expect(admin, user).toMatchObject({ companyName: COMPANY_NAME, owner: { companyName: COMPANY_NAME, name: NAMES['company-user-1'] } })
+        expect((await itemOf(user, '/requests?limit=100', id)).companyName, user).toBe(COMPANY_NAME)
+      }
+      expect((await itemOf('company-user-1', '/requests?limit=100', roundCase.id)).companyName).toBe(COMPANY_NAME)
+      expect((await get('company-user-2', '/requests?limit=100')).body.items).toEqual([])
+    })
+
+    it('gives reviewers and the employer the pinned company name and still no owner', async () => {
+      for (const user of ['reviewer-1', 'employer-1'] as const) {
+        for (const path of ['/admin/requests?limit=100', '/requests?limit=100']) {
+          const res = await get(user, path)
+          const item = (res.body.items as Item[]).find((entry) => entry.id === roundCase.id)!
+          expect(item.companyName, `${user} ${path}`).toBe(COMPANY_NAME)
+          expect(item.owner ?? null, `${user} ${path}`).toBeNull()
+          const text = JSON.stringify(res.body)
+          for (const secret of ['company-user-1', NAMES['company-user-1']]) expect(text, `${user} ${path}`).not.toContain(secret)
+        }
+      }
+    })
+
+    it('reads the live name for oversight and the name at submission for reviewers', async () => {
+      await companyStore.update('1', { name: 'نام تازه شرکت' })
+      try {
+        expect((await itemOf('owner', '/admin/requests?limit=100', roundCase.id)).companyName).toBe('نام تازه شرکت')
+        expect((await itemOf('reviewer-1', '/requests?limit=100', roundCase.id)).companyName).toBe(COMPANY_NAME)
+      } finally {
+        await companyStore.update('1', { name: COMPANY_NAME })
       }
     })
   })
