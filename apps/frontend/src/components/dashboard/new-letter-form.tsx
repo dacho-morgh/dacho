@@ -231,7 +231,8 @@ export function NewLetterForm({
       dir="rtl"
     >
       <header className="flex min-h-10 flex-wrap items-center justify-between gap-4">
-        <nav aria-label="مسیر صفحه" className="flex flex-wrap items-center gap-2">
+        {/* pe-12: clear of the mobile menu button at the top-left corner; the heading gets its own line on a phone. */}
+        <nav aria-label="مسیر صفحه" className="flex min-w-0 basis-full flex-wrap items-center gap-2 pe-12 md:basis-auto md:pe-0">
           <Link href="/dashboard/letters">
             <Typography as="span" variant="16/regular" className="text-neutral-500">کارتابل نامه</Typography>
           </Link>
