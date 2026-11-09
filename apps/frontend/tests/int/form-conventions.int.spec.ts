@@ -113,18 +113,16 @@ describe('primary action position and colour (Design QA #277)', () => {
   })
 
   it('ProfileDialog renders primary before secondary', () => {
-    render(
-      createElement(
-        ProfileDialog,
-        {
-          title: 'افزودن',
-          onClose: vi.fn(),
-          primary: createElement('button', { type: 'button' }, 'ثبت'),
-          secondary: createElement('button', { type: 'button' }, 'انصراف'),
-          children: createElement('input', { 'aria-label': 'نام' }),
-        },
-      ),
-    )
+    const field = createElement('input', { 'aria-label': 'نام' })
+    // The body is the element's child; it sits in a variable so the props stay typed without a `children` key.
+    const props = {
+      title: 'افزودن',
+      onClose: vi.fn(),
+      primary: createElement('button', { type: 'button' }, 'ثبت'),
+      secondary: createElement('button', { type: 'button' }, 'انصراف'),
+      children: field,
+    }
+    render(createElement(ProfileDialog, props, field))
     const footer = document.querySelector('[data-slot="dialog-footer"]')!
     expect(Array.from(footer.children).map((child) => child.textContent)).toEqual(['ثبت', 'انصراف'])
   })
