@@ -31,6 +31,7 @@ import { PostgresEvaluationRepository, type EvaluationStore } from '../../review
 import { PostgresNotificationOutbox, type NotificationOutbox } from '../notification-outbox.js'
 import { PostgresVerificationStore, type VerificationStore } from '../verification-repo.js'
 import { requestWithActions, resolveRequesterNames } from './route-helpers.js'
+import { companyActivityView } from '../request-detail.js'
 
 export interface DashboardDeps {
   pool: Pool
@@ -156,10 +157,15 @@ export function createDashboardContext(deps: DashboardDeps) {
     return reviewerRequestView(item, answers) as unknown as T
   }
 
+  /** Reviewers and employers get no actor at all; the company gets no Fund staff account id (#288). */
   const limitActivities = <A extends Parameters<typeof reviewerActivityView>[0]>(
-    actor: { operationalRole: OperationalRole },
+    actor: { id: string; operationalRole: OperationalRole },
     items: A[],
-  ) => (isReviewerRole(actor.operationalRole) ? items.map(reviewerActivityView) : items)
+  ) => {
+    if (isReviewerRole(actor.operationalRole)) return items.map(reviewerActivityView)
+    if (actor.operationalRole === 'representative') return items.map((item) => companyActivityView(item, actor.id))
+    return items
+  }
 
   const resolveScope = async (actorId: string, role: OperationalRole): Promise<{ scope: RequestScope; companyId: string | null }> => {
     const companyId = await actorCompanyId(actorId, role)

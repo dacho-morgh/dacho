@@ -260,9 +260,10 @@ const actorIdOf = (row: object): string | null => {
 
 /**
  * Who did each history step («توسط …»). Reviewers and employers already get rows
- * without the actor, so nothing is added for them. The company sees names only
- * for steps its own account took; for Fund staff it gets the role, never the
- * person, so a chief or reviewer is not identified to the applicant.
+ * without the actor, so nothing is added for them. The company sees names (and
+ * `actorId`) only for steps its own account took; for Fund staff it gets the
+ * role, never the name or account id, so a chief or reviewer is not identified
+ * to the applicant.
  */
 export async function withTimelineActors<T extends object>(
   userStore: UserStore,
@@ -280,13 +281,31 @@ export async function withTimelineActors<T extends object>(
   return timeline.map((row) => {
     const actorId = actorIdOf(row)
     const user = actorId ? people.get(actorId) : undefined
-    const nameVisible = role !== 'representative' || (actorId !== null && ownAccountIds.includes(actorId))
+    const own = actorId !== null && ownAccountIds.includes(actorId)
+    const nameVisible = role !== 'representative' || own
+    // The company never gets a staff member's account id either; its own steps keep theirs.
+    const visibleRow = role === 'representative' && !own ? withoutActorId(row) : row
     return {
-      ...row,
+      ...visibleRow,
       actorName: nameVisible && user?.name?.trim() ? user.name.trim() : null,
       actorRole: roleOf(user),
     }
   })
+}
+
+/** The row without `actorId`, for a reader who may not identify the person who acted. */
+export function withoutActorId<T extends object>(row: T): T {
+  if (!('actorId' in row)) return row
+  const { actorId: _actorId, ...rest } = row as T & { actorId?: unknown }
+  return rest as T
+}
+
+/**
+ * History rows for the company outside the case page (`/requests/:id/history`,
+ * `/activities`): Fund staff steps lose their `actorId`; the company's own keep it.
+ */
+export function companyActivityView<T extends { actorId: string | null; ownerId: string }>(row: T, actorId: string): T {
+  return row.actorId === null || row.actorId === actorId || row.actorId === row.ownerId ? row : withoutActorId(row)
 }
 
 /* ── Fixed stages of an event application ──────────────────────────────── */

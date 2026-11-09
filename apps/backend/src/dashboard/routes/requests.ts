@@ -49,7 +49,10 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
     const ownAccounts = role === 'representative'
       ? [actor.id, request.ownerId, ...(company?.representativeId ? [company.representativeId] : [])]
       : []
-    const timeline = await withTimelineActors(deps.userStore, role, limitActivities(actor, history), ownAccounts)
+    // The company's rows go in whole: the actor's role is read first, then staff account ids are dropped.
+    const timeline = await withTimelineActors(
+      deps.userStore, role, role === 'representative' ? history : limitActivities(actor, history), ownAccounts,
+    )
 
     let workflow = service?.workflow ?? []
     if (workflow.length === 0 && event) {

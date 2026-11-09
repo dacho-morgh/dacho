@@ -456,7 +456,7 @@ describe('#288 request page data per role (int)', () => {
   })
 
   describe('history actors', () => {
-    const rowOf = (timeline: { action: string | null }[], action: string) => timeline.find((row) => row.action === action)!
+    const rowOf = <R extends { action: string | null }>(timeline: R[], action: string): R => timeline.find((row) => row.action === action)!
 
     it('names who did each step for the owner, Secretariat, chief and investment person', async () => {
       for (const user of ['owner', 'secretariat', 'chief'] as const) {
@@ -473,6 +473,23 @@ describe('#288 request page data per role (int)', () => {
       expect(rowOf(body.timeline, 'submit')).toMatchObject({ actorName: NAMES['company-user-1'], actorRole: 'representative' })
       expect(rowOf(body.timeline, 'chief_accept')).toMatchObject({ actorName: null, actorRole: 'chief-reviewer' })
       expect(JSON.stringify(body)).not.toContain(NAMES.chief)
+    })
+
+    it('gives the company no Fund staff account id in any history, only its own', async () => {
+      const staff = ['chief', 'owner', 'secretariat', 'investment', 'reviewer-1', 'reviewer-2', 'reviewer-3', 'employer-1']
+      type Row = { action: string | null; actorId?: string | null }
+      const page = (await detail('company-user-1', roundCase.id)).timeline as Row[]
+      const history = (await get('company-user-1', `/requests/${roundCase.id}/history`)).body.items as Row[]
+      const feed = (await get('company-user-1', '/activities?limit=1000')).body.items as Row[]
+      for (const [label, rows] of [['page', page], ['history', history], ['activities', feed]] as const) {
+        expect(rows.length, label).toBeGreaterThan(0)
+        for (const row of rows) expect(staff, `${label} ${row.action}`).not.toContain(row.actorId)
+        expect(rowOf(rows, 'chief_accept'), label).not.toHaveProperty('actorId')
+        expect(rowOf(rows, 'submit').actorId, label).toBe('company-user-1')
+      }
+      // Fund-wide readers keep the staff account id.
+      expect(rowOf((await detail('owner', roundCase.id)).timeline, 'chief_accept')).toMatchObject({ actorId: 'chief' })
+      expect(rowOf((await get('chief', `/requests/${roundCase.id}/history`)).body.items, 'chief_accept')).toMatchObject({ actorId: 'chief' })
     })
 
     it('still gives reviewers and the employer no actor at all', async () => {
