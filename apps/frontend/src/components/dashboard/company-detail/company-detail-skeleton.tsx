@@ -32,7 +32,7 @@ export function CompanyDetailSkeleton() {
           <Skeleton className="h-9 w-48 max-w-full rounded-lg bg-neutral-200 motion-reduce:animate-none" />
         </div>
         <div className="flex shrink-0 grow flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 lg:min-h-0 lg:flex-1 lg:flex-row">
-          <div className="sticky bottom-2 z-20 order-last grid grid-cols-4 gap-1 rounded-2xl border border-neutral-200 bg-background p-1 shadow-lg lg:static lg:order-first lg:flex lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-4 lg:self-stretch lg:rounded-none lg:border-y-0 lg:border-r-0 lg:bg-transparent lg:p-0 lg:pl-2 lg:shadow-none">
+          <div className="sticky bottom-2 z-20 order-last grid grid-cols-4 gap-1 rounded-2xl border border-neutral-200 bg-background p-1 shadow-lg lg:static lg:order-first lg:flex lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-4 lg:self-stretch lg:rounded-none lg:border-y-0 lg:border-s-0 lg:bg-transparent lg:p-0 lg:pe-2 lg:shadow-none">
             {Array.from({ length: 4 }, (_, index) => (
               <Skeleton key={index} className={`h-12 rounded-xl lg:h-10 ${block}`} />
             ))}

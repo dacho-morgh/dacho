@@ -170,7 +170,7 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-5 text-right" dir="rtl">
+    <div className="flex w-full min-w-0 flex-col gap-5 text-start" dir="rtl">
       <nav aria-label="مسیر نامه" className="flex min-h-9 flex-wrap items-center gap-2 pe-12 md:pe-0">
         <Typography asChild variant="16/regular" className="shrink-0 text-neutral-500 hover:text-brand-600">
           <Link href="/dashboard/letters">کارتابل نامه</Link>
@@ -214,7 +214,7 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
               <Typography as="span" variant="16/semibold" className="text-inherit">ثبت بازخورد</Typography>
             </Button>}
             {showActions && (
-              <div className="mr-auto flex items-center gap-1">
+              <div className="ms-auto flex items-center gap-1">
                 {mail.action && (
                   <Button asChild size="40">
                     <Link href={mail.action.href}>

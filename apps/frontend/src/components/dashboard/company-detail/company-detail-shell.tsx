@@ -71,7 +71,7 @@ export function CompanyDetailShell({
         {/* Below lg the sections are a bottom navigation bar that floats at the foot of the screen. */}
         <nav
           aria-label="بخش‌های شرکت"
-          className="sticky bottom-2 z-20 order-last grid grid-cols-4 gap-1 rounded-2xl border border-neutral-200 bg-background p-1 shadow-lg lg:static lg:order-first lg:flex lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-4 lg:self-stretch lg:rounded-none lg:border-y-0 lg:border-r-0 lg:bg-transparent lg:p-0 lg:pl-2 lg:shadow-none"
+          className="sticky bottom-2 z-20 order-last grid grid-cols-4 gap-1 rounded-2xl border border-neutral-200 bg-background p-1 shadow-lg lg:static lg:order-first lg:flex lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-4 lg:self-stretch lg:rounded-none lg:border-y-0 lg:border-s-0 lg:bg-transparent lg:p-0 lg:pe-2 lg:shadow-none"
         >
           {TABS.map((tab) => {
             const isActive = tab.id === active
