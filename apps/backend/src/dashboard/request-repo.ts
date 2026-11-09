@@ -9,6 +9,7 @@ import { notifyNextRole } from './next-role.js'
 import { PostgresNotificationOutbox, type NotificationOutbox } from './notification-outbox.js'
 import { lockApprovedVerification } from './verification-repo.js'
 import { requestWorkQueueClause, type RequestWorkQueueFilter } from './work-queues.js'
+import { companyRequestPhaseSql, type CompanyRequestPhase } from './company-request-phase.js'
 
 export type RequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'
 
@@ -253,6 +254,8 @@ export interface RequestFilters {
   /** The company's representative: requests the person owns. */
   ownerId?: string
   reviewStage?: ReviewStage
+  /** The company-facing phase (#280), folded from status and review stage by `company-request-phase.ts`. */
+  phase?: CompanyRequestPhase
   queue?: RequestWorkQueueFilter
 }
 
@@ -273,6 +276,10 @@ export function requestFilterClauses(filters: RequestFilters, params: unknown[])
   if (filters.reviewStage) {
     params.push(filters.reviewStage)
     clauses.push(`r.review_stage = $${params.length}`)
+  }
+  if (filters.phase) {
+    params.push(filters.phase)
+    clauses.push(`${companyRequestPhaseSql('r')} = $${params.length}`)
   }
   if (filters.queue) clauses.push(requestWorkQueueClause(filters.queue, params))
   return clauses

@@ -32,15 +32,33 @@ Three counts have no request list behind them, and each comes from the list that
 | Route | Who | Behaviour |
 | --- | --- | --- |
 | `GET /stats/overview` | Any active role | `{ counts, queues: [{ key, count }], events: [{ id, title }] }`. `events` holds only events with a case in the actor's scope, and is the filter's option list. `private, no-store`. |
-| `GET /requests`, `GET /admin/requests` | As before | Also accept `search`, `eventId`, `stage` and `queue`. |
-| `GET /stats` | Any active role | Accepts the same four filters, so a status tab counts what it opens. |
+| `GET /requests`, `GET /admin/requests` | As before | Also accept `search`, `eventId`, `stage`, `phase` and `queue`. |
+| `GET /stats` | Any active role | Accepts the same five filters, so a status tab counts what it opens. `{ total, in_review, approved, action_needed, rejected, phases: { verification, reviewing, finished } }`. |
 
 - `search` matches the title and tracking code only, which every reader of the row already sees. It is case-insensitive, `%` and `_` are literal, and at most 100 characters are accepted (`400 invalid_search`).
 - `eventId` must be a UUID (`400 invalid_event_id`). Another event's id returns an empty list, so it confirms nothing.
 - `stage` is `chief_triage`, `triaged` or `advanced` (`400 invalid_stage`).
+- `phase` is `verification`, `reviewing` or `finished` (`400 invalid_phase`; a repeated parameter is invalid too). See [Company phases](#company-phases).
 - `queue` must belong to the actor's role (`400 invalid_queue`).
 
-`GET /stats/overview` used to return the same body as `/stats`. No caller read it, so its shape changed.
+`GET /stats/overview` used to return the same body as `/stats`. No caller read it, so its shape changed. Its `counts` now also carry `phases`.
+
+## Company phases
+
+Design QA #280 shows a company three phases only: «احراز هویت» (`verification`), «در حال داوری» (`reviewing`) and «تمام‌شده (نتیجهٔ نهایی)» (`finished`). The status and review stage fold into them by one table, [`company-request-phase.ts`](../../apps/backend/src/dashboard/company-request-phase.ts):
+
+| Status | Review stage | Phase |
+| --- | --- | --- |
+| `draft` | any | `verification` |
+| `in_review`, `action_needed` | `chief_triage` | `verification` |
+| `in_review`, `action_needed` | `triaged`, `advanced` or none | `reviewing` |
+| `approved`, `rejected` | any | `finished` |
+| anything else | any | `reviewing` |
+
+- The list filter and the counts run the same SQL expression, generated from that table, so `phases.<p>` of `GET /stats` equals `total` of `GET /requests?phase=<p>` with the same other filters.
+- `phase` is a filter like the others: it narrows `GET /stats` too. A screen that shows a count per phase reads `/stats` without `phase`, as the status tabs read it without `status`.
+- `phase` only narrows the row scope. A company still sees only its own cases, and staff lists are unchanged when it is absent. Staff may pass it, but their screens filter by the real status and stage.
+- The frontend's copy of the table, `apps/frontend/src/utilities/company-request-stage.ts`, names each request's phase on the screen. `apps/backend/tests/company-request-phase.spec.ts` asserts both tables, and the SQL, agree for every status × review stage, including no stage and unknown values. Change both together.
 
 ## Confidentiality
 
@@ -66,5 +84,6 @@ The verification and support cards do not link: no screen lists exactly those ro
 
 ## Verification
 
+- `apps/backend/tests/int/stats-activities.int.spec.ts` seeds every status × review stage for two companies on real Postgres and checks the phase list, its pages, `/stats` phase counts, company isolation, staff totals and `400 invalid_phase`.
 - `apps/backend/tests/int/work-queues.int.spec.ts` runs on real Postgres: one case through every queue with list, overview and `/stats` compared at each step, each chief's own event, search and filter isolation for five roles, revocation, replacement and invalid input.
 - `apps/frontend/tests/int/work-queue-overview.int.spec.ts` covers the cards, the empty and failed states, and filters carried across tabs and pages against a stubbed API. It is not evidence of the real integration.

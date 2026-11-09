@@ -6,6 +6,7 @@ import type { ReviewCaseFile } from '../review-case-repo.js'
 import type { EventConfiguration, EventInput } from '../event-repo.js'
 import { RequestRepository, type RequestFilters, type ReviewStage } from '../request-repo.js'
 import { isRequestWorkQueueOf } from '../work-queues.js'
+import { isCompanyRequestPhase } from '../company-request-phase.js'
 import type { User, UserStore } from '../../auth/user-store.js'
 import { isUuid } from '../../exhibitions/catalogue.js'
 
@@ -34,6 +35,10 @@ export function parseRequestFilters(
   if (query.stage !== undefined) {
     if (!REVIEW_STAGES.includes(query.stage)) return 'invalid_stage'
     filters.reviewStage = query.stage as ReviewStage
+  }
+  if (query.phase !== undefined) {
+    if (!isCompanyRequestPhase(query.phase)) return 'invalid_phase'
+    filters.phase = query.phase
   }
   if (query.queue !== undefined) {
     if (!isRequestWorkQueueOf(actor.operationalRole, query.queue)) return 'invalid_queue'
