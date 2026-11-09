@@ -538,7 +538,7 @@ describe('EventsView design QA #281 - card typography, status tags and spacing',
     id: 'events-upcoming',
     rawId: 'upcoming-1',
     title: 'رویداد پیش رو',
-    badgeText: 'پیش رو',
+    badgeText: 'پیش‌رو',
     badgeType: 'upcoming',
     startTimestamp: 3,
   }
@@ -558,7 +558,7 @@ describe('EventsView design QA #281 - card typography, status tags and spacing',
     render(createElement(EventsView, { initialEventsList: [ended, active, upcoming] }))
     const tagIn = (title: string, label: string) =>
       within(screen.getByRole('heading', { name: title }).closest('article')!).getByText(label)
-    expect(tagIn(upcoming.title, 'پیش رو').getAttribute('data-variant')).toBe('secondary')
+    expect(tagIn(upcoming.title, 'پیش‌رو').getAttribute('data-variant')).toBe('secondary')
     expect(tagIn(active.title, 'در حال برگزاری').getAttribute('data-variant')).toBe('primary')
     expect(tagIn(ended.title, 'تمام شده').getAttribute('data-variant')).toBe('gray')
     expect(tagIn(ended.title, 'تمام شده').getAttribute('data-slot')).toBe('badge')
@@ -566,7 +566,7 @@ describe('EventsView design QA #281 - card typography, status tags and spacing',
 
   it('uses the same status tag on the event page', async () => {
     render(createElement(EventsView, { initialEventsList: [upcoming], initialSelectedEventId: upcoming.rawId }))
-    expect(screen.getByText('پیش رو').getAttribute('data-variant')).toBe('secondary')
+    expect(screen.getByText('پیش‌رو').getAttribute('data-variant')).toBe('secondary')
     await waitFor(() => expect(dashboardApi.getEventCategories).toHaveBeenCalled())
   })
 

@@ -21,7 +21,7 @@ export function ExhibitionPicker({
 }) {
   return (
     <div dir="rtl" className="flex w-full max-w-[1140px] flex-col gap-4">
-      <Typography as="h1" variant="24/bold" color="neutral-800">
+      <Typography as="h1" variant="24/bold" color="neutral-700">
         {title}
       </Typography>
       {items.length === 0 ? (

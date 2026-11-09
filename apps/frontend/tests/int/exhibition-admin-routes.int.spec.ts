@@ -88,6 +88,11 @@ it('pads the exhibition pages 16px at the sides and 40px at the top (design QA #
   expect(main.className).toMatch(/\bpx-4\b/)
   expect(main.className).toMatch(/\bpt-10\b/)
   expect(main.className).not.toMatch(/\bp-4\b/)
+  // The page title matches the events page: 24/bold in neutral-700.
+  const heading = screen.getByRole('heading', { level: 1 })
+  expect(heading.getAttribute('data-variant')).toBe('24/bold')
+  expect(heading.className).toContain('text-neutral-700')
+  expect(heading.className).not.toContain('text-neutral-800')
 })
 it('gives the Secretariat the booth request queue instead of booth administration', async () => {
   backend.auth.mockResolvedValue({ user: { operationalRole: 'central-secretariat', isActive: true } })

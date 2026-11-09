@@ -84,7 +84,7 @@ function mapEvent(
     serviceKey,
     title: String(item.title ?? ''),
     description: extractDescription(item.description),
-    badgeText: status === 'ended' ? 'تمام شده' : status === 'active' ? 'در حال برگزاری' : 'پیش رو',
+    badgeText: status === 'ended' ? 'تمام شده' : status === 'active' ? 'در حال برگزاری' : 'پیش‌رو',
     badgeType: status as 'ended' | 'active' | 'upcoming',
     dates: formatDateRange(startDate, endDate),
     location: String(item.location ?? 'محل برگزاری ثبت نشده است'),

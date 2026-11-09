@@ -28,7 +28,7 @@ export type PublicPage = {
 }
 export type PublicStatus = 'upcoming' | 'ongoing' | 'past'
 export const PUBLIC_STATUS_LABELS: Record<PublicStatus, string> = {
-  upcoming: 'پیش رو',
+  upcoming: 'پیش‌رو',
   ongoing: 'در حال برگزاری',
   past: 'تمام شده',
 }
