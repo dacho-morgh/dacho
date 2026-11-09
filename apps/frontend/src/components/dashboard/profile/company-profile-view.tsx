@@ -500,7 +500,10 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
         </div>
 
         {/* One grid: every field is a cell, and the cells of a row share the row's height. */}
-        <div data-slot="basic-info-grid" className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+        <div
+          data-slot="basic-info-grid"
+          className="grid grid-cols-1 items-stretch gap-x-4 gap-y-5 md:grid-cols-2"
+        >
           <InlineProfileField
             label="نام شرکت"
             required
@@ -510,11 +513,27 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             onChange={(name) => setBasicForm({ ...basicForm, name })}
           />
           <InlineProfileField
-            label="شناسه ملی"
-            value={basicForm.nationalId}
-            editing={false}
-            dir="ltr"
-            onChange={() => {}}
+            label="تاریخ تاسیس"
+            placeholder="مثال: ۱۳۸۵/۰۱/۱۵"
+            value={basicForm.establishmentDate}
+            editing={isEditingBasic}
+            dir="auto"
+            onChange={(establishmentDate) => setBasicForm({ ...basicForm, establishmentDate })}
+          />
+          <InlineProfileField
+            label="وضعیت شرکت"
+            required
+            placeholder="مثال: فعال"
+            value={basicForm.status}
+            editing={isEditingBasic}
+            onChange={(status) => setBasicForm({ ...basicForm, status })}
+          />
+          <InlineProfileField
+            label="نوع شرکت"
+            placeholder="نوع شرکت"
+            value={basicForm.type}
+            editing={isEditingBasic}
+            onChange={(type) => setBasicForm({ ...basicForm, type })}
           />
           <InlineProfileField
             label="شماره ثبت"
@@ -534,27 +553,11 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             onChange={(economicCode) => setBasicForm({ ...basicForm, economicCode })}
           />
           <InlineProfileField
-            label="وضعیت شرکت"
-            required
-            placeholder="مثال: فعال"
-            value={basicForm.status}
-            editing={isEditingBasic}
-            onChange={(status) => setBasicForm({ ...basicForm, status })}
-          />
-          <InlineProfileField
-            label="نوع شرکت (مرحله اول)"
-            placeholder="نوع شرکت"
-            value={basicForm.type}
-            editing={isEditingBasic}
-            onChange={(type) => setBasicForm({ ...basicForm, type })}
-          />
-          <InlineProfileField
-            label="تاریخ تاسیس"
-            placeholder="مثال: ۱۳۸۵/۰۱/۱۵"
-            value={basicForm.establishmentDate}
-            editing={isEditingBasic}
-            dir="auto"
-            onChange={(establishmentDate) => setBasicForm({ ...basicForm, establishmentDate })}
+            label="شناسه ملی"
+            value={basicForm.nationalId}
+            editing={false}
+            dir="ltr"
+            onChange={() => {}}
           />
           <InlineProfileField
             label="نوع شخصیت حقوقی (سهامی خاص / عام / با مسئولیت محدود / ...)"
@@ -707,7 +710,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             آدرس جدید
           </Button>
         </div>
-        <div className="flex flex-col gap-4">
+        <div data-slot="address-list" className="flex flex-col gap-5">
           {profile.addresses.length === 0 && (
             <Typography color="neutral-400">آدرسی ثبت نشده است.</Typography>
           )}

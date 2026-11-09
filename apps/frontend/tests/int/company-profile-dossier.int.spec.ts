@@ -386,6 +386,21 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
     const cells = grid.querySelectorAll(':scope > [data-slot="profile-field"]')
     expect(cells.length).toBe(15)
     cells.forEach((cell) => expect(cell.className).toContain('h-full'))
+    expect(grid.className).toContain('gap-y-5')
+    expect(grid.className).toContain('gap-x-4')
+    // Figma 238:4213 order (first item on the right in RTL), then the fields Figma does not show.
+    const labels = Array.from(cells).map((cell) => cell.querySelector('label')!.firstChild!.textContent)
+    expect(labels.slice(0, 7)).toEqual([
+      'نام شرکت',
+      'تاریخ تاسیس',
+      'وضعیت شرکت',
+      'نوع شرکت',
+      'شماره ثبت',
+      'کد اقتصادی',
+      'شناسه ملی',
+    ])
+    expect(document.querySelector('[data-slot="address-list"]')!.className).toContain('gap-5')
+    expect(screen.queryByText(/مرحله اول/)).toBeNull()
 
     fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0]!)
     const actions = document.querySelector('[data-slot="basic-info-actions"]')!
