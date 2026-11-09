@@ -118,7 +118,7 @@ export default function LoginPage({
             autoComplete="username"
             autoCapitalize="none"
             autoCorrect="off"
-            className="text-base leading-7 text-neutral-800 placeholder:text-neutral-300"
+            className="text-base leading-7 text-neutral-800 placeholder:font-light placeholder:text-neutral-400"
             containerClassName="h-10 rounded-lg border-neutral-100 px-2 py-2 shadow-none"
             id="login-identifier"
             inputMode="text"
@@ -135,7 +135,7 @@ export default function LoginPage({
           <div className="flex flex-col gap-4">
             <Input
               autoComplete="current-password"
-              className="text-base leading-7 text-neutral-800 placeholder:text-neutral-300"
+              className="text-base leading-7 text-neutral-800 placeholder:font-light placeholder:text-neutral-400"
               containerClassName="h-10 rounded-lg border-neutral-100 px-2 py-2 shadow-none"
               endIcon={
                 <Button

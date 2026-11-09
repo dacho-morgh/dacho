@@ -94,17 +94,17 @@ type SignupSuccessBody = {
 }
 
 const registerInputClasses = {
-  className: 'text-sm leading-6 text-neutral-800 placeholder:text-neutral-300',
+  // Figma 242:10534: placeholder 16/Light, grey/400. The label keeps the shared
+  // 16/Regular neutral-600 (Figma 242:10530).
+  className: 'text-base leading-7 text-neutral-800 placeholder:font-light placeholder:text-neutral-400',
   containerClassName: 'h-12 rounded-lg border-neutral-200 px-3 py-2 shadow-none',
-  wrapperClassName:
-    'gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700',
+  wrapperClassName: 'gap-2',
 } as const
 
-// The selects and the date field share the inputs' 14px label and 48px control.
+// The selects and the date field share the inputs' label and 48px control.
 const registerFieldClasses = {
-  wrapperClassName:
-    'gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700',
-  className: 'h-12 rounded-lg border-neutral-200 text-sm leading-6 text-neutral-800',
+  wrapperClassName: 'gap-2',
+  className: 'h-12 rounded-lg border-neutral-200 text-base leading-7 text-neutral-800',
 } as const
 
 const requiredText = (label: string) =>
@@ -575,7 +575,8 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
   return (
     <div className="mx-auto flex min-h-svh w-full max-w-[520px] flex-col px-6 pt-8 pb-6 lg:h-svh lg:min-h-0 lg:px-5 lg:pt-10 lg:pb-8">
       <header className="shrink-0">
-        <Typography color="neutral-800" variant="24/bold">
+        {/* Figma 242:12199: 20/Bold, neutral-700, line height 32. */}
+        <Typography color="neutral-700" variant="20/bold">
           ثبت شرکت
         </Typography>
         <Typography className="mt-2" color="neutral-500" variant="16/regular">
@@ -779,7 +780,7 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
                 render={({ field }) => (
                   <JalaliDatePicker
                     {...registerFieldClasses}
-                    containerClassName="h-12 rounded-lg border-neutral-200 text-sm leading-6"
+                    containerClassName="h-12 rounded-lg border-neutral-200 text-base leading-7"
                     error={errors.companyEstablishmentDate?.message}
                     id="register-companyEstablishmentDate"
                     label="تاریخ تأسیس"

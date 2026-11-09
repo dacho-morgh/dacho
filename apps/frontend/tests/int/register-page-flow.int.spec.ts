@@ -341,6 +341,78 @@ describe('registration form: layout, formats, location and date fields, auto sig
     })
   })
 
+  describe('Jalali date picker keyboard', () => {
+    const dayButton = (label: RegExp) => screen.getByRole('button', { name: label })
+    const pick = async (year: string, month: string) => {
+      fireEvent.click(screen.getByLabelText('تاریخ تأسیس'))
+      fireEvent.change(await screen.findByLabelText('سال'), { target: { value: year } })
+      fireEvent.change(screen.getByLabelText('ماه'), { target: { value: month } })
+    }
+    /** Presses a key on the focused day and waits for focus to land on the expected day. */
+    const press = async (key: string, expected: RegExp) => {
+      fireEvent.keyDown(document.activeElement as HTMLElement, { key })
+      await waitFor(() => {
+        const active = document.activeElement as HTMLElement
+        expect(active.dataset.variant).toBe('day')
+        expect(active.getAttribute('aria-label')).toMatch(expected)
+      })
+    }
+
+    it('moves focus with every navigation key, across month and year boundaries', async () => {
+      render(createElement(RegisterPage))
+      await pick('1380', '5')
+      // 15 Mordad 1380 is a Monday (the 3rd column from the right).
+      dayButton(/ ۱۵ مرداد ۱۳۸۰$/).focus()
+      await press('ArrowRight', /^یکشنبه ۱۴ مرداد ۱۳۸۰$/)
+      await press('ArrowLeft', /^دوشنبه ۱۵ مرداد ۱۳۸۰$/)
+      await press('ArrowDown', /^دوشنبه ۲۲ مرداد ۱۳۸۰$/)
+      await press('ArrowUp', /^دوشنبه ۱۵ مرداد ۱۳۸۰$/)
+      await press('Home', /^شنبه ۱۳ مرداد ۱۳۸۰$/)
+      await press('End', /^جمعه ۱۹ مرداد ۱۳۸۰$/)
+      // Past the end of the week row, the next day is the Saturday of the next row.
+      await press('ArrowLeft', /^شنبه ۲۰ مرداد ۱۳۸۰$/)
+      await press('PageDown', /^.* ۲۰ شهریور ۱۳۸۰$/)
+      await press('PageUp', /^.* ۲۰ مرداد ۱۳۸۰$/)
+      expect((screen.getByLabelText('ماه') as HTMLSelectElement).value).toBe('5')
+
+      // The first of a month steps back into the previous month.
+      dayButton(/ ۱ مرداد ۱۳۸۰$/).focus()
+      await press('ArrowRight', /^.* ۳۱ تیر ۱۳۸۰$/)
+      expect((screen.getByLabelText('ماه') as HTMLSelectElement).value).toBe('4')
+      // ... and the first of the year into the last day of the previous year.
+      fireEvent.change(screen.getByLabelText('ماه'), { target: { value: '1' } })
+      dayButton(/ ۱ فروردین ۱۳۸۰$/).focus()
+      await press('ArrowRight', /^.* ۳۰ اسفند ۱۳۷۹$/)
+      expect((screen.getByLabelText('سال') as HTMLSelectElement).value).toBe('1379')
+    })
+
+    it('starts a move from the day that really has focus, not from a stale tab stop', async () => {
+      render(createElement(RegisterPage))
+      await pick('1380', '5')
+      // The roving tab stop is still on the previously viewed day; focus another one.
+      dayButton(/ ۲۰ مرداد ۱۳۸۰$/).focus()
+      await press('ArrowRight', /^.* ۱۹ مرداد ۱۳۸۰$/)
+    })
+
+    it('does not move past the latest selectable day', async () => {
+      render(createElement(RegisterPage))
+      fireEvent.click(screen.getByLabelText('تاریخ تأسیس'))
+      await screen.findByLabelText('سال')
+      const today = await waitFor(() => {
+        const active = document.activeElement as HTMLElement
+        expect(active.dataset.today).toBe('true')
+        return active
+      })
+      fireEvent.keyDown(today, { key: 'ArrowLeft' })
+      fireEvent.keyDown(today, { key: 'ArrowDown' })
+      fireEvent.keyDown(today, { key: 'PageDown' })
+      expect((document.activeElement as HTMLElement).dataset.today).toBe('true')
+      expect((screen.getByLabelText('سال') as HTMLSelectElement).value).toBe(
+        String(todayJalali().year),
+      )
+    })
+  })
+
   describe('signing in after signup', () => {
     it('enters the panel directly (the role landing page) when the session is established', async () => {
       mockSignup({})

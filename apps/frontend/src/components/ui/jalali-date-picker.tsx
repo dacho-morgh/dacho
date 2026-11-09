@@ -136,26 +136,45 @@ function JalaliDatePicker({
     handleOpenChange(false)
   }
 
+  const viewYear = focused.year
+  const viewMonth = focused.month
+
+  /** The day button an event came from, so a move starts where the browser focus really is. */
+  const dayOf = (target: EventTarget): JalaliDate | null => {
+    const button = (target as HTMLElement).closest<HTMLElement>('[data-day]')
+    return button
+      ? { year: viewYear, month: viewMonth, day: Number(button.dataset.day) }
+      : null
+  }
+
   const onGridKeyDown = (event: React.KeyboardEvent) => {
+    // Only a focused day moves; the month and year dropdowns keep their own arrow keys.
+    const from = dayOf(event.target)
+    if (!from) return
+    const weekday = jalaliWeekdayIndex(from.year, from.month, from.day)
     const step: Record<string, JalaliDate | undefined> = {
       // The week row runs right to left: left is later, right is earlier.
-      ArrowLeft: addDays(focused, 1),
-      ArrowRight: addDays(focused, -1),
-      ArrowDown: addDays(focused, 7),
-      ArrowUp: addDays(focused, -7),
-      PageDown: addMonths(focused, 1),
-      PageUp: addMonths(focused, -1),
-      Home: addDays(focused, -jalaliWeekdayIndex(focused.year, focused.month, focused.day)),
-      End: addDays(focused, 6 - jalaliWeekdayIndex(focused.year, focused.month, focused.day)),
+      ArrowLeft: addDays(from, 1),
+      ArrowRight: addDays(from, -1),
+      ArrowDown: addDays(from, 7),
+      ArrowUp: addDays(from, -7),
+      PageDown: addMonths(from, 1),
+      PageUp: addMonths(from, -1),
+      Home: addDays(from, -weekday),
+      End: addDays(from, 6 - weekday),
     }
     const next = step[event.key]
     if (!next) return
     event.preventDefault()
+    event.stopPropagation()
     moveFocus(next)
   }
 
-  const viewYear = focused.year
-  const viewMonth = focused.month
+  // A day focused by Tab, a click or a script becomes the grid's tab stop.
+  const onGridFocus = (event: React.FocusEvent) => {
+    const day = dayOf(event.target)
+    if (day && day.day !== focused.day) setFocused(day)
+  }
   const monthLength = jalaliMonthLength(viewYear, viewMonth)
   const leading = jalaliWeekdayIndex(viewYear, viewMonth, 1)
   const cells: Array<number | null> = [
@@ -204,7 +223,7 @@ function JalaliDatePicker({
               data-empty={selected ? undefined : 'true'}
               className={cn(
                 typographyVariants({ variant: '16/regular', color: 'neutral-600' }),
-                'flex h-12 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-background px-3 py-2 text-start outline-none transition-colors hover:border-brand-500 focus-visible:border-brand-500 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-400 data-[invalid=true]:border-error-100 data-[invalid=true]:focus-visible:border-error-500 data-[empty=true]:font-light data-[empty=true]:text-neutral-300',
+                'flex h-12 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-background px-3 py-2 text-start outline-none transition-colors hover:border-brand-500 focus-visible:border-brand-500 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-400 data-[invalid=true]:border-error-100 data-[invalid=true]:focus-visible:border-error-500 data-[empty=true]:font-light data-[empty=true]:text-neutral-400',
                 containerClassName,
               )}
             >
@@ -298,6 +317,7 @@ function JalaliDatePicker({
             <div
               aria-label={`${JALALI_MONTHS[viewMonth - 1]} ${toPersianDigits(viewYear)}`}
               className="mt-3 grid grid-cols-7 gap-y-1"
+              onFocus={onGridFocus}
               onKeyDown={onGridKeyDown}
               ref={gridRef}
               role="group"
@@ -325,6 +345,7 @@ function JalaliDatePicker({
                     aria-label={dayLabel(date)}
                     aria-pressed={sameDay(selected, date)}
                     className="mx-auto"
+                    data-day={day}
                     data-today={sameDay(today, date) || undefined}
                     disabled={isFuture}
                     key={day}

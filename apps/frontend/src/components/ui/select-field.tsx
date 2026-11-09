@@ -76,7 +76,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(
             aria-describedby={ariaDescribedBy || helperId}
             aria-invalid={ariaInvalid ?? (error ? true : undefined)}
             className={cn(
-              'data-[empty=true]:font-light data-[empty=true]:text-neutral-300 [&>option]:font-normal [&>option]:text-neutral-700',
+              'data-[empty=true]:font-light data-[empty=true]:text-neutral-400 [&>option]:font-normal [&>option]:text-neutral-700',
               error && 'border-error-100',
               className,
             )}
