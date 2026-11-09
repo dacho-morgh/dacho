@@ -15,6 +15,7 @@
     "migrate": "tsx src/db/migrate-cli.ts",
     "inventory": "tsx src/db/migration-inventory-cli.ts",
     "reconciliation": "tsx src/db/migration-reconciliation-cli.ts",
+    "seed:dev-review": "tsx --env-file=.env src/dev/seed-review-stages-cli.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --config ./vitest.config.mts",
     "test:int": "vitest run --config ./vitest.int.config.mts"
