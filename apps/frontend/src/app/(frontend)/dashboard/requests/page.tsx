@@ -5,6 +5,11 @@ import { getPayload } from 'payload'
 import React from 'react'
 import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import {
+  adminRequestsQuery,
+  toAdminRequestsPage,
+  type AdminRequestsApiResponse,
+} from '@/components/dashboard/admin-request-list-data'
+import {
   parseRequestStatus,
   RequestsListView,
   type RequestItem,
@@ -28,6 +33,8 @@ import {
 import type { CompanyRequestStage } from '@/utilities/company-request-stage'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import {
+  canReadCompanyDossiers,
+  canReadFollowUps,
   dashboardOperationalRole,
   isInternalDashboardUser,
   serverDashboardFetchResult,
@@ -54,19 +61,22 @@ export default async function RequestsPage({
     eventId?: string | string[]
     stage?: string | string[]
     queue?: string | string[]
+    followUp?: string | string[]
     view?: string | string[]
   }>
 }) {
   const query = await searchParams
   const status = parseRequestStatus(query.status)
   const page = parseRequestPage(query.page)
-  // `phase` is the company's own stage filter; staff filter by the real status and stage.
-  const parsedFilters = parseRequestFilters(query)
-
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isInternal = isInternalDashboardUser(user)
-  const filters: RequestQueueFilters = isInternal ? { ...parsedFilters, phase: undefined } : parsedFilters
+  const canFollowUp = canReadFollowUps(user)
+  // Only the Secretariat and the owner may ask for the follow-up cases; anyone else gets the whole list.
+  // `phase` is the company's own stage filter; staff filter by the real status and stage.
+  const { followUp, ...parsedFilters } = parseRequestFilters(query)
+  const otherFilters: RequestQueueFilters = isInternal ? { ...parsedFilters, phase: undefined } : parsedFilters
+  const filters: RequestQueueFilters = canFollowUp && followUp ? { ...otherFilters, followUp } : otherFilters
   const filterQuery = requestFiltersQuery(filters)
 
   // Reviewers and employers work from their own assignment queue (T23), not the generic list.
@@ -92,15 +102,21 @@ export default async function RequestsPage({
     approved: stats.approved,
     rejected: stats.rejected,
   }
-  const filterForm = <RequestsFilters status={status} filters={filters} events={events} counts={counts} />
 
+  // The page is read here, so the table opens with its rows instead of a skeleton and a loading line.
+  const adminQuery = adminRequestsQuery(status, page, filters)
+  const firstPage = await serverDashboardFetchResult<AdminRequestsApiResponse>(`/admin/requests?${adminQuery}`)
+  const initial = firstPage.kind === 'ok' ? toAdminRequestsPage(firstPage.data, page) : null
   return (
     <AdminRequestList
       status={status}
       page={page}
       filters={filters}
-      toolbar={filterForm}
-      notice={queueNote}
+      counts={counts}
+      events={events}
+      canViewCompany={canReadCompanyDossiers(user)}
+      canFollowUp={canFollowUp}
+      initial={initial ? { ...initial, key: adminQuery } : undefined}
     />
   )
 }

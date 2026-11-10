@@ -39,8 +39,6 @@ export {
   publishResult,
   type PublishedResultDto,
   type CompanySupplementaryRequestDto,
-  type FollowUpQueueItemDto,
-  type FollowUpQueueDto,
   type ResultVersionDto,
   type CaseFollowUpDto,
 } from './follow-ups'

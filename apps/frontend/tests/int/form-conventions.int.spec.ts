@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { createElement } from 'react'
+import { createElement, type ComponentProps } from 'react'
 import { useForm } from 'react-hook-form'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -113,16 +113,14 @@ describe('primary action position and colour (Design QA #277)', () => {
   })
 
   it('ProfileDialog renders primary before secondary', () => {
-    const field = createElement('input', { 'aria-label': 'نام' })
-    // The body is the element's child; it sits in a variable so the props stay typed without a `children` key.
-    const props = {
+    const props: ComponentProps<typeof ProfileDialog> = {
       title: 'افزودن',
       onClose: vi.fn(),
       primary: createElement('button', { type: 'button' }, 'ثبت'),
       secondary: createElement('button', { type: 'button' }, 'انصراف'),
-      children: field,
+      children: createElement('input', { 'aria-label': 'نام' }),
     }
-    render(createElement(ProfileDialog, props, field))
+    render(createElement(ProfileDialog, props))
     const footer = document.querySelector('[data-slot="dialog-footer"]')!
     expect(Array.from(footer.children).map((child) => child.textContent)).toEqual(['ثبت', 'انصراف'])
   })

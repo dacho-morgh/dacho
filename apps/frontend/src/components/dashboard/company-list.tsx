@@ -9,6 +9,7 @@ import {
   type AdminColumn,
   type AdminListLoadState,
 } from '@/components/dashboard/admin-list-view'
+import { CompanyAvatar } from '@/components/dashboard/company-avatar'
 import { DashboardTrashIcon, TickCircleIcon } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { formatDate } from '@/utilities/dashboard-api'
@@ -108,14 +109,21 @@ const baseColumns: AdminColumn<Company>[] = [
   {
     id: 'name',
     header: 'نام شرکت',
-    render: (item) =>
-      item.optimistic ? (
-        text(item.name)
-      ) : (
-        <Link href={`/dashboard/companies/${item.id}`} className="flex items-center gap-2">
-          {text(item.name)}
-        </Link>
-      ),
+    render: (item) => (
+      <div className="flex items-center gap-3">
+        <CompanyAvatar logoUrl={item.logoUrl} />
+        {item.optimistic ? (
+          text(item.name)
+        ) : (
+          <Link
+            href={`/dashboard/companies/${item.id}`}
+            className="min-w-0 truncate rounded-sm focus-visible:outline-2 focus-visible:outline-brand-500"
+          >
+            {text(item.name)}
+          </Link>
+        )}
+      </div>
+    ),
   },
   { id: 'submittedAt', header: 'تاریخ ارسال', render: (item) => text(formatDate(item.submittedAt) || '—') },
   {
@@ -440,6 +448,7 @@ export function CompanyList({
                 company: {
                   id: `optimistic-${draft.phone}`,
                   name: draft.companyName,
+                  logoUrl: null,
                   ceo: draft.name,
                   companyType: draft.companyType || '—',
                   address: '—',

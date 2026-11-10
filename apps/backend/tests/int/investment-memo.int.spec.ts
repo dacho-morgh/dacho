@@ -379,6 +379,42 @@ describe('T32: Investment memo (int)', () => {
     expect((await caseMemos(app, 'investment', id)).status).toBe(403)
     // The Secretariat receives; it does not write.
     expect((await saveMemo(app, 'secretariat', id, 'نفوذ')).status).toBe(403)
+    for (const user of ['secretariat', 'company-user-1', 'chief', 'reviewer-1', 'employer-1']) {
+      expect((await request(app).get(`/investment/cases/${id}/memos`).set(auth(user))).status).toBe(403)
+    }
+    expect((await request(app).get(`/investment/cases/${id}/memos`).set(auth('investment-2'))).status).toBe(404)
+    expect((await request(app).get(`/investment/cases/${id}/memos`).set(auth('investment'))).body.memos)
+      .toEqual([expect.objectContaining({ version: 1, body: 'محرمانه' })])
+  })
+
+  it('lets the owner write and send a memo on a handed-off case it does not hold', async () => {
+    const app = await makeApp()
+    const pending = await handedOffCase(app, { submit: false })
+    // Before the handoff there is nothing to write on, for the owner as for the investment person.
+    expect((await saveMemo(app, 'owner', pending, 'زودهنگام')).status).toBe(404)
+    expect((await request(app).get(`/investment/cases/${pending}/memos`).set(auth('owner'))).status).toBe(404)
+
+    const id = await handedOffCase(app)
+    await saveMemo(app, 'investment', id, 'پیش‌نویس کارشناس')
+    // The owner does not read the investment person's draft on the writer's view, nor send it.
+    expect((await request(app).get(`/investment/cases/${id}/memos`).set(auth('owner'))).body.memos).toEqual([])
+    expect((await sendMemo(app, 'owner', id, 1)).status).toBe(404)
+
+    const saved = await saveMemo(app, 'owner', id, 'یادداشت مدیر')
+    expect(saved.status).toBe(201)
+    expect(saved.body.memo).toMatchObject({ version: 2, body: 'یادداشت مدیر', authorId: 'owner', sentAt: null })
+    expect((await saveMemo(app, 'owner', id, 'یادداشت مدیر')).status).toBe(200)
+    const sent = await sendMemo(app, 'owner', id, 2)
+    expect(sent.status).toBe(200)
+    expect(sent.body.memo.sentAt).toEqual(expect.any(String))
+    expect((await request(app).get(`/investment/cases/${id}/memos`).set(auth('owner'))).body.memos)
+      .toEqual([expect.objectContaining({ version: 2, authorId: 'owner' })])
+
+    // The Secretariat receives it as any sent memo, and the case does not move.
+    expect((await caseMemos(app, 'secretariat', id)).body.items).toEqual([expect.objectContaining({ version: 2, authorId: 'owner' })])
+    expect((await request(app).get(`/requests/${id}`).set(auth('owner'))).body.request).toMatchObject({ status: 'in_review', reviewStage: 'advanced' })
+    // The investment person's replaced draft can no longer go.
+    expect((await sendMemo(app, 'investment', id, 1)).status).toBe(409)
   })
 
   it('needs the handoff, valid text and a version the actor wrote', async () => {
