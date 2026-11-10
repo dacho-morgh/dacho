@@ -48,6 +48,8 @@ export interface RequestQueueFilters {
   eventId?: string
   stage?: ReviewStageFilter
   queue?: string
+  /** Only the Secretariat's follow-up cases (a sent investment memo); the Secretariat and the owner only. */
+  followUp?: boolean
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -59,6 +61,7 @@ export function parseRequestFilters(query: {
   eventId?: string | string[]
   stage?: string | string[]
   queue?: string | string[]
+  followUp?: string | string[]
 }): RequestQueueFilters {
   const filters: RequestQueueFilters = {}
   const phase = parseCompanyRequestStage(query.phase)
@@ -69,6 +72,7 @@ export function parseRequestFilters(query: {
   const stage = REVIEW_STAGE_OPTIONS.find((option) => option.value === query.stage)
   if (stage) filters.stage = stage.value
   if (typeof query.queue === 'string' && /^[a-z_]{1,64}$/.test(query.queue)) filters.queue = query.queue
+  if (query.followUp === '1') filters.followUp = true
   return filters
 }
 
@@ -79,6 +83,7 @@ function appendFilters(query: URLSearchParams, filters: RequestQueueFilters) {
   if (filters.eventId) query.set('eventId', filters.eventId)
   if (filters.stage) query.set('stage', filters.stage)
   if (filters.queue) query.set('queue', filters.queue)
+  if (filters.followUp) query.set('followUp', '1')
 }
 
 /** The API query string of the filters, starting with `&`, or nothing without any. */

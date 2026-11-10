@@ -257,6 +257,8 @@ export interface RequestFilters {
   /** The company-facing phase (#280), folded from status and review stage by `company-request-phase.ts`. */
   phase?: CompanyRequestPhase
   queue?: RequestWorkQueueFilter
+  /** Cases with a sent investment memo: the Secretariat's follow-up cases. */
+  followUp?: boolean
 }
 
 export function requestFilterClauses(filters: RequestFilters, params: unknown[]): string[] {
@@ -282,6 +284,9 @@ export function requestFilterClauses(filters: RequestFilters, params: unknown[])
     clauses.push(`${companyRequestPhaseSql('r')} = $${params.length}`)
   }
   if (filters.queue) clauses.push(requestWorkQueueClause(filters.queue, params))
+  if (filters.followUp) {
+    clauses.push('EXISTS (SELECT 1 FROM dashboard.investment_memos m WHERE m.request_id = r.id AND m.sent_at IS NOT NULL)')
+  }
   return clauses
 }
 

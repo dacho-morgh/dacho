@@ -4,7 +4,7 @@ import {
   type PersonnelGender,
 } from '@cms-core/access/roles'
 import type { BadgeProps } from '@/components/ui/badge'
-import { AdminError, adminRequest } from '../owner-admin'
+import { AdminError, adminRequest, loadPeople } from '../owner-admin'
 
 export type PersonnelFileRef = {
   id: number
@@ -100,5 +100,17 @@ export async function setEmployeeActive(employee: Employee, isActive: boolean): 
   return { ...employee, ...result.doc }
 }
 
-export const fileRef = (file: PersonnelFileRef | number): PersonnelFileRef =>
+/** Company representatives are applicants, not staff. */
+export const toStaff = (items: Employee[]): Employee[] =>
+  items.filter((item) => item.operationalRole !== 'representative')
+
+/** The owner reads every account (with its version stamp); everyone else reads the admin list. */
+export async function loadEmployees(canManage: boolean): Promise<Employee[]> {
+  const items = canManage
+    ? await loadPeople()
+    : ((await adminRequest('/api/dashboard/admin/employees?limit=100')).items as Employee[])
+  return toStaff(items)
+}
+
+export const fileRef =(file: PersonnelFileRef | number): PersonnelFileRef =>
   typeof file === 'number' ? { id: file } : file

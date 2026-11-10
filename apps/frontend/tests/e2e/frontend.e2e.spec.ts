@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { validNationalId } from '../helpers/nationalId'
 
 test.use({ channel: 'chrome' })
 
@@ -76,26 +77,28 @@ test.describe('Frontend', () => {
     const suffix = `${Date.now()}`.slice(-9)
     const phone = `09${suffix}`
     const password = 'password123'
-    const registration = await page.request.post('http://localhost:3000/api/users', {
+    // Registration is `/self-signup`: it creates the person and the company they represent, then
+    // signs them in. A plain `/api/users` create makes a person with no company, which has no
+    // joining state to show.
+    const registration = await page.request.post('http://localhost:3000/api/users/self-signup', {
+      headers: { Origin: 'http://localhost:3000' },
       data: {
         email: `overview-${suffix}@example.com`,
-        username: phone,
         password,
         phone,
         name: 'متقاضی تست داشبورد',
+        position: 'مدیرعامل',
         companyName: 'شرکت تست داشبورد',
-        companyNationalId: `10${suffix}`,
+        companyNationalId: validNationalId(`6${suffix}`),
         companyRegistrationNumber: suffix,
         companyType: 'سهامی خاص',
         companyProvince: 'بوشهر',
         companyCity: 'بوشهر',
+        activityDomain: 'انرژی',
       },
     })
-    expect(registration.ok()).toBe(true)
-    const login = await page.request.post('http://localhost:3000/api/users/login', {
-      data: { username: phone, password },
-    })
-    expect(login.ok()).toBe(true)
+    expect(registration.status()).toBe(201)
+    expect((await registration.json()).session).toMatchObject({ established: true })
 
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('http://localhost:3000/dashboard')
