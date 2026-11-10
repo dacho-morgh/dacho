@@ -300,7 +300,7 @@ test('an event case travels from submission to the company reading its published
   })
 
   await test.step('the Secretariat finds the case in its queue, previews and publishes a separate text', async () => {
-    const queue = await open('secretariat', '/dashboard/follow-ups')
+    const queue = await open('secretariat', '/dashboard/requests?followUp=1')
     await queue.getByRole('link', { name: new RegExp(`طرح آزمون مسیر ${suffix}`) }).click()
     await queue.waitForURL(`**/dashboard/requests/${requestId}`, { timeout: 60_000 })
     const panel = queue.getByTestId('secretariat-follow-up')

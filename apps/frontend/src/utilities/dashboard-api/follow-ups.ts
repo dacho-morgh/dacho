@@ -1,4 +1,4 @@
-import { type Paginated, dashboardFetch, postJson } from './core'
+import { dashboardFetch, postJson } from './core'
 
 export interface PublishedResultDto {
   body: string
@@ -10,18 +10,6 @@ export interface CompanySupplementaryRequestDto {
   body: string
   createdAt: string
 }
-
-export interface FollowUpQueueItemDto {
-  requestId: string
-  trackingCode: string
-  title: string
-  companyName: string | null
-  latestMemoVersion: number
-  latestMemoSentAt: string
-  publishedAt: string | null
-}
-
-export type FollowUpQueueDto = Paginated<FollowUpQueueItemDto>
 
 export interface ResultVersionDto {
   id: string
