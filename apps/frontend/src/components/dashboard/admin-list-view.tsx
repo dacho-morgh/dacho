@@ -69,7 +69,9 @@ export type AdminRowAction = {
   label: string
   icon: React.ReactNode
   destructive?: boolean
-  onSelect: () => void
+  /** A link to another page; otherwise `onSelect` runs. */
+  href?: string
+  onSelect?: () => void
 }
 /**
  * A row's actions (the shared RowActions). «مشاهده» comes first; `viewLabel` renames it (e.g.

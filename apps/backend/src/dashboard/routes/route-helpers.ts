@@ -10,6 +10,11 @@ import type { User, UserStore } from '../../auth/user-store.js'
 import { isUuid } from '../../exhibitions/catalogue.js'
 
 export const MAX_REQUEST_SEARCH_LENGTH = 100
+
+/** The roles that read the Secretariat's follow-up cases (memos sent, results published). */
+export function isFollowUpReader(role: OperationalRole): boolean {
+  return role === 'central-secretariat' || role === 'system-owner'
+}
 export const REVIEW_STAGES: readonly unknown[] = ['chief_triage', 'triaged', 'advanced']
 
 /** The list and count filters, or the error code of the first invalid one. A queue of another role is invalid. */
@@ -38,6 +43,11 @@ export function parseRequestFilters(
   if (query.queue !== undefined) {
     if (!isRequestWorkQueueOf(actor.operationalRole, query.queue)) return 'invalid_queue'
     filters.queue = { key: query.queue, actorId: actor.id, role: actor.operationalRole }
+  }
+  if (query.followUp !== undefined) {
+    // Whether a memo went out is the Secretariat's and the owner's to know, as on the follow-up queue.
+    if (query.followUp !== '1' || !isFollowUpReader(actor.operationalRole)) return 'invalid_follow_up'
+    filters.followUp = true
   }
   return filters
 }
@@ -101,6 +111,13 @@ export function requesterDisplayName(user: Awaited<ReturnType<UserStore['findByI
 
 export function safeOwner(user: User | undefined | null) {
   return user ? { id: user.id, name: user.name ?? null } : null
+}
+
+/** The logo the admin pages show: its id and the access-checked file route. Null when the company has none. */
+export function logoOf(company: { logo?: { id: string; filename: string | null } | null } | undefined) {
+  const logo = company?.logo
+  if (!logo?.filename) return null
+  return { id: logo.id, url: `/api/company-logos/file/${encodeURIComponent(logo.filename)}` }
 }
 
 /** Adds the download routes to a case file's proposal and RFP; each route still authorizes its reader. */

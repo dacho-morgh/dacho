@@ -336,8 +336,8 @@ test.describe('Register', () => {
 
     const date = page.locator('#register-companyEstablishmentDate')
     await date.click()
-    await page.getByLabel('سال').selectOption('1380')
-    await page.getByLabel('ماه').selectOption('5')
+    await page.getByLabel('سال', { exact: true }).selectOption('1380')
+    await page.getByLabel('ماه', { exact: true }).selectOption('5')
     await page.getByRole('button', { name: /۱۵ مرداد ۱۳۸۰$/ }).click()
     await expect(date).toHaveText('۱۳۸۰/۰۵/۱۵')
   })
@@ -369,8 +369,8 @@ test.describe('Register', () => {
     await page.locator('#register-companyProvince').selectOption('بوشهر')
     await page.locator('#register-companyCity').selectOption('برازجان')
     await page.locator('#register-companyEstablishmentDate').click()
-    await page.getByLabel('سال').selectOption('1380')
-    await page.getByLabel('ماه').selectOption('5')
+    await page.getByLabel('سال', { exact: true }).selectOption('1380')
+    await page.getByLabel('ماه', { exact: true }).selectOption('5')
     await page.getByRole('button', { name: /۱۵ مرداد ۱۳۸۰$/ }).click()
     await page.getByRole('button', { name: 'ادامه' }).click()
 
