@@ -3,6 +3,7 @@ import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import { getPayload, handleEndpoints, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import config from '@/payload.config'
+import { validNationalId } from '../helpers/nationalId'
 import { changesCompanyDossier } from '@cms-core/hooks/invalidateCompanyVerification'
 
 /**
@@ -73,7 +74,8 @@ describe('S4 account and company CMS contracts', () => {
       collection: 'companies',
       data: {
         name: `شرکت S4 ${suffix}`,
-        nationalId: `99174${Date.now() % 1000000}`,
+        // Signup now validates the check digit (#278); the seed must be claimable.
+        nationalId: validNationalId(`99174${Date.now() % 100000}`),
         representative: users[3],
         economicCode: '411',
         addresses: [{ title: 'دفتر', address: 'نشانی' }],
@@ -200,7 +202,7 @@ describe('S4 account and company CMS contracts', () => {
       email: `s4-created-${n}-${suffix}@example.invalid`,
       password: 'temporary-password',
       companyName: `شرکت ساخته‌شده ${n} ${suffix}`,
-      companyNationalId: `9917420${n}${Date.now() % 100000}`,
+      companyNationalId: validNationalId(`99${n}${Date.now() % 10_000_000}`),
       activityDomain: 'انرژی',
     })
 

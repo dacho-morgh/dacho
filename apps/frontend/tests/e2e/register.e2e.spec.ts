@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { getPayload } from 'payload'
 import config from '../../src/payload.config.js'
+import { validNationalId } from '../helpers/nationalId'
 
 test.use({ channel: 'chrome' })
 
@@ -50,7 +51,8 @@ test.afterAll(async () => {
 
 async function fillCompanyStep(page: Page) {
   await page.locator('#register-companyName').fill('شرکت نمونه تست')
-  await page.locator('#register-companyNationalId').fill('12345678901')
+  // Mocked-response flows never reach the server, but the form checks the digit.
+  await page.locator('#register-companyNationalId').fill(validNationalId('5000001'))
   await page.locator('#register-activityDomain').fill('انرژی')
   await page.getByRole('button', { name: 'ادامه' }).click()
 }
@@ -141,7 +143,7 @@ test.describe('Register', () => {
     page,
   }) => {
     const suffix = `${Date.now()}`.slice(-9)
-    const nationalId = `3${suffix}`
+    const nationalId = validNationalId(`3${suffix}`)
     const first = await page.request.post('http://localhost:3000/api/users/self-signup', {
       headers: cookieRequestHeaders,
       data: {
@@ -247,7 +249,7 @@ test.describe('Register', () => {
         name: 'No domain',
         position: 'CEO',
         companyName: 'No domain company',
-        companyNationalId: `4${suffix}`,
+        companyNationalId: validNationalId(`4${suffix}`),
         activityDomain: '   ',
       },
     })
@@ -273,23 +275,82 @@ test.describe('Register', () => {
     await expect(page.getByText('شناسه ملی باید فقط شامل رقم باشد.')).toBeVisible()
     await expect(page.locator('#register-companyNationalId')).toBeFocused()
 
+    // Right length, wrong check digit, then too short.
+    const nationalId = validNationalId('5000002')
+    const wrongCheckDigit = `${nationalId.slice(0, 10)}${(Number(nationalId[10]) + 1) % 10}`
+    await page.locator('#register-companyNationalId').fill(wrongCheckDigit)
+    await page.getByRole('button', { name: 'ادامه' }).click()
+    await expect(page.getByText('شناسه ملی معتبر نیست؛ ارقام را دوباره بررسی کنید.')).toBeVisible()
     await page.locator('#register-companyNationalId').fill('۰۰١۲')
+    await page.getByRole('button', { name: 'ادامه' }).click()
+    await expect(page.getByText('شناسه ملی باید ۱۱ رقم باشد.')).toBeVisible()
+    await expect(page.locator('#register-name')).toHaveCount(0)
+
+    await page.locator('#register-companyNationalId').fill(nationalId)
     await page.getByRole('button', { name: 'ادامه' }).click()
     await page.locator('#register-name').fill('متقاضی نمونه')
     await page.locator('#register-position').fill('مدیرعامل')
     await page.locator('#register-phone').fill('123')
-    await page.locator('#register-email').fill('register-ux@example.invalid')
+    await page.locator('#register-email').fill('not-an-email')
     await page.getByRole('button', { name: 'ادامه' }).click()
     await expect(page.getByText('شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.')).toBeVisible()
+    await expect(page.getByText(/ایمیل معتبر نیست/)).toBeVisible()
+    await expect(page.locator('#register-password')).toHaveCount(0)
   })
 
-  test('signs up an applicant and can log in with the registered phone or email', async ({
+  test('shows no error when the security step opens, only after touch or a submit attempt', async ({
+    page,
+  }) => {
+    await page.goto(registerUrl)
+    await page.waitForFunction(() => document.querySelector('form[data-hydrated="true"]') !== null)
+    await fillCompanyStep(page)
+    await fillRepresentativeStep(page)
+    await expect(page.locator('#register-password')).toBeVisible()
+    await expect(page.locator('#register-password')).not.toHaveAttribute('aria-invalid', 'true')
+    await expect(page.locator('#register-password-confirmation')).not.toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    await expect(page.getByText(/را وارد کنید\./)).toHaveCount(0)
+
+    await page.locator('#register-password').focus()
+    await page.locator('#register-password-confirmation').focus()
+    await expect(page.getByText('رمز عبور را وارد کنید.')).toBeVisible()
+    await expect(page.getByText('تکرار رمز عبور را وارد کنید.')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'ثبت شرکت' }).click()
+    await expect(page.getByText('تکرار رمز عبور را وارد کنید.')).toBeVisible()
+  })
+
+  test('filters the cities by province and picks a Jalali founding date', async ({ page }) => {
+    await page.goto(registerUrl)
+    await page.waitForFunction(() => document.querySelector('form[data-hydrated="true"]') !== null)
+    const city = page.locator('#register-companyCity')
+    await expect(city).toBeDisabled()
+    await page.locator('#register-companyProvince').selectOption('بوشهر')
+    await expect(city.locator('option', { hasText: 'برازجان' })).toHaveCount(1)
+    await expect(city.locator('option', { hasText: 'تبریز' })).toHaveCount(0)
+    await city.selectOption('برازجان')
+    await page.locator('#register-companyProvince').selectOption('تهران')
+    await expect(city).toHaveValue('')
+
+    const date = page.locator('#register-companyEstablishmentDate')
+    await date.click()
+    await page.getByLabel('سال', { exact: true }).selectOption('1380')
+    await page.getByLabel('ماه', { exact: true }).selectOption('5')
+    await page.getByRole('button', { name: /۱۵ مرداد ۱۳۸۰$/ }).click()
+    await expect(date).toHaveText('۱۳۸۰/۰۵/۱۵')
+  })
+
+  test('signs up an applicant, lands in the panel already signed in, and can still log in by email', async ({
     page,
   }) => {
     // Unique per run so CI retries don't collide on the unique phone/email.
     const suffix = Date.now().toString().slice(-9)
     const phone = `09${suffix}`
     const email = `e2e-applicant-${suffix}@example.com`
+    // A leading zero must survive normalization; the ID carries a valid check digit.
+    const nationalId = validNationalId(`0${suffix}`)
 
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto(
@@ -303,8 +364,14 @@ test.describe('Register', () => {
 
     // Step 1 — company info
     await page.locator('#register-companyName').fill('شرکت نمونه تست')
-    await page.locator('#register-companyNationalId').fill(`۰${suffix}`)
+    await page.locator('#register-companyNationalId').fill(nationalId.replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]))
     await page.locator('#register-activityDomain').fill('انرژی')
+    await page.locator('#register-companyProvince').selectOption('بوشهر')
+    await page.locator('#register-companyCity').selectOption('برازجان')
+    await page.locator('#register-companyEstablishmentDate').click()
+    await page.getByLabel('سال', { exact: true }).selectOption('1380')
+    await page.getByLabel('ماه', { exact: true }).selectOption('5')
+    await page.getByRole('button', { name: /۱۵ مرداد ۱۳۸۰$/ }).click()
     await page.getByRole('button', { name: 'ادامه' }).click()
 
     // Step 2 — representative info
@@ -325,26 +392,26 @@ test.describe('Register', () => {
     const registrationBody = await registrationResponse.json()
     registeredUserIds.push(registrationBody.user.id)
     registeredCompanyIds.push(registrationBody.company.id)
-    expect(registrationBody.company.nationalId).toBe(`0${suffix}`)
+    expect(registrationBody.company.nationalId).toBe(nationalId)
     expect(registrationBody.company.activityDomain).toBe('انرژی')
     // Company relationships expose IDs without hydrating authentication records.
     expect(registrationBody.user.roles).toEqual(['representative'])
     expect(registrationBody.company.representative).toBe(registrationBody.user.id)
 
-    await page.waitForURL(
-      '**/login?registered=1&returnUrl=%2Fdashboard%2Frequests%3Fstatus%3Ddraft',
-    )
-    await expect(page.getByText('ثبت‌نام با موفقیت')).toBeVisible()
-
-    await page.locator('#login-identifier').fill(phone)
-    await page.locator('#login-password').fill('password123')
-    const [loginResponse] = await Promise.all([
-      page.waitForResponse((response) => response.url().endsWith('/api/users/login')),
-      page.getByRole('button', { name: 'ورود', exact: true }).click(),
-    ])
-
-    expect(loginResponse.status()).toBe(200)
-    await expect(page).toHaveURL('http://localhost:3000/dashboard/requests?status=draft')
+    // #278: the signup signs the representative in, so the form goes straight
+    // to the requested panel page: no login page in between.
+    expect(registrationBody.session).toMatchObject({ established: true })
+    await page.waitForURL('http://localhost:3000/dashboard/requests?status=draft')
+    const company = await payload.findByID({
+      collection: 'companies',
+      id: registrationBody.company.id,
+      overrideAccess: true,
+    })
+    expect(company).toMatchObject({
+      province: 'بوشهر',
+      city: 'برازجان',
+      establishmentDate: '1380/05/15',
+    })
 
     const me = await page.request.get('http://localhost:3000/api/users/me', {
       headers: cookieRequestHeaders,
@@ -397,7 +464,7 @@ test.describe('Register', () => {
         position: 'Company representative',
         companyName: 'Test company',
         activityDomain: 'Energy',
-        companyNationalId: `20${suffix}`,
+        companyNationalId: validNationalId(`2${suffix}`),
         companyRegistrationNumber: suffix,
         companyType: 'سهامی خاص',
         companyProvince: 'بوشهر',
@@ -414,6 +481,14 @@ test.describe('Register', () => {
     // admin session is active.
     expect(body.user.roles).toEqual(['representative'])
     expect(body.company.representative).toBe(body.user.id)
+    // #278: the signup response itself signs the new representative in,
+    // replacing the admin's session cookie, exactly as a login would.
+    expect(body.session).toMatchObject({ established: true })
+    expect(registration.headers()['set-cookie']).toMatch(/payload-token=/)
+    const signedIn = await page.request.get('http://localhost:3000/api/users/me', {
+      headers: cookieRequestHeaders,
+    })
+    expect((await signedIn.json()).user).toMatchObject({ id: body.user.id, operationalRole: 'representative' })
 
     const logout = await page.request.post('http://localhost:3000/api/users/logout', {
       headers: cookieRequestHeaders,

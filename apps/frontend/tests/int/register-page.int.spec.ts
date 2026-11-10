@@ -4,6 +4,10 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RegisterPage from '@/components/auth/register-page'
+import { toPersianDigits } from '@/utilities/digits'
+import { validNationalId } from '../helpers/nationalId'
+
+const VALID_ID = validNationalId(1)
 
 const { replace, useFormSpy } = vi.hoisted(() => ({ replace: vi.fn(), useFormSpy: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }))
@@ -28,7 +32,7 @@ async function advance() {
   })
 }
 
-async function company(nationalId = '12345678901') {
+async function company(nationalId = VALID_ID) {
   fill('نام شرکت', ' شرکت نمونه ')
   fill('شناسه ملی', nationalId)
   fill('حوزه فعالیت', ' انرژی ')
@@ -72,7 +76,7 @@ describe('signup frontend contract (mocked HTTP, not release evidence)', () => {
   it('does not skip representative validation when continue is clicked twice during resolver work', async () => {
     render(createElement(RegisterPage))
     fill('نام شرکت', 'شرکت نمونه')
-    fill('شناسه ملی', '123')
+    fill('شناسه ملی', VALID_ID)
     fill('حوزه فعالیت', 'انرژی')
     const next = screen.getByRole('button', { name: 'ادامه' })
     await act(async () => {
@@ -87,7 +91,7 @@ describe('signup frontend contract (mocked HTTP, not release evidence)', () => {
   it('requires activity domain on company step without making completion fields eligibility gates', async () => {
     render(createElement(RegisterPage))
     fill('نام شرکت', 'شرکت نمونه')
-    fill('شناسه ملی', '12345678901')
+    fill('شناسه ملی', VALID_ID)
     await advance()
     expect(screen.getByText('حوزه فعالیت را وارد کنید.')).toBeTruthy()
     const activity = screen.getByLabelText('حوزه فعالیت')
@@ -98,8 +102,8 @@ describe('signup frontend contract (mocked HTTP, not release evidence)', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it.each(['۰۰١۲', '123', '12345678901234567890'])(
-    'submits normalized digit-only ID %s without a length gate or privilege fields',
+  it.each([VALID_ID, toPersianDigits(VALID_ID), VALID_ID.replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]!)])(
+    'submits the normalized national ID %s without privilege fields (no session: falls back to login)',
     async (id) => {
       vi.mocked(fetch).mockResolvedValue(new Response('{}', { status: 201 }))
       render(createElement(RegisterPage, { returnUrl: '/dashboard/requests?status=draft' }))
@@ -113,7 +117,7 @@ describe('signup frontend contract (mocked HTTP, not release evidence)', () => {
       const body = JSON.parse(String(options?.body))
       expect(body).toMatchObject({
         companyName: 'شرکت نمونه',
-        companyNationalId: id === '۰۰١۲' ? '0012' : id,
+        companyNationalId: VALID_ID,
         activityDomain: 'انرژی',
         name: 'نماینده نمونه',
         position: 'مدیرعامل',
@@ -132,37 +136,85 @@ describe('signup frontend contract (mocked HTTP, not release evidence)', () => {
     },
   )
 
-  it.each(['', '۱۲x', '12 34', '12.34'])(
-    'rejects empty or nondigit national ID %s and focuses its linked error',
-    async (id) => {
+  it.each([
+    ['', 'شناسه ملی را وارد کنید.'],
+    ['۱۲x', 'شناسه ملی باید فقط شامل رقم باشد.'],
+    ['12 34', 'شناسه ملی باید فقط شامل رقم باشد.'],
+    ['12.34', 'شناسه ملی باید فقط شامل رقم باشد.'],
+    ['۰۰١۲', 'شناسه ملی باید ۱۱ رقم باشد.'],
+    ['123', 'شناسه ملی باید ۱۱ رقم باشد.'],
+    ['12345678901234567890', 'شناسه ملی باید ۱۱ رقم باشد.'],
+    ['12345678901', 'شناسه ملی معتبر نیست؛ ارقام را دوباره بررسی کنید.'],
+    ['00000000000', 'شناسه ملی معتبر نیست؛ ارقام را دوباره بررسی کنید.'],
+    [
+      // One digit off a valid ID breaks the check digit.
+      `${VALID_ID.slice(0, 10)}${(Number(VALID_ID[10]) + 1) % 10}`,
+      'شناسه ملی معتبر نیست؛ ارقام را دوباره بررسی کنید.',
+    ],
+  ])(
+    'rejects national ID %s with a Persian reason and focuses its linked error',
+    async (id, message) => {
       render(createElement(RegisterPage))
       await company(id)
       const input = screen.getByLabelText('شناسه ملی')
       expect(input.getAttribute('aria-invalid')).toBe('true')
-      expect(
-        screen.getByText(id ? 'شناسه ملی باید فقط شامل رقم باشد.' : 'شناسه ملی را وارد کنید.').id,
-      ).toBe(input.getAttribute('aria-describedby'))
+      expect(screen.getByText(message).id).toBe(input.getAttribute('aria-describedby'))
       await waitFor(() => expect(document.activeElement).toBe(input))
+      expect(screen.queryByLabelText('نام و نام خانوادگی')).toBeNull()
       expect(fetch).not.toHaveBeenCalled()
     },
   )
 
   it.each([
-    ['companyNationalId', 'شناسه ملی', 'شناسه ملی باید فقط شامل رقم باشد.', 'Invalid national ID.'],
+    [
+      'companyNationalId',
+      'شناسه ملی',
+      'digits_only',
+      'شناسه ملی باید فقط شامل رقم باشد.',
+      'Invalid national ID: only digits are allowed.',
+    ],
+    [
+      'companyNationalId',
+      'شناسه ملی',
+      'length',
+      'شناسه ملی باید ۱۱ رقم باشد.',
+      'Invalid national ID: a company national ID has exactly 11 digits.',
+    ],
+    [
+      'companyNationalId',
+      'شناسه ملی',
+      'checksum',
+      'شناسه ملی معتبر نیست؛ ارقام را دوباره بررسی کنید.',
+      'Invalid national ID: the check digit does not match.',
+    ],
     [
       'phone',
       'شماره موبایل',
+      'mobile_format',
       'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.',
       'Invalid mobile number.',
     ],
-    ['activityDomain', 'حوزه فعالیت', 'مقدار واردشده معتبر نیست.', 'Internal validation details.'],
+    [
+      'email',
+      'ایمیل',
+      'email_format',
+      'ایمیل معتبر نیست؛ آن را به شکل name@example.com وارد کنید.',
+      'Invalid email address.',
+    ],
+    [
+      'activityDomain',
+      'حوزه فعالیت',
+      undefined,
+      'مقدار واردشده معتبر نیست.',
+      'Internal validation details.',
+    ],
   ])(
-    'localizes invalid_field for %s and returns focus without discarding answers',
-    async (field, label, message, serverMessage) => {
+    'localizes invalid_field for %s (%s) by its reason and returns focus without discarding answers',
+    async (field, label, reason, message, serverMessage) => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(
           JSON.stringify({
-            errors: [{ code: 'invalid_field', field, message: serverMessage }],
+            errors: [{ code: 'invalid_field', field, reason, message: serverMessage }],
           }),
           { status: 400 },
         ),

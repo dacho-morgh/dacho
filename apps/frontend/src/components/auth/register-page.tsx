@@ -4,19 +4,36 @@ import { ArrowLeft, ArrowRight, Check, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { Controller, useForm, type FieldErrors, type Resolver } from 'react-hook-form'
+import {
+  Controller,
+  useForm,
+  useWatch,
+  type FieldErrors,
+  type Resolver,
+} from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { JalaliDatePicker } from '@/components/ui/jalali-date-picker'
+import { SelectField } from '@/components/ui/select-field'
 import { Typography } from '@/components/ui/typography'
-import { getLoginUrl, getSafeReturnUrl } from '@/utilities/auth-return-url'
+import {
+  citiesOfProvince,
+  IRAN_PROVINCES,
+  isCityOfProvince,
+} from '@/data/iran-locations'
+import { getExplicitSafeReturnUrl, getLoginUrl, getSafeReturnUrl } from '@/utilities/auth-return-url'
+import { toEnglishDigits } from '@/utilities/digits'
+import { compareJalali, parseJalali, todayJalali } from '@/utilities/jalali'
+import { resolvePostSignInDestination } from '@/utilities/post-sign-in'
+import {
+  DIGITS_ONLY_MESSAGE,
+  emailProblem,
+  isDigitsOnly,
+  mobileProblem,
+  nationalIdProblem,
+  SIGNUP_REASON_MESSAGES,
+} from '@/utilities/signup-validation'
 
 const steps = ['اطلاعات شرکت', 'اطلاعات نماینده', 'امنیت حساب'] as const
 
@@ -28,6 +45,8 @@ const COMPANY_TYPES = [
   'استارتاپ',
   'سایر',
 ] as const
+
+const PROVINCE_NAMES = IRAN_PROVINCES.map((province) => province.name)
 
 // Form field names mirror the Users collection: the representative's
 // fullName/mobile/email map to name/phone/email, and company fields carry a
@@ -59,6 +78,7 @@ type FormErrors = Partial<Record<keyof FormState, string>>
 type PayloadError = {
   code?: unknown
   field?: unknown
+  reason?: unknown
   path?: unknown
   message?: unknown
 }
@@ -68,73 +88,112 @@ type PayloadErrorBody = {
   message?: unknown
 }
 
+type SignupSuccessBody = {
+  user?: { contentEditor?: boolean | null }
+  session?: { established?: unknown }
+}
+
 const registerInputClasses = {
-  className: 'text-sm leading-6 text-neutral-800 placeholder:text-neutral-300',
+  // Figma 242:10534: placeholder 16/Light, grey/400. The label keeps the shared
+  // 16/Regular neutral-600 (Figma 242:10530).
+  className: 'text-base leading-7 text-neutral-800 placeholder:font-light placeholder:text-neutral-400',
   containerClassName: 'h-12 rounded-lg border-neutral-200 px-3 py-2 shadow-none',
-  wrapperClassName:
-    'gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700',
+  wrapperClassName: 'gap-2',
 } as const
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const NATIONAL_ID_RE = /^\d+$/
-const IRANIAN_MOBILE_RE = /^09\d{9}$/
-
-const toEnglishDigits = (value: string): string =>
-  value
-    .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
-    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+// The selects and the date field share the inputs' label and 48px control.
+const registerFieldClasses = {
+  wrapperClassName: 'gap-2',
+  className: 'h-12 rounded-lg border-neutral-200 text-base leading-7 text-neutral-800',
+} as const
 
 const requiredText = (label: string) =>
   z.string().refine((value) => value.trim().length > 0, `${label} را وارد کنید.`)
 
-const signupSchema = z
-  .object({
-    companyName: requiredText('نام شرکت'),
-    companyNationalId: requiredText('شناسه ملی').refine(
-      (value) => !value.trim() || NATIONAL_ID_RE.test(toEnglishDigits(value.trim())),
-      'شناسه ملی باید فقط شامل رقم باشد.',
-    ),
-    activityDomain: requiredText('حوزه فعالیت'),
-    companyRegistrationNumber: z.string(),
-    companyType: z.string(),
-    companyProvince: z.string(),
-    companyCity: z.string(),
-    companyEstablishmentDate: z.string(),
-    companyStatus: z.string(),
-    companyEconomicCode: z.string(),
-    name: requiredText('نام و نام خانوادگی'),
-    position: requiredText('سمت'),
-    phone: requiredText('شماره موبایل').refine(
-      (value) => !value.trim() || IRANIAN_MOBILE_RE.test(toEnglishDigits(value.trim())),
-      'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.',
-    ),
-    email: requiredText('ایمیل').refine(
-      (value) => !value.trim() || EMAIL_RE.test(value.trim()),
-      'ایمیل معتبر نیست.',
-    ),
-    password: requiredText('رمز عبور').refine(
-      (value) => !value || value.length >= 8,
-      'رمز عبور باید حداقل ۸ کاراکتر باشد.',
-    ),
-    passwordConfirmation: requiredText('تکرار رمز عبور'),
+/** A required text field with one extra rule that only runs once something is typed. */
+const requiredWithRule = (label: string, problem: (value: string) => string | undefined) =>
+  z.string().superRefine((value, ctx) => {
+    if (!value.trim()) {
+      ctx.addIssue({ code: 'custom', message: `${label} را وارد کنید.` })
+      return
+    }
+    const message = problem(value)
+    if (message) ctx.addIssue({ code: 'custom', message })
   })
-  .refine(
-    (values) =>
-      !values.password ||
-      !values.passwordConfirmation ||
-      values.password === values.passwordConfirmation,
-    { path: ['passwordConfirmation'], message: 'رمز عبور و تکرار آن یکسان نیستند.' },
-  )
+
+const optionalDigits = z.string().refine((value) => !value.trim() || isDigitsOnly(value), DIGITS_ONLY_MESSAGE)
+
+const signupSchema = z.object({
+  companyName: requiredText('نام شرکت'),
+  companyNationalId: requiredWithRule('شناسه ملی', (value) => {
+    const reason = nationalIdProblem(value)
+    return reason ? SIGNUP_REASON_MESSAGES[reason] : undefined
+  }),
+  activityDomain: requiredText('حوزه فعالیت'),
+  companyRegistrationNumber: optionalDigits,
+  companyType: z.string(),
+  companyProvince: z.string(),
+  companyCity: z.string(),
+  companyEstablishmentDate: z.string().superRefine((value, ctx) => {
+    if (!value.trim()) return
+    const date = parseJalali(value)
+    if (!date) ctx.addIssue({ code: 'custom', message: 'تاریخ تأسیس معتبر نیست.' })
+    else if (compareJalali(date, todayJalali()) > 0)
+      ctx.addIssue({ code: 'custom', message: 'تاریخ تأسیس نمی‌تواند در آینده باشد.' })
+  }),
+  companyStatus: z.string(),
+  companyEconomicCode: optionalDigits,
+  name: requiredText('نام و نام خانوادگی'),
+  position: requiredText('سمت'),
+  phone: requiredWithRule('شماره موبایل', (value) => {
+    const reason = mobileProblem(value)
+    return reason ? SIGNUP_REASON_MESSAGES[reason] : undefined
+  }),
+  email: requiredWithRule('ایمیل', (value) => {
+    const reason = emailProblem(value)
+    return reason ? SIGNUP_REASON_MESSAGES[reason] : undefined
+  }),
+  password: requiredText('رمز عبور').refine(
+    (value) => !value || value.length >= 8,
+    'رمز عبور باید حداقل ۸ کاراکتر باشد.',
+  ),
+  passwordConfirmation: requiredText('تکرار رمز عبور'),
+})
+
+/** Rules that compare two fields; run next to the schema so a per-field error never hides them. */
+function crossFieldIssues(values: FormState): Array<{ name: keyof FormState; message: string }> {
+  const issues: Array<{ name: keyof FormState; message: string }> = []
+  if (
+    values.password &&
+    values.passwordConfirmation &&
+    values.password !== values.passwordConfirmation
+  ) {
+    issues.push({ name: 'passwordConfirmation', message: 'رمز عبور و تکرار آن یکسان نیستند.' })
+  }
+  if (values.companyCity) {
+    if (!values.companyProvince) {
+      issues.push({ name: 'companyCity', message: 'ابتدا استان را انتخاب کنید.' })
+    } else if (!isCityOfProvince(values.companyProvince, values.companyCity)) {
+      issues.push({ name: 'companyCity', message: 'این شهر در استان انتخاب‌شده نیست.' })
+    }
+  }
+  return issues
+}
 
 // ponytail: flat fields need only Zod's first issue; use a resolver package if nested fields arrive.
 const signupResolver: Resolver<FormState> = (values) => {
   const result = signupSchema.safeParse(values)
-  if (result.success) return { values: result.data, errors: {} }
   const errors: FieldErrors<FormState> = {}
-  for (const issue of result.error.issues) {
-    const name = issue.path[0] as keyof FormState
-    errors[name] ??= { type: issue.code, message: issue.message }
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      const name = issue.path[0] as keyof FormState
+      errors[name] ??= { type: issue.code, message: issue.message }
+    }
   }
+  for (const issue of crossFieldIssues(values)) {
+    errors[issue.name] ??= { type: 'custom', message: issue.message }
+  }
+  if (result.success && Object.keys(errors).length === 0) return { values: result.data, errors: {} }
   return { values: {}, errors }
 }
 
@@ -193,6 +252,22 @@ function payloadErrorField(error: PayloadError): keyof FormState | undefined {
 }
 
 /**
+ * The Persian message for a server `invalid_field`, chosen by the server's
+ * stable `reason` (digits_only | length | checksum | mobile_format |
+ * email_format). The server's English text is never shown.
+ */
+function invalidFieldMessage(field: keyof FormState, reason: unknown): string {
+  if (field === 'companyNationalId') {
+    return reason === 'digits_only' || reason === 'length' || reason === 'checksum'
+      ? SIGNUP_REASON_MESSAGES[reason]
+      : SIGNUP_REASON_MESSAGES.checksum
+  }
+  if (field === 'phone') return SIGNUP_REASON_MESSAGES.mobile_format
+  if (field === 'email') return SIGNUP_REASON_MESSAGES.email_format
+  return 'مقدار واردشده معتبر نیست.'
+}
+
+/**
  * A response the browser cannot interpret may still follow a committed signup
  * (a gateway timeout after the server wrote both records, say). The browser
  * never decides the outcome itself: it tells the person to try signing in
@@ -232,9 +307,10 @@ function isDuplicateError(error: PayloadError): boolean {
   return /unique|duplicate|already|exists|قبلاً|تکراری/.test(message)
 }
 
-export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?: string }) {
+export default function RegisterPage({ returnUrl }: { returnUrl?: string | string[] }) {
   const router = useRouter()
   const safeReturnUrl = getSafeReturnUrl(returnUrl)
+  const explicitReturnUrl = getExplicitSafeReturnUrl(returnUrl)
   const [step, setStep] = useState(1)
   const {
     register,
@@ -242,13 +318,20 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
     trigger,
     clearErrors,
     setError,
+    setValue,
+    getValues,
+    getFieldState,
     handleSubmit,
     formState: { errors, isSubmitting: submitting },
   } = useForm<FormState>({
     defaultValues: EMPTY_FORM,
     resolver: signupResolver,
+    // A field reports its error after the person has left it (or a step or the
+    // form was submitted), never while the step is first shown (design QA #278).
+    mode: 'onTouched',
     shouldFocusError: false,
   })
+  const province = useWatch({ control, name: 'companyProvince' })
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [confirmationVisible, setConfirmationVisible] = useState(false)
   const [notice, setNoticeState] = useState<Notice | null>(null)
@@ -283,7 +366,14 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
 
   const registerField = (name: keyof FormState) =>
     register(name, {
-      onChange: () => clearFieldError(name),
+      onChange: () => {
+        clearFieldError(name)
+        // The confirmation is compared with the password: re-check it once the
+        // person has started typing it, not before.
+        if (name === 'password' && getValues('passwordConfirmation')) {
+          void trigger('passwordConfirmation')
+        }
+      },
     })
 
   const focusField = (name: keyof FormState) => {
@@ -315,10 +405,13 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
     const fields = (Object.keys(fieldStep) as Array<keyof FormState>).filter(
       (name) => fieldStep[name] === step,
     )
-    if (await trigger(fields, { shouldFocus: true })) {
+    if (await trigger(fields)) {
       setNotice(null)
       setStep(Math.min(3, step + 1))
+      return
     }
+    const firstInvalid = fields.find((name) => getFieldState(name).error)
+    if (firstInvalid) focusField(firstInvalid)
   }
 
   const submitSignup = async (form: FormState) => {
@@ -381,12 +474,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
           } else if (code === 'missing_field') {
             serverErrors[field] = 'این فیلد الزامی است.'
           } else if (code === 'invalid_field') {
-            serverErrors[field] =
-              field === 'companyNationalId'
-                ? 'شناسه ملی باید فقط شامل رقم باشد.'
-                : field === 'phone'
-                  ? 'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.'
-                  : 'مقدار واردشده معتبر نیست.'
+            serverErrors[field] = invalidFieldMessage(field, error.reason)
           } else if ((isDuplicateError(error) || payloadInvalidUniqueField) && field === 'phone') {
             serverErrors.phone = 'این شماره موبایل قبلاً ثبت شده است.'
           } else if ((isDuplicateError(error) || payloadInvalidUniqueField) && field === 'email') {
@@ -446,6 +534,30 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
       }
 
       outcomeUncertain.current = false
+      const created = (await response.json().catch(() => null)) as SignupSuccessBody | null
+      if (!mounted.current) return
+
+      // The server signs the new representative in with the same cookie a login
+      // sets (`session.established`). Enter the panel directly, exactly as the
+      // login form does; if the sign-in did not happen, or the panel cannot be
+      // resolved, the account still exists, so fall back to the login page.
+      if (created?.session?.established === true) {
+        try {
+          const result = await resolvePostSignInDestination({
+            user: created.user,
+            explicitReturnUrl,
+          })
+          if (!mounted.current) return
+          if ('destination' in result) {
+            // A document-level navigation sends the protected route the cookie
+            // the signup just stored instead of an unauthenticated router cache.
+            window.location.replace(result.destination)
+            return
+          }
+        } catch {
+          if (!mounted.current) return
+        }
+      }
       router.replace(getLoginUrl(safeReturnUrl, { registered: true }))
     } catch {
       if (!mounted.current) return
@@ -463,19 +575,8 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
   return (
     <div className="mx-auto flex min-h-svh w-full max-w-[520px] flex-col px-6 pt-8 pb-6 lg:h-svh lg:min-h-0 lg:px-5 lg:pt-10 lg:pb-8">
       <header className="shrink-0">
-        <Typography
-          asChild
-          className="inline-flex items-center gap-2 transition-colors hover:text-neutral-800"
-          color="neutral-600"
-          variant="16/regular"
-        >
-          <Link href={loginUrl}>
-            <ArrowRight aria-hidden="true" className="size-5 stroke-[1.5]" />
-            بازگشت
-          </Link>
-        </Typography>
-
-        <Typography className="mt-7" color="neutral-800" variant="24/bold">
+        {/* Figma 242:12199: 20/Bold, neutral-700, line height 32. */}
+        <Typography color="neutral-700" variant="20/bold">
           ثبت شرکت
         </Typography>
         <Typography className="mt-2" color="neutral-500" variant="16/regular">
@@ -484,11 +585,11 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
 
         <ol className="relative mt-10 grid list-none grid-cols-3" aria-label={`مرحله ${step} از ۳`}>
           <span
-            className="absolute top-3.5 right-[calc(16.667%+14px)] left-[calc(16.667%+14px)] h-0.5 bg-neutral-200"
+            className="absolute top-3.5 start-[calc(16.667%+14px)] end-[calc(16.667%+14px)] h-0.5 bg-neutral-200"
             aria-hidden="true"
           />
           <span
-            className="absolute top-3.5 right-[calc(16.667%+14px)] h-0.5 max-w-[calc(66.666%-28px)] bg-brand-500 transition-[width] duration-200 ease-out"
+            className="absolute top-3.5 start-[calc(16.667%+14px)] h-0.5 max-w-[calc(66.666%-28px)] bg-brand-500 transition-[width] duration-200 ease-out"
             style={{
               width:
                 step === 1 ? '0' : step === 2 ? 'calc(33.333% - 28px)' : 'calc(66.666% - 28px)',
@@ -536,6 +637,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
         className="flex min-h-0 flex-1 flex-col pt-11"
         aria-busy={submitting || undefined}
         aria-label="فرم ثبت شرکت"
+        noValidate
         ref={formRef}
         onSubmit={(event) => {
           event.preventDefault()
@@ -577,7 +679,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 label="شناسه ملی"
                 aria-required="true"
                 {...registerField('companyNationalId')}
-                placeholder="شناسه ملی شرکت را وارد کنید"
+                placeholder="شناسه ملی ۱۱ رقمی شرکت را وارد کنید"
               />
               <Input
                 {...registerInputClasses}
@@ -593,90 +695,105 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 {...registerInputClasses}
                 error={errors.companyRegistrationNumber?.message}
                 id="register-companyRegistrationNumber"
+                inputMode="numeric"
                 inputSize="lg"
                 label="شماره ثبت (اختیاری)"
                 {...registerField('companyRegistrationNumber')}
                 placeholder="شماره ثبت شرکت را وارد کنید"
               />
-              <div className="flex flex-col gap-2 [&_label]:text-sm [&_label]:leading-5 [&_label]:font-normal [&_label]:text-neutral-700">
-                <Typography
-                  as="label"
-                  htmlFor="register-companyType"
-                  color="neutral-700"
-                  variant="14/regular"
-                >
-                  نوع شرکت (اختیاری)
-                </Typography>
-                <Controller
-                  control={control}
-                  name="companyType"
-                  render={({ field }) => (
-                    <Select
-                      onValueChange={(value) => {
-                        field.onChange(value)
-                        clearFieldError('companyType')
-                      }}
-                      value={field.value || undefined}
-                    >
-                      <SelectTrigger
-                        ref={field.ref}
-                        onBlur={field.onBlur}
-                        aria-describedby={
-                          errors.companyType ? 'register-companyType-error' : undefined
-                        }
-                        aria-invalid={Boolean(errors.companyType) || undefined}
-                        className="h-12 rounded-lg border-neutral-200 px-3 py-2 shadow-none"
-                        id="register-companyType"
-                      >
-                        <SelectValue placeholder="نوع شرکت را انتخاب کنید" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMPANY_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.companyType && (
-                  <Typography
-                    as="p"
-                    id="register-companyType-error"
-                    color="error"
-                    variant="12/light"
-                  >
-                    {errors.companyType.message}
-                  </Typography>
+              <Controller
+                control={control}
+                name="companyType"
+                render={({ field }) => (
+                  <SelectField
+                    {...registerFieldClasses}
+                    error={errors.companyType?.message}
+                    id="register-companyType"
+                    label="نوع شرکت (اختیاری)"
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    onChange={(event) => {
+                      field.onChange(event.target.value)
+                      clearFieldError('companyType')
+                    }}
+                    options={COMPANY_TYPES}
+                    placeholder="نوع شرکت را انتخاب کنید"
+                    ref={field.ref}
+                    value={field.value}
+                  />
                 )}
-              </div>
-              <Input
-                {...registerInputClasses}
-                error={errors.companyProvince?.message}
-                id="register-companyProvince"
-                inputSize="lg"
-                label="استان (اختیاری)"
-                {...registerField('companyProvince')}
-                placeholder="استان محل ثبت را وارد کنید"
               />
-              <Input
-                {...registerInputClasses}
-                error={errors.companyCity?.message}
-                id="register-companyCity"
-                inputSize="lg"
-                label="شهر (اختیاری)"
-                {...registerField('companyCity')}
-                placeholder="شهر محل ثبت را وارد کنید"
+              <Controller
+                control={control}
+                name="companyProvince"
+                render={({ field }) => (
+                  <SelectField
+                    {...registerFieldClasses}
+                    error={errors.companyProvince?.message}
+                    id="register-companyProvince"
+                    label="استان (اختیاری)"
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    onChange={(event) => {
+                      field.onChange(event.target.value)
+                      // The city list depends on the province: a city of the old
+                      // province must not survive a change of province.
+                      setValue('companyCity', '')
+                      clearErrors('companyCity')
+                      clearFieldError('companyProvince')
+                    }}
+                    options={PROVINCE_NAMES}
+                    placeholder="استان محل ثبت را انتخاب کنید"
+                    ref={field.ref}
+                    value={field.value}
+                  />
+                )}
               />
-              <Input
-                {...registerInputClasses}
-                error={errors.companyEstablishmentDate?.message}
-                id="register-companyEstablishmentDate"
-                inputSize="lg"
-                label="تاریخ تأسیس"
-                {...registerField('companyEstablishmentDate')}
-                placeholder="۱۳۷۵/۰۵/۱۲"
+              <Controller
+                control={control}
+                name="companyCity"
+                render={({ field }) => (
+                  <SelectField
+                    {...registerFieldClasses}
+                    disabled={!province}
+                    error={errors.companyCity?.message}
+                    id="register-companyCity"
+                    label="شهر (اختیاری)"
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    onChange={(event) => {
+                      field.onChange(event.target.value)
+                      clearFieldError('companyCity')
+                    }}
+                    options={citiesOfProvince(province)}
+                    placeholder={
+                      province ? 'شهر محل ثبت را انتخاب کنید' : 'ابتدا استان را انتخاب کنید'
+                    }
+                    ref={field.ref}
+                    value={field.value}
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="companyEstablishmentDate"
+                render={({ field }) => (
+                  <JalaliDatePicker
+                    {...registerFieldClasses}
+                    containerClassName="h-12 rounded-lg border-neutral-200 text-base leading-7"
+                    error={errors.companyEstablishmentDate?.message}
+                    id="register-companyEstablishmentDate"
+                    label="تاریخ تأسیس"
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    onChange={(value) => {
+                      field.onChange(value)
+                      clearFieldError('companyEstablishmentDate')
+                    }}
+                    placeholder="تاریخ تأسیس را انتخاب کنید"
+                    value={field.value}
+                  />
+                )}
               />
               <Input
                 {...registerInputClasses}
@@ -691,6 +808,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 {...registerInputClasses}
                 error={errors.companyEconomicCode?.message}
                 id="register-companyEconomicCode"
+                inputMode="numeric"
                 inputSize="lg"
                 label="کد اقتصادی"
                 {...registerField('companyEconomicCode')}
@@ -725,6 +843,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
               />
               <Input
                 {...registerInputClasses}
+                autoComplete="tel"
                 error={errors.phone?.message}
                 id="register-phone"
                 inputMode="tel"
@@ -736,6 +855,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
               />
               <Input
                 {...registerInputClasses}
+                autoComplete="email"
                 error={errors.email?.message}
                 id="register-email"
                 inputMode="email"
@@ -849,13 +969,30 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
             </Button>
           )}
 
+          {/* Distinct keys: the continue and submit buttons must never be one DOM
+              element whose type flips to `submit` mid-click, or the click that
+              opens step 3 would also submit it and show every error at once. */}
           {step < 3 ? (
-            <Button disabled={submitting} onClick={goForward} size="40" type="button">
+            <Button
+              className="min-w-32"
+              disabled={submitting}
+              key="continue"
+              onClick={goForward}
+              size="48"
+              type="button"
+            >
               ادامه
               <ArrowLeft />
             </Button>
           ) : (
-            <Button disabled={submitting} loading={submitting} size="40" type="submit">
+            <Button
+              className="min-w-32"
+              disabled={submitting}
+              key="submit"
+              loading={submitting}
+              size="48"
+              type="submit"
+            >
               ثبت شرکت
             </Button>
           )}

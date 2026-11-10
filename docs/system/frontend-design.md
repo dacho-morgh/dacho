@@ -67,10 +67,12 @@ Figma-parity or completed full exhibition-journey claim is made.
 ### Signup frontend slice (FE03 / #80, FE29 / #78, FE30 / #79)
 
 `/register` retains the three-step company / representative / account-security
-shell referenced by Figma `qVz7LsJUPwiXI3OMoW9kAj`, node `242:12193`. Approved
-form contracts override its 11-digit placeholder: national ID is a nonempty
-digit string, normalized from Persian/Arabic digits on submission with leading
-zeroes preserved and no length/checksum gate. Company name, national ID and
+shell referenced by Figma `qVz7LsJUPwiXI3OMoW9kAj`, node `242:12193`. Since
+design QA #278 the national ID is 11 digits with the legal-entity check digit
+(server `invalid_field` reasons `digits_only` / `length` / `checksum`), normalized
+from Persian/Arabic digits on submission with leading zeroes preserved; mobile
+(`mobile_format`) and email (`email_format`) syntax are also enforced by the
+server. See [fixed-form-contracts.md](fixed-form-contracts.md). Company name, national ID and
 free-text `activityDomain` are required in step one; registration number, legal
 type, province and city remain optional early answers, not eligibility gates.
 The existing legal-type choices are legacy UI vocabulary, not an approved final
@@ -80,8 +82,11 @@ The browser POSTs to `/api/users/self-signup`: trimmed `companyName`,
 `activityDomain`, representative `name` / `position`, normalized `phone`,
 lowercased `email`, `password`, normalized `companyNationalId`, and existing
 optional company answers. Password confirmation and privilege fields are never
-sent. A successful response redirects to login with the safe return URL; signup
-does not confer company verification or participation rights. With FE03 the
+sent. Since #278 a successful `201` also sets the HttpOnly `payload-token`
+session cookie and reports `session: { established: true }`, so the client can
+continue into the panel like a completed login; `session.established: false`
+(account created, sign-in step failed) falls back to login with the safe return
+URL. Signup does not confer company verification or participation rights. With FE03 the
 server requires `activityDomain` (`missing_field` when absent or blank), closing
 the earlier omission window.
 

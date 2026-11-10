@@ -25,11 +25,14 @@ import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import {
   APIError,
   commitTransaction,
+  headersWithCors,
   initTransaction,
+  loginOperation,
   type Access,
   type CollectionConfig,
   type FieldAccess,
 } from 'payload'
+import { generatePayloadCookie } from 'payload/shared'
 
 /**
  * The only fields the profile command may echo back. `apiKey`, `enableAPIKey`,
@@ -441,11 +444,35 @@ export const Users: CollectionConfig = {
                 req,
                 context: { ...req.context, allowCompanySignup: true },
               }),
+            // Registration signs the new representative in (#278). It runs the
+            // same operation and cookie as `POST /api/users/login`, so the
+            // beforeLogin active-account gate, login-attempt lockout and
+            // session record all apply; there is no OTP or email verification
+            // step in the approved password-login scope to bypass.
+            startSession: async ({ email, password }) => {
+              const collection = req.payload.collections.users
+              const login = await loginOperation({
+                collection,
+                data: { email, password },
+                req,
+              })
+              if (!login.token) throw new Error('Login after signup returned no token.')
+              const cookie = generatePayloadCookie({
+                collectionAuthConfig: collection.config.auth,
+                cookiePrefix: req.payload.config.cookiePrefix,
+                token: login.token,
+              })
+              return { exp: login.exp, headers: { 'Set-Cookie': cookie } }
+            },
           },
           (error) => console.error('[users] self-signup failed', error),
         )
 
-        return Response.json(result.body, { status: result.status })
+        // The token travels only in the HttpOnly cookie, never in the body.
+        return Response.json(result.body, {
+          status: result.status,
+          ...(result.headers ? { headers: headersWithCors({ headers: new Headers(result.headers), req }) } : {}),
+        })
       },
     },
   ],
