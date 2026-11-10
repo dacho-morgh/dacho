@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen, within } from '@testing-library/react'
-import type { ReactElement } from 'react'
+import { createElement, type ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RoleOverview } from '@/components/dashboard/role-overview'
+import { OverviewSkeleton } from '@/components/dashboard/role-overview/overview-skeleton'
+import { FIXED_CARD_HEIGHT } from '@/components/dashboard/role-overview/shared'
 
 const backend = vi.hoisted(() => ({ fetch: vi.fn() }))
 vi.mock('next/headers', () => ({
@@ -299,14 +301,179 @@ describe('RoleOverview', () => {
       kpi().getByText(`${fa(1)} اصلاح، ${fa(1)} مدارک مالی، ${fa(0)} مدارک تکمیلی`),
     ).toBeTruthy()
     expect(kpi().getByText(fa(7))).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'ثبت درخواست جدید' }).getAttribute('href')).toBe(
-      '/dashboard/new-request',
-    )
+    // The dashboard no longer carries a "new request" button; applications start from an event.
+    expect(screen.queryByRole('link', { name: 'ثبت درخواست جدید' })).toBeNull()
     // Pending verification: the third step is the current one.
     expect(screen.getByText('احراز هویت').closest('li')?.getAttribute('aria-current')).toBe('step')
     const table = within(screen.getByRole('table'))
     expect(table.getByRole('link', { name: 'اصلاح' })).toBeTruthy()
     expect(table.getByRole('link', { name: 'مشاهده' })).toBeTruthy()
+  })
+
+  it('gives a new company a profile call to action and the events it can register for', async () => {
+    serve({
+      '/stats/overview': ok({
+        counts: { total: 0, in_review: 0, approved: 0, action_needed: 0, rejected: 0 },
+        events: [],
+        queues: [],
+      }),
+      '/requests?limit=5&page=1': ok({ items: [], total: 0, page: 1, totalPages: 1 }),
+      '/activities?limit=4': feed,
+      '/letters?read=false&limit=1': ok({ total: 0, items: [] }),
+      '/profile/verification': ok({ status: 'unsubmitted' }),
+      '/profile/dossier': ok({
+        missing: {
+          required: ['registrationNumber', 'addresses'],
+          optional: [],
+          canRequestVerification: false,
+        },
+      }),
+      '/events': ok({
+        items: [
+          {
+            id: 'e-closed',
+            publicEventId: 'p0',
+            title: 'رویداد بسته‌شده',
+            registrationOpenAt: '2026-09-01T00:00:00Z',
+            registrationCloseAt: '2026-10-01T00:00:00Z',
+          },
+          {
+            id: 'e-open',
+            publicEventId: 'p1',
+            title: 'رویداد انرژی بوشهر',
+            registrationOpenAt: '2026-10-20T00:00:00Z',
+            registrationCloseAt: '2026-12-20T00:00:00Z',
+          },
+        ],
+      }),
+    })
+    await renderRole({ role: 'representative', userName: null })
+
+    const card = within(screen.getByRole('region', { name: 'شروع ثبت‌نام در رویدادها' }))
+    expect(card.getByRole('heading', { name: 'پروفایل شرکت خود را تکمیل کنید' })).toBeTruthy()
+    expect(card.getByRole('link', { name: 'تکمیل پروفایل' }).getAttribute('href')).toContain(
+      '/dashboard/profile/company',
+    )
+    expect(card.getByText('شماره ثبت')).toBeTruthy()
+    // Only events whose registration has not closed are offered.
+    expect(card.getByRole('link', { name: /رویداد انرژی بوشهر/ }).getAttribute('href')).toBe(
+      '/dashboard/events?eventId=e-open',
+    )
+    expect(card.queryByText('رویداد بسته‌شده')).toBeNull()
+  })
+
+  it('shows an approved company the open events without a profile call to action', async () => {
+    serve({
+      '/stats/overview': ok({ counts, events: [], queues: [] }),
+      '/requests?limit=5&page=1': ok({ items: [], total: 0, page: 1, totalPages: 1 }),
+      '/activities?limit=4': feed,
+      '/letters?read=false&limit=1': ok({ total: 0, items: [] }),
+      '/profile/verification': ok({ status: 'approved' }),
+      '/events': ok({ items: [] }),
+    })
+    await renderRole({ role: 'representative', userName: null })
+
+    const card = within(screen.getByRole('region', { name: 'شروع ثبت‌نام در رویدادها' }))
+    expect(card.getByRole('heading', { name: 'رویدادهای باز برای ثبت‌نام' })).toBeTruthy()
+    expect(card.queryByRole('link', { name: 'تکمیل پروفایل' })).toBeNull()
+    expect(card.getByText('در حال حاضر رویدادی برای ثبت‌نام باز نیست.')).toBeTruthy()
+  })
+
+  it('keeps the events list in place with a notice when the events cannot be read', async () => {
+    serve({
+      '/stats/overview': ok({ counts, events: [], queues: [] }),
+      '/requests?limit=5&page=1': ok({ items: [], total: 0, page: 1, totalPages: 1 }),
+      '/activities?limit=4': feed,
+      '/letters?read=false&limit=1': ok({ total: 0, items: [] }),
+      '/profile/verification': ok({ status: 'unsubmitted' }),
+    })
+    await renderRole({ role: 'representative', userName: null })
+
+    const card = within(screen.getByRole('region', { name: 'شروع ثبت‌نام در رویدادها' }))
+    expect(card.getByRole('alert')).toBeTruthy()
+  })
+
+  it('draws every top card icon in the primary theme on the company, reviewer and chief boards', async () => {
+    const chip = (label: string) =>
+      kpi().getByText(label).closest('[data-slot="card"]')!.querySelector('[aria-hidden="true"]')!
+    serve({
+      '/stats/overview': ok({
+        counts,
+        events: [],
+        queues: [{ key: 'company_correction', count: 1 }],
+      }),
+      '/requests?limit=5&page=1': ok({ items: [], total: 0, page: 1, totalPages: 1 }),
+      '/activities?limit=4': feed,
+      '/letters?read=false&limit=1': ok({ total: 0, items: [] }),
+      '/profile/verification': ok({ status: 'approved' }),
+    })
+    await renderRole({ role: 'representative', userName: null })
+    for (const label of ['درخواست‌های فعال', 'نیازمند اقدام شما']) {
+      expect(chip(label).className).toContain('text-brand-600')
+    }
+    cleanup()
+
+    serve({
+      '/review/queue?view=all&page=1&limit=100': ok({
+        items: [],
+        counts: { all: 0, open: 0, closed: 0 },
+      }),
+      '/stats/overview': ok({ counts, events: [], queues: [] }),
+      '/activities?limit=4': feed,
+    })
+    await renderRole({ role: 'reviewer', userName: null })
+    for (const label of ['در انتظار ثبت نهایی', 'ارزیابی‌های نهایی‌شده']) {
+      expect(chip(label).className).toContain('text-brand-600')
+    }
+    cleanup()
+
+    serve({
+      '/stats/overview': ok({ counts, events: [], queues: [{ key: 'chief_triage', count: 1 }] }),
+      '/activities?limit=4': feed,
+    })
+    await renderRole({ role: 'chief-reviewer', userName: null })
+    for (const label of ['در انتظار بررسی اولیه', 'داوری کامل، در انتظار تصمیم']) {
+      expect(chip(label).className).toContain('text-brand-600')
+    }
+  })
+
+  it('drops the unclear "newer revision" card and levels the reviewer section cards', async () => {
+    serve({
+      '/review/queue?view=all&page=1&limit=100': ok({
+        items: [],
+        counts: { all: 0, open: 0, closed: 0 },
+      }),
+      '/stats/overview': ok({ counts, events: [], queues: [] }),
+      '/activities?limit=4': feed,
+    })
+    await renderRole({ role: 'reviewer', userName: null })
+
+    expect(screen.queryByText(/نسخه جدیدتر/)).toBeNull()
+    const cardOf = (name: string) =>
+      screen.getByRole('heading', { name }).closest('[data-slot="card"]')!
+    const heights = ['پیشرفت ارزیابی‌های شما', 'کارهای بعدی', 'اعلان‌ها'].map(
+      (name) => cardOf(name).className.match(/h-\[\d+px\]/)?.[0],
+    )
+    expect(heights[0]).toBeTruthy()
+    expect(new Set(heights).size).toBe(1)
+  })
+
+  it('puts the chief funnel and notifications in one row of equal fixed height', async () => {
+    serve({
+      '/stats/overview': ok({ counts, events: [], queues: [] }),
+      '/activities?limit=4': feed,
+    })
+    await renderRole({ role: 'chief-reviewer', userName: null })
+
+    const cardOf = (name: string) =>
+      screen.getByRole('heading', { name }).closest('[data-slot="card"]')!
+    const funnel = cardOf('مسیر درخواست‌ها در رویداد')
+    const feedCard = cardOf('اعلان‌ها')
+    expect(funnel.parentElement).toBe(feedCard.parentElement)
+    expect(funnel.className.match(/h-\[\d+px\]/)?.[0]).toBe(
+      feedCard.className.match(/h-\[\d+px\]/)?.[0],
+    )
+    expect(screen.queryByRole('heading', { name: 'کارهای بعدی' })).toBeNull()
   })
 
   it('shows a dash and a notice for a failed read, never a zero', async () => {
@@ -482,6 +649,23 @@ describe('RoleOverview charts and next tasks (S3)', () => {
 
     const funnel = screen.getByRole('heading', { name: 'مسیر درخواست‌ها در رویداد' }).parentElement!
     expect(within(funnel).getByRole('alert')).toBeTruthy()
-    expect(screen.getByRole('link', { name: /در انتظار بررسی اولیه/ })).toBeTruthy()
+    // The committee board has no "next tasks" card: its KPI cards already count the queues.
+    expect(screen.queryByRole('heading', { name: 'کارهای بعدی' })).toBeNull()
+  })
+})
+
+describe('OverviewSkeleton', () => {
+  it('holds the KPI cards at their real 168px height and the section row at the fixed card height', () => {
+    const { container } = render(createElement(OverviewSkeleton))
+    const kpiRow = container.querySelector('[aria-hidden="true"] > div:nth-child(2)')!
+    expect(kpiRow.children.length).toBe(4)
+    for (const card of Array.from(kpiRow.children)) {
+      expect(card.className).toContain('h-[168px]')
+    }
+    const sectionRow = container.querySelector('[aria-hidden="true"] > div:nth-child(3)')!
+    expect(sectionRow.children.length).toBe(3)
+    for (const card of Array.from(sectionRow.children)) {
+      expect(card.className).toContain(FIXED_CARD_HEIGHT)
+    }
   })
 })

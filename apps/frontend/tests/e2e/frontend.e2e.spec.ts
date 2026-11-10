@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { validNationalId } from '../helpers/nationalId'
 
 test.use({ channel: 'chrome' })
 
@@ -68,6 +69,58 @@ test.describe('Frontend', () => {
     const box = await sidebar.boundingBox()
     expect(box).not.toBeNull()
     expect(box!.x).toBeGreaterThan(0)
+  })
+
+  test('gives a newly registered company a profile call to action instead of a new-request button', async ({
+    page,
+  }) => {
+    const suffix = `${Date.now()}`.slice(-9)
+    const phone = `09${suffix}`
+    const password = 'password123'
+    // Registration is `/self-signup`: it creates the person and the company they represent, then
+    // signs them in. A plain `/api/users` create makes a person with no company, which has no
+    // joining state to show.
+    const registration = await page.request.post('http://localhost:3000/api/users/self-signup', {
+      headers: { Origin: 'http://localhost:3000' },
+      data: {
+        email: `overview-${suffix}@example.com`,
+        password,
+        phone,
+        name: 'متقاضی تست داشبورد',
+        position: 'مدیرعامل',
+        companyName: 'شرکت تست داشبورد',
+        companyNationalId: validNationalId(`6${suffix}`),
+        companyRegistrationNumber: suffix,
+        companyType: 'سهامی خاص',
+        companyProvince: 'بوشهر',
+        companyCity: 'بوشهر',
+        activityDomain: 'انرژی',
+      },
+    })
+    expect(registration.status()).toBe(201)
+    expect((await registration.json()).session).toMatchObject({ established: true })
+
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('http://localhost:3000/dashboard')
+
+    const cta = page.getByRole('region', { name: 'شروع ثبت‌نام در رویدادها' })
+    await expect(cta).toBeVisible()
+    await expect(cta.getByRole('link', { name: 'تکمیل پروفایل' })).toHaveAttribute(
+      'href',
+      /\/dashboard\/profile\/company/,
+    )
+    await expect(page.getByRole('link', { name: 'ثبت درخواست جدید' })).toHaveCount(0)
+
+    // The KPI icons use the primary theme and the sections are 16px apart.
+    const chip = page
+      .getByRole('region', { name: 'شاخص‌های کلیدی' })
+      .locator('[data-slot="card"] span[aria-hidden="true"]')
+      .first()
+    await expect(chip).toHaveClass(/text-brand-600/)
+    const shell = page
+      .getByRole('heading', { name: 'داشبورد', level: 1 })
+      .locator('xpath=ancestor::header/parent::div')
+    await expect(shell).toHaveCSS('row-gap', '16px')
   })
 
   test('can load homepage', async ({ page }) => {

@@ -1,27 +1,23 @@
-import Link from 'next/link'
 import { ActivityCard } from '@/components/dashboard/owner-overview/activity-card'
 import { KpiCard } from '@/components/dashboard/owner-overview/kpi-card'
-import {
-  DashboardAddIcon,
-  EditIcon,
-  LettersIcon,
-  RequestsIcon,
-  ClockBulkIcon,
-} from '@/components/icons'
+import { EditIcon, LettersIcon, RequestsIcon, ClockBulkIcon } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
   REQUEST_STATUS_LABELS,
   formatDate,
   type ActivityDto,
+  type CompanyVerificationDto,
+  type MissingDossierItemsDto,
   type Paginated,
   type RequestDto,
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { serverDashboardFetchResult } from '@/utilities/dashboard-server'
+import { deriveEligibility } from '@/utilities/participation-eligibility'
 import { BreakdownCard } from './breakdown-card'
 import { STATUS_VARIANT } from './case-list'
 import { BOOTH_ROWS, REQUEST_ROWS, requestValues } from './chart-rows'
+import { CompanyOnboardingCard, openEvents, type OpenEventDto } from './company-onboarding-card'
 import { CaseCell, DataTableCard, RowAction } from './data-table-card'
 import { NextTasksCard } from './next-tasks-card'
 import { KpiGrid, OverviewShell } from './overview-shell'
@@ -36,7 +32,7 @@ import {
 } from './shared'
 import { StepperCard } from './stepper-card'
 
-type VerificationStatus = 'unsubmitted' | 'pending' | 'approved' | 'returned' | 'rejected'
+type VerificationStatus = CompanyVerificationDto['status']
 
 const MEMBERSHIP_STEPS = [
   { title: 'ثبت‌نام اولیه', description: 'اطلاعات پایه شرکت' },
@@ -75,13 +71,16 @@ function nextAction(item: RequestDto): { label: string; primary: boolean } {
 /** Company representative: own requests, what needs action, letters and the joining steps. */
 export async function CompanyOverview({ userName }: { userName?: string | null }) {
   const now = new Date()
-  const [overview, requests, activities, letters, verification] = await Promise.all([
-    serverDashboardFetchResult<RoleOverviewDto>('/stats/overview'),
-    serverDashboardFetchResult<Paginated<RequestDto>>('/requests?limit=5&page=1'),
-    serverDashboardFetchResult<Paginated<ActivityDto>>('/activities?limit=4'),
-    serverDashboardFetchResult<{ total: number }>('/letters?read=false&limit=1'),
-    serverDashboardFetchResult<{ status: VerificationStatus }>('/profile/verification'),
-  ])
+  const [overview, requests, activities, letters, verification, dossier, events] =
+    await Promise.all([
+      serverDashboardFetchResult<RoleOverviewDto>('/stats/overview'),
+      serverDashboardFetchResult<Paginated<RequestDto>>('/requests?limit=5&page=1'),
+      serverDashboardFetchResult<Paginated<ActivityDto>>('/activities?limit=4'),
+      serverDashboardFetchResult<{ total: number }>('/letters?read=false&limit=1'),
+      serverDashboardFetchResult<CompanyVerificationDto>('/profile/verification'),
+      serverDashboardFetchResult<{ missing?: MissingDossierItemsDto }>('/profile/dossier'),
+      serverDashboardFetchResult<{ items?: OpenEventDto[] }>('/events'),
+    ])
   const queues = overview.kind === 'ok' ? overview.data.queues : undefined
   const counts = overview.kind === 'ok' ? overview.data.counts : undefined
   const correction = queueCount(queues, 'company_correction')
@@ -93,19 +92,25 @@ export async function CompanyOverview({ userName }: { userName?: string | null }
       : correction + financial + supplementary
   const active = counts ? counts.in_review + counts.action_needed : undefined
   const member = verification.kind === 'ok' ? membership(verification.data.status) : undefined
+  // The profile's gaps come from the dossier; without them an unsent profile reads as ready to send.
+  const eligibility =
+    verification.kind === 'ok'
+      ? deriveEligibility(
+          verification.data,
+          dossier.kind === 'ok' ? dossier.data.missing : undefined,
+        )
+      : undefined
 
   return (
-    <OverviewShell
-      greeting={greeting(userName, now)}
-      action={
-        <Button size="40" asChild>
-          <Link href="/dashboard/new-request">
-            <DashboardAddIcon aria-hidden="true" />
-            ثبت درخواست جدید
-          </Link>
-        </Button>
-      }
-    >
+    <OverviewShell greeting={greeting(userName, now)}>
+      {eligibility ? (
+        <CompanyOnboardingCard
+          eligibility={eligibility}
+          events={events.kind === 'ok' ? openEvents(events.data.items ?? [], now) : undefined}
+          eventsNotice={unavailableReasonFor(events)}
+        />
+      ) : null}
+
       <KpiGrid>
         <KpiCard
           label="درخواست‌های فعال"
@@ -115,7 +120,6 @@ export async function CompanyOverview({ userName }: { userName?: string | null }
         />
         <KpiCard
           label="نیازمند اقدام شما"
-          tone="warning"
           value={countText(needAction)}
           icon={<ClockBulkIcon />}
           meta={

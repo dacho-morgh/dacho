@@ -29,9 +29,9 @@ export function StatCards({ data, notice, activeStatus }: StatCardsProps) {
       status: undefined as RequestStatus | undefined,
       changeType: 'increase' as const,
       icon: FileText,
-      bgColor: 'bg-blue-50',
-      iconColor: 'text-blue-600',
-      borderColor: 'border-blue-100',
+      bgColor: 'bg-brand-50',
+      iconColor: 'text-brand-600',
+      borderColor: 'border-neutral-200',
     },
     {
       title: 'در حال بررسی و داوری',
@@ -40,9 +40,9 @@ export function StatCards({ data, notice, activeStatus }: StatCardsProps) {
       status: 'in_review' as RequestStatus | undefined,
       changeType: 'neutral' as const,
       icon: Clock,
-      bgColor: 'bg-amber-50',
-      iconColor: 'text-amber-600',
-      borderColor: 'border-amber-100',
+      bgColor: 'bg-brand-50',
+      iconColor: 'text-brand-600',
+      borderColor: 'border-neutral-200',
     },
     {
       title: 'تأیید و تصویب شده',
@@ -51,9 +51,9 @@ export function StatCards({ data, notice, activeStatus }: StatCardsProps) {
       status: 'approved' as RequestStatus | undefined,
       changeType: 'success' as const,
       icon: CheckCircle2,
-      bgColor: 'bg-emerald-50',
-      iconColor: 'text-emerald-600',
-      borderColor: 'border-emerald-100',
+      bgColor: 'bg-brand-50',
+      iconColor: 'text-brand-600',
+      borderColor: 'border-neutral-200',
     },
     {
       title: 'نیازمند اقدام / رفع نقص',
@@ -62,9 +62,9 @@ export function StatCards({ data, notice, activeStatus }: StatCardsProps) {
       status: 'action_needed' as RequestStatus | undefined,
       changeType: 'warning' as const,
       icon: AlertTriangle,
-      bgColor: 'bg-rose-50',
-      iconColor: 'text-rose-600',
-      borderColor: 'border-rose-100',
+      bgColor: 'bg-brand-50',
+      iconColor: 'text-brand-600',
+      borderColor: 'border-neutral-200',
     },
   ]
 
@@ -95,9 +95,9 @@ export function StatCards({ data, notice, activeStatus }: StatCardsProps) {
             </div>
 
             <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
-              {stat.changeType === 'increase' && <TrendingUp className="h-3.5 w-3.5 text-blue-600 shrink-0" />}
-              {stat.changeType === 'warning' && <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />}
-              {stat.changeType === 'success' && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />}
+              {stat.changeType === 'increase' && <TrendingUp className="h-3.5 w-3.5 text-brand-600 shrink-0" />}
+              {stat.changeType === 'warning' && <span className="h-2 w-2 rounded-full bg-brand-500 shrink-0" />}
+              {stat.changeType === 'success' && <CheckCircle2 className="h-3.5 w-3.5 text-brand-600 shrink-0" />}
               <span className="truncate">مشاهده صف</span>
             </div>
           </Link>

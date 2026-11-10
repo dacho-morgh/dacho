@@ -12,7 +12,7 @@ export function OverviewShell({
   children: ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-6 p-4 pb-10 sm:px-8 sm:pt-6">
+    <div className="flex flex-col gap-4 p-4 pb-10 sm:px-8 sm:pt-6">
       <header className="flex flex-wrap items-center justify-between gap-3 pe-14 md:pe-0">
         <div className="flex flex-col gap-1">
           <Typography as="h1" variant="24/bold" color="neutral-800">
