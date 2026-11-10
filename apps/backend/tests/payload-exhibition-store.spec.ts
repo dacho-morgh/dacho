@@ -108,8 +108,17 @@ describe('PayloadExhibitionStore public records (S5)', () => {
       'PATCH http://cms:3000/api/events/6?depth=0',
       'DELETE http://cms:3000/api/events/5',
       'DELETE http://cms:3000/api/events/5',
-      'GET http://cms:3000/api/events/7?depth=0',
+      'GET http://cms:3000/api/events/7?depth=1',
     ])
+  })
+
+  it('reads the poster one level deep and never returns more of the media document (#288)', async () => {
+    const { store } = recorder([
+      { status: 200, body: { id: 8, ...content, featuredImage: { id: 3, url: '/api/media/file/poster.jpg', alt: 'پوستر', filename: 'poster.jpg' } } },
+      { status: 200, body: { id: 9, ...content, featuredImage: 3 } },
+    ])
+    await expect(store.find('events', '8')).resolves.toMatchObject({ image: { url: '/api/media/file/poster.jpg', alt: 'پوستر' } })
+    await expect(store.find('events', '9')).resolves.toMatchObject({ image: null })
   })
 
   it('lists every page of records, or only the requested ids', async () => {

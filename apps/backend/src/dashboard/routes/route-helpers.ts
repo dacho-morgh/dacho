@@ -296,6 +296,20 @@ export async function resolveRequesterNames(userStore: UserStore, requesterIds: 
   return new Map(ids.map((id) => [id, requesterDisplayName(byId.get(id))]))
 }
 
+/**
+ * Display names of staff accounts by id, read one by one from the identity store.
+ * An account the store cannot resolve maps to null; one failed read never fails
+ * the response that shows the names (#288).
+ */
+export async function resolveUserNames(userStore: UserStore, ids: readonly string[]): Promise<Map<string, string | null>> {
+  const unique = [...new Set(ids.filter((id) => typeof id === 'string' && id !== ''))]
+  const entries = await Promise.all(unique.map(async (id) => {
+    const user = await userStore.findById(id).catch(() => undefined)
+    return [id, user?.name?.trim() ? user.name.trim() : null] as const
+  }))
+  return new Map(entries)
+}
+
 /** Returns the names of required form fields missing from `answers`, or null when complete. */
 export function missingRequiredFields(service: ServiceDefinition, answers: Record<string, unknown>): string[] | null {
   const fields = service.formFields

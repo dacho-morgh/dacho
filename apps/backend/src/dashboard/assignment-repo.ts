@@ -162,6 +162,19 @@ export class AssignmentRepository {
     return rows[0]?.present === true
   }
 
+  /**
+   * Records the first time the holder of an active assignment opened the case
+   * (#288), so the round's reviewer list can tell «مشاهده نشده» from «درحال بررسی».
+   * Later reads leave the first time in place.
+   */
+  async markViewed(requestId: string, userId: string, role: CaseAssignmentRole): Promise<void> {
+    await this.pool.query(
+      `UPDATE dashboard.case_assignments SET viewed_at = now()
+       WHERE request_id = $1 AND user_id = $2 AND role = $3 AND active AND viewed_at IS NULL`,
+      [requestId, userId, role],
+    )
+  }
+
   async listForUser(userId: string): Promise<CaseAssignmentDto[]> {
     const { rows } = await this.pool.query<AssignmentRow>(
       `SELECT ${ASSIGNMENT_COLUMNS} FROM dashboard.case_assignments

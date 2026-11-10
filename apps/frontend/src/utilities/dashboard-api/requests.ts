@@ -1,7 +1,14 @@
 import type { RequestItem } from '@/components/dashboard/requests/types'
 import { companyRequestStage, companyRequestStageLabel } from '../company-request-stage'
 import { companyNextAction } from '../request-tracking'
-import { type RequestStatus, type RequestDto, type ActivityDto, type Paginated, formatDate, dashboardFetch } from './core'
+import {
+  type RequestStatus,
+  type RequestDto,
+  type ActivityDto,
+  type Paginated,
+  formatDate,
+  dashboardFetch,
+} from './core'
 
 export function listRequests(params?: {
   status?: RequestStatus
@@ -19,12 +26,77 @@ export function listRequests(params?: {
   return dashboardFetch<Paginated<RequestDto>>(`/requests${suffix}`)
 }
 
+/** The event of an event application (#288); public page fields are null when the CMS did not answer. */
+export interface RequestEventInfo {
+  id: string
+  title: string
+  category: { id: string; title: string } | null
+  subtopic: { id: string; title: string } | null
+  image: { url: string; alt: string | null } | null
+  startDate: string | null
+  endDate: string | null
+  location: string | null
+  status: 'upcoming' | 'ongoing' | 'past' | null
+}
+
+/** The company card (#288). Reviewers and employers get only name/type/province/city from the submission. */
+export interface RequestCompanyCardInfo {
+  id: string | null
+  name: string | null
+  type: string | null
+  province: string | null
+  city: string | null
+  status: string | null
+  active: boolean | null
+  foundingYear: string | null
+  ageYears: number | null
+  /** Owner, Secretariat, chief and investment person only: `/api/dashboard/requests/:id/company/logo`. */
+  logo: { url: string } | null
+  source: 'profile' | 'submission'
+}
+
 export interface RequestDetail {
   request: RequestDto
-  timeline: ActivityDto[]
-  workflow: { title: string; role: string; roleName: string; order: number }[]
+  /** `actorName`/`actorRole` are absent for reviewers and employers; the company gets names only for its own steps. */
+  timeline: (ActivityDto & { actorName?: string | null; actorRole?: string | null })[]
+  /** Event applications: the backend's fixed stages with `key` and `state` (#288). */
+  workflow: {
+    title: string
+    role: string
+    roleName: string
+    order: number
+    key?: 'submission' | 'chief_triage' | 'review' | 'investment' | 'result'
+    state?: 'done' | 'current' | 'upcoming' | 'rejected'
+  }[]
   /** Absent for reviewers and employers, who are not told whose case it is. */
   owner?: { id: string; name: string | null } | null
+  event?: RequestEventInfo | null
+  company?: RequestCompanyCardInfo | null
+  /** The company's own live profile and resume; null for every other role (#288). */
+  companyProfile?: {
+    company: {
+      name: string
+      establishmentDate: string
+      status: string
+      type: string
+      registrationNumber: string
+      economicCode: string
+      nationalId: string
+    }
+    activityDomain: string
+    province: string
+    city: string
+    executives: { role: string; name: string }[]
+    addresses: {
+      id: string
+      title: string
+      province: string
+      city: string
+      postalCode: string
+      address: string
+    }[]
+    dossier: Record<string, unknown>
+  } | null
 }
 
 export function getRequest(id: string): Promise<RequestDetail> {

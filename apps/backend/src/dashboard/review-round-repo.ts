@@ -8,6 +8,14 @@ import { PostgresNotificationOutbox, type NotificationOutbox } from './notificat
 
 export type ReviewSlot = 'employer' | 'ordinary'
 
+/**
+ * Where one slot's work stands (#288): `not_viewed` until the holder first opens
+ * the case, `in_review` once they have opened it or saved a draft, `final` once
+ * their evaluation of the round's revision is final. Only the state, never the
+ * answers, so it stays within what oversight may read of unfinished work.
+ */
+export type ReviewSlotStatus = 'not_viewed' | 'in_review' | 'final'
+
 export interface ReviewRoundSlotDto {
   assignmentId: string
   userId: string
@@ -17,6 +25,9 @@ export interface ReviewRoundSlotDto {
   assignedAt: string
   revokedAt: string | null
   revokeReason: string | null
+  /** When the holder first opened the case; null before that (and for views before #288). */
+  viewedAt: string | null
+  status: ReviewSlotStatus
 }
 
 export interface ReviewReplacementDto {
@@ -87,6 +98,9 @@ interface SlotRow {
   assigned_at: Date
   revoked_at: Date | null
   revoke_reason: string | null
+  viewed_at?: Date | null
+  /** The holder's evaluation of the round's revision, when the query joined it. */
+  evaluation_state?: 'draft' | 'final' | null
 }
 
 interface ReplacementRow {
@@ -111,6 +125,12 @@ const REPLACEMENT_EMPLOYER_SQL = `(
   ORDER BY rp.replaced_at DESC, rp.id DESC LIMIT 1
 )`
 
+export function slotStatus(row: { viewed_at?: Date | null; evaluation_state?: 'draft' | 'final' | null }): ReviewSlotStatus {
+  if (row.evaluation_state === 'final') return 'final'
+  if (row.evaluation_state === 'draft' || row.viewed_at) return 'in_review'
+  return 'not_viewed'
+}
+
 function mapSlot(row: SlotRow): ReviewRoundSlotDto {
   return {
     assignmentId: row.id,
@@ -121,6 +141,8 @@ function mapSlot(row: SlotRow): ReviewRoundSlotDto {
     assignedAt: row.assigned_at.toISOString(),
     revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
     revokeReason: row.revoke_reason,
+    viewedAt: row.viewed_at ? row.viewed_at.toISOString() : null,
+    status: slotStatus(row),
   }
 }
 
@@ -300,10 +322,16 @@ export class ReviewRoundRepository {
       [requestId, filter.revision ?? null, filter.limit ?? null],
     )
     const roundIds = rows.map((round) => round.id)
+    // Each slot with its holder's evaluation state for the round's revision (#288).
     const slots = await this.pool.query<SlotRow>(
-      `SELECT id, round_id, user_id, role, slot, active, assigned_at, revoked_at, revoke_reason
-       FROM dashboard.case_assignments WHERE round_id = ANY($1::uuid[])
-       ORDER BY slot DESC, assigned_at ASC, user_id ASC`,
+      `SELECT a.id, a.round_id, a.user_id, a.role, a.slot, a.active, a.assigned_at, a.revoked_at,
+              a.revoke_reason, a.viewed_at, ev.state AS evaluation_state
+       FROM dashboard.case_assignments a
+       JOIN dashboard.review_rounds rr ON rr.id = a.round_id
+       LEFT JOIN dashboard.evaluations ev
+         ON ev.request_id = a.request_id AND ev.user_id = a.user_id AND ev.revision = rr.request_revision
+       WHERE a.round_id = ANY($1::uuid[])
+       ORDER BY a.slot DESC, a.assigned_at ASC, a.user_id ASC`,
       [roundIds],
     )
     const replacements = await this.pool.query<ReplacementRow>(

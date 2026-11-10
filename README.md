@@ -115,6 +115,31 @@ pnpm generate:importmap   # writes apps/frontend/src/app/(payload)/admin/importM
 - `test:int` runs `tests/int/**/*.int.spec.ts` against a real Postgres. The environment is `node` (not `jsdom`) because the spec bootstraps the full Payload config.
 - `test:e2e` runs Playwright against `pnpm dev` (browser: Playwright 1.61, chromium). The homepage spec expects seeded content — seed first via `POST /next/seed` (there's a "Seed" button on the admin dashboard) or directly against `apps/frontend/src/endpoints/seed/`. Seeding downloads placeholder images from a remote URL, so it needs network access.
 
+### Design-review data for the request page (local dev only)
+
+Two idempotent scripts give every staff role a non-empty request list to compare with Figma (#288). Both refuse anything but a loopback database named `dacho-cms` (the Compose dev database) or `dacho_phase0_test`, refuse `NODE_ENV=production`, and the backend one also refuses a non-loopback `PAYLOAD_URL`.
+
+```bash
+# 1. CMS half (Payload local API, uses apps/frontend/.env). Needs a system owner (`pnpm create:admin`)
+#    and the «events» service (`pnpm seed:dashboard`); it warns if either is missing.
+pnpm --filter @dacho/frontend seed:dev-review
+# 2. Backend half (uses apps/backend/.env: DATABASE_URL, PAYLOAD_URL, PAYLOAD_API_KEY,
+#    PRIVATE_DOCUMENTS_DIR). The frontend (CMS) must be running at PAYLOAD_URL.
+pnpm --filter @dacho/backend seed:dev-review
+```
+
+The CMS half makes sure these accounts exist with their operational role (new ones get `DEV_SEED_PASSWORD`, default `DevPass!2026`; existing ones keep their name, phone and password): `central-secretariat@`, `chief-reviewer@`, `reviewer@`, `reviewer-2@`, `reviewer-3@` (a round needs three ordinary reviewers), `employer-reviewer@`, `investment-reviewer@` and `representative@`, all `@dacho.localhost.test`. It gives `representative@` a company with a complete profile and resume, filling only blank fields.
+
+The backend half starts the backend in-process on a random loopback port, applies pending backend migrations (as a backend start would) and drives the real API as those people. It makes the event «رویداد نمونه بازبینی طراحی» (owner: `admin@dacho.localhost.test`, or set `DEV_SEED_OWNER_EMAIL`; poster: the newest CMS media file, if any) with three subtopics and RFPs, has the Secretariat verify the company, and leaves one application per stage:
+
+| Application | Stage | Who has it in their list |
+| --- | --- | --- |
+| «نمونه بازبینی — سامانه پایش خطوط لوله» | Submitted, waiting for triage | Chief (triage), Secretariat, owner, company |
+| «نمونه بازبینی — بازیافت گاز مشعل» | Review round of four: employer final, `reviewer-3@` draft, `reviewer-2@` opened, `reviewer@` not opened | Chief, the four reviewers, Secretariat, owner, company |
+| «نمونه بازبینی — بهینه‌سازی انرژی پالایشگاه» | Four final evaluations, advanced, package submitted, held by the investment person | Investment person, chief, the four reviewers (closed), Secretariat, owner, company |
+
+A second run finds everything by title and changes nothing; an interrupted run continues where it stopped. The cases are synthetic test data and there is no undo script; reset the dev database to remove them. The first time `reviewer@` opens the round case, its slot turns from «مشاهده نشده» to «درحال بررسی», as in production.
+
 ## Architecture notes
 
 - **`cms-core` is React-free.** It holds the entire Payload domain (config, collections, globals, fields, hooks, access) and the generated types — nothing else. Custom admin components (custom fields, blocks, login screens) live in `apps/frontend`, keeping the domain package server-only. The only `@/` references inside cms-core are *string* component identifiers (`'@/components/BeforeLogin'`, `'@/Header/RowLabel#RowLabel'`) resolved by the frontend's import map at runtime — not TypeScript imports.

@@ -262,12 +262,15 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
       expect.arrayContaining(['read', 'correct', 'uploadDocument', 'deleteDocument']),
     )
     const returnEntry = company.body.timeline.find((entry: { action: string }) => entry.action === 'chief_return')
+    // The step names the chief's role, not the person or account (#288).
     expect(returnEntry).toMatchObject({
-      actorId: 'chief',
+      actorRole: 'chief-reviewer',
+      actorName: null,
       reason: 'برنامه زمان‌بندی را کامل کنید',
       fromState: 'in_review',
       toState: 'action_needed',
     })
+    expect(returnEntry).not.toHaveProperty('actorId')
     const letters = await pool.query(
       "SELECT recipient_id FROM dashboard.notification_jobs WHERE request_id = $1 AND action = 'chief_return'",
       [submitted.id],
@@ -322,14 +325,21 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
     expect(first.body.proposal.answers.summary).toBe('خلاصه اولیه')
     expect(first.body.proposal.proposalDocuments.map((doc: { filename: string }) => doc.filename)).toEqual(['proposal.pdf'])
 
-    // The chief sees the corrected case again and the history keeps every actor.
+    // The chief sees the corrected case again and the history keeps every actor;
+    // the company sees its own account on its steps and no staff account id (#288).
     const queue = await request(app).get(`/admin/requests/${submitted.id}`).set(auth('chief'))
     expect(queue.status).toBe(200)
     expect(queue.body.request.allowedActions).toEqual(['read', 'triage'])
-    const history = await request(app).get(`/requests/${submitted.id}/history`).set(auth('company-user-1'))
-    expect(history.body.items.map((entry: { action: string; actorId: string }) => [entry.action, entry.actorId])).toEqual([
+    const chiefHistory = await request(app).get(`/requests/${submitted.id}/history`).set(auth('chief'))
+    expect(chiefHistory.body.items.map((entry: { action: string; actorId: string }) => [entry.action, entry.actorId])).toEqual([
       ['submit', 'company-user-1'],
       ['chief_return', 'chief'],
+      ['correction_submit', 'company-user-1'],
+    ])
+    const history = await request(app).get(`/requests/${submitted.id}/history`).set(auth('company-user-1'))
+    expect(history.body.items.map((entry: { action: string; actorId?: string }) => [entry.action, entry.actorId])).toEqual([
+      ['submit', 'company-user-1'],
+      ['chief_return', undefined],
       ['correction_submit', 'company-user-1'],
     ])
   })
@@ -428,10 +438,9 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
     expect(rejected.body.request.allowedActions).toEqual(['read'])
 
     const company = await request(app).get(`/requests/${rejectedCase.id}`).set(auth('company-user-1'))
-    expect(company.body.timeline.find((entry: { action: string }) => entry.action === 'chief_reject')).toMatchObject({
-      actorId: 'chief',
-      reason: 'خارج از دامنه فراخوان',
-    })
+    const rejectEntry = company.body.timeline.find((entry: { action: string }) => entry.action === 'chief_reject')
+    expect(rejectEntry).toMatchObject({ actorRole: 'chief-reviewer', reason: 'خارج از دامنه فراخوان' })
+    expect(rejectEntry).not.toHaveProperty('actorId')
 
     // The rejected subtopic stays closed for that company; the other one and other companies are unaffected.
     const retry = await request(app)
@@ -496,11 +505,14 @@ describe('T21: Chief triage, correction, rejection and reopen (int)', () => {
       'owner_reopen',
     ])
     expect(history.body.items[2]).toMatchObject({
-      actorId: 'owner',
       reason: 'مدارک تکمیلی ارائه شد',
       fromState: 'rejected',
       toState: 'in_review',
     })
+    // The owner's reopen is a staff step: the company gets no account id for it (#288).
+    expect(history.body.items[2]).not.toHaveProperty('actorId')
+    const ownerHistory = await request(app).get(`/requests/${rejectedCase.id}/history`).set(auth('owner'))
+    expect(ownerHistory.body.items[2]).toMatchObject({ actorId: 'owner', action: 'owner_reopen' })
 
     // The responsible chief can triage the reopened case again.
     const queue = await request(app).get(`/admin/requests/${rejectedCase.id}`).set(auth('chief'))

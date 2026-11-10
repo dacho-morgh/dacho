@@ -2,13 +2,13 @@
 import type { Router } from 'express'
 import type { Response } from 'express'
 import { operationalRoleOf, type OperationalRole } from '../../access/roles.js'
-import type { ReplaceSlotResult, RoundStartContext } from '../review-round-repo.js'
+import type { ReplaceSlotResult, ReviewRoundDto, RoundStartContext } from '../review-round-repo.js'
 import { isReviewerRole, parseQueueView } from '../review-case-repo.js'
 import { actorOf } from '../proxy-auth.js'
 import type { EvaluationDto } from '../../reviews/evaluation-repo.js'
 import { ROUND_REQUIRED_EVALUATIONS } from '../../reviews/round-completion.js'
 import { validateAndScoreReview } from '../../reviews/scoring.js'
-import { parsePositiveInt, parseRevisionQuery, withDownloadUrls, parseExpectedRevision, parseOptionalReason } from './route-helpers.js'
+import { parsePositiveInt, parseRevisionQuery, withDownloadUrls, parseExpectedRevision, parseOptionalReason, resolveUserNames } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 
 export function registerReviewRoutes(router: Router, ctx: DashboardContext): void {
@@ -52,6 +52,7 @@ export function registerReviewRoutes(router: Router, ctx: DashboardContext): voi
         res.status(404).json({ error: 'not_found' })
         return
       }
+      await assignments.markViewed(found.case.requestId, actor.id, actor.operationalRole)
       res.set('Cache-Control', 'private, no-store, max-age=0').json({
         ...found,
         ...withDownloadUrls(found.case.requestId, found),
@@ -175,6 +176,19 @@ export function registerReviewRoutes(router: Router, ctx: DashboardContext): voi
   })
 
   /**
+   * Adds each slot holder's display name for the reviewers list (#288). Accounts
+   * carry no picture, so `avatarUrl` is always null and the page draws initials.
+   * Callers pass only rounds and slots the reader may already see.
+   */
+  const withSlotPeople = async (items: ReviewRoundDto[]) => {
+    const names = await resolveUserNames(deps.userStore, items.flatMap((round) => round.slots.map((slot) => slot.userId)))
+    return items.map((round) => ({
+      ...round,
+      slots: round.slots.map((slot) => ({ ...slot, name: names.get(slot.userId) ?? null, avatarUrl: null })),
+    }))
+  }
+
+  /**
    * Oversight (owner, Secretariat, the case's chief) sees all four slots; an
    * assigned reviewer or employer sees only their own slot, never who else was
    * picked. Companies and investment people have no part in a review round.
@@ -196,10 +210,11 @@ export function registerReviewRoutes(router: Router, ctx: DashboardContext): voi
         const mine = round.slots.find((slot) => slot.userId === actor.id && slot.active)
         if (!mine) { res.status(404).json({ error: 'not_found' }); return }
         const { id, requestId, requestRevision, proposalRevision, startedAt } = round
-        res.json({ round: { id, requestId, requestRevision, proposalRevision, startedAt, slots: [mine] } })
+        const [own] = await withSlotPeople([{ ...round, slots: [mine] }])
+        res.json({ round: { id, requestId, requestRevision, proposalRevision, startedAt, slots: own!.slots } })
         return
       }
-      res.json({ round })
+      res.json({ round: (await withSlotPeople([round]))[0] })
     } catch (error) { next(error) }
   })
 
@@ -215,7 +230,7 @@ export function registerReviewRoutes(router: Router, ctx: DashboardContext): voi
       const { scope } = await resolveScope(actor.id, role)
       const request = await repo.findByIdScoped(req.params.id, scope)
       if (!request) { res.status(404).json({ error: 'not_found' }); return }
-      res.json({ items: await rounds.listForRequest(request.id) })
+      res.json({ items: await withSlotPeople(await rounds.listForRequest(request.id)) })
     } catch (error) { next(error) }
   })
 

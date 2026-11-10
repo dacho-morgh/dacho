@@ -22,9 +22,17 @@ export interface PublicContent {
   status: PublicStatus
 }
 
+/** The public page's poster (CMS `featuredImage`, a public media file). */
+export interface PublicImage {
+  url: string
+  alt: string | null
+}
+
 export interface PublicRecord extends PublicContent {
   id: string
   updatedAt: string
+  /** Only `find` resolves it (one level deep); lists and writes leave it out. */
+  image?: PublicImage | null
 }
 
 /** The CMS rejected the record (HTTP 4xx) rather than failing to answer. */
@@ -90,10 +98,19 @@ export function fromRichText(value: unknown): string {
   return root.children.map(textOf).join('\n').trim()
 }
 
-function asPublicRecord(doc: unknown): PublicRecord {
+/** The media file's URL when the relationship was populated; an id alone or no file is null. */
+function imageOf(value: unknown): PublicImage | null {
+  if (!value || typeof value !== 'object') return null
+  const media = value as { url?: unknown; alt?: unknown }
+  if (typeof media.url !== 'string' || media.url === '') return null
+  return { url: media.url, alt: typeof media.alt === 'string' && media.alt !== '' ? media.alt : null }
+}
+
+function asPublicRecord(doc: unknown, withImage = false): PublicRecord {
   const value = (doc ?? {}) as Record<string, unknown>
   const text = (field: unknown) => (typeof field === 'string' ? field : '')
   return {
+    ...(withImage ? { image: imageOf(value.featuredImage) } : {}),
     id: String(value.id),
     title: text(value.title),
     description: fromRichText(value.description),
@@ -167,12 +184,13 @@ export class PayloadExhibitionStore implements ExhibitionStore, PublicRecordStor
   }
 
   async find(collection: PublicCollection, id: string): Promise<PublicRecord | undefined> {
-    const res = await this.fetcher(`${this.baseUrl}/api/${collection}/${encodeURIComponent(id)}?depth=0`, {
+    // One level deep, so the poster arrives as a media document with its public URL.
+    const res = await this.fetcher(`${this.baseUrl}/api/${collection}/${encodeURIComponent(id)}?depth=1`, {
       headers: this.headers(),
     })
     if (res.status === 404) return undefined
     if (!res.ok) throw this.failure(res.status)
-    return asPublicRecord(await res.json())
+    return asPublicRecord(await res.json(), true)
   }
 
   async list(collection: PublicCollection, ids?: string[]): Promise<PublicRecord[]> {
@@ -184,7 +202,7 @@ export class PayloadExhibitionStore implements ExhibitionStore, PublicRecordStor
       const res = await this.fetcher(`${this.baseUrl}/api/${collection}?${params}`, { headers: this.headers() })
       if (!res.ok) throw this.failure(res.status)
       const body = (await res.json()) as { docs?: unknown[]; hasNextPage?: boolean }
-      records.push(...(body.docs ?? []).map(asPublicRecord))
+      records.push(...(body.docs ?? []).map((doc) => asPublicRecord(doc)))
       if (!body.hasNextPage) return records
     }
   }
@@ -236,6 +254,12 @@ export class InMemoryPublicRecordStore implements ExhibitionStore, PublicRecordS
     return record
   }
 
+  /** Sets the poster as if an editor attached one in the CMS. */
+  setImage(collection: PublicCollection, id: string, image: PublicImage | null): void {
+    const record = this.records.get(this.key(collection, id))
+    if (record) this.records.set(this.key(collection, id), { ...record, image })
+  }
+
   all(collection: PublicCollection): PublicRecord[] {
     return [...this.records.entries()]
       .filter(([key]) => key.startsWith(`${collection}:`))
@@ -253,8 +277,9 @@ export class InMemoryPublicRecordStore implements ExhibitionStore, PublicRecordS
 
   async update(collection: PublicCollection, id: string, content: PublicContent): Promise<PublicRecord | undefined> {
     this.fail('update')
-    if (!this.records.has(this.key(collection, id))) return undefined
-    const record = { ...content, id, updatedAt: new Date().toISOString() }
+    const existing = this.records.get(this.key(collection, id))
+    if (!existing) return undefined
+    const record = { ...content, id, updatedAt: new Date().toISOString(), ...(existing.image !== undefined ? { image: existing.image } : {}) }
     this.records.set(this.key(collection, id), record)
     return record
   }

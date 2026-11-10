@@ -26,6 +26,8 @@ Case responses advertise the chief action `startReview` only to the event's curr
 
 The assigned people's queue and case file are in [reviewer-queue.md](reviewer-queue.md) (T23).
 
+Since #288 every slot in the round responses also carries the holder's `name`, `avatarUrl` (always `null`), `viewedAt` and `status` (`not_viewed`, `in_review`, `final`); the audiences are unchanged. See [request page data](request-dossier.md#request-page-data-for-the-figma-frames-288).
+
 ## Not in this slice
 
 Replacing an unfinished reviewer or the employer (done in [T26](review-replacement.md)), 4/4 completion (done in [T27](review-completion.md)), the chief's advance/reject/correct decision (done in [T28](chief-decision.md)), and notifications to the assigned people.

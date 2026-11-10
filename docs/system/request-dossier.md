@@ -20,6 +20,58 @@ The page shows what the API returned for this person. `GET /requests/:id` is the
 
 The server already withholds financial files from the chief and reviewers. The page also omits their slots and the sentence about them, so the screen does not suggest they exist for that reader.
 
+## Request page data for the Figma frames (#288)
+
+`GET /requests/:id` and `GET /admin/requests/:id` (internal roles) return the same body, built in `apps/backend/src/dashboard/request-detail.ts`. `request`, `owner` and the `timeline` rows keep their earlier projection; the rest is new. Owner, Secretariat, the event's chief and the investment person holding the case are the **supervisory** roles below.
+
+```ts
+{
+  request, owner,                       // unchanged
+  timeline: (ActivityDto & { actorName: string | null; actorRole: OperationalRole | null })[],
+  workflow: { key, title, role, roleName, order, state }[],
+  event: { id, title, category: { id, title } | null, subtopic: { id, title } | null,
+           image: { url, alt } | null, startDate, endDate, location, status } | null,
+  company: { id, name, type, province, city, status, active, foundingYear, ageYears,
+             logo: { url } | null, source: 'profile' | 'submission' } | null,
+  companyProfile: { company, activityDomain, province, city, executives, addresses, dossier } | null,
+}
+```
+
+| Field | Supervisory roles | Reviewer, employer | Company |
+| --- | --- | --- | --- |
+| `owner` | `{ id, name }` of the submitting representative (unchanged) | `null` (unchanged) | `{ id, name }` (unchanged) |
+| `event` | Event, category, subtopic; poster, dates, place and status from the public CMS page | Same (public, and already in their queue) | Same |
+| `company` | Live company record: name (the company's own, not the representative's), type, province, city, `status` («وضعیت شرکت» text), `active` (representative account not deactivated), `foundingYear` (dossier year, else establishment date), `ageYears`, `logo.url` when a logo is set; `source: 'profile'` | Only `name`, `type`, `province`, `city` from the profile pinned at submission (the necessary profile they already read); `id`, `status`, `active`, `foundingYear`, `ageYears` and `logo` are `null`; `source: 'submission'` | Its own live card; `logo` is `null` because the logo collection belongs to the Secretariat and owner |
+| `companyProfile` | `null` | `null` | Its own live profile and resume: basic info, executives, addresses and the stage-2 dossier (products, key members, past projects, certificates…) |
+| `timeline[].actorName` / `actorRole` | Name and operational role of whoever took each step | Not present; rows still carry no `actorId` (unchanged) | Name and `actorId` only for steps its own account took; Fund staff steps carry `actorRole` with `actorName: null` and no `actorId`, so no chief or reviewer is identified. The same `actorId` rule applies to `GET /requests/:id/history` and `GET /activities` (before #288 the company received staff account ids there) |
+| `workflow` | Event applications: the fixed stages below with `state`. Other services: the CMS workflow if one exists, else `[]` | Same | Same |
+
+`ageYears` compares a Persian founding year (1200–1450) with the current Persian year and a Gregorian one with the current Gregorian year. The logo is served by `GET /requests/:id/company/logo` (`image/png|jpeg|webp`, `private, no-store`, `nosniff`) to supervisory roles that can read the case; reviewers, employers and the company get `403`, and a supervisory role outside the case gets the same `404` as an unknown id. Accounts carry no picture, so the frontend draws initials for people.
+
+The CMS no longer stores service workflows, so an event application's stages come from the backend. Step `state` is `done`, `current`, `upcoming` or `rejected`:
+
+| Recorded state | Current step |
+| --- | --- |
+| `draft`, `action_needed` | `submission` («ثبت و ارسال درخواست») |
+| `in_review` + `chief_triage` | `chief_triage` («بررسی اولیه سردبیر») |
+| `in_review` + `triaged` | `review` («داوری و تصمیم سردبیر») |
+| `in_review` + `advanced` | `investment` («بررسی سرمایه‌گذاری») |
+| published result | `result` («اعلام نتیجه») |
+| `rejected` | `chief_triage` or `review` (by the last reject action), state `rejected` |
+| `approved` | every step `done` |
+
+The step keys never name the financial package, which the chief and reviewers may not see.
+
+The round's reviewer list (`GET /requests/:id/review-round`, `GET /requests/:id/review-rounds`) adds to each slot `name`, `avatarUrl` (always `null`), `viewedAt` and `status`: `not_viewed` («مشاهده نشده») until the holder first opens the case (`GET /review/cases/:id` or `GET /requests/:id`, recorded in `case_assignments.viewed_at`, migration `1780511400041`), `in_review` («درحال بررسی») once opened or with a draft, `final` («نهایی») once their evaluation of the round's revision is final. Oversight still sees all four slots and a reviewer or employer only their own; the company and the investment person still get `403`. Only the state is exposed, never draft answers.
+
+### Company name in the request lists
+
+`GET /requests` and `GET /admin/requests` items carry **`companyName`**: the company's own name, never the representative's. The owner, Secretariat, chief, investment person and the company get the live company record's name (the name pinned at submission when the CMS has none). Reviewers and the employer get the name pinned at submission, the same value their `/review/queue` shows, and still no `owner`. In `GET /admin/requests` the readers who receive an `owner` also get `owner.companyName` with the same value; new code should read the top-level `companyName`, which is present for every role. The review, investment and follow-up queues already return `companyName` from the pinned profile.
+
+History rows whose step the backend took itself (the investment handoff) have `actorId: 'system'` for the roles that receive actor ids, and `actorName`/`actorRole` `null`; the system actor is never looked up as an account.
+
+`apps/backend/tests/int/request-detail.int.spec.ts` proves each row of the table above per role, including that reviewers and the employer still receive no owner, representative, account id or staff name.
+
 ## Actions
 
 | `allowedActions` entry | Who | Control | Command |
@@ -33,14 +85,19 @@ The server already withholds financial files from the chief and reviewers. The p
 
 Return and reject require a reason. Each command sends the case revision. A stale or closed command keeps what was typed, explains what happened and rereads the case.
 
-Allowed actions with no screen yet get a sentence and no button:
+Allowed actions with no screen yet get a sentence and no button (`UNBUILT_ACTION_NOTES` in `request-dossier.tsx`):
 
 | Action | Owner of the screen | Why it is not here |
 | --- | --- | --- |
 | `submit` | FE12 | Final submission lives on the event application workspace; acceptance uses the unapproved placeholder agreement versions until approved text is supplied |
-| `submitFinancialPackage` | FE19 | The file field cannot record a statement year yet, so a package could never complete |
-| `replaceReviewer`, `replaceEmployer` | FE15 | The round response has no names, so the chief could not tell who is being replaced |
-| Evaluation form | FE17 | The fixed rubric form does not exist |
+
+Built since this table was first written (checked against the code for #288):
+
+| Action | Where |
+| --- | --- |
+| `replaceReviewer`, `replaceEmployer` | `review-assignment-panel.tsx` («لیست داوران و فرم‌های داوری»): «جایگزینی داور» on each unfinished ordinary slot of the current round and «جایگزینی کارفرما» on the employer slot, each opening a picker with a reason; `POST /requests/:id/review-round/reviewers/:userId/replace` and `/review-round/employer/replace` |
+| `submitFinancialPackage` | `financial-package-panel.tsx`: statement-year uploads and `POST /requests/:id/financial-package` |
+| Evaluation form | `reviewer/review-evaluation-form.tsx` at `/dashboard/requests/:id/evaluation` |
 
 The company's `correct` action is built (FE13): the company's case page shows a tracking section (stage, next action, submitted proposal revision, the chief's return or rejection reason, an owner's reopen and the published result) and, while the server lists `correct`, a correction form that patches the same case and calls `POST /requests/:id/resubmit`. That form owns the proposal upload while correcting. Acceptance is recorded with the server's current agreement versions, which remain unapproved placeholders until the approved text is supplied.
 

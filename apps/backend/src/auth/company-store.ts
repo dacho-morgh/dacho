@@ -6,6 +6,14 @@ export interface CompanyLogo {
   filename: string | null
 }
 
+/** Image types a logo download may carry; anything else is refused rather than served. */
+export const COMPANY_LOGO_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const
+
+export interface CompanyLogoFile {
+  body: Buffer
+  contentType: (typeof COMPANY_LOGO_CONTENT_TYPES)[number]
+}
+
 export interface Company extends CompanyFields {
   id: string
   /** The user acting as this company's representative (نماینده). */
@@ -23,6 +31,18 @@ export interface CompanyStore {
   setLogo(id: string, logoId: string | null): Promise<Company>
   /** `withLogos` resolves each company's logo file (one level deeper); the default list carries only its id. */
   list(options?: { search?: string; withLogos?: boolean }): Promise<Company[]>
+  /**
+   * The logo's bytes for a download the backend has already authorized (#288).
+   * Undefined when the company has no logo or the file is not a permitted image.
+   */
+  readLogo?(company: Company): Promise<CompanyLogoFile | undefined>
+}
+
+function logoContentType(value: string | null): CompanyLogoFile['contentType'] | undefined {
+  const type = (value ?? '').split(';')[0]!.trim().toLowerCase()
+  return (COMPANY_LOGO_CONTENT_TYPES as readonly string[]).includes(type)
+    ? (type as CompanyLogoFile['contentType'])
+    : undefined
 }
 
 export type HttpFetcher = (
@@ -120,6 +140,20 @@ export class PayloadCompanyStore implements CompanyStore {
     })
     const data = await this.ok(res)
     return ((data as { docs?: unknown[] }).docs ?? []).map((doc) => this.toCompany(doc))
+  }
+
+  async readLogo(company: Company): Promise<CompanyLogoFile | undefined> {
+    const filename = company.logo?.filename
+    if (!filename) return undefined
+    // The logo collection is private; the service account reads it through Payload's access-checked file route.
+    const res = await fetch(`${this.baseUrl}/api/company-logos/file/${encodeURIComponent(filename)}`, {
+      headers: { Authorization: `users API-Key ${this.apiKey}` },
+    })
+    if (res.status === 404) return undefined
+    if (!res.ok) throw new Error(`Payload API error: HTTP ${res.status}`)
+    const contentType = logoContentType(res.headers.get('content-type'))
+    if (!contentType) return undefined
+    return { body: Buffer.from(await res.arrayBuffer()), contentType }
   }
 
   private headers(): Record<string, string> {
@@ -308,6 +342,9 @@ export async function companyOfUser(
   return companies.findByRepresentative(user.id)
 }
 
+const ONE_PIXEL_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
 /** In-memory stand-in used by the unit and integration test harnesses. */
 export class InMemoryCompanyStore implements CompanyStore {
   private readonly companies = new Map<string, Company>()
@@ -353,6 +390,12 @@ export class InMemoryCompanyStore implements CompanyStore {
     const updated: Company = logoId === null ? rest : { ...rest, logo: { id: logoId, filename: `logo-${logoId}.png` } }
     this.companies.set(id, updated)
     return updated
+  }
+
+  /** A fixed one-pixel PNG for any company that has a logo set. */
+  async readLogo(company: Company): Promise<CompanyLogoFile | undefined> {
+    if (!this.companies.get(company.id)?.logo) return undefined
+    return { body: Buffer.from(ONE_PIXEL_PNG, 'base64'), contentType: 'image/png' }
   }
 
   async list(options: { search?: string; withLogos?: boolean } = {}): Promise<Company[]> {
