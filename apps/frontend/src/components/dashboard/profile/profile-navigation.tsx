@@ -120,6 +120,7 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
             type="button"
             variant="outline-gray"
             className="flex-1"
+            autoFocus
             disabled={isLoggingOut}
             onClick={() => setIsLogoutOpen(false)}
           >
