@@ -29,12 +29,29 @@ afterEach(() => {
 })
 
 describe('S4 company verification card (Figma 16, 22-24)', () => {
-  it('asks for the missing items while the dossier is incomplete and points to the form with submit disabled', () => {
+  it('asks for the missing items while the dossier is incomplete and names the page and section of each, with submit disabled and no complete-info button', () => {
     card(verification({ canRequestVerification: false }), { required: ['articlesOfAssociation'], optional: [], canRequestVerification: false })
     expect(screen.getByText('اطلاعات شرکت هنوز کامل نیست')).toBeTruthy()
     expect(screen.getByText('اساس‌نامه')).toBeTruthy()
     expect((screen.getByRole('button', { name: 'ارسال برای احراز' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByRole('link', { name: 'تکمیل اطلاعات شرکت' }).getAttribute('href')).toBe('#company-basic')
+    expect(screen.getByText(/صفحهٔ «پروفایل شرکت»، بخش «مدارک رسمی شرکت»/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'تکمیل اطلاعات شرکت' })).toBeNull()
+    expect(screen.queryByText('تکمیل اطلاعات')).toBeNull()
+  })
+
+  it('groups missing items by the page and section that hold their form', () => {
+    card(verification({ canRequestVerification: false }), {
+      required: ['legalEntityType', 'foundingYear', 'articlesOfAssociation', 'productsServices', 'addresses'],
+      optional: [],
+      canRequestVerification: false,
+    })
+    const groups = Array.from(document.querySelectorAll('[data-slot="missing-group"]')).map((group) => group.textContent)
+    expect(groups).toEqual([
+      'صفحهٔ «پروفایل شرکت»، بخش «اطلاعات پایه»؛ این موارد را پر کنید:نوع شخصیت حقوقیسال تأسیس',
+      'صفحهٔ «پروفایل شرکت»، بخش «مدارک رسمی شرکت»؛ این موارد را پر کنید:اساس‌نامه',
+      'صفحهٔ «رزومه»، بخش «محصولات و خدمات»؛ این موارد را پر کنید:محصولات و خدمات',
+      'صفحهٔ «پروفایل شرکت»، بخش «آدرس‌ها»؛ این موارد را پر کنید:آدرس‌ها',
+    ])
   })
 
   it('shows the review steps while pending and the approval facts once approved', () => {

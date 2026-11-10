@@ -7,6 +7,7 @@ import { Typography } from '@/components/ui/typography'
 import {
   dossierFieldLabel,
   formatDate,
+  groupMissingByLocation,
   type CompanyVerificationDto,
   type MissingDossierItemsDto,
 } from '@/utilities/dashboard-api'
@@ -192,16 +193,29 @@ export function CompanyVerificationCard({
         )}
 
         {status !== 'pending' && status !== 'approved' && status !== 'rejected' && missing.required.length > 0 && (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <Typography variant="14/semibold" color="neutral-600">
               اطلاعات یا مدارک الزامی ناقص:
             </Typography>
-            <ul className="flex flex-wrap gap-2">
-              {missing.required.map((key) => (
-                <li key={key}>
-                  <Badge variant="error" size="md">
-                    {dossierFieldLabel(key)}
-                  </Badge>
+            <ul className="flex flex-col gap-3">
+              {groupMissingByLocation(missing.required).map((group) => (
+                <li
+                  key={`${group.page}-${group.section}`}
+                  data-slot="missing-group"
+                  className="flex flex-col gap-2 rounded-lg border border-neutral-100 p-3"
+                >
+                  <Typography variant="14/regular" color="neutral-600">
+                    صفحهٔ «{group.page}»، بخش «{group.section}»؛ این موارد را پر کنید:
+                  </Typography>
+                  <ul className="flex flex-wrap gap-2">
+                    {group.keys.map((key) => (
+                      <li key={key}>
+                        <Badge variant="error" size="md">
+                          {dossierFieldLabel(key)}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               ))}
             </ul>
@@ -231,14 +245,9 @@ export function CompanyVerificationCard({
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
           {status !== 'pending' && status !== 'approved' && !verification.canRequestVerification && (
-            <>
-              <Button type="button" size="40" disabled aria-describedby="company-verification-title">
-                {resubmit ? 'ارسال دوباره برای احراز' : 'ارسال برای احراز'}
-              </Button>
-              <Button asChild size="40" variant="outline-gray">
-                <a href="#company-basic">تکمیل اطلاعات شرکت</a>
-              </Button>
-            </>
+            <Button type="button" size="40" disabled aria-describedby="company-verification-title">
+              {resubmit ? 'ارسال دوباره برای احراز' : 'ارسال برای احراز'}
+            </Button>
           )}
           {canSubmit && (
             <Button type="button" size="40" loading={submitting} onClick={onSubmit}>
