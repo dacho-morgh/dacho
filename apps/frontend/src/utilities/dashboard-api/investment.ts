@@ -8,8 +8,9 @@ export interface InvestmentMemoDto {
   sentAt: string | null
 }
 
+/** The writer's own versions and every sent one; 404 before the handoff (or for a case they may not write on). */
 export function listInvestmentMemos(id: string): Promise<{ memos: InvestmentMemoDto[] }> {
-  return dashboardFetch(`/investment/cases/${encodeURIComponent(id)}`)
+  return dashboardFetch(`/investment/cases/${encodeURIComponent(id)}/memos`)
 }
 
 export function saveInvestmentMemo(id: string, body: string): Promise<unknown> {
