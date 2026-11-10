@@ -49,12 +49,39 @@ test.afterAll(async () => {
   }
 })
 
+/** Registration number, type, location, founding date and economic code: all required. */
+async function fillCompanyDetails(page: Page) {
+  await page.locator('#register-companyRegistrationNumber').fill('12345')
+  await pickFromCombobox(page, '#register-companyType', 'خاص', 'سهامی خاص')
+  await pickFromCombobox(page, '#register-companyProvince', 'بوش', 'بوشهر')
+  await pickFromCombobox(page, '#register-companyCity', 'برازج', 'برازجان')
+  await pickJalaliDate(page, '۱۳۸۰', 'مرداد', /۱۵-ام مرداد ۱۳۸۰$/)
+  await page.locator('#register-companyEconomicCode').fill('12345678901')
+}
+
 async function fillCompanyStep(page: Page) {
   await page.locator('#register-companyName').fill('شرکت نمونه تست')
   // Mocked-response flows never reach the server, but the form checks the digit.
   await page.locator('#register-companyNationalId').fill(validNationalId('5000001'))
   await page.locator('#register-activityDomain').fill('انرژی')
+  await fillCompanyDetails(page)
   await page.getByRole('button', { name: 'ادامه' }).click()
+}
+
+/** Types into a searchable dropdown and picks the matching option from its list. */
+async function pickFromCombobox(page: Page, id: string, query: string, option: string) {
+  await page.locator(id).fill(query)
+  await page.getByRole('option', { name: option, exact: true }).click()
+}
+
+/** Chooses a Jalali day in the shadcn calendar popover. */
+async function pickJalaliDate(page: Page, year: string, month: string, dayLabel: RegExp) {
+  await page.locator('#register-companyEstablishmentDate').click()
+  await page.getByRole('button', { name: 'انتخاب سال' }).click()
+  await page.getByRole('button', { name: year, exact: true }).click()
+  await page.getByRole('button', { name: 'انتخاب ماه' }).click()
+  await page.getByRole('button', { name: month, exact: true }).click()
+  await page.getByRole('button', { name: dayLabel }).click()
 }
 
 async function fillRepresentativeStep(
@@ -271,6 +298,7 @@ test.describe('Register', () => {
     await page.locator('#register-companyName').fill('شرکت نمونه تست')
     await page.locator('#register-companyNationalId').fill('۱۲x')
     await page.locator('#register-activityDomain').fill('انرژی')
+    await fillCompanyDetails(page)
     await page.getByRole('button', { name: 'ادامه' }).click()
     await expect(page.getByText('شناسه ملی باید فقط شامل رقم باشد.')).toBeVisible()
     await expect(page.locator('#register-companyNationalId')).toBeFocused()
@@ -322,24 +350,33 @@ test.describe('Register', () => {
     await expect(page.getByText('تکرار رمز عبور را وارد کنید.')).toBeVisible()
   })
 
-  test('filters the cities by province and picks a Jalali founding date', async ({ page }) => {
+  test('filters provinces and cities as the person types and picks a Jalali founding date', async ({
+    page,
+  }) => {
     await page.goto(registerUrl)
     await page.waitForFunction(() => document.querySelector('form[data-hydrated="true"]') !== null)
+    const province = page.locator('#register-companyProvince')
     const city = page.locator('#register-companyCity')
     await expect(city).toBeDisabled()
-    await page.locator('#register-companyProvince').selectOption('بوشهر')
-    await expect(city.locator('option', { hasText: 'برازجان' })).toHaveCount(1)
-    await expect(city.locator('option', { hasText: 'تبریز' })).toHaveCount(0)
-    await city.selectOption('برازجان')
-    await page.locator('#register-companyProvince').selectOption('تهران')
+
+    await province.fill('بوش')
+    await expect(page.getByRole('option', { name: 'بوشهر', exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: 'تبریز' })).toHaveCount(0)
+    await page.getByRole('option', { name: 'بوشهر', exact: true }).click()
+    await expect(province).toHaveValue('بوشهر')
+
+    await city.fill('برازج')
+    await expect(page.getByRole('option', { name: 'برازجان', exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: 'تبریز' })).toHaveCount(0)
+    await page.getByRole('option', { name: 'برازجان', exact: true }).click()
+    await expect(city).toHaveValue('برازجان')
+
+    // Changing the province drops the city that belonged to the old one.
+    await pickFromCombobox(page, '#register-companyProvince', 'تهر', 'تهران')
     await expect(city).toHaveValue('')
 
-    const date = page.locator('#register-companyEstablishmentDate')
-    await date.click()
-    await page.getByLabel('سال', { exact: true }).selectOption('1380')
-    await page.getByLabel('ماه', { exact: true }).selectOption('5')
-    await page.getByRole('button', { name: /۱۵ مرداد ۱۳۸۰$/ }).click()
-    await expect(date).toHaveText('۱۳۸۰/۰۵/۱۵')
+    await pickJalaliDate(page, '۱۳۸۰', 'مرداد', /۱۵-ام مرداد ۱۳۸۰$/)
+    await expect(page.locator('#register-companyEstablishmentDate')).toHaveText('۱۳۸۰/۰۵/۱۵')
   })
 
   test('signs up an applicant, lands in the panel already signed in, and can still log in by email', async ({
@@ -366,12 +403,7 @@ test.describe('Register', () => {
     await page.locator('#register-companyName').fill('شرکت نمونه تست')
     await page.locator('#register-companyNationalId').fill(nationalId.replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]))
     await page.locator('#register-activityDomain').fill('انرژی')
-    await page.locator('#register-companyProvince').selectOption('بوشهر')
-    await page.locator('#register-companyCity').selectOption('برازجان')
-    await page.locator('#register-companyEstablishmentDate').click()
-    await page.getByLabel('سال', { exact: true }).selectOption('1380')
-    await page.getByLabel('ماه', { exact: true }).selectOption('5')
-    await page.getByRole('button', { name: /۱۵ مرداد ۱۳۸۰$/ }).click()
+    await fillCompanyDetails(page)
     await page.getByRole('button', { name: 'ادامه' }).click()
 
     // Step 2 — representative info

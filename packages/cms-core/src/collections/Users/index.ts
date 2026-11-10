@@ -16,9 +16,11 @@ import {
 } from '@cms-core/access/roles'
 import { createBackendJwtStrategy } from '@cms-core/auth/backendJwtStrategy'
 import {
+  checkSignupAvailability,
   normalizeDigits,
   normalizeLoginIdentifier,
   runSelfSignup,
+  type SelfSignupStore,
 } from '@cms-core/auth/self-signup'
 import { changeOwnPassword, updateOwnAccount } from '@cms-core/endpoints/selfAccount'
 import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
@@ -31,8 +33,37 @@ import {
   type Access,
   type CollectionConfig,
   type FieldAccess,
+  type PayloadRequest,
 } from 'payload'
 import { generatePayloadCookie } from 'payload/shared'
+
+/** The read-only lookups behind the signup duplicate checks. */
+function signupLookups(
+  req: PayloadRequest,
+): Pick<SelfSignupStore, 'companyNationalIdExists' | 'identityTaken'> {
+  const exists = async (collection: 'users' | 'companies', where: Record<string, unknown>) =>
+    (
+      await req.payload.find({
+        collection,
+        where: where as never,
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+        pagination: false,
+      })
+    ).docs.length > 0
+  return {
+    companyNationalIdExists: (nationalId) =>
+      exists('companies', { nationalId: { equals: nationalId } }),
+    identityTaken: async ({ phone, email }) => ({
+      // The username is the phone, so either column holding it is a conflict.
+      phone: phone
+        ? await exists('users', { or: [{ phone: { equals: phone } }, { username: { equals: phone } }] })
+        : false,
+      email: email ? await exists('users', { email: { equals: email } }) : false,
+    }),
+  }
+}
 
 /**
  * The only fields the profile command may echo back. `apiKey`, `enableAPIKey`,
@@ -391,6 +422,17 @@ export const Users: CollectionConfig = {
       },
     },
     {
+      // The register form checks a step's phone/email/national ID here before
+      // moving on, so a duplicate is shown on its own field and step.
+      path: '/signup-availability',
+      method: 'post',
+      handler: async (req) => {
+        const body = typeof req.json === 'function' ? await req.json().catch(() => null) : req.json
+        const result = await checkSignupAvailability(body, signupLookups(req))
+        return Response.json(result.body, { status: result.status })
+      },
+    },
+    {
       path: '/self-signup',
       method: 'post',
       handler: async (req) => {
@@ -399,16 +441,7 @@ export const Users: CollectionConfig = {
         const result = await runSelfSignup(
           body,
           {
-            companyNationalIdExists: async (nationalId) => {
-              const existing = await req.payload.find({
-                collection: 'companies',
-                where: { nationalId: { equals: nationalId } },
-                limit: 1,
-                depth: 0,
-                overrideAccess: true,
-              })
-              return existing.docs.length > 0
-            },
+            ...signupLookups(req),
             inTransaction: async (run) => {
               // One transaction: the person and the company they represent are
               // created together or not at all. Both writes share `req`, so

@@ -125,7 +125,7 @@ describe('Postgres Company Verification Integration (T14)', () => {
       knowledgeBasedStatus: 'دانش‌بنیان',
       classification: 'فناوری اطلاعات',
       foundingYear: '1399',
-      productsServices: ['فایروال بومی'],
+      productsServices: [{ title: 'فایروال بومی' }],
       addresses: [{ id: 'a1', title: 'مرکز', province: 'تهران', city: 'تهران', postalCode: '1111111111', address: 'تهران' }],
       notAvailable: [
         'centerEstablishment', 'website', 'insuredEmployeeCount', 'pastProjectsCustomers',

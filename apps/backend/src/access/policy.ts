@@ -180,7 +180,7 @@ export function canRequestAction(
 
 /* ── Private document policy (docs/system/document-policy.json) ─────────── */
 
-export const DOCUMENT_POLICY_VERSION = 'private-documents-2026-10-23-v1'
+export const DOCUMENT_POLICY_VERSION = 'private-documents-2026-11-10-v2'
 export const MAX_DOCUMENT_BYTES = 10_000_000
 export const DOCUMENT_SIZE_DISPLAY = '10 MB per file'
 
@@ -192,6 +192,7 @@ export const DOCUMENT_CATEGORIES = [
   'amendmentNotices',
   'catalogues',
   'certificatesLicenses',
+  'productsServices',
   'financialStatements',
   'debtFacilityEvidence',
   'taxInsuranceRecords',
@@ -210,8 +211,8 @@ export function isDocumentCategory(value: unknown): value is DocumentCategory {
 }
 
 export interface DocumentTypeRule {
-  format: 'PDF' | 'Word'
-  extension: '.pdf' | '.doc' | '.docx'
+  format: 'PDF' | 'Word' | 'Image'
+  extension: '.pdf' | '.doc' | '.docx' | '.jpg' | '.jpeg' | '.png' | '.webp'
   mimeType: string
 }
 
@@ -224,6 +225,24 @@ export const ALLOWED_DOCUMENT_TYPES: readonly DocumentTypeRule[] = [
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   },
 ]
+
+/** Photos and scans, accepted only where `IMAGE_DOCUMENT_CATEGORIES` allows them. */
+export const IMAGE_DOCUMENT_TYPES: readonly DocumentTypeRule[] = [
+  { format: 'Image', extension: '.jpg', mimeType: 'image/jpeg' },
+  { format: 'Image', extension: '.jpeg', mimeType: 'image/jpeg' },
+  { format: 'Image', extension: '.png', mimeType: 'image/png' },
+  { format: 'Image', extension: '.webp', mimeType: 'image/webp' },
+]
+
+/** A product/service file and a certificate may be a photo as well as a PDF or Word file. */
+export const IMAGE_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = ['productsServices', 'certificatesLicenses']
+
+/** The file types a category accepts. */
+export function allowedDocumentTypes(category: DocumentCategory): readonly DocumentTypeRule[] {
+  return IMAGE_DOCUMENT_CATEGORIES.includes(category)
+    ? [...ALLOWED_DOCUMENT_TYPES, ...IMAGE_DOCUMENT_TYPES]
+    : ALLOWED_DOCUMENT_TYPES
+}
 
 export type DocumentAudience = 'company' | 'case' | 'financial' | 'unsupported'
 
@@ -245,6 +264,7 @@ const COMPANY_CATEGORIES: readonly DocumentCategory[] = [
   'amendmentNotices',
   'catalogues',
   'certificatesLicenses',
+  'productsServices',
 ]
 
 export const FINANCIAL_CATEGORIES: readonly DocumentCategory[] = [

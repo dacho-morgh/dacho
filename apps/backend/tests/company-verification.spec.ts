@@ -29,7 +29,7 @@ describe('Company Verification and Secretariat Queue (T14)', () => {
       knowledgeBasedStatus: 'دانش‌بنیان نوپا',
       classification: 'فناوری اطلاعات',
       foundingYear: '1398',
-      productsServices: ['سامانه ابری'],
+      productsServices: [{ title: 'سامانه ابری' }],
       addresses: [
         {
           id: 'addr-1',
@@ -321,7 +321,7 @@ describe('Company Verification and Secretariat Queue (T14)', () => {
         knowledgeBasedStatus: 'دانش‌بنیان',
         classification: 'نرم‌افزار',
         foundingYear: '1400',
-        productsServices: ['سرویس'],
+        productsServices: [{ title: 'سرویس' }],
         addresses: [{ id: 'a1', title: 'دفتر', province: 'تهران', city: 'تهران', postalCode: '1111111111', address: 'خ ۱' }],
         notAvailable: [
           'centerEstablishment', 'website', 'insuredEmployeeCount', 'pastProjectsCustomers',

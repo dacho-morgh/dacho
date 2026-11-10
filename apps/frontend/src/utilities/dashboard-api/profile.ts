@@ -89,6 +89,16 @@ export function groupMissingByLocation(keys: readonly string[]): MissingItemGrou
 export interface KeyMemberDto {
   name: string
   role: string
+  /** Degree or field of study. */
+  education?: string
+  /** Where the degree was obtained. */
+  degreePlace?: string
+}
+
+/** A product or service, with an optional private file (PDF, Word or image). */
+export interface ProductServiceDto {
+  title: string
+  documentId?: string
 }
 
 export interface PastProjectCustomerDto {
@@ -99,6 +109,9 @@ export interface PastProjectCustomerDto {
 
 export interface CertificateLicenceDto {
   title: string
+  /** An optional private file (PDF, Word or image) of the certificate. */
+  documentId?: string
+  /** No longer asked for; a value entered earlier is kept and sent back as it is. */
   issuer?: string
   reference?: string
 }
@@ -122,7 +135,7 @@ export interface CompanyDossierDto {
   website: string
   centerEstablishment: string
   insuredEmployeeCount: number | null
-  productsServices: string[]
+  productsServices: ProductServiceDto[]
   keyMembers: KeyMemberDto[]
   pastProjectsCustomers: PastProjectCustomerDto[]
   requestedServices: string[]

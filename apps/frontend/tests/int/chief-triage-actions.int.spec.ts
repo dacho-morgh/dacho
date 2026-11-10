@@ -288,7 +288,7 @@ describe('chief intake snapshots', () => {
             createdAt: '2026-10-01T00:00:00.000Z',
             snapshot: {
               company: { name: 'آریانا فناوران', nationalId: '10101010101', type: 'سهامی خاص' },
-              dossier: { activityDomain: 'انرژی', productsServices: ['توربین', 'پمپ'] },
+              dossier: { activityDomain: 'انرژی', productsServices: [{ title: 'توربین' }, { title: 'پمپ' }] },
             },
           },
         },

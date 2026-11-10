@@ -15,7 +15,7 @@ const roles = [
 // Explicit expectations: do not derive the oracle from production audience rules.
 const companyCategories: readonly DocumentCategory[] = [
   'articlesOfAssociation', 'establishmentNotices', 'amendmentNotices',
-  'catalogues', 'certificatesLicenses',
+  'catalogues', 'certificatesLicenses', 'productsServices',
 ]
 const unsupportedCategories: readonly DocumentCategory[] = [
   'rfp', 'supplementaryCaseFiles', 'boothPaymentReceipt',

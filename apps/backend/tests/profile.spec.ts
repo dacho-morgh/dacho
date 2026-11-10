@@ -55,6 +55,79 @@ describe('Dashboard Profile Endpoints', () => {
     expect(getRes.body.contacts.email).toBe('info@fannavaran.ir')
   })
 
+  it('PATCH /profile saves province and city and normalizes numeric fields like signup', async () => {
+    const { app, headers } = await createProfileTestApp()
+
+    const res = await request(app)
+      .patch('/profile')
+      .set(headers)
+      .send({
+        company: {
+          province: 'بوشهر',
+          city: 'برازجان',
+          registrationNumber: ' ۱۲۳۴۵ ',
+          economicCode: '۴۱۱۱۱۱۱۱۱۱۱',
+          establishmentDate: '۱۴۰۰/۰۱/۰۱',
+          type: 'تعاونی',
+        },
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body.company).toMatchObject({
+      province: 'بوشهر',
+      city: 'برازجان',
+      registrationNumber: '12345',
+      economicCode: '41111111111',
+      establishmentDate: '1400/01/01',
+      type: 'تعاونی',
+    })
+  })
+
+  it('PATCH /profile refuses company values registration would refuse, before writing anything', async () => {
+    const { app, headers } = await createProfileTestApp()
+
+    const res = await request(app)
+      .patch('/profile')
+      .set(headers)
+      .send({
+        company: {
+          name: '  ',
+          registrationNumber: '12',
+          economicCode: '12ab',
+          type: 'شرکت خیالی',
+          establishmentDate: '1400-01-01',
+        },
+        contacts: { email: 'should-not-save@example.invalid' },
+      })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('invalid_company_field')
+    expect(res.body.fields).toEqual([
+      { field: 'name', reason: 'required' },
+      { field: 'registrationNumber', reason: 'registration_number_length' },
+      { field: 'economicCode', reason: 'economic_code_digits' },
+      { field: 'type', reason: 'company_type' },
+      { field: 'establishmentDate', reason: 'establishment_date' },
+    ])
+    const profile = await request(app).get('/profile').set(headers)
+    expect(profile.body.company.name).toBe('شرکت پایه')
+    expect(profile.body.contacts.email).toBe('')
+  })
+
+  it('PATCH /profile keeps accepting a company type saved before the current list', async () => {
+    const { app, headers, companyStore } = await createProfileTestApp()
+    const company = (await companyStore.findByRepresentative(headers['x-user-id']))!
+    await companyStore.update(company.id, { type: 'دانش‌بنیان' })
+
+    const res = await request(app)
+      .patch('/profile')
+      .set(headers)
+      .send({ company: { type: 'دانش‌بنیان', name: 'شرکت تازه' } })
+
+    expect(res.status).toBe(200)
+    expect(res.body.company.type).toBe('دانش‌بنیان')
+  })
+
   it('POST, PUT, DELETE /profile/addresses manages user addresses', async () => {
     const { app, headers } = await createProfileTestApp()
 
@@ -153,10 +226,10 @@ describe('Dashboard Profile Endpoints', () => {
     const requiredValues = {
       legalEntityType: 'سهامی خاص',
       knowledgeBasedStatus: 'دانش‌بنیان نوع یک',
-      classification: 'فناوری اطلاعات',
+      classification: 'فناور',
       foundingYear: '1398',
       activityDomain: 'نرم‌افزار',
-      productsServices: ['سامانه ابری'],
+      productsServices: [{ title: 'سامانه ابری' }],
       keyMembers: [{ name: 'نام عضو', role: 'فنی' }],
     }
     const optionalAbsent = [
@@ -201,8 +274,12 @@ describe('Dashboard Profile Endpoints', () => {
       expect(res.body.dossier).toMatchObject({ legalEntityType: '', productsServices: [], notAvailable: [] })
       expect(res.body.documents).toHaveLength(2)
       expect(res.body.missing.required).toEqual(
-        expect.arrayContaining(['legalEntityType', 'foundingYear', 'knowledgeBasedStatus', 'productsServices']),
+        expect.arrayContaining(['classification', 'knowledgeBasedStatus', 'productsServices']),
       )
+      // No longer asked for, so never required.
+      for (const removed of ['legalEntityType', 'foundingYear', 'status']) {
+        expect(res.body.missing.required).not.toContain(removed)
+      }
       expect(res.body.missing.required).not.toContain('registrationNumber')
       expect(res.body.missing.optional).toContain('website')
       expect(res.body.missing.canRequestVerification).toBe(false)
@@ -316,6 +393,63 @@ describe('Dashboard Profile Endpoints', () => {
       expect(profile.body.contacts.email).toBe('')
       expect(profile.body.executives).toEqual([])
       expect(profile.body.dossier.website).toBe('')
+    })
+
+    it('takes knowledge-based status and classification only from their lists, keeping an older value', async () => {
+      const { app, headers, companyStore, company } = await createDossierTestApp()
+
+      for (const [field, value] of [['knowledgeBasedStatus', 'ساختگی'], ['classification', 'ساختگی']] as const) {
+        const res = await request(app).patch('/profile/dossier').set(headers).send({ [field]: value })
+        expect(res.status).toBe(400)
+        expect(res.body.error).toBe(`invalid_${field}`)
+      }
+      const ok = await request(app).patch('/profile/dossier').set(headers)
+        .send({ knowledgeBasedStatus: 'دانش‌بنیان نوع دو', classification: 'صنعتی' })
+      expect(ok.status).toBe(200)
+
+      await companyStore.update(company.id, { classification: 'فناوری اطلاعات' })
+      const unchanged = await request(app).patch('/profile/dossier').set(headers)
+        .send({ classification: 'فناوری اطلاعات', activityDomain: 'انرژی' })
+      expect(unchanged.status).toBe(200)
+    })
+
+    it('saves a key member\'s education and degree place', async () => {
+      const { app, headers } = await createDossierTestApp()
+      const member = { name: 'سارا محمدی', role: 'مدیر فنی', education: 'کارشناسی ارشد برق', degreePlace: 'دانشگاه شیراز' }
+
+      const res = await request(app).patch('/profile/dossier').set(headers).send({ keyMembers: [member] })
+
+      expect(res.status).toBe(200)
+      expect(res.body.dossier.keyMembers).toEqual([member])
+    })
+
+    it('links a product or certificate only to this company\'s own file of that kind', async () => {
+      const { app, headers, company, dossierDocuments } = await createDossierTestApp()
+      const productFile = dossierDocuments.add(company.id, 'productsServices', 'product.png')
+      const certificateFile = dossierDocuments.add(company.id, 'certificatesLicenses', 'iso.pdf')
+      const otherCompanyFile = dossierDocuments.add('other-company', 'productsServices', 'other.png')
+
+      const saved = await request(app).patch('/profile/dossier').set(headers).send({
+        productsServices: [{ title: 'سامانه ابری', documentId: productFile.id }, 'مشاوره'],
+        certificatesLicenses: [{ title: 'ISO 9001', documentId: certificateFile.id }],
+      })
+      expect(saved.status).toBe(200)
+      expect(saved.body.dossier.productsServices).toEqual([
+        { title: 'سامانه ابری', documentId: productFile.id },
+        { title: 'مشاوره' },
+      ])
+      expect(saved.body.dossier.certificatesLicenses).toEqual([{ title: 'ISO 9001', documentId: certificateFile.id }])
+      expect(saved.body.missing.optional).not.toContain('certificatesLicenses')
+
+      for (const body of [
+        { productsServices: [{ title: 'x', documentId: otherCompanyFile.id }] },
+        { productsServices: [{ title: 'x', documentId: certificateFile.id }] },
+        { certificatesLicenses: [{ title: 'x', documentId: 'missing' }] },
+      ]) {
+        const res = await request(app).patch('/profile/dossier').set(headers).send(body)
+        expect(res.status).toBe(400)
+        expect(res.body.error).toMatch(/^invalid_(productsServices|certificatesLicenses)_document$/)
+      }
     })
 
     it('rejects a founding year that is not a plausible four-digit year', async () => {

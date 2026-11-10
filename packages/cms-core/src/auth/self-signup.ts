@@ -8,6 +8,29 @@
  * because their phone and username are unique.
  */
 
+/**
+ * The legal forms a company can have: the seven of Article 20 of the Commercial
+ * Code (the cooperative form included). The registration form offers only these.
+ * Defined here, with no imports, because the backend type-checks this file
+ * under node16 resolution; `collections/companyTypes.ts` re-exports them.
+ */
+export const COMPANY_LEGAL_FORMS = [
+  'سهامی عام',
+  'سهامی خاص',
+  'مسئولیت محدود',
+  'تضامنی',
+  'مختلط غیرسهامی',
+  'مختلط سهامی',
+  'نسبی',
+  'تعاونی',
+] as const
+
+/**
+ * Every value `companies.type` accepts: the legal forms, plus the earlier
+ * knowledge-based/startup/other values so existing records keep their value.
+ */
+export const COMPANY_TYPE_OPTIONS = [...COMPANY_LEGAL_FORMS, 'دانش‌بنیان', 'استارتاپ', 'سایر'] as const
+
 export interface SelfSignupBody {
   [key: string]: unknown
   // Person → `users`
@@ -204,10 +227,24 @@ export function isValidLegalEntityNationalId(nationalId: string): boolean {
 }
 
 /** The specific rule a present field failed. Stable values for client mapping. */
-export type SignupFieldReason = NationalIdProblem | 'mobile_format' | 'email_format'
+export type SignupFieldReason =
+  | NationalIdProblem
+  | 'mobile_format'
+  | 'email_format'
+  | 'registration_number_digits'
+  | 'registration_number_length'
+  | 'economic_code_digits'
+  | 'economic_code_length'
+  | 'company_type'
 
 export interface SignupFieldProblem {
-  field: 'phone' | 'email' | 'companyNationalId'
+  field:
+    | 'phone'
+    | 'email'
+    | 'companyNationalId'
+    | 'companyRegistrationNumber'
+    | 'companyEconomicCode'
+    | 'companyType'
   reason: SignupFieldReason
 }
 
@@ -223,6 +260,25 @@ export function signupFieldProblems(body: SelfSignupBody): SignupFieldProblem[] 
   const nationalId = digits(body.companyNationalId)
   const nationalIdReason = nationalId === undefined ? undefined : nationalIdProblem(nationalId)
   if (nationalIdReason) problems.push({ field: 'companyNationalId', reason: nationalIdReason })
+
+  // Optional here (older clients), but a supplied value must be well formed.
+  const registrationNumber = digits(body.companyRegistrationNumber)
+  if (registrationNumber !== undefined) {
+    if (!/^\d+$/.test(registrationNumber))
+      problems.push({ field: 'companyRegistrationNumber', reason: 'registration_number_digits' })
+    else if (registrationNumber.length < 3 || registrationNumber.length > 6)
+      problems.push({ field: 'companyRegistrationNumber', reason: 'registration_number_length' })
+  }
+  const economicCode = digits(body.companyEconomicCode)
+  if (economicCode !== undefined) {
+    if (!/^\d+$/.test(economicCode))
+      problems.push({ field: 'companyEconomicCode', reason: 'economic_code_digits' })
+    else if (economicCode.length !== 11)
+      problems.push({ field: 'companyEconomicCode', reason: 'economic_code_length' })
+  }
+  const companyType = str(body.companyType)
+  if (companyType !== undefined && !(COMPANY_TYPE_OPTIONS as readonly string[]).includes(companyType))
+    problems.push({ field: 'companyType', reason: 'company_type' })
   return problems
 }
 
@@ -237,6 +293,43 @@ const INVALID_FIELD_MESSAGES: Record<SignupFieldReason, string> = {
   digits_only: 'Invalid national ID: only digits are allowed.',
   length: 'Invalid national ID: a company national ID has exactly 11 digits.',
   checksum: 'Invalid national ID: the check digit does not match.',
+  registration_number_digits: 'Invalid registration number: only digits are allowed.',
+  registration_number_length: 'Invalid registration number: expected 3 to 6 digits.',
+  economic_code_digits: 'Invalid economic code: only digits are allowed.',
+  economic_code_length: 'Invalid economic code: expected exactly 11 digits.',
+  company_type: 'Invalid company type: choose one of the listed legal forms.',
+}
+
+/** The register form's field name for each company record field Payload may reject. */
+const COMPANY_FIELD_BY_PATH: Record<string, string> = {
+  name: 'companyName',
+  nationalId: 'companyNationalId',
+  activityDomain: 'activityDomain',
+  registrationNumber: 'companyRegistrationNumber',
+  type: 'companyType',
+  province: 'companyProvince',
+  city: 'companyCity',
+  establishmentDate: 'companyEstablishmentDate',
+  status: 'companyStatus',
+  economicCode: 'companyEconomicCode',
+}
+
+/**
+ * The company fields a Payload ValidationError names, when it names only company
+ * fields (so it says nothing about which account exists). Lets the form show the
+ * error on the field instead of a system failure.
+ */
+function companyFieldsRejected(error: unknown): string[] {
+  if (!error || typeof error !== 'object') return []
+  const e = error as { name?: unknown; data?: { errors?: unknown }; errors?: unknown }
+  if (e.name !== 'ValidationError') return []
+  const entries = Array.isArray(e.data?.errors) ? e.data.errors : Array.isArray(e.errors) ? e.errors : []
+  if (entries.length === 0) return []
+  const fields = entries.map((entry) => {
+    const path = (entry as { path?: unknown; field?: unknown })?.path ?? (entry as { field?: unknown })?.field
+    return typeof path === 'string' ? COMPANY_FIELD_BY_PATH[path.split('.').at(-1) ?? ''] : undefined
+  })
+  return fields.every((field): field is string => field !== undefined) ? fields : []
 }
 
 /** A national id that already belongs to a company. */
@@ -328,6 +421,15 @@ export interface SelfSignupStore {
   createUser(fields: Record<string, string>): Promise<SelfSignupUser>
   createCompany(fields: Record<string, string | number>): Promise<SelfSignupCompany>
   /**
+   * Optional: whether the (normalized) phone and email already belong to an
+   * account. When supplied, a taken phone/email is reported on its own field
+   * before any write, so the form can show it on the step that asks for it.
+   */
+  identityTaken?(identity: { phone?: string; email?: string }): Promise<{
+    phone: boolean
+    email: boolean
+  }>
+  /**
    * Optional: signs the newly created person in through the ordinary password
    * login, after the signup transaction has committed. Only the public
    * `/self-signup` endpoint supplies it; an owner enrolling a company must not
@@ -392,19 +494,95 @@ const duplicateNationalId = (): SelfSignupResponse => ({
   },
 })
 
+type SignupConflict = { code: string; field: string; message: string }
+
+const PHONE_TAKEN: SignupConflict = {
+  code: 'phone_taken',
+  field: 'phone',
+  message: 'This mobile number is already registered.',
+}
+const EMAIL_TAKEN: SignupConflict = {
+  code: 'email_taken',
+  field: 'email',
+  message: 'This email is already registered.',
+}
+const NATIONAL_ID_TAKEN: SignupConflict = {
+  code: 'duplicate_national_id',
+  field: 'companyNationalId',
+  message: 'This company is already registered.',
+}
+
 /**
- * A user-level conflict (phone/email/username) is intentionally collapsed into
- * the same generic rejection as any other validation failure. The signup
- * response must not tell an anonymous visitor which account already exists.
+ * The phone, email and company national ID in `body` that already exist. Only
+ * well-formed values are looked up; a malformed one is the field's syntax
+ * error, not a conflict.
+ */
+async function signupConflicts(
+  body: SelfSignupBody,
+  store: Pick<SelfSignupStore, 'companyNationalIdExists' | 'identityTaken'>,
+): Promise<SignupConflict[]> {
+  const wellFormed = new Set(['phone', 'email', 'companyNationalId'])
+  for (const { field } of signupFieldProblems(body)) wellFormed.delete(field)
+
+  const nationalId = wellFormed.has('companyNationalId') ? digits(body.companyNationalId) : undefined
+  const phone = wellFormed.has('phone') ? digits(body.phone) : undefined
+  const mail = wellFormed.has('email') ? email(body.email) : undefined
+
+  const conflicts: SignupConflict[] = []
+  if (nationalId && (await store.companyNationalIdExists(nationalId)))
+    conflicts.push(NATIONAL_ID_TAKEN)
+  if (store.identityTaken && (phone || mail)) {
+    const taken = await store.identityTaken({ phone, email: mail })
+    if (phone && taken.phone) conflicts.push(PHONE_TAKEN)
+    if (mail && taken.email) conflicts.push(EMAIL_TAKEN)
+  }
+  return conflicts
+}
+
+/**
+ * `/signup-availability`: lets the register form stop on the step that asks
+ * for a phone, email or company national ID that is already registered,
+ * instead of failing only at the final submit. Any subset of the three may be
+ * sent; the answer names each taken field (409) or reports none (200).
+ */
+export async function checkSignupAvailability(
+  input: unknown,
+  store: Pick<SelfSignupStore, 'companyNationalIdExists' | 'identityTaken'>,
+): Promise<SelfSignupResponse> {
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    return { status: 400, body: { errors: [{ code: 'invalid_request', message: 'Expected an object.' }] } }
+  const body = input as SelfSignupBody
+  const query: SelfSignupBody = {
+    phone: typeof body.phone === 'string' ? body.phone : undefined,
+    email: typeof body.email === 'string' ? body.email : undefined,
+    companyNationalId:
+      typeof body.companyNationalId === 'string' ? body.companyNationalId : undefined,
+  }
+  const conflicts = await signupConflicts(query, store)
+  return conflicts.length > 0 ? { status: 409, body: { errors: conflicts } } : { status: 200, body: {} }
+}
+
+/**
+ * A user-level conflict (phone/email/username) the pre-check did not see (a
+ * concurrent signup) cannot be assigned honestly to one field, so it falls back
+ * to a generic rejection.
  */
 function isAccountConflict(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false
-  const e = error as { code?: unknown; detail?: unknown; errors?: unknown; message?: unknown }
+  const e = error as {
+    code?: unknown
+    detail?: unknown
+    errors?: unknown
+    data?: { errors?: unknown }
+    message?: unknown
+  }
   if (asText(e.code) === '23505') return true
-  if (Array.isArray(e.errors)) {
-    return e.errors.some((entry) => {
+  // Payload's ValidationError carries its field errors in `data.errors`.
+  const entries = Array.isArray(e.errors) ? e.errors : Array.isArray(e.data?.errors) ? e.data.errors : null
+  if (entries) {
+    return entries.some((entry) => {
       if (!entry || typeof entry !== 'object') return false
-      const field = (entry as { field?: unknown; path?: unknown })
+      const field = entry as { field?: unknown; path?: unknown }
       return [field.field, field.path].some((value) => /^(phone|email|username)$/i.test(asText(value)))
     })
   }
@@ -453,8 +631,8 @@ export async function runSelfSignup(
     }
   }
 
-  const nationalId = normalizeDigits(String(body.companyNationalId).trim())
-  if (await store.companyNationalIdExists(nationalId)) return duplicateNationalId()
+  const conflicts = await signupConflicts(body, store)
+  if (conflicts.length > 0) return { status: 409, body: { errors: conflicts } }
 
   const userFields = pickUserFields(body)
   let result: { user: SelfSignupUser; company: SelfSignupCompany }
@@ -470,6 +648,19 @@ export async function runSelfSignup(
     if (isAccountConflict(error)) return signupRejected()
     const payloadErrors = (error as { errors?: unknown })?.errors
     if (Array.isArray(payloadErrors) && payloadErrors.length > 0) return signupRejected()
+    const rejectedFields = companyFieldsRejected(error)
+    if (rejectedFields.length > 0) {
+      return {
+        status: 400,
+        body: {
+          errors: rejectedFields.map((field) => ({
+            code: 'invalid_field',
+            field,
+            message: `Invalid value for ${field}.`,
+          })),
+        },
+      }
+    }
     return {
       status: 500,
       body: {

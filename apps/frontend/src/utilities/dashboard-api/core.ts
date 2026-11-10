@@ -122,6 +122,9 @@ export interface CompanyInfoDto {
   registrationNumber: string
   economicCode: string
   nationalId: string
+  /** Optional for responses from a backend that predates them. */
+  province?: string
+  city?: string
 }
 
 export interface ContactInfoDto {

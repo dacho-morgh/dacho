@@ -50,6 +50,8 @@ export type InputProps = Omit<React.ComponentProps<'input'>, 'size'> &
     endIcon?: React.ReactNode
     containerClassName?: string
     wrapperClassName?: string
+    /** Keep `aria-required` for assistive tech but draw no `*` (a form where every field is required). */
+    hideRequiredMark?: boolean
   }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -58,6 +60,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       className,
       containerClassName,
       wrapperClassName,
+      hideRequiredMark,
       type = 'text',
       variant,
       inputSize = 'default',
@@ -149,7 +152,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className="cursor-pointer select-none"
           >
             {label}
-            {isRequired ? <RequiredMark className="ms-0.5" /> : null}
+            {isRequired && !hideRequiredMark ? <RequiredMark className="ms-0.5" /> : null}
           </Typography>
         )}
 

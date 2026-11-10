@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button'
 import { RequiredMark } from '@/components/ui/field'
 import { Typography } from '@/components/ui/typography'
 import {
-  DOCUMENT_ACCEPT,
-  DOCUMENT_FORMATS_MESSAGE,
+  documentAccept,
+  documentFormatsMessage,
   DOCUMENT_SIZE_MESSAGE,
   DocumentApiError,
   DocumentUploadCancelled,
@@ -234,7 +234,7 @@ export function PrivateDocumentField({
     const selected = Array.from(files)
     for (const file of selected) {
       if (scopeKeyRef.current !== batchScope) return
-      const localError = validateSelectedFile(file)
+      const localError = validateSelectedFile(file, category)
       if (localError) {
         setUploads((current) => [
           ...current,
@@ -275,7 +275,7 @@ export function PrivateDocumentField({
         </Typography>
         {readOnly ? null : (
           <Typography variant="12/regular" color="neutral-500">
-            {DOCUMENT_FORMATS_MESSAGE} · {DOCUMENT_SIZE_MESSAGE}
+            {documentFormatsMessage(category)} · {DOCUMENT_SIZE_MESSAGE}
           </Typography>
         )}
       </div>
@@ -430,7 +430,7 @@ export function PrivateDocumentField({
           id={inputId}
           type="file"
           className="sr-only"
-          accept={DOCUMENT_ACCEPT}
+          accept={documentAccept(category)}
           multiple
           disabled={!uploadAllowed || pending}
           onChange={(event) => {

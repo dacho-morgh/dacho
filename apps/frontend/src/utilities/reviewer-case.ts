@@ -152,5 +152,11 @@ export function answerText(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
   if (typeof value === 'boolean') return value ? 'بله' : 'خیر'
   if (Array.isArray(value) && value.every((item) => typeof item !== 'object')) return value.join('، ')
+  // Products and services are `{ title, documentId? }` records; show their titles.
+  if (Array.isArray(value) && value.every(hasTitle)) return value.map((item) => item.title).join('، ')
   return typeof value === 'object' ? JSON.stringify(value) : String(value)
+}
+
+function hasTitle(item: unknown): item is { title: string } {
+  return typeof item === 'object' && item !== null && typeof (item as { title?: unknown }).title === 'string'
 }

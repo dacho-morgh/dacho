@@ -21,7 +21,7 @@ describe('T59: any company dossier edit invalidates verification', () => {
         name: 'شرکت فناور پیشرو',
         nationalId: '10101010101',
         registrationNumber: '998877',
-        economicCode: '411111111111',
+        economicCode: '41111111111',
         type: 'سهامی خاص',
         status: 'فعال',
         province: 'تهران',
@@ -30,7 +30,7 @@ describe('T59: any company dossier edit invalidates verification', () => {
         representativeId: rep.id,
         legalEntityType: 'سهامی خاص',
         website: 'https://example.invalid',
-        productsServices: ['سامانه ابری'],
+        productsServices: [{ title: 'سامانه ابری' }],
         executives: [{ position: 'مدیرعامل', name: 'علی رضایی' }],
         addresses: [
           { id: 'addr-1', title: 'دفتر مرکزی', province: 'تهران', city: 'تهران', postalCode: '1234567890', address: 'خیابان آزادی' },
@@ -57,7 +57,7 @@ describe('T59: any company dossier edit invalidates verification', () => {
 
   it('returns an approved company to re-verification when a non-identity company field changes', async () => {
     const { app, headers, current } = await setup()
-    await request(app).patch('/profile').set(headers).send({ company: { economicCode: '422222222222' } }).expect(200)
+    await request(app).patch('/profile').set(headers).send({ company: { economicCode: '42222222222' } }).expect(200)
     expect(await current()).toMatchObject({ status: 'returned', reason: COMPANY_EDIT_REVERIFICATION_REASON })
   })
 
@@ -75,7 +75,7 @@ describe('T59: any company dossier edit invalidates verification', () => {
 
     const products = await setup()
     await request(products.app).patch('/profile').set(products.headers)
-      .send({ dossier: { productsServices: ['سامانه ابری', 'مشاوره'] } }).expect(200)
+      .send({ dossier: { productsServices: [{ title: 'سامانه ابری' }, { title: 'مشاوره' }] } }).expect(200)
     expect((await products.current())?.status).toBe('returned')
   })
 
@@ -98,9 +98,9 @@ describe('T59: any company dossier edit invalidates verification', () => {
   it('keeps approval when a save carries no real change', async () => {
     const { app, headers, current } = await setup()
     await request(app).patch('/profile').set(headers).send({
-      company: { economicCode: '411111111111', name: 'شرکت فناور پیشرو' },
+      company: { economicCode: '41111111111', name: 'شرکت فناور پیشرو' },
       executives: [{ role: 'مدیرعامل', name: 'علی رضایی' }],
-      dossier: { website: 'https://example.invalid', productsServices: ['سامانه ابری'] },
+      dossier: { website: 'https://example.invalid', productsServices: [{ title: 'سامانه ابری' }] },
     }).expect(200)
     await request(app).patch('/profile/dossier').set(headers).send({ website: 'https://example.invalid' }).expect(200)
     await request(app).put('/profile/addresses/addr-1').set(headers).send({ address: 'خیابان آزادی' }).expect(200)
@@ -115,13 +115,13 @@ describe('T59: any company dossier edit invalidates verification', () => {
 
   it('leaves an already returned verification and its reason untouched', async () => {
     const { app, headers, current } = await setup('returned')
-    await request(app).patch('/profile').set(headers).send({ company: { economicCode: '433333333333' } }).expect(200)
+    await request(app).patch('/profile').set(headers).send({ company: { economicCode: '43333333333' } }).expect(200)
     expect(await current()).toMatchObject({ status: 'returned', reason: 'مدارک ناقص است' })
   })
 
   it('reports the new state and the reason on GET /profile/verification after the edit', async () => {
     const { app, headers } = await setup()
-    await request(app).patch('/profile/dossier').set(headers).send({ productsServices: ['تجهیزات'] }).expect(200)
+    await request(app).patch('/profile/dossier').set(headers).send({ productsServices: [{ title: 'تجهیزات' }] }).expect(200)
     const res = await request(app).get('/profile/verification').set(headers).expect(200)
     expect(res.body).toMatchObject({ status: 'returned', reason: COMPANY_EDIT_REVERIFICATION_REASON })
   })

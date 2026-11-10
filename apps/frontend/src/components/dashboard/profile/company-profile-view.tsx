@@ -9,8 +9,11 @@ import {
   DashboardTrashIcon,
 } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ComboboxField } from '@/components/ui/combobox-field'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { JalaliDatePicker } from '@/components/ui/jalali-date-picker'
 import { SelectField } from '@/components/ui/select-field'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -33,6 +36,18 @@ import {
   updateProfile,
 } from '@/utilities/dashboard-api'
 import { citiesOfProvince, IRAN_PROVINCES } from '@/data/iran-locations'
+import {
+  CENTER_ESTABLISHED,
+  CITY_NEEDS_PROVINCE_PLACEHOLDER,
+  CLASSIFICATION_OPTIONS,
+  KNOWLEDGE_BASED_STATUS_OPTIONS,
+  COMPANY_BASIC_LABELS,
+  COMPANY_BASIC_PLACEHOLDERS,
+  COMPANY_TYPES,
+  companyBasicErrors,
+  PROVINCE_NAMES,
+  type CompanyBasicField,
+} from '@/utilities/company-basic-rules'
 import { buildCompanyDossierPatch } from '@/utilities/dossier-edits'
 import { CompanyVerificationCard, editWithdrawsVerification } from './company-verification-card'
 import { InlineProfileField } from './inline-profile-field'
@@ -43,6 +58,37 @@ import { toast } from 'sonner'
 /** A value saved before the dropdowns existed (free text) stays selectable until changed. */
 function withCurrent(options: readonly string[], current: string): readonly string[] {
   return current && !options.includes(current) ? [current, ...options] : options
+}
+
+/** Where each registration field's input lives, so a failed save can focus it. */
+const basicFieldId: Record<CompanyBasicField, string> = {
+  name: 'company-basic-name',
+  activityDomain: 'company-basic-activityDomain',
+  registrationNumber: 'company-basic-registrationNumber',
+  type: 'company-basic-type',
+  province: 'company-basic-province',
+  city: 'company-basic-city',
+  establishmentDate: 'company-basic-establishmentDate',
+  economicCode: 'company-basic-economicCode',
+}
+
+/** The registration-form order, used to focus the first field with an error. */
+const basicFieldOrder = Object.keys(basicFieldId) as CompanyBasicField[]
+
+/** The picker and date controls share the profile cell's label style. */
+const profileControlClassName =
+  'gap-2 [&>label]:text-sm [&>label]:leading-6 [&>label]:font-semibold [&>label]:text-neutral-400'
+
+/** Numeric registration fields are stored with ASCII digits, as signup stores them. */
+function normalizeCompanyInfo(company: CompanyInfoDto): CompanyInfoDto {
+  const digits = (value: string) => toEnglishDigits(value.trim())
+  return {
+    ...company,
+    name: company.name.trim(),
+    registrationNumber: digits(company.registrationNumber),
+    economicCode: digits(company.economicCode),
+    establishmentDate: digits(company.establishmentDate),
+  }
 }
 
 const emptyAddress: Omit<AddressDto, 'id'> = {
@@ -103,6 +149,10 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
   const [basicForm, setBasicForm] = useState<CompanyInfoDto>(initialProfile.company)
   const [isEditingBasic, setIsEditingBasic] = useState(false)
   const [isSavingBasic, setIsSavingBasic] = useState(false)
+  const [basicErrors, setBasicErrors] = useState<Partial<Record<CompanyBasicField, string>>>({})
+  const [dossierErrors, setDossierErrors] = useState<
+    Partial<Record<'knowledgeBasedStatus' | 'classification', string>>
+  >({})
   const basicSaveLock = useRef(false)
   const dossierAtEdit = useRef(initialDossier?.dossier ?? emptyDossier)
   const refreshSequence = useRef(0)
@@ -202,14 +252,54 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
     setBasicForm({ ...profile.company })
     setDossierForm({ ...dossier })
     dossierAtEdit.current = dossier
+    setBasicErrors({})
+    setDossierErrors({})
     setError(null)
     setIsEditingBasic(true)
   }
+
+  const setBasicValue = <Field extends keyof CompanyInfoDto>(field: Field, value: CompanyInfoDto[Field]) => {
+    setBasicForm((current) => ({ ...current, [field]: value }))
+    if (field in basicFieldId) clearBasicError(field as CompanyBasicField)
+  }
+
+  const clearDossierError = (field: 'knowledgeBasedStatus' | 'classification') =>
+    setDossierErrors((current) => {
+      if (!current[field]) return current
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
+
+  /**
+   * The checkbox always gives an answer: ticked keeps an earlier description or
+   * stores the standard one; unticked records that the company is not established.
+   */
+  const setCenterEstablished = (established: boolean) => {
+    const withoutCenter = dossierForm.notAvailable.filter((item) => item !== 'centerEstablishment')
+    setDossierForm({
+      ...dossierForm,
+      centerEstablishment: established
+        ? dossierAtEdit.current.centerEstablishment.trim() || CENTER_ESTABLISHED
+        : '',
+      notAvailable: established ? withoutCenter : [...withoutCenter, 'centerEstablishment'],
+    })
+  }
+
+  const clearBasicError = (field: CompanyBasicField) =>
+    setBasicErrors((current) => {
+      if (!current[field]) return current
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
 
   const cancelBasicEdit = () => {
     if (basicSaveLock.current) return
     setBasicForm({ ...profile.company })
     setDossierForm({ ...dossier })
+    setBasicErrors({})
+    setDossierErrors({})
     setError(null)
     setIsEditingBasic(false)
   }
@@ -219,7 +309,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
    * company has none. An absence answer saved earlier stays until a value is typed.
    */
   const setOptionalDossierValue = (
-    field: 'website' | 'centerEstablishment' | 'insuredEmployeeCount',
+    field: 'website' | 'insuredEmployeeCount',
     value: string | number | null,
   ) => {
     const filled = value !== null && value !== ''
@@ -234,22 +324,38 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
 
   const saveBasic = async () => {
     if (!dossierLoaded || basicSaveLock.current || documentsPending) return
+
+    // The registration rules: the same fields are checked as on the register page.
+    const fieldErrors = companyBasicErrors(
+      {
+        name: basicForm.name,
+        activityDomain: dossierForm.activityDomain,
+        registrationNumber: basicForm.registrationNumber,
+        type: basicForm.type,
+        province: basicForm.province ?? '',
+        city: basicForm.city ?? '',
+        establishmentDate: basicForm.establishmentDate,
+        economicCode: basicForm.economicCode,
+      },
+      profile.company.type,
+    )
+    setBasicErrors(fieldErrors)
+    const choiceErrors: Partial<Record<'knowledgeBasedStatus' | 'classification', string>> = {}
+    if (!dossierForm.knowledgeBasedStatus.trim()) choiceErrors.knowledgeBasedStatus = 'وضعیت دانش‌بنیانی را انتخاب کنید.'
+    if (!dossierForm.classification.trim()) choiceErrors.classification = 'طبقه‌بندی شرکت را انتخاب کنید.'
+    setDossierErrors(choiceErrors)
+    const firstInvalid =
+      basicFieldOrder.map((field) => (fieldErrors[field] ? basicFieldId[field] : undefined)).find(Boolean) ??
+      (Object.keys(choiceErrors) as Array<keyof typeof choiceErrors>).map((field) => `company-basic-${field}`)[0]
+    if (firstInvalid) {
+      setError('لطفاً موارد مشخص‌شده را اصلاح کنید.')
+      requestAnimationFrame(() => document.getElementById(firstInvalid)?.focus())
+      return
+    }
+
     basicSaveLock.current = true
     setError(null)
     setIsSavingBasic(true)
-
-    // Validate foundingYear if provided
-    let foundingYearVal = dossierForm.foundingYear.trim()
-    if (foundingYearVal) {
-      foundingYearVal = toEnglishDigits(foundingYearVal)
-      const yearNum = Number(foundingYearVal)
-      if (!/^\d{4}$/.test(foundingYearVal) || yearNum < 1200 || yearNum > 2100) {
-        setError('سال تأسیس باید یک عدد چهاررقمی معتبر (مثلاً ۱۳۸۵) باشد.')
-        setIsSavingBasic(false)
-        basicSaveLock.current = false
-        return
-      }
-    }
 
     try {
       const latest = await fetchProfileDossier()
@@ -265,12 +371,14 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
       }
       const dossierPatch = buildCompanyDossierPatch(
         dossierAtEdit.current,
-        { ...dossierForm, foundingYear: foundingYearVal },
+        dossierForm,
         latest.dossier,
       )
+      const normalizedBasic = normalizeCompanyInfo(basicForm)
       const companyPatch: Partial<CompanyInfoDto> = {}
-      for (const field of Object.keys(basicForm) as (keyof CompanyInfoDto)[]) {
-        if (basicForm[field] !== profile.company[field]) companyPatch[field] = basicForm[field]
+      for (const field of Object.keys(normalizedBasic) as (keyof CompanyInfoDto)[]) {
+        if ((normalizedBasic[field] ?? '') !== (profile.company[field] ?? ''))
+          (companyPatch as Record<string, unknown>)[field] = normalizedBasic[field]
       }
       if (
         (Object.keys(companyPatch).length > 0 || Object.keys(dossierPatch).length > 0) &&
@@ -430,7 +538,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
   const cityOptions = withCurrent(citiesOfProvince(addressForm.province), addressForm.city)
   const displayedDossier = isEditingBasic ? dossierForm : dossier
   const isWebsiteAbsent = !isEditingBasic && displayedDossier.notAvailable.includes('website')
-  const isCenterAbsent = !isEditingBasic && displayedDossier.notAvailable.includes('centerEstablishment')
+  const centerEstablished = Boolean((isEditingBasic ? dossierForm : dossier).centerEstablishment.trim())
   const isInsuredAbsent = !isEditingBasic && displayedDossier.notAvailable.includes('insuredEmployeeCount')
 
   if (!dossierLoaded) {
@@ -504,53 +612,79 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
           data-slot="basic-info-grid"
           className="grid grid-cols-1 items-stretch gap-x-4 gap-y-5 md:grid-cols-2"
         >
+          {/* Figma 238:4213 order; the registration fields use the register form's controls and rules. */}
           <InlineProfileField
-            label="نام شرکت"
+            id={basicFieldId.name}
+            label={COMPANY_BASIC_LABELS.name}
             required
-            placeholder="نام شرکت را وارد کنید"
+            placeholder={COMPANY_BASIC_PLACEHOLDERS.name}
             value={basicForm.name}
             editing={isEditingBasic}
-            onChange={(name) => setBasicForm({ ...basicForm, name })}
+            error={basicErrors.name}
+            onChange={(name) => setBasicValue('name', name)}
           />
+          {isEditingBasic ? (
+            <div data-slot="profile-field" className="flex h-full min-w-0 flex-col rounded-lg border border-neutral-100 p-2">
+              <JalaliDatePicker
+                id={basicFieldId.establishmentDate}
+                label="تاریخ تاسیس"
+                required
+                wrapperClassName={profileControlClassName}
+                error={basicErrors.establishmentDate}
+                placeholder={COMPANY_BASIC_PLACEHOLDERS.establishmentDate}
+                value={basicForm.establishmentDate}
+                onChange={(establishmentDate) => setBasicValue('establishmentDate', establishmentDate)}
+              />
+            </div>
+          ) : (
+            <InlineProfileField
+              label="تاریخ تاسیس"
+              value={basicForm.establishmentDate}
+              editing={false}
+              dir="auto"
+              onChange={() => {}}
+            />
+          )}
+          {isEditingBasic ? (
+            <div data-slot="profile-field" className="flex h-full min-w-0 flex-col rounded-lg border border-neutral-100 p-2">
+              <ComboboxField
+                id={basicFieldId.type}
+                label={COMPANY_BASIC_LABELS.type}
+                required
+                wrapperClassName={profileControlClassName}
+                error={basicErrors.type}
+                options={withCurrent(COMPANY_TYPES, profile.company.type)}
+                placeholder={COMPANY_BASIC_PLACEHOLDERS.type}
+                value={basicForm.type}
+                onChange={(type) => setBasicValue('type', type)}
+              />
+            </div>
+          ) : (
+            <InlineProfileField label={COMPANY_BASIC_LABELS.type} value={basicForm.type} editing={false} onChange={() => {}} />
+          )}
           <InlineProfileField
-            label="تاریخ تاسیس"
-            placeholder="مثال: ۱۳۸۵/۰۱/۱۵"
-            value={basicForm.establishmentDate}
-            editing={isEditingBasic}
-            dir="auto"
-            onChange={(establishmentDate) => setBasicForm({ ...basicForm, establishmentDate })}
-          />
-          <InlineProfileField
-            label="وضعیت شرکت"
+            id={basicFieldId.registrationNumber}
+            label={COMPANY_BASIC_LABELS.registrationNumber}
             required
-            placeholder="مثال: فعال"
-            value={basicForm.status}
-            editing={isEditingBasic}
-            onChange={(status) => setBasicForm({ ...basicForm, status })}
-          />
-          <InlineProfileField
-            label="نوع شرکت"
-            placeholder="نوع شرکت"
-            value={basicForm.type}
-            editing={isEditingBasic}
-            onChange={(type) => setBasicForm({ ...basicForm, type })}
-          />
-          <InlineProfileField
-            label="شماره ثبت"
-            required
-            placeholder="شماره ثبت شرکت"
+            placeholder={COMPANY_BASIC_PLACEHOLDERS.registrationNumber}
             value={basicForm.registrationNumber}
             editing={isEditingBasic}
+            error={basicErrors.registrationNumber}
+            inputMode="numeric"
             dir="ltr"
-            onChange={(registrationNumber) => setBasicForm({ ...basicForm, registrationNumber })}
+            onChange={(registrationNumber) => setBasicValue('registrationNumber', registrationNumber)}
           />
           <InlineProfileField
-            label="کد اقتصادی"
-            placeholder="کد اقتصادی ۱۲ رقمی"
+            id={basicFieldId.economicCode}
+            label={COMPANY_BASIC_LABELS.economicCode}
+            required
+            placeholder={COMPANY_BASIC_PLACEHOLDERS.economicCode}
             value={basicForm.economicCode}
             editing={isEditingBasic}
+            error={basicErrors.economicCode}
+            inputMode="numeric"
             dir="ltr"
-            onChange={(economicCode) => setBasicForm({ ...basicForm, economicCode })}
+            onChange={(economicCode) => setBasicValue('economicCode', economicCode)}
           />
           <InlineProfileField
             label="شناسه ملی"
@@ -559,50 +693,110 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             dir="ltr"
             onChange={() => {}}
           />
+          {isEditingBasic ? (
+            <div data-slot="profile-field" className="flex h-full min-w-0 flex-col rounded-lg border border-neutral-100 p-2">
+              <ComboboxField
+                id={basicFieldId.province}
+                label={COMPANY_BASIC_LABELS.province}
+                required
+                wrapperClassName={profileControlClassName}
+                error={basicErrors.province}
+                options={withCurrent(PROVINCE_NAMES, profile.company.province ?? '')}
+                placeholder={COMPANY_BASIC_PLACEHOLDERS.province}
+                value={basicForm.province ?? ''}
+                onChange={(province) => {
+                  // The city list depends on the province, as on the register form.
+                  if (province !== (basicForm.province ?? '')) {
+                    setBasicForm((current) => ({ ...current, province, city: '' }))
+                    clearBasicError('city')
+                  }
+                  clearBasicError('province')
+                }}
+              />
+            </div>
+          ) : (
+            <InlineProfileField label={COMPANY_BASIC_LABELS.province} value={basicForm.province ?? ''} editing={false} onChange={() => {}} />
+          )}
+          {isEditingBasic ? (
+            <div data-slot="profile-field" className="flex h-full min-w-0 flex-col rounded-lg border border-neutral-100 p-2">
+              <ComboboxField
+                id={basicFieldId.city}
+                label={COMPANY_BASIC_LABELS.city}
+                required
+                disabled={!basicForm.province}
+                wrapperClassName={profileControlClassName}
+                error={basicErrors.city}
+                options={citiesOfProvince(basicForm.province ?? '')}
+                placeholder={basicForm.province ? COMPANY_BASIC_PLACEHOLDERS.city : CITY_NEEDS_PROVINCE_PLACEHOLDER}
+                value={basicForm.city ?? ''}
+                onChange={(city) => setBasicValue('city', city)}
+              />
+            </div>
+          ) : (
+            <InlineProfileField label={COMPANY_BASIC_LABELS.city} value={basicForm.city ?? ''} editing={false} onChange={() => {}} />
+          )}
+          {isEditingBasic ? (
+            <div data-slot="profile-field" className="flex h-full min-w-0 flex-col rounded-lg border border-neutral-100 p-2">
+              <ComboboxField
+                id="company-basic-knowledgeBasedStatus"
+                label="وضعیت دانش‌بنیانی"
+                required
+                wrapperClassName={profileControlClassName}
+                error={dossierErrors.knowledgeBasedStatus}
+                options={withCurrent(KNOWLEDGE_BASED_STATUS_OPTIONS, dossier.knowledgeBasedStatus)}
+                placeholder="وضعیت دانش‌بنیانی را جستجو یا انتخاب کنید"
+                value={dossierForm.knowledgeBasedStatus}
+                onChange={(knowledgeBasedStatus) => {
+                  setDossierForm({ ...dossierForm, knowledgeBasedStatus })
+                  clearDossierError('knowledgeBasedStatus')
+                }}
+              />
+            </div>
+          ) : (
+            <InlineProfileField
+              label="وضعیت دانش‌بنیانی"
+              value={dossier.knowledgeBasedStatus || 'ثبت نشده'}
+              editing={false}
+              onChange={() => {}}
+            />
+          )}
+          {isEditingBasic ? (
+            <div data-slot="profile-field" className="flex h-full min-w-0 flex-col rounded-lg border border-neutral-100 p-2">
+              <ComboboxField
+                id="company-basic-classification"
+                label="طبقه‌بندی شرکت"
+                required
+                wrapperClassName={profileControlClassName}
+                error={dossierErrors.classification}
+                options={withCurrent(CLASSIFICATION_OPTIONS, dossier.classification)}
+                placeholder="طبقه‌بندی شرکت را جستجو یا انتخاب کنید"
+                value={dossierForm.classification}
+                onChange={(classification) => {
+                  setDossierForm({ ...dossierForm, classification })
+                  clearDossierError('classification')
+                }}
+              />
+            </div>
+          ) : (
+            <InlineProfileField
+              label="طبقه‌بندی شرکت"
+              value={dossier.classification || 'ثبت نشده'}
+              editing={false}
+              onChange={() => {}}
+            />
+          )}
           <InlineProfileField
-            label="نوع شخصیت حقوقی (سهامی خاص / عام / با مسئولیت محدود / ...)"
+            id={basicFieldId.activityDomain}
+            label={COMPANY_BASIC_LABELS.activityDomain}
             required
-            placeholder="مثال: سهامی خاص"
-            value={isEditingBasic ? dossierForm.legalEntityType : dossier.legalEntityType || 'ثبت نشده'}
-            editing={isEditingBasic}
-            onChange={(legalEntityType) => setDossierForm({ ...dossierForm, legalEntityType })}
-          />
-          <InlineProfileField
-            label="وضعیت دانش‌بنیانی (دانش‌بنیان نوع یک / دو / نوپا / غیر دانش‌بنیان)"
-            required
-            placeholder="مثال: دانش‌بنیان نوع یک"
-            value={
-              isEditingBasic
-                ? dossierForm.knowledgeBasedStatus
-                : dossier.knowledgeBasedStatus || 'ثبت نشده'
-            }
-            editing={isEditingBasic}
-            onChange={(knowledgeBasedStatus) => setDossierForm({ ...dossierForm, knowledgeBasedStatus })}
-          />
-          <InlineProfileField
-            label="طبقه‌بندی شرکت (نوپا / فناور / صنعتی / ...)"
-            required
-            placeholder="مثال: فناور"
-            value={isEditingBasic ? dossierForm.classification : dossier.classification || 'ثبت نشده'}
-            editing={isEditingBasic}
-            onChange={(classification) => setDossierForm({ ...dossierForm, classification })}
-          />
-          <InlineProfileField
-            label="سال تأسیس (عدد ۴ رقمی مثلاً ۱۳۸۵)"
-            required
-            placeholder="مثال: ۱۳۸۵"
-            value={isEditingBasic ? dossierForm.foundingYear : dossier.foundingYear || 'ثبت نشده'}
-            editing={isEditingBasic}
-            dir="ltr"
-            onChange={(foundingYear) => setDossierForm({ ...dossierForm, foundingYear })}
-          />
-          <InlineProfileField
-            label="حوزه فعالیت اصلی"
-            required
-            placeholder="مثال: هوش مصنوعی"
+            placeholder={COMPANY_BASIC_PLACEHOLDERS.activityDomain}
             value={isEditingBasic ? dossierForm.activityDomain : dossier.activityDomain || 'ثبت نشده'}
             editing={isEditingBasic}
-            onChange={(activityDomain) => setDossierForm({ ...dossierForm, activityDomain })}
+            error={basicErrors.activityDomain}
+            onChange={(activityDomain) => {
+              setDossierForm({ ...dossierForm, activityDomain })
+              clearBasicError('activityDomain')
+            }}
           />
           {/* Optional: left empty when the company has none. */}
           <InlineProfileField
@@ -614,14 +808,27 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             dir="ltr"
             onChange={(website) => setOptionalDossierValue('website', website)}
           />
-          <InlineProfileField
-            label="استقرار در مرکز رشد / پارک علم و فناوری"
-            placeholder="نام پارک یا مرکز رشد…"
-            value={isEditingBasic ? dossierForm.centerEstablishment : dossier.centerEstablishment}
-            editing={isEditingBasic}
-            absent={isCenterAbsent}
-            onChange={(center) => setOptionalDossierValue('centerEstablishment', center)}
-          />
+          {/* A yes/no answer: ticked stores the establishment, unticked records "not established". */}
+          <div
+            data-slot="profile-field"
+            className="flex h-full min-w-0 items-center gap-3 rounded-lg border border-neutral-100 p-2 text-start"
+          >
+            <Checkbox
+              id="company-basic-centerEstablishment"
+              checked={centerEstablished}
+              disabled={!isEditingBasic}
+              onCheckedChange={(checked) => setCenterEstablished(checked === true)}
+            />
+            <Typography
+              as="label"
+              htmlFor="company-basic-centerEstablishment"
+              variant="14/semibold"
+              color="neutral-400"
+              className={isEditingBasic ? 'cursor-pointer' : undefined}
+            >
+              استقرار در مرکز رشد / پارک علم و فناوری
+            </Typography>
+          </div>
           <InlineProfileField
             label="تعداد کارکنان بیمه‌شده"
             type="number"

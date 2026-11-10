@@ -94,10 +94,19 @@ Supported errors use the current `{ errors: [{ code, field?, message }] }`
 envelope. `missing_field` and `invalid_field` get linked Persian field errors;
 `duplicate_national_id` returns to company identity with one-representative
 wording, states that no second company was created and links to login.
-`signup_rejected` stays generic and must not identify an existing phone/email
-account; it carries a neutral "sign in instead if you already have an account"
-link. Legacy duplicate-contact responses remain supported. Unknown field errors
-never echo raw server messages.
+A phone, email or company national ID that is already registered is reported on
+its own field, on the step that asks for it: pressing continue on the company
+step and the representative step calls `POST /api/users/signup-availability`
+with that step's well-formed values, and a `409` naming `duplicate_national_id`,
+`phone_taken` or `email_taken` keeps the person on the step with the field error
+and a "sign in instead" link. The error stays until the value changes. A failed
+availability call does not block the step; the final `/self-signup` applies the
+same check before any write and answers with the same codes. (Product decision,
+2026-11-10: naming the duplicate field outweighs hiding which accounts exist.)
+`signup_rejected` remains only for an account conflict the pre-check could not
+see (a concurrent signup); it stays generic and carries the neutral "sign in
+instead if you already have an account" link. Legacy duplicate-contact
+responses remain supported. Unknown field errors never echo raw server messages.
 
 Outcome certainty follows the server, not the browser. `signup_failed` (the
 server's rolled-back transaction) is reported as "not created". A network

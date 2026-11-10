@@ -60,7 +60,7 @@ const companyStore = new InMemoryCompanyStore([
     foundingYear: '1395',
     establishmentDate: '2016',
     activityDomain: 'فناوری نفت و گاز',
-    productsServices: ['سامانه پایش'],
+    productsServices: [{ title: 'سامانه پایش' }],
     addresses: [{ title: 'دفتر مرکزی', province: 'بوشهر', city: 'بوشهر', postalCode: '7514', address: 'خیابان اصلی' }],
   },
 ])

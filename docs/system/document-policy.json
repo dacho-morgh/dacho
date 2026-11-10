@@ -1,5 +1,5 @@
 {
-  "policyVersion": "private-documents-2026-10-23-v1",
+  "policyVersion": "private-documents-2026-11-10-v2",
   "status": "approved-temporary-specification",
   "source": "User decision on 2026-10-23; runtime enforcement belongs to T10 and linked upload slices.",
   "allowedFileTypes": [
@@ -14,7 +14,14 @@
   "maxFilesPerField": null,
   "countDecision": "No numerical count cap was supplied. A field must support Word and PDF together; do not infer a one-file limit or a maximum of two.",
   "imagesAllowed": false,
-  "imageDecision": "Mentioned for later; explicitly deferred in the current Word/PDF-only policy.",
+  "imageDecision": "Images stay refused in general. User decision on 2026-11-10: a product/service file and a certificate/licence file may also be a photo (imageCategories), checked by file signature like PDF and Word.",
+  "imageFileTypes": [
+    { "format": "Image", "extension": ".jpg", "mimeType": "image/jpeg" },
+    { "format": "Image", "extension": ".jpeg", "mimeType": "image/jpeg" },
+    { "format": "Image", "extension": ".png", "mimeType": "image/png" },
+    { "format": "Image", "extension": ".webp", "mimeType": "image/webp" }
+  ],
+  "imageCategories": ["productsServices", "certificatesLicenses"],
   "categories": [
     "rfp",
     "proposal",
@@ -23,6 +30,7 @@
     "amendmentNotices",
     "catalogues",
     "certificatesLicenses",
+    "productsServices",
     "financialStatements",
     "debtFacilityEvidence",
     "taxInsuranceRecords",

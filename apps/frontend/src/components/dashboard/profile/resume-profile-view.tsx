@@ -16,7 +16,10 @@ import {
   type DossierResponseDto,
   type KeyMemberDto,
   type PastProjectCustomerDto,
+  type ProductServiceDto,
 } from '@/utilities/dashboard-api'
+import { deleteDocument } from '@/utilities/document-api'
+import { DossierItemFileLink, DossierItemFilePicker, type DossierItemFileValue } from './dossier-item-file'
 import { hasStaleDossierSlice } from '@/utilities/dossier-edits'
 import { ProfileDialog } from './profile-dialog'
 import { toast } from 'sonner'
@@ -56,10 +59,14 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
   // Products dialog state
   const [productDialog, setProductDialog] = useState(false)
   const [newProduct, setNewProduct] = useState('')
+  const [productFile, setProductFile] = useState<DossierItemFileValue | null>(null)
+  // True while a dialog's file is still uploading; saving waits for it.
+  const [itemFilePending, setItemFilePending] = useState(false)
 
   // Key Member dialog state
   const [memberDialog, setMemberDialog] = useState(false)
-  const [memberForm, setMemberForm] = useState<KeyMemberDto>({ name: '', role: '' })
+  const emptyMember: KeyMemberDto = { name: '', role: '', education: '', degreePlace: '' }
+  const [memberForm, setMemberForm] = useState<KeyMemberDto>(emptyMember)
 
   // Past project dialog state
   const [projectDialog, setProjectDialog] = useState(false)
@@ -75,11 +82,8 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
 
   // Certificate dialog state
   const [certDialog, setCertDialog] = useState(false)
-  const [certForm, setCertForm] = useState<CertificateLicenceDto>({
-    title: '',
-    issuer: '',
-    reference: '',
-  })
+  const [certTitle, setCertTitle] = useState('')
+  const [certFile, setCertFile] = useState<DossierItemFileValue | null>(null)
 
   useEffect(() => {
     if (initialDossier) return
@@ -139,17 +143,35 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       setError('عنوان محصول یا خدمت الزامی است.')
       return
     }
-    const updated = [...dossier.productsServices, val]
-    const ok = await saveDossierSlice({ productsServices: updated })
+    if (itemFilePending) return
+    const item: ProductServiceDto = { title: val, ...(productFile ? { documentId: productFile.documentId } : {}) }
+    const ok = await saveDossierSlice({ productsServices: [...dossier.productsServices, item] })
     if (ok) {
       setNewProduct('')
+      setProductFile(null)
       setProductDialog(false)
     }
   }
 
+  /** Closing a dialog without saving removes the file it uploaded. */
+  const discardItemFile = (file: DossierItemFileValue | null) => {
+    if (file) void deleteDocument(file.documentId).catch(() => undefined)
+  }
+
+  const closeProductDialog = () => {
+    if (saveLock.current || itemFilePending) return
+    discardItemFile(productFile)
+    setProductFile(null)
+    setNewProduct('')
+    setProductDialog(false)
+  }
+
   const removeProduct = async (index: number) => {
+    const removed = dossier.productsServices[index]
     const updated = dossier.productsServices.filter((_, i) => i !== index)
-    await saveDossierSlice({ productsServices: updated })
+    if (await saveDossierSlice({ productsServices: updated }) && removed?.documentId) {
+      void deleteDocument(removed.documentId).catch(() => undefined)
+    }
   }
 
   // 2. Key members
@@ -158,14 +180,21 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       setError('نام و سمت عضو کلیدی الزامی است.')
       return
     }
+    const education = memberForm.education?.trim()
+    const degreePlace = memberForm.degreePlace?.trim()
     const updated = [
       ...dossier.keyMembers,
-      { name: memberForm.name.trim(), role: memberForm.role.trim() },
+      {
+        name: memberForm.name.trim(),
+        role: memberForm.role.trim(),
+        ...(education ? { education } : {}),
+        ...(degreePlace ? { degreePlace } : {}),
+      },
     ]
     const ok = await saveDossierSlice({ keyMembers: updated })
     if (ok) {
       setMemberDialog(false)
-      setMemberForm({ name: '', role: '' })
+      setMemberForm(emptyMember)
     }
   }
 
@@ -220,26 +249,38 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
 
   // 5. Certificates
   const addCertificate = async () => {
-    if (!certForm.title.trim()) {
+    if (!certTitle.trim()) {
       setError('عنوان گواهی یا مجوز الزامی است.')
       return
     }
+    if (itemFilePending) return
     const item: CertificateLicenceDto = {
-      title: certForm.title.trim(),
-      ...(certForm.issuer?.trim() ? { issuer: certForm.issuer.trim() } : {}),
-      ...(certForm.reference?.trim() ? { reference: certForm.reference.trim() } : {}),
+      title: certTitle.trim(),
+      ...(certFile ? { documentId: certFile.documentId } : {}),
     }
     const updated = [...dossier.certificatesLicenses, item]
     const ok = await saveDossierSlice({ certificatesLicenses: updated })
     if (ok) {
       setCertDialog(false)
-      setCertForm({ title: '', issuer: '', reference: '' })
+      setCertTitle('')
+      setCertFile(null)
     }
   }
 
+  const closeCertDialog = () => {
+    if (saveLock.current || itemFilePending) return
+    discardItemFile(certFile)
+    setCertFile(null)
+    setCertTitle('')
+    setCertDialog(false)
+  }
+
   const removeCertificate = async (index: number) => {
+    const removed = dossier.certificatesLicenses[index]
     const updated = dossier.certificatesLicenses.filter((_, i) => i !== index)
-    await saveDossierSlice({ certificatesLicenses: updated })
+    if (await saveDossierSlice({ certificatesLicenses: updated }) && removed?.documentId) {
+      void deleteDocument(removed.documentId).catch(() => undefined)
+    }
   }
 
   if (isLoading) {
@@ -330,17 +371,20 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           )}
           {dossier.productsServices.map((product, index) => (
             <div
-              key={`${product}-${index}`}
+              key={`${product.title}-${index}`}
               className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-1.5"
             >
               <Typography variant="14/semibold" color="neutral-700">
-                {product}
+                {product.title}
               </Typography>
+              {product.documentId ? (
+                <DossierItemFileLink documentId={product.documentId} label="فایل" />
+              ) : null}
               <Button
                 variant="text-destructive"
                 size="icon-32"
                 type="button"
-                aria-label={`حذف ${product}`}
+                aria-label={`حذف ${product.title}`}
                 onClick={() => removeProduct(index)}
                 disabled={isSaving}
               >
@@ -386,6 +430,11 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
                 <Typography variant="12/regular" color="neutral-400">
                   {member.role}
                 </Typography>
+                {member.education || member.degreePlace ? (
+                  <Typography variant="12/regular" color="neutral-500">
+                    {[member.education, member.degreePlace].filter(Boolean).join(' · ')}
+                  </Typography>
+                ) : null}
               </div>
               <Button
                 type="button"
@@ -536,9 +585,9 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
                 <Typography variant="16/semibold" color="neutral-700">
                   {cert.title}
                 </Typography>
-                <Typography variant="12/regular" color="neutral-400">
-                  {[cert.issuer, cert.reference].filter(Boolean).join(' · ')}
-                </Typography>
+                {cert.documentId ? (
+                  <DossierItemFileLink documentId={cert.documentId} label="دریافت فایل" />
+                ) : null}
               </div>
               <Button
                 type="button"
@@ -586,16 +635,14 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       {productDialog && (
         <ProfileDialog
           title="افزودن محصول یا خدمت جدید"
-          onClose={() => {
-            if (!saveLock.current) setProductDialog(false)
-          }}
+          onClose={closeProductDialog}
           primary={
-            <Button size="40" type="button" variant="primary" className="flex-1" loading={isSaving} onClick={addProduct}>
+            <Button size="40" type="button" variant="primary" className="flex-1" loading={isSaving} disabled={itemFilePending} onClick={addProduct}>
               ثبت
             </Button>
           }
           secondary={
-            <Button size="40" type="button" variant="outline-gray" className="flex-1" onClick={() => setProductDialog(false)}>
+            <Button size="40" type="button" variant="outline-gray" className="flex-1" disabled={itemFilePending} onClick={closeProductDialog}>
               انصراف
             </Button>
           }
@@ -606,6 +653,15 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               value={newProduct}
               placeholder="عنوان محصول یا خدمت جدید…"
               onChange={(e) => setNewProduct(e.target.value)}
+            />
+            <DossierItemFilePicker
+              category="productsServices"
+              companyId={companyId}
+              label="فایل یا عکس محصول (اختیاری)"
+              value={productFile}
+              disabled={isSaving}
+              onChange={setProductFile}
+              onPendingChange={setItemFilePending}
             />
           </div>
         </ProfileDialog>
@@ -669,6 +725,18 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
               placeholder="مثال: مدیر فنی، سرپرست تحقیق و توسعه"
               onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })}
             />
+            <Input
+              label="تحصیلات (اختیاری)"
+              value={memberForm.education ?? ''}
+              placeholder="مثال: کارشناسی ارشد مهندسی برق"
+              onChange={(e) => setMemberForm({ ...memberForm, education: e.target.value })}
+            />
+            <Input
+              label="محل اخذ مدرک (اختیاری)"
+              value={memberForm.degreePlace ?? ''}
+              placeholder="مثال: دانشگاه صنعتی شریف"
+              onChange={(e) => setMemberForm({ ...memberForm, degreePlace: e.target.value })}
+            />
           </div>
         </ProfileDialog>
       )}
@@ -721,16 +789,14 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
       {certDialog && (
         <ProfileDialog
           title="افزودن گواهی یا مجوز"
-          onClose={() => {
-            if (!saveLock.current) setCertDialog(false)
-          }}
+          onClose={closeCertDialog}
           primary={
-            <Button size="40" type="button" variant="primary" className="flex-1" loading={isSaving} onClick={addCertificate}>
+            <Button size="40" type="button" variant="primary" className="flex-1" loading={isSaving} disabled={itemFilePending} onClick={addCertificate}>
               ثبت
             </Button>
           }
           secondary={
-            <Button size="40" type="button" variant="outline-gray" className="flex-1" onClick={() => setCertDialog(false)}>
+            <Button size="40" type="button" variant="outline-gray" className="flex-1" disabled={itemFilePending} onClick={closeCertDialog}>
               انصراف
             </Button>
           }
@@ -738,21 +804,18 @@ export function ResumeProfileView({ initialDossier, companyId }: ResumeProfileVi
           <div className="flex flex-col gap-3 text-start">
             <Input
               label="عنوان گواهی یا مجوز" aria-required="true"
-              value={certForm.title}
+              value={certTitle}
               placeholder="مثال: پروانه بهره‌برداری، ایزو ۹۰۰۱"
-              onChange={(e) => setCertForm({ ...certForm, title: e.target.value })}
+              onChange={(e) => setCertTitle(e.target.value)}
             />
-            <Input
-              label="مرجع صادرکننده (اختیاری)"
-              value={certForm.issuer ?? ''}
-              placeholder="مثال: وزارت صمت، سازمان استاندارد"
-              onChange={(e) => setCertForm({ ...certForm, issuer: e.target.value })}
-            />
-            <Input
-              label="شماره مرجع / سریال (اختیاری)"
-              value={certForm.reference ?? ''}
-              placeholder="مثال: IR-1402-998"
-              onChange={(e) => setCertForm({ ...certForm, reference: e.target.value })}
+            <DossierItemFilePicker
+              category="certificatesLicenses"
+              companyId={companyId}
+              label="فایل یا عکس گواهی (اختیاری)"
+              value={certFile}
+              disabled={isSaving}
+              onChange={setCertFile}
+              onPendingChange={setItemFilePending}
             />
           </div>
         </ProfileDialog>

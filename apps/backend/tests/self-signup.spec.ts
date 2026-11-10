@@ -13,6 +13,7 @@ import {
   normalizeLoginIdentifier,
   pickCompanyFields,
   pickUserFields,
+  checkSignupAvailability,
   runSelfSignup,
   signupFieldProblems,
   type SelfSignupCompany,
@@ -50,6 +51,7 @@ class MemorySignupStore implements SelfSignupStore {
   companies: StoredCompany[] = []
   calls: StoreCall[] = []
   failCompanyCreate?: Error
+  failUserCreate?: Error
   private sequence = 0
 
   async companyNationalIdExists(nationalId: string): Promise<boolean> {
@@ -75,6 +77,7 @@ class MemorySignupStore implements SelfSignupStore {
 
   async createUser(fields: Record<string, string>): Promise<StoredUser> {
     this.calls.push('user')
+    if (this.failUserCreate) throw this.failUserCreate
     if (this.users.some((user) => user.phone === fields.phone))
       throw uniqueViolation('users_phone_unique')
     if (this.users.some((user) => user.email === fields.email))
@@ -96,6 +99,16 @@ class MemorySignupStore implements SelfSignupStore {
     const company: StoredCompany = { id: `c${++this.sequence}`, ...fields }
     this.companies.push(company)
     return company
+  }
+}
+
+/** A store that also answers the phone/email pre-check, as the Payload endpoint does. */
+class IdentitySignupStore extends MemorySignupStore {
+  async identityTaken({ phone, email }: { phone?: string; email?: string }) {
+    return {
+      phone: phone !== undefined && this.users.some((user) => user.phone === phone),
+      email: email !== undefined && this.users.some((user) => user.email === email),
+    }
   }
 }
 
@@ -181,6 +194,59 @@ describe('self-signup contract (unit)', () => {
     expect(store.users).toHaveLength(0)
     expect(store.companies).toHaveLength(0)
     expect(store.calls).toEqual(['precheck', 'begin', 'user', 'company', 'rollback'])
+  })
+
+  it.each([
+    [{ companyRegistrationNumber: '12ab' }, 'companyRegistrationNumber', 'registration_number_digits'],
+    [{ companyRegistrationNumber: '12' }, 'companyRegistrationNumber', 'registration_number_length'],
+    [{ companyRegistrationNumber: '1234567' }, 'companyRegistrationNumber', 'registration_number_length'],
+    [{ companyEconomicCode: '1x' }, 'companyEconomicCode', 'economic_code_digits'],
+    [{ companyEconomicCode: '1234567890' }, 'companyEconomicCode', 'economic_code_length'],
+    [{ companyType: 'نامعتبر' }, 'companyType', 'company_type'],
+  ])('rejects %j before any write, naming the field and rule', async (extra, field, reason) => {
+    const store = new MemorySignupStore()
+    const response = await runSelfSignup({ ...validBody, ...extra }, store)
+    expect(response.status).toBe(400)
+    expect(response.body.errors).toMatchObject([{ code: 'invalid_field', field, reason }])
+    expect(store.calls).toEqual([])
+  })
+
+  it('accepts the Commercial Code legal forms and well-formed registration identifiers', async () => {
+    const store = new MemorySignupStore()
+    const response = await runSelfSignup(
+      {
+        ...validBody,
+        companyType: 'مختلط غیرسهامی',
+        companyRegistrationNumber: '۱۲۳۴۵',
+        companyEconomicCode: '12345678901',
+      },
+      store,
+    )
+    expect(response.status).toBe(201)
+  })
+
+  it('reports a Payload field-validation failure on a company field as an error on that field', async () => {
+    const store = new MemorySignupStore()
+    store.failCompanyCreate = Object.assign(
+      new Error('The following field is invalid: نوع شرکت'),
+      { name: 'ValidationError', data: { errors: [{ path: 'type', message: 'invalid' }] } },
+    )
+    const response = await runSelfSignup(validBody, store)
+    expect(response.status).toBe(400)
+    expect(response.body.errors).toMatchObject([{ code: 'invalid_field', field: 'companyType' }])
+    expect(store.users).toHaveLength(0)
+  })
+
+  it("treats Payload's duplicate-phone ValidationError (errors under `data`) as a rejected signup, not a system failure", async () => {
+    const store = new MemorySignupStore()
+    store.failUserCreate = Object.assign(new Error('The following field is invalid: username'), {
+      name: 'ValidationError',
+      data: { collection: 'users', errors: [{ path: 'username', message: 'already registered' }] },
+    })
+    const response = await runSelfSignup(validBody, store)
+    expect(response.status).toBe(400)
+    expect(response.body.errors?.[0]?.code).toBe('signup_rejected')
+    expect(store.companies).toHaveLength(0)
   })
 
   it('rejects invalid phone, email and national-ID syntax before any write, naming the rule', async () => {
@@ -270,7 +336,7 @@ describe('self-signup contract (unit)', () => {
     expect(store.calls).toEqual([])
   })
 
-  it('does not reveal whether a phone or email account already exists', async () => {
+  it('falls back to a generic rejection for an account conflict the pre-check did not see', async () => {
     const store = new MemorySignupStore()
     store.users.push({
       id: 'u-existing',
@@ -295,6 +361,87 @@ describe('self-signup contract (unit)', () => {
     expect(store.users).toHaveLength(1)
     expect(store.companies).toHaveLength(0)
     expect(store.calls).toEqual(['precheck', 'begin', 'user', 'rollback'])
+  })
+})
+
+describe('signup duplicate checks', () => {
+  const existing = {
+    id: 'u-existing',
+    email: 'taken@example.com',
+    phone: '09120000000',
+    password: 'existing-password',
+  }
+
+  it('names a taken phone and email on their fields before any write', async () => {
+    const store = new IdentitySignupStore()
+    store.users.push(existing)
+
+    const response = await runSelfSignup(
+      { ...validBody, email: 'TAKEN@example.com', phone: '۰۹۱۲۰۰۰۰۰۰۰' },
+      store,
+    )
+
+    expect(response.status).toBe(409)
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ code: 'phone_taken', field: 'phone' }),
+      expect.objectContaining({ code: 'email_taken', field: 'email' }),
+    ])
+    expect(store.calls).toEqual(['precheck'])
+    expect(store.users).toHaveLength(1)
+  })
+
+  it('reports a taken company national ID together with a taken phone', async () => {
+    const store = new IdentitySignupStore()
+    store.users.push(existing)
+    store.companies.push({ id: 'c-existing', nationalId: validBody.companyNationalId })
+
+    const response = await runSelfSignup({ ...validBody, phone: existing.phone }, store)
+
+    expect(response.status).toBe(409)
+    expect(response.body.errors?.map((error) => error.code)).toEqual([
+      'duplicate_national_id',
+      'phone_taken',
+    ])
+  })
+
+  it('answers the per-step availability check for any subset of fields', async () => {
+    const store = new IdentitySignupStore()
+    store.users.push(existing)
+    store.companies.push({ id: 'c-existing', nationalId: validBody.companyNationalId })
+
+    const free = await checkSignupAvailability(
+      { phone: '09129999999', email: 'new@example.com' },
+      store,
+    )
+    expect(free).toEqual({ status: 200, body: {} })
+
+    const taken = await checkSignupAvailability(
+      { phone: existing.phone, email: ' Taken@Example.com ' },
+      store,
+    )
+    expect(taken.status).toBe(409)
+    expect(taken.body.errors?.map((error) => error.field)).toEqual(['phone', 'email'])
+
+    const company = await checkSignupAvailability(
+      { companyNationalId: validBody.companyNationalId },
+      store,
+    )
+    expect(company.body.errors).toEqual([
+      expect.objectContaining({ code: 'duplicate_national_id', field: 'companyNationalId' }),
+    ])
+    expect(store.calls).not.toContain('begin')
+  })
+
+  it('does not look up malformed values or non-object input', async () => {
+    const store = new IdentitySignupStore()
+    store.users.push({ ...existing, phone: '12345' })
+
+    expect(await checkSignupAvailability({ phone: '12345', companyNationalId: '1' }, store)).toEqual({
+      status: 200,
+      body: {},
+    })
+    expect(store.calls).toEqual([])
+    expect((await checkSignupAvailability(['phone'], store)).status).toBe(400)
   })
 })
 

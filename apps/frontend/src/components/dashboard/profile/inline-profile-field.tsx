@@ -1,6 +1,6 @@
 'use client'
 
-import type { HTMLInputTypeAttribute } from 'react'
+import type { HTMLAttributes, HTMLInputTypeAttribute } from 'react'
 import { RequiredMark } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Typography } from '@/components/ui/typography'
@@ -19,6 +19,10 @@ interface InlineProfileFieldProps {
   step?: number
   /** Shows «ندارد» instead of an input (an optional value saved as absent). */
   absent?: boolean
+  /** A validation message shown under the input while editing. */
+  error?: string
+  id?: string
+  inputMode?: HTMLAttributes<HTMLInputElement>['inputMode']
   onChange: (value: string) => void
 }
 
@@ -33,6 +37,9 @@ export function InlineProfileField({
   min,
   step,
   absent = false,
+  error,
+  id,
+  inputMode,
   onChange,
 }: InlineProfileFieldProps) {
   return (
@@ -49,7 +56,10 @@ export function InlineProfileField({
           </Typography>
         ) : (
         <Input
+          id={id}
           type={type}
+          inputMode={inputMode}
+          error={editing ? error : undefined}
           min={min}
           step={step}
           dir={dir}

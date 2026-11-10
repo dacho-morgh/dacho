@@ -16,12 +16,14 @@ vi.mock('@/components/documents/private-document-field', () => ({
 const profile: ProfileDto = {
   company: {
     name: 'شرکت نمونه',
-    establishmentDate: '۱۳۵۱/۰۴/۱۲ (54 سال)',
+    establishmentDate: '۱۳۵۱/۰۴/۱۲',
     status: 'فعال',
     type: 'سهامی خاص',
     registrationNumber: '۱۵۷۸۱',
     economicCode: '10100578556',
     nationalId: '411111495187',
+    province: 'تهران',
+    city: 'تهران',
   },
   contacts: { phone: '۰۹۱۲۳۴۵۶۷۸۹', email: 'sample@company.com' },
   executives: [{ role: 'مدیرعامل', name: 'کاربر نمونه' }],
@@ -39,8 +41,8 @@ const profile: ProfileDto = {
 
 const dossier: DossierResponseDto = {
   dossier: {
-    legalEntityType: '', knowledgeBasedStatus: '', classification: '', foundingYear: '',
-    activityDomain: '', website: '', centerEstablishment: '', insuredEmployeeCount: null,
+    legalEntityType: '', knowledgeBasedStatus: 'غیر دانش‌بنیان', classification: 'فناور', foundingYear: '',
+    activityDomain: 'نرم‌افزار', website: '', centerEstablishment: '', insuredEmployeeCount: null,
     productsServices: [], keyMembers: [], pastProjectsCustomers: [], requestedServices: [],
     certificatesLicenses: [], notAvailable: [],
   },

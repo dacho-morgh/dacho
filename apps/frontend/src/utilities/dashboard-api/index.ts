@@ -128,6 +128,7 @@ export {
   fetchCompanyVerification,
   submitCompanyVerification,
   type KeyMemberDto,
+  type ProductServiceDto,
   type PastProjectCustomerDto,
   type CertificateLicenceDto,
   type AbsenceField,

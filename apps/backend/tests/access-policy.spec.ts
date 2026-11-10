@@ -203,6 +203,30 @@ describe('document audience and policy', () => {
     expect(validateDocumentFile({ category: 'not-a-category', filename: 'a.pdf', mimeType: 'application/pdf', body: pdf() })).toEqual({ ok: false, error: 'unsupported_category' })
   })
 
+  it('accepts photos only for product and certificate files, checked by their signature', () => {
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0])
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0])
+    const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')])
+    for (const category of ['productsServices', 'certificatesLicenses'] as const) {
+      for (const [filename, mimeType, body] of [
+        ['photo.jpg', 'image/jpeg', jpeg],
+        ['photo.jpeg', 'image/jpeg', jpeg],
+        ['scan.png', 'image/png', png],
+        ['shot.webp', 'image/webp', webp],
+        ['doc.pdf', 'application/pdf', pdf()],
+      ] as const) {
+        expect(validateDocumentFile({ category, filename, mimeType, body })).toMatchObject({ ok: true })
+      }
+      expect(validateDocumentFile({ category, filename: 'fake.png', mimeType: 'image/png', body: jpeg }))
+        .toEqual({ ok: false, error: 'invalid_file_content' })
+      expect(validateDocumentFile({ category, filename: 'a.gif', mimeType: 'image/gif', body: Buffer.from('GIF89a') }))
+        .toEqual({ ok: false, error: 'invalid_file_type' })
+    }
+    // Every other category stays PDF/Word only.
+    expect(validateDocumentFile({ category: 'catalogues', filename: 'photo.jpg', mimeType: 'image/jpeg', body: jpeg }))
+      .toEqual({ ok: false, error: 'invalid_file_type' })
+  })
+
   it('does not invent a file-count cap and keeps multiple files independently valid', () => {
     const first = validateDocumentFile({ category: 'proposal', filename: 'one.pdf', mimeType: 'application/pdf', body: pdf() })
     const second = validateDocumentFile({ category: 'proposal', filename: 'two.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', body: docx() })

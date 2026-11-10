@@ -1385,7 +1385,21 @@ export interface Company {
   activityDomain?: string | null;
   registrationNumber?: string | null;
   logo?: (number | null) | CompanyLogo;
-  type?: ('سهامی خاص' | 'سهامی عام' | 'مسئولیت محدود' | 'دانش‌بنیان' | 'استارتاپ' | 'سایر') | null;
+  type?:
+    | (
+        | 'سهامی عام'
+        | 'سهامی خاص'
+        | 'مسئولیت محدود'
+        | 'تضامنی'
+        | 'مختلط غیرسهامی'
+        | 'مختلط سهامی'
+        | 'نسبی'
+        | 'تعاونی'
+        | 'دانش‌بنیان'
+        | 'استارتاپ'
+        | 'سایر'
+      )
+    | null;
   province?: string | null;
   city?: string | null;
   establishmentDate?: string | null;
@@ -1419,6 +1433,7 @@ export interface Company {
   productsServices?:
     | {
         title: string;
+        documentId?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -1426,6 +1441,8 @@ export interface Company {
     | {
         name: string;
         role: string;
+        education?: string | null;
+        degreePlace?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -1446,6 +1463,7 @@ export interface Company {
   certificatesLicenses?:
     | {
         title: string;
+        documentId?: string | null;
         issuer?: string | null;
         reference?: string | null;
         id?: string | null;
@@ -2371,6 +2389,7 @@ export interface CompaniesSelect<T extends boolean = true> {
     | T
     | {
         title?: T;
+        documentId?: T;
         id?: T;
       };
   keyMembers?:
@@ -2378,6 +2397,8 @@ export interface CompaniesSelect<T extends boolean = true> {
     | {
         name?: T;
         role?: T;
+        education?: T;
+        degreePlace?: T;
         id?: T;
       };
   pastProjectsCustomers?:
@@ -2398,6 +2419,7 @@ export interface CompaniesSelect<T extends boolean = true> {
     | T
     | {
         title?: T;
+        documentId?: T;
         issuer?: T;
         reference?: T;
         id?: T;

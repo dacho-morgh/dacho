@@ -24,6 +24,8 @@ import * as migration_20261026_100000_add_company_activity_domain from "./202610
 import * as migration_20261026_120000_company_dossier from "./20261026_120000_company_dossier";
 import * as migration_20261102_120000_personnel_profile from "./20261102_120000_personnel_profile";
 import * as migration_20261105_120000_company_logo from "./20261105_120000_company_logo";
+import * as migration_20261110_120000_company_legal_forms from "./20261110_120000_company_legal_forms";
+import * as migration_20261110_130000_dossier_item_files from "./20261110_130000_dossier_item_files";
 
 export const migrations = [
   {
@@ -131,4 +133,6 @@ export const migrations = [
   { up: migration_20261026_120000_company_dossier.up, down: migration_20261026_120000_company_dossier.down, name: "20261026_120000_company_dossier" },
   { up: migration_20261102_120000_personnel_profile.up, down: migration_20261102_120000_personnel_profile.down, name: "20261102_120000_personnel_profile" },
   { up: migration_20261105_120000_company_logo.up, down: migration_20261105_120000_company_logo.down, name: "20261105_120000_company_logo" },
+  { up: migration_20261110_120000_company_legal_forms.up, down: migration_20261110_120000_company_legal_forms.down, name: "20261110_120000_company_legal_forms" },
+  { up: migration_20261110_130000_dossier_item_files.up, down: migration_20261110_130000_dossier_item_files.down, name: "20261110_130000_dossier_item_files" },
 ];
