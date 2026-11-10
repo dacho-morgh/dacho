@@ -197,7 +197,7 @@ describe('EventApplicationWorkspace drafts', () => {
     renderWorkspace()
 
     const first = await card(SUB_1)
-    fireEvent.change(first.getByLabelText('عنوان طرح'), { target: { value: 'باتری شبکه' } })
+    fireEvent.change(first.getByLabelText(/عنوان طرح/), { target: { value: 'باتری شبکه' } })
     fillTeam(first)
     fireEvent.click(await enabledButton(first, 'ذخیره پیش‌نویس'))
 
@@ -234,10 +234,10 @@ describe('EventApplicationWorkspace drafts', () => {
     renderWorkspace([SUB_1])
 
     const first = await card(SUB_1)
-    await waitFor(() => expect((first.getByLabelText('عنوان طرح') as HTMLInputElement).value).toBe('طرح قبلی'))
+    await waitFor(() => expect((first.getByLabelText(/عنوان طرح/) as HTMLInputElement).value).toBe('طرح قبلی'))
     expect((first.getByLabelText('نام عضو ۱') as HTMLInputElement).value).toBe('رضا')
     expect(first.getByTestId('tracking-code').textContent).toContain('TRK-req-9')
-    fireEvent.change(first.getByLabelText('عنوان طرح'), { target: { value: 'طرح اصلاح‌شده' } })
+    fireEvent.change(first.getByLabelText(/عنوان طرح/), { target: { value: 'طرح اصلاح‌شده' } })
     fireEvent.click(await enabledButton(first, 'ذخیره پیش‌نویس'))
 
     // The saved result is a toast outside the workspace (FE43).

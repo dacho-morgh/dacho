@@ -413,3 +413,21 @@ export function canDeleteDocument(
   }
   return document.requestOwnerId === actorId
 }
+
+/**
+ * Deleting a company dossier file (one with no request parent). Only the
+ * representative of the owning company may remove its own dossier files, the
+ * same audience that may add them. Staff and case roles gain nothing here:
+ * dossier files were never deletable through this route before, and a request
+ * file keeps the rules of `canDeleteDocument`.
+ */
+export function canDeleteCompanyDocument(
+  role: OperationalRole,
+  document: { category: DocumentCategory; companyId: string | null; requestId: string | null },
+  actorCompanyId: string | null,
+): boolean {
+  if (role !== 'representative') return false
+  if (document.requestId) return false
+  if (documentAudience(document.category) !== 'company') return false
+  return Boolean(document.companyId && actorCompanyId && document.companyId === actorCompanyId)
+}

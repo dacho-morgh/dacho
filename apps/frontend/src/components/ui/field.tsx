@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { Children, isValidElement, useMemo, type ReactNode } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { typographyVariants } from "@/components/ui/typography"
@@ -11,6 +11,31 @@ import { cn } from "@/utilities/ui"
  * Label 14/regular neutral-600, hint 12/light neutral-500, error 12/light error.
  * The error stays next to its field and is announced with role="alert".
  */
+/**
+ * The shared required-field marker: a red asterisk after the label. It is
+ * decorative (aria-hidden) and drawn with CSS so it never becomes part of the
+ * label text or its accessible name; the control itself carries aria-required.
+ */
+function RequiredMark({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="required-marker"
+      aria-hidden="true"
+      className={cn("text-error-500 after:content-['*']", className)}
+      {...props}
+    />
+  )
+}
+
+/** True when a direct child control is flagged required (aria-required / required). */
+function hasRequiredControl(children: ReactNode): boolean {
+  return Children.toArray(children).some((child) => {
+    if (!isValidElement<Record<string, unknown>>(child)) return false
+    const flag = child.props["aria-required"] ?? child.props.required
+    return flag === true || flag === "true"
+  })
+}
+
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   return (
     <fieldset
@@ -21,13 +46,21 @@ function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   )
 }
 
-function FieldLegend({ className, ...props }: React.ComponentProps<"legend">) {
+function FieldLegend({
+  className,
+  required,
+  children,
+  ...props
+}: React.ComponentProps<"legend"> & { required?: boolean }) {
   return (
     <legend
       data-slot="field-legend"
       className={cn(typographyVariants({ variant: "14/semibold", color: "neutral-700" }), "mb-1.5", className)}
       {...props}
-    />
+    >
+      {children}
+      {required ? <RequiredMark className="ms-0.5" /> : null}
+    </legend>
   )
 }
 
@@ -70,7 +103,12 @@ function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
   return <div data-slot="field-content" className={cn("flex flex-1 flex-col gap-1", className)} {...props} />
 }
 
-function FieldLabel({ className, ...props }: React.ComponentProps<"label">) {
+function FieldLabel({
+  className,
+  required,
+  children,
+  ...props
+}: React.ComponentProps<"label"> & { required?: boolean }) {
   return (
     <label
       data-slot="field-label"
@@ -80,7 +118,10 @@ function FieldLabel({ className, ...props }: React.ComponentProps<"label">) {
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+      {required ? <RequiredMark className="-ms-1.5" /> : null}
+    </label>
   )
 }
 
@@ -120,4 +161,4 @@ function FieldError({
   )
 }
 
-export { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet }
+export { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet, RequiredMark, hasRequiredControl }

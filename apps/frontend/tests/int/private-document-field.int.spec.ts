@@ -4,16 +4,17 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { DocumentApiError, type PrivateDocumentDto } from '@/utilities/document-api'
+import { DocumentApiError, DocumentUploadCancelled, type PrivateDocumentDto } from '@/utilities/document-api'
 
-const { listDocuments, uploadDocument } = vi.hoisted(() => ({
+const { listDocuments, uploadDocument, deleteDocument } = vi.hoisted(() => ({
   listDocuments: vi.fn(),
   uploadDocument: vi.fn(),
+  deleteDocument: vi.fn(),
 }))
 
 vi.mock('@/utilities/document-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/utilities/document-api')>()
-  return { ...actual, listDocuments, uploadDocument }
+  return { ...actual, listDocuments, uploadDocument, deleteDocument }
 })
 
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
@@ -43,6 +44,7 @@ describe('PrivateDocumentField states', () => {
   beforeEach(() => {
     listDocuments.mockReset()
     uploadDocument.mockReset()
+    deleteDocument.mockReset()
     listDocuments.mockResolvedValue([])
   })
 
@@ -110,6 +112,61 @@ describe('PrivateDocumentField states', () => {
     await waitFor(() => expect(onPendingChange).toHaveBeenLastCalledWith(false))
     expect(onReadyChange).toHaveBeenLastCalledWith(true)
     expect(await findByText('proposal.pdf')).toBeTruthy()
+  })
+
+  it('has no button-like "در حال بارگذاری" label and lets the user cancel an in-flight upload', async () => {
+    let signal: AbortSignal | undefined
+    uploadDocument.mockImplementation(
+      (_input, onProgress: (percent: number) => void, abortSignal: AbortSignal) =>
+        new Promise<PrivateDocumentDto>((_resolve, reject) => {
+          signal = abortSignal
+          onProgress(30)
+          abortSignal.addEventListener('abort', () => reject(new DocumentUploadCancelled()))
+        }),
+    )
+    const onPendingChange = vi.fn()
+    const view = render(
+      createElement(PrivateDocumentField, { category: 'proposal', requestId: 'request-1', onPendingChange }),
+    )
+    await waitFor(() => expect(listDocuments).toHaveBeenCalled())
+    fireEvent.change(view.container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [pdf()] },
+    })
+    await waitFor(() => expect(onPendingChange).toHaveBeenLastCalledWith(true))
+
+    expect(view.queryByText('در حال بارگذاری…')).toBeNull()
+    expect(view.getByRole('button', { name: 'انتخاب فایل‌ها' })).toBeTruthy()
+
+    fireEvent.click(view.getByRole('button', { name: 'لغو بارگذاری proposal.pdf' }))
+    expect(signal?.aborted).toBe(true)
+    await waitFor(() => expect(onPendingChange).toHaveBeenLastCalledWith(false))
+    expect(view.queryByText('proposal.pdf')).toBeNull()
+    // A cancelled upload is silent: no error alert.
+    expect(view.queryByRole('alert')).toBeNull()
+  })
+
+  it('shows an x on an uploaded file that deletes it after confirmation', async () => {
+    listDocuments.mockResolvedValueOnce([{ ...document, allowedActions: ['download', 'delete'] }])
+    deleteDocument.mockResolvedValue(undefined)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const view = render(
+      createElement(PrivateDocumentField, { category: 'proposal', requestId: 'request-1', canDelete: true }),
+    )
+    expect(await view.findByText('proposal.pdf')).toBeTruthy()
+    // The control is an icon-only x, not a text button.
+    expect(view.queryByText('حذف')).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: 'حذف proposal.pdf' }))
+    await waitFor(() => expect(deleteDocument).toHaveBeenCalledWith('doc-1'))
+    await waitFor(() => expect(view.queryByText('proposal.pdf')).toBeNull())
+  })
+
+  it('shows no x on an uploaded file the role may not delete', async () => {
+    listDocuments.mockResolvedValueOnce([document])
+    const view = render(
+      createElement(PrivateDocumentField, { category: 'proposal', requestId: 'request-1', canDelete: true }),
+    )
+    expect(await view.findByText('proposal.pdf')).toBeTruthy()
+    expect(view.queryByRole('button', { name: 'حذف proposal.pdf' })).toBeNull()
   })
 
   it('filters mixed categories and versions, then ignores an upload batch after its parent changes', async () => {

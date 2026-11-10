@@ -564,6 +564,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 id="register-companyName"
                 inputSize="lg"
                 label="نام شرکت"
+                aria-required="true"
                 {...registerField('companyName')}
                 placeholder="نام رسمی شرکت را وارد کنید"
               />
@@ -574,6 +575,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 inputMode="numeric"
                 inputSize="lg"
                 label="شناسه ملی"
+                aria-required="true"
                 {...registerField('companyNationalId')}
                 placeholder="شناسه ملی شرکت را وارد کنید"
               />
@@ -583,6 +585,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 id="register-activityDomain"
                 inputSize="lg"
                 label="حوزه فعالیت"
+                aria-required="true"
                 {...registerField('activityDomain')}
                 placeholder="حوزه فعالیت شرکت را وارد کنید"
               />
@@ -705,6 +708,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 inputMode="text"
                 inputSize="lg"
                 label="نام و نام خانوادگی"
+                aria-required="true"
                 {...registerField('name')}
                 placeholder="نام و نام خانوادگی را وارد کنید"
               />
@@ -715,6 +719,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 inputMode="text"
                 inputSize="lg"
                 label="سمت"
+                aria-required="true"
                 {...registerField('position')}
                 placeholder="سمت خود را در شرکت انتخاب کنید"
               />
@@ -725,6 +730,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 inputMode="tel"
                 inputSize="lg"
                 label="شماره موبایل"
+                aria-required="true"
                 {...registerField('phone')}
                 placeholder="مثلاً ۰۹۱۲۱۲۳۴۵۶۷"
               />
@@ -735,6 +741,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 inputMode="email"
                 inputSize="lg"
                 label="ایمیل"
+                aria-required="true"
                 {...registerField('email')}
                 placeholder="مثلاً example@company.ir"
               />
@@ -764,6 +771,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 id="register-password"
                 inputSize="lg"
                 label="رمز عبور"
+                aria-required="true"
                 {...registerField('password')}
                 placeholder="رمز عبور خود را وارد کنید"
                 type={passwordVisible ? 'text' : 'password'}
@@ -792,6 +800,7 @@ export default function RegisterPage({ returnUrl = '/dashboard' }: { returnUrl?:
                 id="register-password-confirmation"
                 inputSize="lg"
                 label="تکرار رمز عبور"
+                aria-required="true"
                 {...registerField('passwordConfirmation')}
                 placeholder="رمز عبور خود را دوباره وارد کنید"
                 type={confirmationVisible ? 'text' : 'password'}

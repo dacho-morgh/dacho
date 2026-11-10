@@ -7,6 +7,7 @@ import { useForm, type FieldValues, type Path, type UseFormSetError } from 'reac
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
+import { RequiredMark, hasRequiredControl } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -147,12 +148,15 @@ export function FormRow({
   id,
   label,
   error,
+  required,
   children,
   className,
 }: {
   id: string
   label: string
   error?: string
+  /** Defaults to whether the control inside is marked aria-required. */
+  required?: boolean
   children: ReactNode
   className?: string
 }) {
@@ -160,6 +164,7 @@ export function FormRow({
     <div className={cn('flex min-w-0 flex-col gap-2', className)}>
       <Typography as="label" htmlFor={id} variant="16/semibold" color="neutral-700">
         {label}
+        {(required ?? hasRequiredControl(children)) ? <RequiredMark className="ms-0.5" /> : null}
       </Typography>
       <div className="flex flex-col gap-1">
         {children}
@@ -238,7 +243,7 @@ export function PublicFields<T extends ReturnType<typeof publicDefaults>>({
   return (
     <>
       <FormRow id="title" label={titleLabel} error={errors.title?.message}>
-        <Input id="title" aria-required variant={errors.title ? 'error' : 'default'} aria-describedby={describedBy('title')} {...reg('title')} />
+        <Input id="title" aria-required placeholder="مثلا: همایش سالانه فناوری انرژی" variant={errors.title ? 'error' : 'default'} aria-describedby={describedBy('title')} {...reg('title')} />
       </FormRow>
       <FormRow id="location" label="محل برگزاری" error={errors.location?.message}>
         <Input id="location" aria-required placeholder="مثلا: بوشهر، سالن همایش‌ها" variant={errors.location ? 'error' : 'default'} aria-describedby={describedBy('location')} {...reg('location')} />
@@ -260,7 +265,7 @@ export function PublicFields<T extends ReturnType<typeof publicDefaults>>({
       </FormRow>
       <div className="hidden md:block" />
       <FormRow id="description" label="شرح عمومی" error={errors.description?.message} className="md:col-span-2">
-        <Textarea id="description" className="h-28" aria-describedby={describedBy('description')} {...reg('description')} />
+        <Textarea id="description" placeholder="شرح کوتاه رویداد برای صفحه عمومی…" className="h-28" aria-describedby={describedBy('description')} {...reg('description')} />
       </FormRow>
     </>
   )
@@ -567,7 +572,7 @@ function EventEditor({
           {event && (
             <FormSection title="ثبت تغییر">
               <FormRow id="reason" label="دلیل تغییر" error={errors.reason?.message} className="md:col-span-2">
-                <Input id="reason" aria-required variant={errors.reason ? 'error' : 'default'} {...register('reason')} />
+                <Input id="reason" aria-required placeholder="دلیل این تغییر را بنویسید" variant={errors.reason ? 'error' : 'default'} {...register('reason')} />
               </FormRow>
             </FormSection>
           )}

@@ -168,12 +168,25 @@ export interface UploadDocumentInput {
   statementYear?: number
 }
 
+/** Thrown by `uploadDocument` when its AbortSignal fires; callers treat it as a quiet stop. */
+export class DocumentUploadCancelled extends Error {
+  constructor() {
+    super('upload_cancelled')
+    this.name = 'DocumentUploadCancelled'
+  }
+}
+
 /** XHR is used because `fetch` cannot report upload progress in browsers. */
 export function uploadDocument(
   input: UploadDocumentInput,
   onProgress?: (percent: number) => void,
+  signal?: AbortSignal,
 ): Promise<PrivateDocumentDto> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DocumentUploadCancelled())
+      return
+    }
     const form = new FormData()
     form.set('file', input.file)
     form.set('category', input.category)
@@ -190,6 +203,11 @@ export function uploadDocument(
       onProgress(Math.round((event.loaded / event.total) * 100))
     }
     xhr.onerror = () => reject(new DocumentApiError(0, 'upload_failed'))
+    // The user cancelled this upload: stop sending bytes and settle without an error message.
+    signal?.addEventListener('abort', () => {
+      xhr.abort()
+      reject(new DocumentUploadCancelled())
+    })
     xhr.onload = () => {
       let body: unknown = null
       try {

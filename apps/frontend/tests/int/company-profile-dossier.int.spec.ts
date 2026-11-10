@@ -167,7 +167,8 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
     expect(screen.getByText('اطلاعات شرکت هنوز کامل نیست')).toBeTruthy()
     expect(screen.getByText('نوع شخصیت حقوقی')).toBeTruthy()
     expect(screen.getByText('سال تأسیس')).toBeTruthy()
-    expect(screen.getByText('اساس‌نامه')).toBeTruthy()
+    // The missing-item badge and the (now unsuffixed, `*`-marked) upload field share the label.
+    expect(screen.getAllByText('اساس‌نامه').length).toBeGreaterThan(0)
   })
 
   it('renders ResumeProfileView with repeatable items and absence states (FE04, FE29)', () => {
@@ -197,7 +198,7 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
     expect(screen.getByText('گواهی افتا')).toBeTruthy()
   })
 
-  it('renders absence banner when absence option is selected in ResumeProfileView', () => {
+  it('shows no "ندارم" checkbox in the resume view and keeps legacy absent sections usable', () => {
     const absentDossier: DossierResponseDto = {
       dossier: {
         ...mockDossier,
@@ -219,9 +220,13 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
       }),
     )
 
-    expect(screen.getByText('ثبت شده است که شرکت سابقه پروژه یا مشتری قبلی ندارد.')).toBeTruthy()
-    expect(screen.getByText('ثبت شده است که شرکت کاتالوگ ندارد.')).toBeTruthy()
+    // Design QA #277: the user leaves an unavailable item empty instead of ticking a box.
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    expect(screen.queryByText(/ندارم/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'پروژه جدید' })).toBeTruthy()
+    expect(screen.getByText('فایل کاتالوگ')).toBeTruthy()
   })
+
   it('blocks company edits after a failed dossier read instead of saving empty defaults', async () => {
     vi.mocked(fetchProfileDossier).mockRejectedValueOnce(new Error('offline'))
     render(createElement(CompanyProfileView, { initialProfile: mockProfile }))
@@ -258,26 +263,49 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
     )
   })
 
-  it('merges an edited absence flag with current flags from the other profile page', async () => {
-    vi.mocked(fetchProfileDossier).mockResolvedValue({
+  it('clears a legacy absence answer when the website is filled in, keeping other flags', async () => {
+    const legacy: DossierResponseDto = {
       ...mockDossierResponse,
-      dossier: { ...mockDossier, notAvailable: ['requestedServices'] },
+      dossier: { ...mockDossier, website: '', notAvailable: ['website'] },
+    }
+    vi.mocked(fetchProfileDossier).mockResolvedValue({
+      ...legacy,
+      dossier: { ...legacy.dossier, notAvailable: ['requestedServices', 'website'] },
     })
     vi.mocked(updateProfile).mockResolvedValue(mockProfile)
     render(
       createElement(CompanyProfileView, {
         initialProfile: mockProfile,
-        initialDossier: mockDossierResponse,
+        initialDossier: legacy,
       }),
     )
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
     fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0]!)
-    fireEvent.click(screen.getAllByRole('checkbox')[0]!)
+    fireEvent.change(screen.getByPlaceholderText('https://example.com'), {
+      target: { value: 'https://novin.ir' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }))
     await waitFor(() =>
       expect(updateProfile).toHaveBeenCalledWith({
         company: {},
-        dossier: { notAvailable: ['requestedServices', 'website'] },
+        dossier: { website: 'https://novin.ir', notAvailable: ['requestedServices'] },
       }),
+    )
+  })
+
+  it('keeps a saved absence answer when the optional field stays empty', async () => {
+    const legacy: DossierResponseDto = {
+      ...mockDossierResponse,
+      dossier: { ...mockDossier, website: '', notAvailable: ['website'] },
+    }
+    vi.mocked(fetchProfileDossier).mockResolvedValue(legacy)
+    vi.mocked(updateProfile).mockResolvedValue(mockProfile)
+    render(createElement(CompanyProfileView, { initialProfile: mockProfile, initialDossier: legacy }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0]!)
+    fireEvent.change(screen.getByDisplayValue(mockProfile.company.name), { target: { value: 'نام تازه' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }))
+    await waitFor(() =>
+      expect(updateProfile).toHaveBeenCalledWith({ company: { name: 'نام تازه' }, dossier: {} }),
     )
   })
 
@@ -324,20 +352,27 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
     await screen.findByText('تغییرات با موفقیت ذخیره شد.')
   })
 
-  it('persists the optional absence of amendment notices', async () => {
-    vi.mocked(fetchProfileDossier).mockResolvedValue(mockDossierResponse)
-    vi.mocked(updateProfileDossier).mockResolvedValue({
+  it('offers no absence checkbox for amendment notices and still shows the uploader', () => {
+    const legacy: DossierResponseDto = {
       ...mockDossierResponse,
       dossier: { ...mockDossier, notAvailable: ['amendmentNotices'] },
-    })
+    }
+    render(createElement(CompanyProfileView, { initialProfile: mockProfile, initialDossier: legacy }))
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    expect(screen.queryByText(/ندارم/)).toBeNull()
+    expect(screen.getByText('آگهی‌های آخرین تغییرات')).toBeTruthy()
+  })
+
+  it('marks required basic fields with * while editing and lists no "ندارم" option', () => {
     render(
       createElement(CompanyProfileView, {
         initialProfile: mockProfile,
         initialDossier: mockDossierResponse,
       }),
     )
-    fireEvent.click(screen.getByRole('checkbox', { name: 'آگهی تغییرات ندارم' }))
-    await screen.findByText('ثبت شده است که شرکت آگهی تغییرات ندارد.')
-    expect(updateProfileDossier).toHaveBeenCalledWith({ notAvailable: ['amendmentNotices'] })
+    fireEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0]!)
+    expect(document.querySelectorAll('[data-slot="required-marker"]').length).toBeGreaterThan(5)
+    expect(screen.getByPlaceholderText('نام شرکت را وارد کنید')).toBeTruthy()
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
   })
 })

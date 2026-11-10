@@ -344,6 +344,7 @@ export function BoothRequestsQueue({ exhibition }: { exhibition: BoothExhibition
                       </label>
                       <Textarea
                         id={`reason-${item.id}`}
+                        placeholder="دلیل را بنویسید…"
                         value={reason}
                         onChange={(event) => {
                           setReason(event.target.value)
@@ -354,15 +355,7 @@ export function BoothRequestsQueue({ exhibition }: { exhibition: BoothExhibition
                         aria-describedby={reasonError ? `reason-${item.id}-error` : undefined}
                       />
                       <FieldError id={`reason-${item.id}-error`}>{reasonError}</FieldError>
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="36"
-                          variant="text-gray"
-                          disabled={busy}
-                          onClick={() => setReasonFor(null)}
-                        >
-                          انصراف
-                        </Button>
+                      <div className="flex justify-start gap-2">
                         <Button
                           size="36"
                           variant="destructive"
@@ -370,6 +363,14 @@ export function BoothRequestsQueue({ exhibition }: { exhibition: BoothExhibition
                           onClick={() => submitReason(reasonFor)}
                         >
                           {reasonFor.kind === 'reject_attendance' ? 'ثبت رد حضور' : 'ثبت برگشت فیش'}
+                        </Button>
+                        <Button
+                          size="36"
+                          variant="text-gray"
+                          disabled={busy}
+                          onClick={() => setReasonFor(null)}
+                        >
+                          انصراف
                         </Button>
                       </div>
                     </div>

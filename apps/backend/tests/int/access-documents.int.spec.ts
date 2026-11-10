@@ -593,6 +593,60 @@ describe('shared access policy and private documents (T09/T10)', () => {
     expect(missingCompany.status).toBe(404)
   })
 
+  it('lets only the owning representative delete a company dossier file and keeps allowedActions in agreement', async () => {
+    const companyA = (await companyStore.findByRepresentative(people.repA.id))!
+    // A case of the same company, opened while it is still verified, gives staff an assignment.
+    const caseId = await createRequest()
+    await submit(caseId).then((response) => expect(response.status).toBe(200))
+    await assign(caseId, people.reviewer.id, 'reviewer').expect(201)
+    await assign(caseId, people.chief.id, 'chief-reviewer').expect(201)
+    const uploaded = await upload({
+      userId: people.repA.id,
+      category: 'certificatesLicenses',
+      filename: 'license.pdf',
+      contentType: 'application/pdf',
+      body: pdf('license'),
+      companyId: companyA.id,
+    }).expect(201)
+    const docId = uploaded.body.document.id as string
+    expect(uploaded.body.document.requestId).toBeNull()
+    expect(uploaded.body.document.allowedActions).toEqual(['download', 'delete'])
+
+    const actionsFor = async (userId: string) =>
+      (await request(payload).get(`/documents/${docId}`).set(headers(userId)).expect(200)).body.document.allowedActions
+    expect(await actionsFor(people.repA.id)).toEqual(['download', 'delete'])
+    const ownList = await request(payload).get(`/documents?companyId=${companyA.id}`).set(headers(people.repA.id)).expect(200)
+    expect(ownList.body.items.find((item: { id: string }) => item.id === docId).allowedActions).toEqual(['download', 'delete'])
+    // Staff read the dossier but gain no delete action.
+    expect(await actionsFor(people.owner.id)).toEqual(['download'])
+    expect(await actionsFor(people.secretariat.id)).toEqual(['download'])
+    const staffList = await request(payload).get(`/documents?companyId=${companyA.id}`).set(headers(people.secretariat.id)).expect(200)
+    expect(staffList.body.items.find((item: { id: string }) => item.id === docId).allowedActions).toEqual(['download'])
+
+    // Another company's representative and case staff, even assigned, cannot see or delete it.
+    for (const person of [people.repB, people.reviewer, people.chief, people.employer, people.investment]) {
+      await request(payload).delete(`/documents/${docId}`).set(headers(person.id)).expect(404, { error: 'not_found' })
+    }
+    // Readers who may not delete get 403.
+    for (const person of [people.owner, people.secretariat]) {
+      await request(payload).delete(`/documents/${docId}`).set(headers(person.id)).expect(403, { error: 'forbidden' })
+    }
+    const storedKey = (await pool.query<{ storage_key: string }>(
+      'SELECT storage_key FROM dashboard.private_documents WHERE id = $1', [docId])).rows[0]?.storage_key
+    expect(storedKey).toBeDefined()
+    expect(readdirSync(storageRoot)).toContain(storedKey)
+
+    // Removing a dossier file is a company edit (T59), like uploading one.
+    await pool.query('UPDATE dashboard.company_verifications SET status = $1 WHERE company_id = $2', ['approved', companyA.id])
+    await request(payload).delete(`/documents/${docId}`).set(headers(people.repA.id)).expect(200, { success: true })
+    expect((await pool.query('SELECT id FROM dashboard.private_documents WHERE id = $1', [docId])).rows).toHaveLength(0)
+    expect(readdirSync(storageRoot)).not.toContain(storedKey)
+    expect((await pool.query('SELECT status FROM dashboard.company_verifications WHERE company_id = $1 ORDER BY revision DESC LIMIT 1', [companyA.id])).rows)
+      .toEqual([{ status: 'returned' }])
+    await request(payload).get(`/documents/${docId}`).set(headers(people.repA.id)).expect(404)
+    await request(payload).delete(`/documents/${docId}`).set(headers(people.repA.id)).expect(404)
+  })
+
   it('validates assignment role/account state and does not let another role assign', async () => {
     const id = await createRequest()
     expect((await assign(id, people.reviewer.id, 'chief-reviewer')).status).toBe(400)

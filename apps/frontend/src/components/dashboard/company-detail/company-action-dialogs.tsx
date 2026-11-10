@@ -209,6 +209,7 @@ function TextField<T extends FieldValues>({
       name={name}
       label={label}
       className={className}
+      required={Boolean(input['aria-required'])}
       render={({ field, controlProps }) => <Input {...field} {...controlProps} {...input} />}
     />
   )
@@ -277,6 +278,7 @@ export function AddressDialog({
         <FormField
           control={form.control}
           name="address"
+          required
           label="نشانی"
           className="sm:col-span-2"
           render={({ field, controlProps }) => (

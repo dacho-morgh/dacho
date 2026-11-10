@@ -9,7 +9,7 @@ import {
   DashboardTrashIcon,
 } from '@/components/icons/generated'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -21,7 +21,6 @@ import {
   fetchProfileDossier,
   submitCompanyVerification,
   toEnglishDigits,
-  type AbsenceField,
   type AddressDto,
   type CompanyDossierDto,
   type CompanyInfoDto,
@@ -31,7 +30,6 @@ import {
   type ProfileDto,
   updateAddress,
   updateProfile,
-  updateProfileDossier,
 } from '@/utilities/dashboard-api'
 import { buildCompanyDossierPatch } from '@/utilities/dossier-edits'
 import { CompanyVerificationCard, editWithdrawsVerification } from './company-verification-card'
@@ -192,37 +190,6 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
     }
   }
 
-  const setAmendmentsAbsent = async (absent: boolean) => {
-    if (basicSaveLock.current || documentsPending || !dossierLoaded) return
-    basicSaveLock.current = true
-    setIsSavingBasic(true)
-    setError(null)
-    try {
-      const latest = await fetchProfileDossier()
-      if (!latest) throw new Error('dossier_load_failed')
-      const notAvailable: AbsenceField[] = latest.dossier.notAvailable.filter(
-        (field) => field !== 'amendmentNotices',
-      )
-      if (absent) notAvailable.push('amendmentNotices')
-      if (!(await confirmReverification())) return
-      const result = await updateProfileDossier({ notAvailable })
-      if (!result) throw new Error('dossier_update_failed')
-      setDossier(result.dossier)
-      setDossierForm(result.dossier)
-      setMissing(result.missing)
-      toast.success('وضعیت آگهی تغییرات ثبت شد.')
-      await refreshVerification()
-    } catch {
-      toast.error('ثبت وضعیت آگهی تغییرات انجام نشد.')
-      setError(
-        'ثبت وضعیت آگهی تغییرات انجام نشد. ابتدا فایل‌های این بخش را حذف کنید یا دوباره تلاش کنید.',
-      )
-    } finally {
-      basicSaveLock.current = false
-      setIsSavingBasic(false)
-    }
-  }
-
   const startBasicEdit = () => {
     if (!dossierLoaded || basicSaveLock.current || documentsPending) return
     setBasicForm({ ...profile.company })
@@ -232,26 +199,22 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
     setIsEditingBasic(true)
   }
 
-  const toggleDossierAbsence = (field: AbsenceField) => {
-    const isCurrentlyAbsent = dossierForm.notAvailable.includes(field)
-    let nextAbsence: AbsenceField[]
-    if (isCurrentlyAbsent) {
-      nextAbsence = dossierForm.notAvailable.filter((f) => f !== field)
-    } else {
-      nextAbsence = [...dossierForm.notAvailable, field]
-    }
-
+  /**
+   * Website, growth-centre and insured-staff fields are simply left empty when the
+   * company has none. An absence answer saved earlier stays until a value is typed.
+   */
+  const setOptionalDossierValue = (
+    field: 'website' | 'centerEstablishment' | 'insuredEmployeeCount',
+    value: string | number | null,
+  ) => {
+    const filled = value !== null && value !== ''
+    const wasAbsent = dossierAtEdit.current.notAvailable.includes(field)
+    const withoutField = dossierForm.notAvailable.filter((item) => item !== field)
     setDossierForm({
       ...dossierForm,
-      notAvailable: nextAbsence,
-      ...(isCurrentlyAbsent
-        ? {}
-        : {
-            ...(field === 'website' ? { website: '' } : {}),
-            ...(field === 'centerEstablishment' ? { centerEstablishment: '' } : {}),
-            ...(field === 'insuredEmployeeCount' ? { insuredEmployeeCount: null } : {}),
-          }),
-    })
+      [field]: value,
+      notAvailable: !filled && wasAbsent ? [...withoutField, field] : withoutField,
+    } as CompanyDossierDto)
   }
 
   const saveBasic = async () => {
@@ -446,9 +409,9 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
   }
 
   const displayedDossier = isEditingBasic ? dossierForm : dossier
-  const isWebsiteAbsent = displayedDossier.notAvailable.includes('website')
-  const isCenterAbsent = displayedDossier.notAvailable.includes('centerEstablishment')
-  const isInsuredAbsent = displayedDossier.notAvailable.includes('insuredEmployeeCount')
+  const isWebsiteAbsent = !isEditingBasic && displayedDossier.notAvailable.includes('website')
+  const isCenterAbsent = !isEditingBasic && displayedDossier.notAvailable.includes('centerEstablishment')
+  const isInsuredAbsent = !isEditingBasic && displayedDossier.notAvailable.includes('insuredEmployeeCount')
 
   if (!dossierLoaded) {
     return (
@@ -519,6 +482,8 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
           <div className="flex flex-col gap-4">
             <InlineProfileField
               label="نام شرکت"
+              required
+              placeholder="نام شرکت را وارد کنید"
               value={basicForm.name}
               editing={isEditingBasic}
               onChange={(name) => setBasicForm({ ...basicForm, name })}
@@ -532,6 +497,8 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             />
             <InlineProfileField
               label="شماره ثبت"
+              required
+              placeholder="شماره ثبت شرکت"
               value={basicForm.registrationNumber}
               editing={isEditingBasic}
               dir="ltr"
@@ -539,6 +506,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             />
             <InlineProfileField
               label="کد اقتصادی"
+              placeholder="کد اقتصادی ۱۲ رقمی"
               value={basicForm.economicCode}
               editing={isEditingBasic}
               dir="ltr"
@@ -546,18 +514,22 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             />
             <InlineProfileField
               label="وضعیت شرکت"
+              required
+              placeholder="مثال: فعال"
               value={basicForm.status}
               editing={isEditingBasic}
               onChange={(status) => setBasicForm({ ...basicForm, status })}
             />
             <InlineProfileField
               label="نوع شرکت (مرحله اول)"
+              placeholder="نوع شرکت"
               value={basicForm.type}
               editing={isEditingBasic}
               onChange={(type) => setBasicForm({ ...basicForm, type })}
             />
             <InlineProfileField
               label="تاریخ تاسیس"
+              placeholder="مثال: ۱۳۸۵/۰۱/۱۵"
               value={basicForm.establishmentDate}
               editing={isEditingBasic}
               dir="auto"
@@ -568,6 +540,8 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
           <div className="flex flex-col gap-4">
             <InlineProfileField
               label="نوع شخصیت حقوقی (سهامی خاص / عام / با مسئولیت محدود / ...)"
+              required
+              placeholder="مثال: سهامی خاص"
               value={
                 isEditingBasic ? dossierForm.legalEntityType : dossier.legalEntityType || 'ثبت نشده'
               }
@@ -576,6 +550,8 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             />
             <InlineProfileField
               label="وضعیت دانش‌بنیانی (دانش‌بنیان نوع یک / دو / نوپا / غیر دانش‌بنیان)"
+              required
+              placeholder="مثال: دانش‌بنیان نوع یک"
               value={
                 isEditingBasic
                   ? dossierForm.knowledgeBasedStatus
@@ -588,6 +564,8 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             />
             <InlineProfileField
               label="طبقه‌بندی شرکت (نوپا / فناور / صنعتی / ...)"
+              required
+              placeholder="مثال: فناور"
               value={
                 isEditingBasic ? dossierForm.classification : dossier.classification || 'ثبت نشده'
               }
@@ -596,6 +574,8 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             />
             <InlineProfileField
               label="سال تأسیس (عدد ۴ رقمی مثلاً ۱۳۸۵)"
+              required
+              placeholder="مثال: ۱۳۸۵"
               value={isEditingBasic ? dossierForm.foundingYear : dossier.foundingYear || 'ثبت نشده'}
               editing={isEditingBasic}
               dir="ltr"
@@ -603,6 +583,8 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             />
             <InlineProfileField
               label="حوزه فعالیت اصلی"
+              required
+              placeholder="مثال: هوش مصنوعی"
               value={
                 isEditingBasic ? dossierForm.activityDomain : dossier.activityDomain || 'ثبت نشده'
               }
@@ -610,23 +592,12 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
               onChange={(activityDomain) => setDossierForm({ ...dossierForm, activityDomain })}
             />
 
-            {/* وبسایت با چک‌باکس ندارم */}
+            {/* وبسایت (اختیاری؛ در صورت نداشتن خالی بماند) */}
             <div className="flex flex-col gap-1 rounded-lg border border-neutral-100 p-2">
               <div className="flex items-center justify-between">
                 <Typography variant="14/semibold" color="neutral-500">
                   وب‌سایت رسمی
                 </Typography>
-                {isEditingBasic && (
-                  <Typography
-                    as="label"
-                    className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500"
-                  >
-                    <Checkbox
-                      checked={isWebsiteAbsent}
-                      onCheckedChange={() => toggleDossierAbsence('website')} />
-                    ندارم
-                  </Typography>
-                )}
               </div>
               {isWebsiteAbsent ? (
                 <Typography variant="14/regular" color="neutral-400" className="py-2">
@@ -638,7 +609,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
                   value={isEditingBasic ? dossierForm.website : dossier.website}
                   readOnly={!isEditingBasic}
                   placeholder="https://example.com"
-                  onChange={(e) => setDossierForm({ ...dossierForm, website: e.target.value })}
+                  onChange={(e) => setOptionalDossierValue('website', e.target.value)}
                   containerClassName={
                     isEditingBasic
                       ? 'bg-background'
@@ -654,17 +625,6 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
                 <Typography variant="14/semibold" color="neutral-500">
                   استقرار در مرکز رشد / پارک علم و فناوری
                 </Typography>
-                {isEditingBasic && (
-                  <Typography
-                    as="label"
-                    className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500"
-                  >
-                    <Checkbox
-                      checked={isCenterAbsent}
-                      onCheckedChange={() => toggleDossierAbsence('centerEstablishment')} />
-                    ندارم
-                  </Typography>
-                )}
               </div>
               {isCenterAbsent ? (
                 <Typography variant="14/regular" color="neutral-400" className="py-2">
@@ -677,9 +637,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
                   }
                   readOnly={!isEditingBasic}
                   placeholder="نام پارک یا مرکز رشد…"
-                  onChange={(e) =>
-                    setDossierForm({ ...dossierForm, centerEstablishment: e.target.value })
-                  }
+                  onChange={(e) => setOptionalDossierValue('centerEstablishment', e.target.value)}
                   containerClassName={
                     isEditingBasic
                       ? 'bg-background'
@@ -695,17 +653,6 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
                 <Typography variant="14/semibold" color="neutral-500">
                   تعداد کارکنان بیمه‌شده
                 </Typography>
-                {isEditingBasic && (
-                  <Typography
-                    as="label"
-                    className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500"
-                  >
-                    <Checkbox
-                      checked={isInsuredAbsent}
-                      onCheckedChange={() => toggleDossierAbsence('insuredEmployeeCount')} />
-                    ندارم
-                  </Typography>
-                )}
               </div>
               {isInsuredAbsent ? (
                 <Typography variant="14/regular" color="neutral-400" className="py-2">
@@ -727,7 +674,7 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
                   onChange={(e) => {
                     const parsed =
                       e.target.value === '' ? null : Number(toEnglishDigits(e.target.value))
-                    setDossierForm({ ...dossierForm, insuredEmployeeCount: parsed })
+                    setOptionalDossierValue('insuredEmployeeCount', parsed)
                   }}
                   containerClassName={
                     isEditingBasic
@@ -760,24 +707,12 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {(
             [
-              ['articlesOfAssociation', 'اساس‌نامه (اجباری)', true],
-              ['establishmentNotices', 'آگهی تأسیس (اجباری)', true],
+              ['articlesOfAssociation', 'اساس‌نامه', true],
+              ['establishmentNotices', 'آگهی تأسیس', true],
               ['amendmentNotices', 'آگهی‌های آخرین تغییرات', false],
             ] as const
           ).map(([category, label, isRequired]) => (
             <div key={category} className="flex flex-col gap-3">
-              {category === 'amendmentNotices' && (
-                <Typography as="label" className="flex items-center gap-2">
-                  <Checkbox
-                    checked={dossier.notAvailable.includes('amendmentNotices')}
-                    disabled={isSavingBasic || isEditingBasic || documentsPending}
-                    onCheckedChange={(checked) => void setAmendmentsAbsent(checked === true)} />
-                  آگهی تغییرات ندارم
-                </Typography>
-              )}
-              {category === 'amendmentNotices' && dossier.notAvailable.includes(category) ? (
-                <Typography color="neutral-400">ثبت شده است که شرکت آگهی تغییرات ندارد.</Typography>
-              ) : (
                 <PrivateDocumentField
                   category={category}
                   label={label}
@@ -796,7 +731,6 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
                     void refreshVerification()
                   }}
                 />
-              )}
             </div>
           ))}
         </div>
@@ -911,61 +845,62 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
         </div>
       </section>
 
+      {/* Dialogs: the primary action is first in the DOM, so it sits on the right in RTL. */}
       {addressDialogOpen && (
         <ProfileDialog
           title={editingAddressId ? 'ویرایش آدرس' : 'اضافه کردن آدرس جدید'}
           onClose={() => setAddressDialogOpen(false)}
-          actions={
-            <>
-              <Button size="40"
-                type="button"
-                variant="outline-primary"
-                className="flex-1"
-                onClick={() => setAddressDialogOpen(false)}
-              >
-                لغو
-              </Button>
-              <Button size="40"
-                type="button"
-                className="flex-1"
-                loading={isSavingAddress}
-                onClick={saveAddress}
-              >
-                ذخیره
-              </Button>
-            </>
+          primary={
+            <Button size="40" type="button" variant="primary" className="flex-1" loading={isSavingAddress} onClick={saveAddress}>
+              ذخیره
+            </Button>
+          }
+          secondary={
+            <Button size="40" type="button" variant="outline-gray" className="flex-1" onClick={() => setAddressDialogOpen(false)}>
+              لغو
+            </Button>
           }
         >
           <Input
             label="نام آدرس"
+            aria-required="true"
+            placeholder="مثال: دفتر مرکزی"
             value={addressForm.title}
             onChange={(event) => setAddressForm({ ...addressForm, title: event.target.value })}
           />
           <Input
             label="استان"
+            placeholder="مثال: تهران"
             value={addressForm.province}
             onChange={(event) => setAddressForm({ ...addressForm, province: event.target.value })}
           />
           <Input
             label="شهر"
+            placeholder="مثال: تهران"
             value={addressForm.city}
             onChange={(event) => setAddressForm({ ...addressForm, city: event.target.value })}
           />
           <Input
             label="کد پستی"
             dir="ltr"
+            placeholder="مثال: 1234567890"
             value={addressForm.postalCode}
             onChange={(event) => setAddressForm({ ...addressForm, postalCode: event.target.value })}
           />
-          <Typography as="label" variant="16/regular" color="neutral-600">
-            آدرس
+          <Field>
+            <FieldLabel htmlFor="company-address-text" required className="text-base">
+              آدرس
+            </FieldLabel>
             <Textarea
+              id="company-address-text"
               rows={4}
+              aria-required="true"
+              placeholder="نشانی کامل را وارد کنید…"
               value={addressForm.address}
               onChange={(event) => setAddressForm({ ...addressForm, address: event.target.value })}
-              className="mt-2 resize-none text-start"
+              className="resize-none text-start"
             />
-          </Typography>
+          </Field>
         </ProfileDialog>
       )}
 
@@ -973,34 +908,28 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
         <ProfileDialog
           title={editingExecutiveIndex === -1 ? 'افزودن شخص' : 'ویرایش شخص'}
           onClose={() => setEditingExecutiveIndex(null)}
-          actions={
-            <>
-              <Button size="40"
-                type="button"
-                variant="outline-gray"
-                className="flex-1"
-                onClick={() => setEditingExecutiveIndex(null)}
-              >
-                انصراف
-              </Button>
-              <Button size="40"
-                type="button"
-                className="flex-1"
-                loading={isSavingExecutive}
-                onClick={saveExecutive}
-              >
-                ذخیره
-              </Button>
-            </>
+          primary={
+            <Button size="40" type="button" variant="primary" className="flex-1" loading={isSavingExecutive} onClick={saveExecutive}>
+              ذخیره
+            </Button>
+          }
+          secondary={
+            <Button size="40" type="button" variant="outline-gray" className="flex-1" onClick={() => setEditingExecutiveIndex(null)}>
+              انصراف
+            </Button>
           }
         >
           <Input
             label="نام و نام خانوادگی"
+            aria-required="true"
+            placeholder="مثال: علی احمدی"
             value={executiveForm.name}
             onChange={(event) => setExecutiveForm({ ...executiveForm, name: event.target.value })}
           />
           <Input
             label="سمت"
+            aria-required="true"
+            placeholder="مثال: مدیرعامل"
             value={executiveForm.role}
             onChange={(event) => setExecutiveForm({ ...executiveForm, role: event.target.value })}
           />

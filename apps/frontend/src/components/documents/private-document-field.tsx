@@ -4,13 +4,16 @@ import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
+import { DashboardCloseCircle } from '@/components/icons'
 import { Button } from '@/components/ui/button'
+import { RequiredMark } from '@/components/ui/field'
 import { Typography } from '@/components/ui/typography'
 import {
   DOCUMENT_ACCEPT,
   DOCUMENT_FORMATS_MESSAGE,
   DOCUMENT_SIZE_MESSAGE,
   DocumentApiError,
+  DocumentUploadCancelled,
   documentCategoryLabel,
   documentErrorMessage,
   deleteDocument,
@@ -84,6 +87,8 @@ export function PrivateDocumentField({
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const keyCounter = useRef(0)
+  // One AbortController per in-flight upload so the user can cancel it.
+  const controllers = useRef(new Map<string, AbortController>())
   const callbacks = useRef({ onPendingChange, onReadyChange, onDocumentsChange })
   const scopeKey = `${requestId ?? ''}|${companyId ?? ''}|${category}|${logicalVersion ?? ''}|${statementYear ?? ''}`
   const scopeKeyRef = useRef(scopeKey)
@@ -112,6 +117,14 @@ export function PrivateDocumentField({
     (logicalVersion === undefined || document.logicalVersion === logicalVersion) &&
     (statementYear === undefined || document.statementYear === statementYear),
   ), [documents, category, companyId, logicalVersion, requestId, statementYear])
+
+  useEffect(() => {
+    const inFlight = controllers.current
+    return () => {
+      for (const controller of inFlight.values()) controller.abort()
+      inFlight.clear()
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -168,6 +181,8 @@ export function PrivateDocumentField({
 
   const uploadOne = async (file: File, uploadScope = scopeKey) => {
     const key = nextKey(file)
+    const controller = new AbortController()
+    controllers.current.set(key, controller)
     setUploads((current) => [...current, { key, name: file.name, progress: 0, error: null, file }])
 
     try {
@@ -179,6 +194,7 @@ export function PrivateDocumentField({
             current.map((upload) => (upload.key === key ? { ...upload, progress } : upload)),
           )
         },
+        controller.signal,
       )
       if (scopeKeyRef.current === uploadScope && document.category === category && (logicalVersion === undefined || document.logicalVersion === logicalVersion)) {
         setDocuments((current) => [...current, document])
@@ -188,12 +204,22 @@ export function PrivateDocumentField({
       }
       if (scopeKeyRef.current === uploadScope) setError(null)
     } catch (cause) {
+      // Cancelled by the user: the row was already removed, so nothing else to show.
+      if (cause instanceof DocumentUploadCancelled) return
       if (scopeKeyRef.current !== uploadScope) return
       const code = report(cause)
       setUploads((current) =>
         current.map((upload) => (upload.key === key ? { ...upload, error: code } : upload)),
       )
+    } finally {
+      controllers.current.delete(key)
     }
+  }
+
+  /** Cancels an in-flight upload, or dismisses one that already failed. */
+  const cancelUpload = (upload: PendingUpload) => {
+    controllers.current.get(upload.key)?.abort()
+    setUploads((current) => current.filter((item) => item.key !== upload.key))
   }
 
   const retry = async (upload: PendingUpload) => {
@@ -226,6 +252,9 @@ export function PrivateDocumentField({
     }
   }
 
+  const detach = (document: PrivateDocumentDto) =>
+    setDocuments((current) => current.filter((item) => item.id !== document.id))
+
   const remove = async (document: PrivateDocumentDto) => {
     if (!window.confirm('این مدرک حذف شود؟')) return
     setError(null)
@@ -242,7 +271,7 @@ export function PrivateDocumentField({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Typography as="h3" variant="16/semibold" color="neutral-700">
           {label ?? documentCategoryLabel(category)}
-          {required ? <span className="text-error-500"> *</span> : null}
+          {required ? <RequiredMark className="ms-1" /> : null}
         </Typography>
         {readOnly ? null : (
           <Typography variant="12/regular" color="neutral-500">
@@ -314,24 +343,17 @@ export function PrivateDocumentField({
                 {document.allowedActions.includes('download') ? (
                   <PrivateDocumentDownload documentId={document.id} filename={document.filename} />
                 ) : null}
-                {sessionOnly ? (
+                {sessionOnly || (canDelete && document.allowedActions.includes('delete')) ? (
                   <Button
                     type="button"
                     variant="text-gray"
-                    size="32"
-                    aria-label={`حذف ${document.filename} از پیوست‌ها`}
-                    onClick={() => setDocuments((current) => current.filter((item) => item.id !== document.id))}
+                    size="icon-32"
+                    aria-label={
+                      sessionOnly ? `حذف ${document.filename} از پیوست‌ها` : `حذف ${document.filename}`
+                    }
+                    onClick={() => (sessionOnly ? detach(document) : remove(document))}
                   >
-                    <Typography variant="12/semibold" className="text-inherit">
-                      حذف از پیوست‌ها
-                    </Typography>
-                  </Button>
-                ) : null}
-                {canDelete && document.allowedActions.includes('delete') ? (
-                  <Button type="button" variant="text-gray" size="32" onClick={() => remove(document)}>
-                    <Typography variant="12/semibold" className="text-inherit">
-                      حذف
-                    </Typography>
+                    <DashboardCloseCircle aria-hidden="true" />
                   </Button>
                 ) : null}
               </div>
@@ -358,11 +380,31 @@ export function PrivateDocumentField({
                         تلاش دوباره
                       </Typography>
                     </Button>
+                    <Button
+                      type="button"
+                      variant="text-gray"
+                      size="icon-32"
+                      aria-label={`حذف ${upload.name} از فهرست`}
+                      onClick={() => cancelUpload(upload)}
+                    >
+                      <DashboardCloseCircle aria-hidden="true" />
+                    </Button>
                   </div>
                 ) : (
-                  <Typography role="status" variant="12/regular" color="neutral-500">
-                    {upload.progress.toLocaleString('fa-IR')}٪
-                  </Typography>
+                  <div className="flex items-center gap-1">
+                    <Typography role="status" variant="12/regular" color="neutral-500">
+                      {upload.progress.toLocaleString('fa-IR')}٪
+                    </Typography>
+                    <Button
+                      type="button"
+                      variant="text-gray"
+                      size="icon-32"
+                      aria-label={`لغو بارگذاری ${upload.name}`}
+                      onClick={() => cancelUpload(upload)}
+                    >
+                      <DashboardCloseCircle aria-hidden="true" />
+                    </Button>
+                  </div>
                 )}
               </div>
               {!upload.error ? (
@@ -404,7 +446,7 @@ export function PrivateDocumentField({
           onClick={() => inputRef.current?.click()}
         >
           <Typography variant="14/regular" className="text-inherit">
-            {pending ? 'در حال بارگذاری…' : 'انتخاب فایل‌ها'}
+            انتخاب فایل‌ها
           </Typography>
         </Button>
         {!uploadAllowed && !disabled ? (

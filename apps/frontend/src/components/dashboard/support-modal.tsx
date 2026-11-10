@@ -221,9 +221,10 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
               <FormField
                 control={form.control}
                 name="subject"
-                label={<>عنوان پیام <span className="text-error-600">*</span></>}
+                required
+                label="عنوان پیام"
                 render={({ field, controlProps }) => (
-                  <Input {...field} {...controlProps} type="text" aria-required="true" placeholder="مثال: سوال در خصوص مدارک همایش یا درخواست اصلاح نامه" />
+                  <Input {...field} {...controlProps} type="text" placeholder="مثال: سوال در خصوص مدارک همایش یا درخواست اصلاح نامه" />
                 )}
               />
 
@@ -239,22 +240,15 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
               <FormField
                 control={form.control}
                 name="message"
-                label={<>متن پیام / شرح درخواست <span className="text-error-600">*</span></>}
+                required
+                label="متن پیام / شرح درخواست"
                 render={({ field, controlProps }) => (
-                  <Textarea {...field} {...controlProps} aria-required="true" rows={4} placeholder="توضیحات کامل درخواست یا سوال خود را اینجا یادداشت فرمایید..." />
+                  <Textarea {...field} {...controlProps} rows={4} placeholder="توضیحات کامل درخواست یا سوال خود را اینجا یادداشت فرمایید..." />
                 )}
               />
 
               {/* Form Actions */}
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline-gray"
-                  size="48"
-                  onClick={handleReset}
-                >
-                  انصراف
-                </Button>
+              <div className="flex items-center justify-start gap-3 pt-2">
                 <Button
                   type="submit"
                   variant="primary"
@@ -269,6 +263,14 @@ export function SupportModal({ isOpen, onClose, onSuccess }: SupportModalProps) 
                       <Send className="size-4" />
                     </>
                   )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline-gray"
+                  size="48"
+                  onClick={handleReset}
+                >
+                  انصراف
                 </Button>
               </div>
             </form>

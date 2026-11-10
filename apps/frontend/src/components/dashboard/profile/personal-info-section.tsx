@@ -134,17 +134,19 @@ export function PersonalInfoSection({
                 <FormField
                   control={form.control}
                   name="name"
+                  required
                   label="نام و نام خانوادگی"
                   render={({ field, controlProps }) => (
-                    <Input {...field} {...controlProps} autoComplete="name" aria-required="true" />
+                    <Input {...field} {...controlProps} placeholder="نام و نام خانوادگی خود را وارد کنید" autoComplete="name" />
                   )}
                 />
                 <FormField
                   control={form.control}
                   name="phone"
+                  required
                   label="شماره تلفن همراه"
                   render={({ field, controlProps }) => (
-                    <Input {...field} {...controlProps} type="tel" dir="ltr" autoComplete="tel" inputMode="numeric" aria-required="true" />
+                    <Input {...field} {...controlProps} type="tel" dir="ltr" placeholder="09123456789" autoComplete="tel" inputMode="numeric" />
                   )}
                 />
                 <FormField
@@ -152,7 +154,7 @@ export function PersonalInfoSection({
                   name="email"
                   label="آدرس ایمیل"
                   render={({ field, controlProps }) => (
-                    <Input {...field} {...controlProps} type="email" dir="ltr" autoComplete="email" />
+                    <Input {...field} {...controlProps} type="email" dir="ltr" placeholder="name@example.com" autoComplete="email" />
                   )}
                 />
               </fieldset>

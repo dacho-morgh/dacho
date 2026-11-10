@@ -226,7 +226,7 @@ describe('dialog keyboard contract', () => {
           {
             title: 'عنوان',
             onClose: () => setOpen(false),
-            actions: createElement('button', { type: 'button' }, 'ذخیره'),
+            primary: createElement('button', { type: 'button' }, 'ذخیره'),
           } as ComponentProps<typeof ProfileDialog>,
           field === 'input'
             ? createElement('input', { 'aria-label': 'نام' })

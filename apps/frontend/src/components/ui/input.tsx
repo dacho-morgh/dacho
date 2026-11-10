@@ -4,6 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { XCircle } from 'lucide-react'
 import * as React from 'react'
 import { SearchIcon } from '@/components/icons'
+import { RequiredMark } from '@/components/ui/field'
 import { Typography, typographyVariants } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
 
@@ -80,6 +81,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const helperId = inputId && (error || hint) ? `${inputId}-description` : undefined
     const isError = Boolean(error) || variant === 'error'
     const computedVariant = isError ? 'error' : variant || 'default'
+    // A required control marks its label with the shared `*`, however it was flagged.
+    const isRequired =
+      props.required === true || props['aria-required'] === true || props['aria-required'] === 'true'
 
     const inputElement = (
       <div
@@ -145,6 +149,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className="cursor-pointer select-none"
           >
             {label}
+            {isRequired ? <RequiredMark className="ms-0.5" /> : null}
           </Typography>
         )}
 

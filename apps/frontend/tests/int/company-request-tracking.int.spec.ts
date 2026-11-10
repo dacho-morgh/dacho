@@ -292,9 +292,9 @@ describe('CompanyCorrectionPanel', () => {
   it('edits the same case and resubmits it with the agreement versions', async () => {
     const fetchMock = stubApi({})
     panel()
-    expect((screen.getByLabelText('عنوان طرح') as HTMLInputElement).value).toBe('باتری شبکه')
+    expect((screen.getByLabelText(/عنوان طرح/) as HTMLInputElement).value).toBe('باتری شبکه')
     expect(screen.getByTestId('document-field').getAttribute('data-request')).toBe(REQUEST_ID)
-    fireEvent.change(screen.getByLabelText('عنوان طرح'), { target: { value: 'باتری شبکه اصلاح‌شده' } })
+    fireEvent.change(screen.getByLabelText(/عنوان طرح/), { target: { value: 'باتری شبکه اصلاح‌شده' } })
     await acceptAgreements()
     fireEvent.click(screen.getByRole('button', { name: 'ارسال اصلاحیه' }))
 
@@ -337,12 +337,12 @@ describe('CompanyCorrectionPanel', () => {
   it('handles a stale case: rereads it and keeps the typed input', async () => {
     stubApi({ resubmit: () => json(409, { error: 'not_correctable' }) })
     panel()
-    fireEvent.change(screen.getByLabelText('عنوان طرح'), { target: { value: 'متن حفظ‌شده' } })
+    fireEvent.change(screen.getByLabelText(/عنوان طرح/), { target: { value: 'متن حفظ‌شده' } })
     await acceptAgreements()
     fireEvent.click(screen.getByRole('button', { name: 'ارسال اصلاحیه' }))
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('دیگر در وضعیت اصلاح نیست'))
     expect(refresh).toHaveBeenCalled()
-    expect((screen.getByLabelText('عنوان طرح') as HTMLInputElement).value).toBe('متن حفظ‌شده')
+    expect((screen.getByLabelText(/عنوان طرح/) as HTMLInputElement).value).toBe('متن حفظ‌شده')
     expect(screen.queryByTestId('correction-sent')).toBeNull()
   })
 

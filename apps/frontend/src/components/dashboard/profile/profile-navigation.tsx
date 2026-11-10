@@ -113,17 +113,18 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
           </Typography>
         )}
         <div className="flex gap-2">
+          <Button size="40" type="button" variant="destructive" className="flex-1" loading={isLoggingOut} onClick={handleLogout}>
+            خروج از حساب
+          </Button>
           <Button size="40"
             type="button"
             variant="outline-gray"
             className="flex-1"
+            autoFocus
             disabled={isLoggingOut}
             onClick={() => setIsLogoutOpen(false)}
           >
             انصراف
-          </Button>
-          <Button size="40" type="button" variant="destructive" className="flex-1" loading={isLoggingOut} onClick={handleLogout}>
-            خروج از حساب
           </Button>
         </div>
       </SheetContent>

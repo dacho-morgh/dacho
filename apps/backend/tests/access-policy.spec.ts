@@ -4,6 +4,7 @@ import {
   MAX_DOCUMENT_BYTES,
   allowedRequestActions,
   bindRequestScope,
+  canDeleteCompanyDocument,
   canDeleteDocument,
   canReadDocument,
   canUploadOwnedDocument,
@@ -291,6 +292,20 @@ describe('document read authority', () => {
     expect(canUploadOwnedDocument('representative', 'financialStatements', { requestOwnerId: 'rep-1', requestStatus: 'in_review' }, 'rep-1', 'company-1')).toBe(false)
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'draft' }, 'rep-1')).toBe(true)
     expect(canDeleteDocument('representative', { requestOwnerId: 'rep-1', requestStatus: 'in_review' }, 'rep-1')).toBe(false)
+  })
+
+  it('lets only the owning representative delete a company dossier file', () => {
+    const dossier = { category: 'certificatesLicenses' as const, companyId: 'company-1', requestId: null }
+    expect(canDeleteCompanyDocument('representative', dossier, 'company-1')).toBe(true)
+    expect(canDeleteCompanyDocument('representative', dossier, 'company-2')).toBe(false)
+    expect(canDeleteCompanyDocument('representative', dossier, null)).toBe(false)
+    expect(canDeleteCompanyDocument('representative', { ...dossier, companyId: null }, null)).toBe(false)
+    for (const role of ['system-owner', 'central-secretariat', 'chief-reviewer', 'reviewer', 'employer-reviewer', 'investment-reviewer'] as const) {
+      expect(canDeleteCompanyDocument(role, dossier, 'company-1')).toBe(false)
+    }
+    // A request file never takes this path; its own rules stay in force.
+    expect(canDeleteCompanyDocument('representative', { ...dossier, requestId: 'request-1' }, 'company-1')).toBe(false)
+    expect(canDeleteCompanyDocument('representative', { ...dossier, category: 'proposal' }, 'company-1')).toBe(false)
   })
 
   it('opens company financial files only after the chief advances the case (T29)', () => {

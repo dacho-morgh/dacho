@@ -919,7 +919,10 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-end gap-2 border-t border-neutral-100 pt-3">
+            <div className="mt-4 flex items-center justify-start gap-2 border-t border-neutral-100 pt-3">
+              <Button type="submit" variant="default" size="32" disabled={submitting}>
+                {submitting ? 'در حال ثبت...' : isEditing ? 'ذخیره تغییرات' : 'ثبت غرفه'}
+              </Button>
               <Button
                 type="button"
                 variant="outline-gray"
@@ -928,9 +931,6 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                 disabled={submitting}
               >
                 انصراف
-              </Button>
-              <Button type="submit" variant="default" size="32" disabled={submitting}>
-                {submitting ? 'در حال ثبت...' : isEditing ? 'ذخیره تغییرات' : 'ثبت غرفه'}
               </Button>
             </div>
           </fieldset>

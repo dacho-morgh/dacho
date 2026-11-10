@@ -64,7 +64,11 @@ Uploads: an active representative may add files to its own draft request or own
 company dossier; System Owner and Central Secretariat may add to an authorized
 parent. Other roles cannot upload here. Deleting a request file is limited to
 the owner representative while the request is `draft`, or System Owner.
-Company-dossier deletion is not exposed in this slice.
+A company-dossier file (no request parent) can be deleted only by the
+representative of the owning company. System Owner, Central Secretariat and
+case roles cannot delete dossier files; a reader who may not delete gets `403`,
+anyone else `404`. Deleting a dossier file is a company edit (T59): it returns
+an approved or pending verification in the same transaction, like an upload.
 Correspondence uploads require a request parent and may be added after submission;
 they do not replace or mutate existing submitted/financial files.
 
@@ -88,9 +92,9 @@ invalid entries. Repeated document ids are persisted once.
 | `GET /documents?requestId=...` | list authorized metadata for an authorized request; `allowedActions` is per document |
 | `GET /documents?companyId=...` | company dossier metadata; representative may only request its own company |
 | `POST /documents` | multipart `file` + `category` + exactly one parent (`requestId` or `companyId`), optional `logicalVersion`; returns safe metadata |
-| `GET /documents/:id` | authorized metadata only; `allowedActions` may include `download` and, while the request is a draft and the actor owns it, `delete` |
+| `GET /documents/:id` | authorized metadata only; `allowedActions` may include `download` and `delete` when the actor may delete: the owner of a draft request file, or the owning representative of a company-dossier file |
 | `GET /documents/:id/download` | authorized bytes with `Content-Disposition`, `Cache-Control: private, no-store`, `nosniff` and a sandbox CSP |
-| `DELETE /documents/:id` | draft-owner or System Owner request file; a file pinned by a submitted proposal snapshot returns `409 document_pinned` |
+| `DELETE /documents/:id` | draft-owner or System Owner request file; a file pinned by a submitted proposal snapshot returns `409 document_pinned`. A company-dossier file only by its company's representative; the private bytes are removed after the metadata commits |
 
 The same-origin `/api/dashboard/*` proxy forwards multipart bytes without
 corrupting the boundary, preserves the authorized download headers, and never
