@@ -7,7 +7,7 @@ import { statementYearPlan } from '../financial-package.js'
 import { actorOf } from '../proxy-auth.js'
 import { AGREEMENT_TEXTS_APPROVED, CURRENT_EVENT_RULES_VERSION, CURRENT_NON_COMPETE_VERSION, parseApplicationTeam } from '../request-repo.js'
 import { isUuid } from '../../exhibitions/catalogue.js'
-import { parseRequestFilters, parsePositiveInt, parseRevisionQuery, acceptsAgreementVersion, isRepresentative, isCompanyAdministrator, safeOwner, requestWithActions, parseExpectedRevision, parseDecisionReason, missingRequiredFields } from './route-helpers.js'
+import { parseRequestFilters, parsePositiveInt, parseRevisionQuery, acceptsAgreementVersion, isRepresentative, isCompanyAdministrator, logoOf, safeOwner, requestWithActions, parseExpectedRevision, parseDecisionReason, missingRequiredFields } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 
 export function registerRequestRoutes(router: Router, ctx: DashboardContext): void {
@@ -178,14 +178,25 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
       limit: parsePositiveInt(req.query.limit, 25),
     })
     const presented = await presentRequests(actor, result.items)
+    const hidesOwner = isReviewerRole(actor.operationalRole)
+    // One read of the companies names every owner's company and picture (a read per row would be slow);
+    // a failed read leaves the rows with the representative's name only.
+    const companyOf = new Map<string, Awaited<ReturnType<typeof deps.companyStore.list>>[number]>()
+    if (!hidesOwner && presented.length > 0) {
+      for (const company of await deps.companyStore.list({ withLogos: true }).catch(() => [])) {
+        if (company.representativeId && !companyOf.has(company.representativeId)) companyOf.set(company.representativeId, company)
+      }
+    }
     const items = await Promise.all(
-      presented.map(async (item) => ({
-        ...(await limitRequest(actor, item, false)),
+      presented.map(async (item) => {
         // One owner the CMS cannot resolve (e.g. an old non-numeric id) must not fail the whole list.
-        owner: isReviewerRole(actor.operationalRole)
-          ? null
-          : safeOwner(await deps.userStore.findById(item.ownerId).catch(() => undefined)),
-      })),
+        const owner = hidesOwner ? null : safeOwner(await deps.userStore.findById(item.ownerId).catch(() => undefined))
+        const company = companyOf.get(item.ownerId)
+        return {
+          ...(await limitRequest(actor, item, false)),
+          owner: owner && { ...owner, companyName: company?.name ?? null, logo: logoOf(company) },
+        }
+      }),
     )
     res.json({ ...result, items })
     } catch (error) { next(error) }

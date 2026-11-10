@@ -409,6 +409,13 @@ describe('T38: scoped queues, counts and overview (int)', () => {
     expect((await get(app, 'company-user-1', `/stats?${query}`)).body).toMatchObject({ total: 1, in_review: 1 })
     expect((await get(app, 'chief', `/admin/requests?search=${found}`)).body.items.map((item: { id: string }) => item.id)).toEqual([mine.id])
     expect((await get(app, 'chief', `/admin/requests?search=${hiddenTitle}`)).body.total).toBe(0)
+    // Each row names the owner's company (and its picture, when it has one) beside the representative.
+    expect((await get(app, 'chief', `/admin/requests?search=${found}`)).body.items[0].owner).toMatchObject({
+      id: 'company-user-1',
+      companyName: 'شرکت فناور پیشرو',
+      logo: null,
+    })
+    expect((await get(app, 'reviewer-1', '/admin/requests')).body.items.every((item: { owner: unknown }) => item.owner === null)).toBe(true)
 
     // Wildcards are literal text, not a way to list everything.
     expect((await get(app, 'owner', '/requests?search=%25')).body.total).toBe(0)

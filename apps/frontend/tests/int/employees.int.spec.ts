@@ -5,12 +5,17 @@ import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EmployeeList } from '@/components/dashboard/employee-list'
 import { EmployeeForm } from '@/components/dashboard/employees/employee-form'
-
-const navigation = vi.hoisted(() => ({ push: vi.fn(), search: new URLSearchParams() }))
+const navigation = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  router: {} as { push: unknown; replace: unknown },
+  search: new URLSearchParams(),
+}))
+navigation.router = { push: navigation.push, replace: navigation.replace }
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard/employees',
   useSearchParams: () => navigation.search,
-  useRouter: () => ({ push: navigation.push }),
+  useRouter: () => navigation.router,
 }))
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status })
 afterEach(() => {
@@ -42,25 +47,40 @@ const staff = [
   { id: 3, name: 'نماینده شرکت', operationalRole: 'representative', isActive: true },
 ]
 
-function openMenu(name: string) {
-  const trigger = screen.getByRole('button', { name: `عملیات ${name}` })
-  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' })
-  return screen.findByRole('menu')
+const staffRows = () => screen.getAllByRole('row').slice(1)
+const rowActions = (index: number) => screen.getAllByRole('button', { name: 'عملیات' })[index]!
+/** The form renders its submit button twice (beside the title from sm, below the form on phones); jsdom hides neither. */
+const submitButton = () => screen.getAllByRole('button', { name: 'ثبت اطلاعات' })[0]!
+
+/** A list that answers the PATCH like the server does: later reads show the new state. */
+function statefulFetch(options: { patchStatus?: number } = {}) {
+  let rows = staff.map((person) => ({ ...person }))
+  const request = vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.method === 'PATCH') {
+      if (options.patchStatus && options.patchStatus !== 200)
+        return json({ error: 'stale_personnel' }, options.patchStatus)
+      const body = JSON.parse(init.body as string)
+      const id = Number(String(url).split('/').pop())
+      rows = rows.map((row) => (row.id === id ? { ...row, isActive: body.isActive } : row))
+      return json({ doc: rows.find((row) => row.id === id) })
+    }
+    return json({ docs: rows, hasNextPage: false })
+  })
+  vi.stubGlobal('fetch', request)
+  return request
 }
 
 describe('employee list', () => {
-  it('shows staff in the Figma columns, hides representatives, searches and filters by role', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => json({ docs: staff, hasNextPage: false })),
-    )
+  it('shows staff in the shared table columns, hides representatives, searches and filters by role', async () => {
+    statefulFetch()
     render(createElement(EmployeeList, { canManage: true }))
     const table = await screen.findByRole('table')
+    await screen.findByText('مهندس آرش حسینی')
     expect(
       within(table)
         .getAllByRole('columnheader')
         .map((cell) => cell.textContent),
-    ).toEqual(['نام کارمند', 'نقش', 'زمینه فعالیت', 'مدرک دانشگاهی', 'عملیات'])
+    ).toEqual(['', 'نام کارمند', 'نقش', 'زمینه فعالیت', 'مدرک دانشگاهی', 'عملیات'])
     expect(screen.getByText('کارشناسی ارشد مدیریت بازرگانی')).toBeTruthy()
     expect(screen.getByText('کمیته سرمایه‌گذاری')).toBeTruthy()
     expect(screen.queryByText('نماینده شرکت')).toBeNull()
@@ -72,18 +92,65 @@ describe('employee list', () => {
     expect(screen.queryByText('مهندس آرش حسینی')).toBeNull()
     expect(screen.getByText('دکتر نازنین بهرامی')).toBeTruthy()
     fireEvent.change(screen.getByLabelText('جستجوی کارمند'), { target: { value: 'ناموجود' } })
-    expect(screen.getByText('کارمندی با این مشخصات پیدا نشد')).toBeTruthy()
+    expect(screen.getByText('موردی پیدا نشد')).toBeTruthy()
   })
 
-  it('shows the Figma empty state with an add action for the owner', async () => {
+  it('puts the search in the URL after a pause, starting again from page 1', async () => {
+    statefulFetch()
+    render(createElement(EmployeeList, { canManage: true }))
+    await screen.findByText('مهندس آرش حسینی')
+    fireEvent.change(screen.getByLabelText('جستجوی کارمند'), { target: { value: 'خدمات' } })
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith(
+        `/dashboard/employees?search=${encodeURIComponent('خدمات')}`,
+      ),
+    )
+  })
+
+  it('filters by the role in the URL', async () => {
+    navigation.search = new URLSearchParams('role=investment-reviewer')
+    statefulFetch()
+    render(createElement(EmployeeList, { canManage: true }))
+    await screen.findByText('دکتر نازنین بهرامی')
+    expect(screen.queryByText('مهندس آرش حسینی')).toBeNull()
+    expect(staffRows()).toHaveLength(1)
+  })
+
+  it('opens with the rows the server read, without asking for them again', () => {
+    const request = vi.fn()
+    vi.stubGlobal('fetch', request)
+    render(createElement(EmployeeList, { canManage: true, initial: staff.slice(0, 2) as never }))
+    expect(screen.getByText('مهندس آرش حسینی')).toBeTruthy()
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('pages ten at a time and writes the page to the URL', async () => {
+    const many = Array.from({ length: 12 }, (_, index) => ({
+      id: 100 + index,
+      name: `کارمند ${index + 1}`,
+      operationalRole: 'reviewer',
+      isActive: true,
+      updatedAt: '2026-11-01T10:00:00.000Z',
+    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => json({ docs: many, hasNextPage: false })),
+    )
+    render(createElement(EmployeeList, { canManage: true }))
+    await screen.findByText('کارمند 1')
+    expect(staffRows()).toHaveLength(10)
+    fireEvent.click(screen.getByRole('button', { name: 'صفحه بعد' }))
+    expect(navigation.push).toHaveBeenCalledWith('/dashboard/employees?page=2')
+  })
+
+  it('shows the empty state of the table', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => json({ docs: [], hasNextPage: false })),
     )
     render(createElement(EmployeeList, { canManage: true }))
-    await screen.findByText('کارمندی در این صفحه موجود نیست')
-    expect(screen.getByText('اولین کارمند را اضافه کنید')).toBeTruthy()
-    expect(screen.getAllByRole('link', { name: 'کارمند جدید' })).toHaveLength(2)
+    await screen.findByText('هنوز موردی برای نمایش وجود ندارد')
+    expect(screen.getByRole('link', { name: 'کارمند جدید' })).toBeTruthy()
   })
 
   it.each([401, 403, 500])('shows personnel load failure %s and safely retries', async (status) => {
@@ -95,10 +162,12 @@ describe('employee list', () => {
     render(createElement(EmployeeList, { canManage: true }))
     await screen.findByRole('alert')
     if (status === 401) expect(screen.getByRole('link', { name: 'ورود دوباره' })).toBeTruthy()
+    else if (status === 403)
+      expect(screen.getByRole('link', { name: 'بازگشت به پیشخوان' })).toBeTruthy()
     else {
       failed = false
       fireEvent.click(screen.getByRole('button', { name: 'تلاش دوباره' }))
-      await screen.findByText('کارمندی در این صفحه موجود نیست')
+      await screen.findByText('هنوز موردی برای نمایش وجود ندارد')
     }
   })
 
@@ -114,61 +183,71 @@ describe('employee list', () => {
     render(createElement(EmployeeList))
     await screen.findByText('کارمند')
     expect(screen.queryByRole('link', { name: 'کارمند جدید' })).toBeNull()
-    const menu = await openMenu('کارمند')
-    expect(within(menu).getByRole('menuitem', { name: 'مشاهده' })).toBeTruthy()
-    expect(within(menu).queryByRole('menuitem', { name: 'ویرایش' })).toBeNull()
-    expect(within(menu).queryByRole('menuitem', { name: 'حذف کارمند' })).toBeNull()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    fireEvent.click(rowActions(0))
+    expect(await screen.findByRole('link', { name: 'مشاهده' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'ویرایش' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'حذف کارمند' })).toBeNull()
   })
 
-  it('deletes an employee by deactivating with the current snapshot after confirmation', async () => {
-    const request = vi.fn(async (_url: string, init?: RequestInit) =>
-      init?.method === 'PATCH'
-        ? json({ doc: { ...staff[0], isActive: false, updatedAt: '2026-11-01T11:00:00.000Z' } })
-        : json({ docs: staff, hasNextPage: false }),
-    )
-    vi.stubGlobal('fetch', request)
+  it('opens the edit screen from the row actions', async () => {
+    statefulFetch()
     render(createElement(EmployeeList, { canManage: true }))
     await screen.findByText('مهندس آرش حسینی')
-    const menu = await openMenu('مهندس آرش حسینی')
-    fireEvent.click(within(menu).getByRole('menuitem', { name: 'حذف کارمند' }))
+    fireEvent.click(rowActions(0))
+    fireEvent.click(await screen.findByRole('button', { name: 'ویرایش' }))
+    expect(navigation.push).toHaveBeenCalledWith('/dashboard/employees/1/edit')
+  })
+
+  it('deactivates with the current snapshot after confirmation and shows it at once', async () => {
+    const request = statefulFetch()
+    render(createElement(EmployeeList, { canManage: true }))
+    await screen.findByText('مهندس آرش حسینی')
+    fireEvent.click(rowActions(0))
+    fireEvent.click(await screen.findByRole('button', { name: 'حذف کارمند' }))
     const dialog = await screen.findByRole('dialog', { name: 'حذف کارمند' })
     expect(request.mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false)
     fireEvent.click(within(dialog).getByRole('button', { name: 'حذف کارمند' }))
-    await screen.findByText('«مهندس آرش حسینی» از کارکنان فعال حذف شد.')
+    await screen.findByText('غیرفعال')
     const [url, init] = request.mock.calls.find(([, init]) => init?.method === 'PATCH')!
     expect(url).toBe('/api/users/personnel/1')
     expect(JSON.parse(init!.body as string)).toEqual({
       expectedUpdatedAt: staff[0].updatedAt,
       isActive: false,
     })
-    expect(screen.getByText('غیرفعال')).toBeTruthy()
   })
 
-  it('keeps the confirmation open and explains a stale deactivation', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (_url: string, init?: RequestInit) =>
-        init?.method === 'PATCH'
-          ? json({ error: 'stale_personnel' }, 409)
-          : json({ docs: staff, hasNextPage: false }),
-      ),
-    )
+  it('puts the employee back when the server refuses a stale deactivation', async () => {
+    statefulFetch({ patchStatus: 409 })
     render(createElement(EmployeeList, { canManage: true }))
     await screen.findByText('مهندس آرش حسینی')
-    const menu = await openMenu('مهندس آرش حسینی')
-    fireEvent.click(within(menu).getByRole('menuitem', { name: 'حذف کارمند' }))
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'حذف کارمند' }))
-    expect((await within(dialog).findByRole('alert')).textContent).toContain('اطلاعات تغییر کرده')
-    expect(within(dialog).getByRole('button', { name: 'دریافت دوباره فهرست' })).toBeTruthy()
+    fireEvent.click(rowActions(0))
+    fireEvent.click(await screen.findByRole('button', { name: 'حذف کارمند' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'حذف کارمند' }),
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(screen.queryByText('غیرفعال')).toBeNull())
+    expect(screen.getByText('مهندس آرش حسینی')).toBeTruthy()
+  })
+
+  it('deactivates the selected employees together', async () => {
+    const request = statefulFetch()
+    render(createElement(EmployeeList, { canManage: true }))
+    await screen.findByText('مهندس آرش حسینی')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'انتخاب همه ردیف‌ها' }))
+    const actions = screen.getByRole('group', { name: 'عملیات گروهی' })
+    fireEvent.click(within(actions).getByRole('button', { name: 'حذف کارمند' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'حذف کارمند' }),
+    )
+    await waitFor(() => expect(screen.getAllByText('غیرفعال')).toHaveLength(2))
+    expect(request.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(2)
   })
 
   it('announces a save that returned from the employee form', async () => {
     navigation.search = new URLSearchParams('saved=created')
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => json({ docs: staff, hasNextPage: false })),
-    )
+    statefulFetch()
     render(createElement(EmployeeList, { canManage: true }))
     // The saved result is a toast (FE43), rendered after mount.
     expect(await screen.findByText('کارمند جدید ثبت شد.')).toBeTruthy()
@@ -212,14 +291,16 @@ describe('employee form', () => {
     fireEvent.submit(form)
     await waitFor(() => expect(writes).toBe(1))
     expect(
-      (screen.getByRole('button', { name: 'در حال ثبت...' }) as HTMLButtonElement).disabled,
+      (screen.getAllByRole('button', { name: 'در حال ثبت...' }) as HTMLButtonElement[]).every(
+        (button) => button.disabled,
+      ),
     ).toBe(true)
     finish(json({ errors: [{ data: { errors: [{ path: 'phone' }] } }] }, 400))
     await screen.findByText('این مقدار معتبر یا یکتا نیست.')
     expect((screen.getByLabelText('نام و نام خانوادگی') as HTMLInputElement).value).toBe(
       'کارفرمای نمونه',
     )
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await waitFor(() =>
       expect(navigation.push).toHaveBeenCalledWith('/dashboard/employees?saved=created'),
     )
@@ -242,7 +323,7 @@ describe('employee form', () => {
     const request = vi.fn()
     vi.stubGlobal('fetch', request)
     render(createElement(EmployeeForm, { mode: 'create' }))
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await screen.findByText('نام و نام خانوادگی را وارد کنید.')
     expect(screen.getByText('شماره تلفن همراه را وارد کنید.')).toBeTruthy()
     expect(screen.getByText('نقش در سیستم را انتخاب کنید.')).toBeTruthy()
@@ -279,7 +360,7 @@ describe('employee form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'آدرس جدید' }))
     fireEvent.change(screen.getByLabelText('آدرس ۱'), { target: { value: 'بوشهر، خیابان ساحلی' } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await screen.findByText('ذخیره یا دریافت اطلاعات انجام نشد. دوباره تلاش کنید.')
     await waitFor(() =>
       expect(
@@ -292,7 +373,7 @@ describe('employee form', () => {
     expect((upload[1]!.body as FormData).get('file')).toBeInstanceOf(File)
 
     failSave = false
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await waitFor(() => expect(navigation.push).toHaveBeenCalled())
     const save = request.mock.calls.filter(([url]) => url === '/api/users').at(-1)!
     expect(JSON.parse(save[1]!.body as string)).toMatchObject({
@@ -336,7 +417,7 @@ describe('employee form', () => {
     expect(screen.getByRole('link', { name: 'old.pdf' })).toBeTruthy()
     latest = { ...original, name: 'نسخه جدید', updatedAt: '2026-10-27T11:00:00.000Z' }
     fireEvent.change(screen.getByLabelText('نقش در سیستم'), { target: { value: 'chief-reviewer' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     expect((await screen.findByRole('alert')).textContent).toContain('اطلاعات تغییر کرده')
     expect((screen.getByLabelText('نام و نام خانوادگی') as HTMLInputElement).value).toBe(
       'نسخه قدیم',
@@ -348,7 +429,7 @@ describe('employee form', () => {
       ),
     )
     fireEvent.change(screen.getByLabelText('نقش در سیستم'), { target: { value: 'chief-reviewer' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ثبت اطلاعات' }))
+    fireEvent.click(submitButton())
     await waitFor(() =>
       expect(navigation.push).toHaveBeenCalledWith('/dashboard/employees?saved=updated'),
     )

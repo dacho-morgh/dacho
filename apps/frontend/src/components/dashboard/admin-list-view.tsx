@@ -68,7 +68,9 @@ export type AdminRowAction = {
   label: string
   icon: React.ReactNode
   destructive?: boolean
-  onSelect: () => void
+  /** A link to another page; otherwise `onSelect` runs. */
+  href?: string
+  onSelect?: () => void
 }
 /**
  * A row's actions always live in this popover (styled like the sidebar's profile popover) and its
@@ -102,24 +104,35 @@ export function AdminRowActions({
             </Typography>
           </Link>
         </Button>
-        {actions.map((action) => (
-          <Button
-            key={action.id}
-            type="button"
-            variant={action.destructive ? 'text-destructive' : 'text-gray'}
-            size="40"
-            className="w-full justify-start px-3"
-            onClick={() => {
-              setOpen(false)
-              action.onSelect()
-            }}
-          >
-            {action.icon}
-            <Typography as="span" variant="14/regular">
-              {action.label}
-            </Typography>
-          </Button>
-        ))}
+        {actions.map((action) =>
+          action.href ? (
+            <Button key={action.id} asChild variant="text-gray" size="40" className="w-full justify-start px-3">
+              <Link href={action.href} onClick={() => setOpen(false)}>
+                {action.icon}
+                <Typography as="span" variant="14/regular">
+                  {action.label}
+                </Typography>
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              key={action.id}
+              type="button"
+              variant={action.destructive ? 'text-destructive' : 'text-gray'}
+              size="40"
+              className="w-full justify-start px-3"
+              onClick={() => {
+                setOpen(false)
+                action.onSelect?.()
+              }}
+            >
+              {action.icon}
+              <Typography as="span" variant="14/regular">
+                {action.label}
+              </Typography>
+            </Button>
+          ),
+        )}
       </PopoverContent>
     </Popover>
   )
@@ -323,7 +336,12 @@ export function AdminListView<T>({
       </Typography>
       {notice}
       {/* On a phone the create action sits under search and filter, full width. */}
-      <div className="flex flex-col-reverse gap-3 sm:flex-row-reverse sm:flex-wrap sm:items-center sm:justify-between">
+      {/* The row runs left to right; search and filter alone belong on the right edge, so the page reads right to left. */}
+      <div
+        className={`flex flex-col-reverse gap-3 sm:flex-row-reverse sm:flex-wrap sm:items-center ${
+          addAction ? 'sm:justify-between' : 'sm:justify-end'
+        }`}
+      >
         {addAction && (
           <div className="flex w-full flex-row-reverse gap-2 sm:w-auto">
             {actionsBesideCreate && bulkButtons}
@@ -383,7 +401,7 @@ export function AdminListView<T>({
               <tr
                 key={getKey(item)}
                 data-state={selected.has(getKey(item)) ? 'selected' : undefined}
-                className="h-[72px] border-b border-neutral-100 last:border-0 data-[state=selected]:bg-brand-50/50"
+                className="h-[72px] border-b border-neutral-100 transition-colors last:border-0 hover:bg-neutral-50 has-[[data-state=open]]:bg-neutral-50 data-[state=selected]:bg-brand-50/50 data-[state=selected]:hover:bg-brand-50/70"
               >
                 {selectable && (
                   <td className="w-12 px-4">
