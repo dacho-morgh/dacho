@@ -6,19 +6,21 @@ Backend slice that lets the person holding a [handed-off case (T31)](investment-
 
 - Every save adds a version. No version's text changes afterwards, and no route deletes one.
 - Saving the holder's latest unsent text again returns that version and writes nothing.
-- Only the holder's own latest version can be sent. A repeated send returns the version already sent.
+- Only the writer's own latest version can be sent. A repeated send returns the version already sent.
+- The owner may also write and send a memo on any handed-off case without holding it (decided 2026-11-08). The rules are the same: the owner sends only its own latest version, and its version replaces an unsent draft of the investment person, which can then no longer be sent.
 - A correction after sending is a new version that must be sent again. The earlier sent version stays as it was.
 - A memo carries no decision. Saving and sending leave the request's status, stage and revision unchanged, and there is no approve, reject, return or voting command.
 
-Save and send run under the request row lock and check the holder inside that transaction, so a revocation that committed first closes the write.
+Save and send run under the request row lock and check the holder (or, for the owner, the handoff) inside that transaction, so a revocation that committed first closes the write.
 
 ## API
 
 | Route | Who | Behaviour |
 | --- | --- | --- |
-| `POST /investment/cases/:id/memo` | Investment person holding the case | Body `{ body }`, trimmed, at most 20,000 characters. `201 { memo }` for a new version, `200 { memo }` for a retry. `400 invalid_memo`; `404` without the case; `409 investment_stage_closed`. Every other role gets `403`. |
-| `POST /investment/cases/:id/memo/send` | Investment person holding the case | Body `{ version }`. `200 { memo }`. `400 invalid_memo_version`; `404` for a version they did not write; `409 memo_version_stale` for a replaced version; `409 investment_stage_closed`. Every other role gets `403`. |
+| `POST /investment/cases/:id/memo` | Investment person holding the case, owner on a handed-off case | Body `{ body }`, trimmed, at most 20,000 characters. `201 { memo }` for a new version, `200 { memo }` for a retry. `400 invalid_memo`; `404` without the case; `409 investment_stage_closed`. Every other role gets `403`. |
+| `POST /investment/cases/:id/memo/send` | Investment person holding the case, owner on a handed-off case | Body `{ version }`. `200 { memo }`. `400 invalid_memo_version`; `404` for a version they did not write; `409 memo_version_stale` for a replaced version; `409 investment_stage_closed`. Every other role gets `403`. |
 | `GET /investment/cases/:id` | Investment person holding the case | The [T31 dossier](investment-handoff.md) now includes `memos`: their own versions and every sent version, newest first. |
+| `GET /investment/cases/:id/memos` | Investment person holding the case, owner on a handed-off case | `{ memos }`: the writer's own versions and every sent version, newest first. The memo panel reads this. `404` before the handoff or without the case. Every other role gets `403`. |
 | `GET /investment/memos` | Secretariat, owner | `{ items, total, page, totalPages }`: every sent memo with its case, author and time, newest first. Every other role gets `403`. |
 | `GET /requests/:id/investment-memos` | Secretariat, owner | `{ items }`, newest first: sent versions for the Secretariat, every version for the owner. Every other role gets `403`. |
 

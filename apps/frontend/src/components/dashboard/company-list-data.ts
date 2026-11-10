@@ -15,6 +15,8 @@ export type VerificationQueue = 'all' | 'pending' | 'approved' | 'returned' | 'r
 export type Company = {
   id: string
   name: string
+  /** The company's picture (its access-checked file route); null when it has none. */
+  logoUrl: string | null
   ceo: string
   companyType: string
   address: string
@@ -56,6 +58,7 @@ export type CompaniesApiResponse = {
     id: string
     companyId?: string | null
     companyName?: string
+    logo?: { id: string; url: string } | null
     name?: string
     updatedAt?: string | null
     companyType?: string
@@ -91,6 +94,7 @@ export function toCompaniesPage(data: CompaniesApiResponse, requestedPage: numbe
     companies: data.items.map((item) => ({
       id: item.id,
       name: item.companyName || item.name || '—',
+      logoUrl: item.logo?.url ?? null,
       ceo:
         item.executives?.find((executive) => /مدیر\s*عامل/i.test(executive.role || ''))?.name ||
         item.name ||

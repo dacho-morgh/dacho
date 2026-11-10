@@ -5,6 +5,11 @@ import { getPayload } from 'payload'
 import React from 'react'
 import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import {
+  adminRequestsQuery,
+  toAdminRequestsPage,
+  type AdminRequestsApiResponse,
+} from '@/components/dashboard/admin-request-list-data'
+import {
   parseRequestStatus,
   RequestsListView,
   type RequestItem,
@@ -26,6 +31,8 @@ import {
 } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import {
+  canReadCompanyDossiers,
+  canReadFollowUps,
   dashboardOperationalRole,
   isInternalDashboardUser,
   serverDashboardFetchResult,
@@ -51,18 +58,21 @@ export default async function RequestsPage({
     eventId?: string | string[]
     stage?: string | string[]
     queue?: string | string[]
+    followUp?: string | string[]
     view?: string | string[]
   }>
 }) {
   const query = await searchParams
   const status = parseRequestStatus(query.status)
   const page = parseRequestPage(query.page)
-  const filters = parseRequestFilters(query)
-  const filterQuery = requestFiltersQuery(filters)
-
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: getPayloadAuthHeaders(await headers()) })
   const isInternal = isInternalDashboardUser(user)
+  const canFollowUp = canReadFollowUps(user)
+  // Only the Secretariat and the owner may ask for the follow-up cases; anyone else gets the whole list.
+  const { followUp, ...otherFilters } = parseRequestFilters(query)
+  const filters = canFollowUp && followUp ? { ...otherFilters, followUp } : otherFilters
+  const filterQuery = requestFiltersQuery(filters)
 
   // Reviewers and employers work from their own assignment queue (T23), not the generic list.
   if (isReviewerRole(dashboardOperationalRole(user))) {
@@ -96,13 +106,20 @@ export default async function RequestsPage({
   const queueNote = <RequestsQueueNote filters={filters} />
 
   if (isInternal) {
+    // The page is read here, so the table opens with its rows instead of a skeleton and a loading line.
+    const adminQuery = adminRequestsQuery(status, page, filters)
+    const firstPage = await serverDashboardFetchResult<AdminRequestsApiResponse>(`/admin/requests?${adminQuery}`)
+    const initial = firstPage.kind === 'ok' ? toAdminRequestsPage(firstPage.data, page) : null
     return (
       <AdminRequestList
         status={status}
         page={page}
         filters={filters}
-        toolbar={filterForm}
-        notice={queueNote}
+        counts={counts}
+        events={overviewResult.kind === 'ok' ? (overviewResult.data.events ?? []) : []}
+        canViewCompany={canReadCompanyDossiers(user)}
+        canFollowUp={canFollowUp}
+        initial={initial ? { ...initial, key: adminQuery } : undefined}
       />
     )
   }

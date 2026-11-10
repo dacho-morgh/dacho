@@ -119,3 +119,9 @@ export function canReadCompanyDossiers(user: SeniorManagerCandidate | null | und
   const role = dashboardOperationalRole(user)
   return role === 'system-owner' || role === 'central-secretariat'
 }
+
+/** The Secretariat's follow-up cases (sent investment memos), as the API's follow-up readers. */
+export function canReadFollowUps(user: SeniorManagerCandidate | null | undefined): boolean {
+  const role = dashboardOperationalRole(user)
+  return role === 'system-owner' || role === 'central-secretariat'
+}
