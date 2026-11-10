@@ -75,11 +75,46 @@ interface HeldCase {
 }
 
 /**
- * Takes the request lock, then checks in the same transaction that the actor still holds
- * the handed-off case, so a revocation that committed first closes the write. Returns
- * `null` for a case the actor does not hold and `closed` once the case has left the stage.
+ * Who writes a memo: the investment person holding the case, or the owner, who may write on
+ * any handed-off case without holding it.
  */
-async function lockHeldCase(client: PoolClient, actorId: string, requestId: string): Promise<HeldCase | 'closed' | null> {
+export interface MemoWriter {
+  id: string
+  role: 'investment-reviewer' | 'system-owner'
+}
+
+/** The package on the case's latest invitation, as `CASE_ROWS_SQL` reads it, without an assignment. */
+const LATEST_PACKAGE_SQL = `
+  SELECT fp.id AS package_id
+  FROM (
+    SELECT fi.id FROM dashboard.financial_invitations fi
+    WHERE fi.request_id = $1 ORDER BY fi.request_revision DESC LIMIT 1
+  ) i
+  JOIN dashboard.financial_packages fp ON fp.invitation_id = i.id
+  ORDER BY fp.package_version DESC LIMIT 1`
+
+/** The package the writer may write against: the held case's for the investment person, the latest for the owner. */
+async function writablePackageId(
+  db: Pick<PoolClient, 'query'>,
+  writer: MemoWriter,
+  requestId: string,
+): Promise<string | undefined> {
+  const found = writer.role === 'system-owner'
+    ? await db.query<{ package_id: string }>(LATEST_PACKAGE_SQL, [requestId])
+    : await db.query<{ package_id: string }>(
+        `SELECT package_id FROM (${CASE_ROWS_SQL}) q WHERE request_id = $2`,
+        [writer.id, requestId],
+      )
+  return found.rows[0]?.package_id
+}
+
+/**
+ * Takes the request lock, then checks in the same transaction that the writer may still
+ * write on the handed-off case, so a revocation that committed first closes the write.
+ * Returns `null` for a case the writer may not write on and `closed` once the case has
+ * left the stage.
+ */
+async function lockHeldCase(client: PoolClient, writer: MemoWriter, requestId: string): Promise<HeldCase | 'closed' | null> {
   const locked = await client.query<{ owner_id: string; status: string; review_stage: string | null; revision: number }>(
     `SELECT owner_id, status::text AS status, review_stage, revision
      FROM dashboard.requests WHERE id = $1 FOR UPDATE`,
@@ -87,11 +122,7 @@ async function lockHeldCase(client: PoolClient, actorId: string, requestId: stri
   )
   const request = locked.rows[0]
   if (!request) return null
-  const held = await client.query<{ package_id: string }>(
-    `SELECT package_id FROM (${CASE_ROWS_SQL}) q WHERE request_id = $2`,
-    [actorId, requestId],
-  )
-  const packageId = held.rows[0]?.package_id
+  const packageId = await writablePackageId(client, writer, requestId)
   if (!packageId) return null
   if (!isFinancialStageOpen(request.status, request.review_stage)) return 'closed'
   return { ownerId: request.owner_id, status: request.status, revision: request.revision, packageId }
@@ -107,12 +138,13 @@ export class InvestmentMemoRepository {
    * Stores the text as the case's next version. Retrying a save of the holder's latest
    * unsent text returns that version and writes nothing.
    */
-  async save(input: { requestId: string; actorId: string; body: string }): Promise<SaveMemoResult> {
+  async save(input: { requestId: string; writer: MemoWriter; body: string }): Promise<SaveMemoResult> {
+    const actorId = input.writer.id
     if (!isUuid(input.requestId)) return { status: 'not_found' }
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
-      const held = await lockHeldCase(client, input.actorId, input.requestId)
+      const held = await lockHeldCase(client, input.writer, input.requestId)
       if (!held || held === 'closed') {
         await client.query('ROLLBACK')
         return { status: held ? 'stage_closed' : 'not_found' }
@@ -123,7 +155,7 @@ export class InvestmentMemoRepository {
         [input.requestId],
       )
       const current = latest.rows[0]
-      if (current && !current.sent_at && current.author_id === input.actorId && current.body === input.body) {
+      if (current && !current.sent_at && current.author_id === actorId && current.body === input.body) {
         await client.query('COMMIT')
         return { status: 'unchanged', memo: mapMemo(current) }
       }
@@ -131,12 +163,12 @@ export class InvestmentMemoRepository {
         `INSERT INTO dashboard.investment_memos AS m (request_id, package_id, version, body, author_id)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING ${MEMO_COLUMNS}`,
-        [input.requestId, held.packageId, (current?.version ?? 0) + 1, input.body, input.actorId],
+        [input.requestId, held.packageId, (current?.version ?? 0) + 1, input.body, actorId],
       )
       await appendTransition(client, {
         requestId: input.requestId,
         ownerId: held.ownerId,
-        actorId: input.actorId,
+        actorId: actorId,
         action: 'investment_memo_save',
         fromState: held.status,
         toState: held.status,
@@ -158,12 +190,13 @@ export class InvestmentMemoRepository {
    * the case's status nor its stage: the memo carries no decision. A repeated send returns
    * the version already sent.
    */
-  async send(input: { requestId: string; actorId: string; version: number }): Promise<SendMemoResult> {
+  async send(input: { requestId: string; writer: MemoWriter; version: number }): Promise<SendMemoResult> {
+    const actorId = input.writer.id
     if (!isUuid(input.requestId)) return { status: 'not_found' }
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
-      const held = await lockHeldCase(client, input.actorId, input.requestId)
+      const held = await lockHeldCase(client, input.writer, input.requestId)
       if (!held || held === 'closed') {
         await client.query('ROLLBACK')
         return { status: held ? 'stage_closed' : 'not_found' }
@@ -173,7 +206,7 @@ export class InvestmentMemoRepository {
                 (SELECT max(l.version) FROM dashboard.investment_memos l WHERE l.request_id = m.request_id) AS latest_version
          FROM dashboard.investment_memos m
          WHERE m.request_id = $1 AND m.version = $2 AND m.author_id = $3`,
-        [input.requestId, input.version, input.actorId],
+        [input.requestId, input.version, actorId],
       )
       const memo = found.rows[0]
       if (!memo) {
@@ -195,14 +228,14 @@ export class InvestmentMemoRepository {
       await appendTransition(client, {
         requestId: input.requestId,
         ownerId: held.ownerId,
-        actorId: input.actorId,
+        actorId: actorId,
         action: 'investment_memo_send',
         fromState: held.status,
         toState: held.status,
         revision: held.revision,
       })
       await notifyNextRole(client, this.notificationOutbox, {
-        requestId: input.requestId, actorId: input.actorId, action: 'investment_memo_send',
+        requestId: input.requestId, actorId: actorId, action: 'investment_memo_send',
         fromState: held.status, toState: held.status,
       })
       await client.query('COMMIT')
@@ -213,6 +246,12 @@ export class InvestmentMemoRepository {
     } finally {
       client.release()
     }
+  }
+
+  /** Whether the writer may write on the case: it was handed off and, for the investment person, they hold it. */
+  async canWrite(writer: MemoWriter, requestId: string): Promise<boolean> {
+    if (!isUuid(requestId)) return false
+    return Boolean(await writablePackageId(this.pool, writer, requestId))
   }
 
   /** The holder's view: their own versions and whatever was sent, so a new holder never reads another person's draft. */
