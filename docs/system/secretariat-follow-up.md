@@ -53,7 +53,7 @@ Delivery does not outlast access: revoking the assignment, deactivating the acco
 
 ## Screens
 
-- `/dashboard/follow-ups`: the queue, for the Secretariat and the owner.
+- `/dashboard/requests`: for the Secretariat and the owner, a case with a sent memo carries the «پیگیری سرمایه‌گذاری» tag (and «منتظر انتشار نتیجه» until a result is published), and the filter `followUp=1` lists only those cases. `/dashboard/follow-ups` redirects there. `GET /admin/requests` returns `followUp: { latestMemoSentAt, publishedAt } | null` on each row for these two roles, and `followUp=1` from any other role is `400 invalid_follow_up`.
 - The internal case page has a follow-up section. It renders nothing for roles the server denies, and is read-only for the owner.
 - The company's case page shows the published result and, once a request exists, the request text and an upload field.
 

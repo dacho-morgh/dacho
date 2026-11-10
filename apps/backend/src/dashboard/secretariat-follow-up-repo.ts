@@ -465,6 +465,39 @@ export class SecretariatFollowUpRepository {
     return rows[0]?.company_name ?? null
   }
 
+  /**
+   * The follow-up state of each listed case that has a sent memo, so the requests list can tag it.
+   * Cases without a sent memo are absent from the map.
+   */
+  async followUpStates(requestIds: string[]): Promise<Map<string, { latestMemoSentAt: string; publishedAt: string | null }>> {
+    const ids = requestIds.filter(isUuid)
+    const states = new Map<string, { latestMemoSentAt: string; publishedAt: string | null }>()
+    if (ids.length === 0) return states
+    const { rows } = await this.pool.query<{ request_id: string; latest_memo_sent_at: Date; published_at: Date | null }>(
+      `SELECT r.id AS request_id, m.sent_at AS latest_memo_sent_at, pr.published_at
+       FROM dashboard.requests r
+       JOIN LATERAL (
+         SELECT sent_at FROM dashboard.investment_memos
+         WHERE request_id = r.id AND sent_at IS NOT NULL
+         ORDER BY version DESC LIMIT 1
+       ) m ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT published_at FROM dashboard.published_results
+         WHERE request_id = r.id AND published_at IS NOT NULL
+         ORDER BY version DESC LIMIT 1
+       ) pr ON TRUE
+       WHERE r.id = ANY($1::uuid[])`,
+      [ids],
+    )
+    for (const row of rows) {
+      states.set(row.request_id, {
+        latestMemoSentAt: row.latest_memo_sent_at.toISOString(),
+        publishedAt: row.published_at?.toISOString() ?? null,
+      })
+    }
+    return states
+  }
+
   /** One row per case with a sent memo. Cases without a published result come first. */
   async listFollowUps(options: { page: number; limit: number }): Promise<FollowUpList> {
     const counted = await this.pool.query<{ total: string }>(

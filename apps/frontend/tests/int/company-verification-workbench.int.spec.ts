@@ -182,6 +182,7 @@ describe('FE05: Secretariat Company Verification Workbench', () => {
               {
                 id: first.id,
                 name: first.companyName,
+                logoUrl: null,
                 ceo: 'علی رضایی',
                 companyType: first.companyType,
                 address: 'تهران، تهران',

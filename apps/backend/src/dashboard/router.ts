@@ -26,12 +26,12 @@ const dashboardRoles = {
     label: 'صاحب سیستم',
     responsibilities: ['مدیریت دسترسی‌های سامانه', 'پیگیری همه درخواست‌ها و نامه‌ها'],
     // One entry for events and exhibitions (S5, FE40); /dashboard/exhibitions redirects into it.
-    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/follow-ups', '/dashboard/letters', '/dashboard/events', '/dashboard/profile'],
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/letters', '/dashboard/events', '/dashboard/profile'],
   },
   'central-secretariat': {
     label: 'دبیرخانه مرکزی',
     responsibilities: ['پیگیری درخواست‌های ارجاع‌شده در محدوده دبیرخانه', 'مدیریت اطلاعات شرکت‌ها'],
-    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/follow-ups', '/dashboard/letters', '/dashboard/exhibitions', '/dashboard/profile'],
+    destinations: ['/dashboard', '/dashboard/companies', '/dashboard/employees', '/dashboard/requests', '/dashboard/letters', '/dashboard/exhibitions', '/dashboard/profile'],
   },
   'chief-reviewer': {
     label: 'سردبیر داوری',

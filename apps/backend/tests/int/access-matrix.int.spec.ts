@@ -743,7 +743,8 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
       expectOk(await post(company, `/requests/${id}/financial-package`), 201, 'package')
 
       // Memo.
-      await expectOnly(id, 'save memo', [holder], (user, target) => post(user, `/investment/cases/${target}/memo`, { body: 'تلاش' }))
+      // The owner may also write a memo on a handed-off case; a version only its author can send.
+      await expectOnly(id, 'save memo', [holder, 'owner'], (user, target) => post(user, `/investment/cases/${target}/memo`, { body: 'تلاش' }))
       const memo = await post(holder, `/investment/cases/${id}/memo`, { body: 'یادداشت' })
       expectOk(memo, 201, 'memo')
       await expectOnly(id, 'send memo', [holder], (user, target) => post(user, `/investment/cases/${target}/memo/send`, { version: memo.body.memo.version }))
