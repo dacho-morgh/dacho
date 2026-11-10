@@ -61,12 +61,12 @@ export function ChiefReviewSummary({ round, evaluations, history, people = {}, c
 
   return (
     <section
-      className="flex min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6"
+      className="flex min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4"
       aria-labelledby="chief-review-summary"
       data-testid="chief-review-summary"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Typography id="chief-review-summary" as="h2" variant="20/bold" color="neutral-900">خلاصه چهار ارزیابی</Typography>
+        <Typography id="chief-review-summary" as="h2" variant="16/bold" sm="20/bold" color="neutral-800">خلاصه چهار ارزیابی</Typography>
         {current ? (
           <Typography
             as="span"

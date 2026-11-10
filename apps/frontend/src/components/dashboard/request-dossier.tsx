@@ -1,15 +1,18 @@
 import type { OperationalRole } from '@cms-core/access/roles'
-import Link from 'next/link'
 
 import { ChiefReviewSummary, type SummaryPart } from '@/components/dashboard/chief-review-summary'
+import { CollapsibleCard, DetailCard, InfoField, ReadonlyField } from '@/components/dashboard/company-detail/company-detail-parts'
 import { InvestmentDossierPanel } from '@/components/dashboard/investment-dossier-panel'
 import { InvestmentMemoPanel } from '@/components/dashboard/investment-memo-panel'
 import { RequestActionsPanel } from '@/components/dashboard/request-actions-panel'
 import { RequestAssignmentPanel } from '@/components/dashboard/request-assignment-panel'
+import { RequestCompanyCard } from '@/components/dashboard/request-detail/request-company-card'
+import { RequestDetailShell } from '@/components/dashboard/request-detail/request-detail-shell'
+import { RequestEventCard, RequestWorkflowStepper } from '@/components/dashboard/request-detail/request-event-card'
+import { RequestCardRow, RequestHistoryCard } from '@/components/dashboard/request-detail/request-history-card'
 import { ReviewAssignmentPanel } from '@/components/dashboard/review-assignment-panel'
 import { SecretariatFollowUpPanel } from '@/components/dashboard/secretariat-follow-up-panel'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
-import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
   formatDate,
@@ -73,6 +76,17 @@ const STATUS_LABELS: Record<string, string> = {
   approved: 'تایید شده',
   rejected: 'رد شده',
 }
+
+/** The tag colour of each status, as the design's status tags use them. */
+const STATUS_VARIANTS: Record<string, 'gray' | 'primary' | 'success' | 'warning' | 'error'> = {
+  draft: 'gray',
+  in_review: 'primary',
+  action_needed: 'warning',
+  approved: 'success',
+  rejected: 'error',
+}
+
+const plainText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
 
 /** Each optional read: null when this role has no such read, `failed` when it did not arrive. */
 export type DossierPart<T> = T | null | 'failed'
@@ -147,33 +161,44 @@ export function RequestDossier({
     <SecretariatFollowUpPanel id={id} trackingCode={request.trackingCode} />
   ) : null
 
-  return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6 sm:p-10" dir="rtl">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <Typography as="h1" variant="24/bold" color="neutral-900">{request.title}</Typography>
-          {!isCompany && owner?.name ? (
-            <Typography variant="14/regular" color="neutral-500">شرکت: {owner.name}</Typography>
-          ) : null}
-        </div>
-        {(role === 'system-owner' || role === 'central-secretariat') && request.ownerId ? (
-          <Button asChild variant="outline-gray" size="40">
-            <Link href={`/dashboard/companies/${encodeURIComponent(request.ownerId)}`}>
-              <Typography variant="14/regular" className="text-inherit">مشاهده پروفایل شرکت</Typography>
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+  const oversight = role === 'system-owner' || role === 'central-secretariat'
+  const companyName = plainText(owner?.name)
+  const profileHref = oversight && request.ownerId ? `/dashboard/companies/${encodeURIComponent(request.ownerId)}` : null
+  const showsCompanyCard = !isCompany && Boolean(companyName || profileHref)
+  // The company and the admin pages open with the application card and its stepper; the others keep the stepper in a fold below.
+  const showsEventCard = isCompany || oversight
+  const pageTitle = !isCompany && companyName ? `درخواست ${companyName}` : request.title
+  const statusLabel = STATUS_LABELS[request.status] ?? request.status
+  const statusVariant = STATUS_VARIANTS[request.status] ?? 'gray'
+  const snapshotCompany = profile && profile !== 'failed' ? profile.verification?.snapshot.company : null
+  const companyFacts = [plainText(snapshotCompany?.type), plainText(snapshotCompany?.province), plainText(snapshotCompany?.city)]
+  const submitted = formatDate(request.submissionDate)
+  const eventFacts = [
+    { icon: 'document' as const, text: `کد پیگیری: ${request.trackingCode}` },
+    ...(submitted ? [{ icon: 'calendar' as const, text: `تاریخ ثبت: ${submitted}` }] : []),
+  ]
 
-      <div className="grid gap-3 rounded-2xl border border-neutral-200 bg-background p-4 sm:grid-cols-3">
-        <Field label="کد پیگیری" value={request.trackingCode} mono />
-        <Field label="وضعیت" value={STATUS_LABELS[request.status] ?? request.status} />
-        <Field label="مرحله" value={isCompany ? companyStageLabel(request) : stageLabel(request.reviewStage, request.currentStep)} />
-        <Field label="نسخه پرونده" value={request.revision ? request.revision.toLocaleString('fa-IR') : '—'} />
-        <Field label="اقدام بعدی شما" value={nextAction ?? 'اقدامی برای شما تعریف نشده است'} />
-        <Field label="تاریخ ثبت" value={formatDate(request.submissionDate) || 'ثبت نشده'} />
-        <Field label="آخرین به‌روزرسانی" value={formatDate(request.updatedAt)} />
-      </div>
+  return (
+    <RequestDetailShell title={pageTitle}>
+      {showsCompanyCard ? (
+        <RequestCompanyCard
+          name={companyName || 'شرکت متقاضی'}
+          facts={companyFacts}
+          profileHref={profileHref}
+        />
+      ) : null}
+
+      {showsEventCard ? (
+        <RequestEventCard
+          title={request.title}
+          titleAsHeading={!isCompany}
+          statusLabel={statusLabel}
+          statusVariant={statusVariant}
+          facts={eventFacts}
+          workflow={workflow}
+          currentStep={request.currentStep}
+        />
+      ) : null}
 
       <RequestActionsPanel id={id} actions={actions} revision={request.revision} />
       {unbuiltNotes.length ? (
@@ -195,17 +220,55 @@ export function RequestDossier({
 
       {companySections}
 
+      {/* The history and the people of the round side by side (Figma 31885:6726); either one alone takes the row. */}
+      <RequestCardRow>
+        <RequestHistoryCard timeline={timeline} statusLabel={statusLabel} statusVariant={statusVariant} />
+        <ReviewAssignmentPanel
+          id={id}
+          actions={actions}
+          revision={request.revision}
+          proposalRevision={proposalDetail?.revision ?? null}
+          round={round}
+          evaluations={evaluations}
+          people={people}
+          employerId={roundEmployerId}
+        />
+      </RequestCardRow>
+      {round !== null || evaluations !== null ? (
+        <ChiefReviewSummary
+          round={round}
+          evaluations={evaluations}
+          history={roundHistory}
+          people={people}
+          canDecide={actions.includes('decideReview')}
+        />
+      ) : null}
+
+      {followUp && !financialStageOpen ? followUp : null}
+      {actions.includes('assign') ? <RequestAssignmentPanel id={id} /> : null}
+
+      <DetailCard title="خلاصه پرونده">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {showsEventCard ? null : <InfoField label="کد پیگیری" value={<bdi className="font-mono">{request.trackingCode}</bdi>} />}
+          <InfoField label="وضعیت" value={statusLabel} />
+          <InfoField label="مرحله" value={isCompany ? companyStageLabel(request) : stageLabel(request.reviewStage, request.currentStep)} />
+          <InfoField label="نسخه پرونده" value={request.revision ? request.revision.toLocaleString('fa-IR') : '—'} />
+          <InfoField label="اقدام بعدی شما" value={nextAction ?? 'اقدامی برای شما تعریف نشده است'} />
+          {showsEventCard ? null : <InfoField label="تاریخ ثبت" value={submitted || 'ثبت نشده'} />}
+          <InfoField label="آخرین به‌روزرسانی" value={formatDate(request.updatedAt)} />
+        </div>
+      </DetailCard>
+
       {profile !== null ? <ProfileSnapshot profile={profile} /> : null}
 
-      <section className="rounded-2xl border border-neutral-200 bg-background p-6">
-        <Typography as="h2" variant="20/bold" color="neutral-900">اطلاعات درخواست</Typography>
+      <DetailCard title="اطلاعات و فرم رویداد">
         {proposal === 'failed' ? (
-          <Typography role="alert" variant="14/regular" color="error" className="mt-2">
+          <Typography role="alert" variant="14/regular" color="error">
             دریافت نسخه پروپوزال انجام نشد. صفحه را دوباره بارگذاری کنید.
           </Typography>
         ) : proposalDetail ? (
-          <>
-            <Typography variant="14/regular" color="neutral-500" className="mt-2">
+          <div className="flex flex-col gap-1">
+            <Typography variant="14/regular" color="neutral-500">
               نسخه پروپوزال: {proposalDetail.revision.toLocaleString('fa-IR')}
             </Typography>
             {!isCompany ? (
@@ -216,36 +279,32 @@ export function RequestDossier({
                   : ''}
               </Typography>
             ) : null}
-          </>
+          </div>
         ) : null}
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           {Object.entries(request.answers ?? {})
             .filter(([key]) => key !== 'applicationTeam')
             .map(([key, value]) => (
-              <div key={key} className="rounded-lg bg-neutral-50 p-3">
-                <Typography variant="12/regular" color="neutral-500">{key}</Typography>
-                <Typography variant="16/regular" color="neutral-800" className="mt-1 break-words">{answerText(value)}</Typography>
-              </div>
+              <ReadonlyField key={key} label={key} value={answerText(value)} />
             ))}
         </div>
         {proposalDetail?.applicationTeam?.length ? (
-          <>
-            <Typography as="h3" variant="16/semibold" color="neutral-900" className="mt-6">تیم متقاضی</Typography>
-            <ul className="mt-2 flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
+            <Typography as="h3" variant="16/semibold" color="neutral-800">تیم متقاضی</Typography>
+            <ul className="flex flex-col gap-2">
               {proposalDetail.applicationTeam.map((member, index) => (
-                <li key={`${index}-${member.name}`} className="rounded-lg bg-neutral-50 p-3">
+                <li key={`${index}-${member.name}`} className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
                   <Typography variant="14/regular" color="neutral-800">
                     {member.name} · {member.role}{member.relation ? ` · ${member.relation}` : ''}
                   </Typography>
                 </li>
               ))}
             </ul>
-          </>
+          </div>
         ) : null}
-      </section>
+      </DetailCard>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
-        <Typography as="h2" variant="20/bold" color="neutral-900">مدارک درخواست</Typography>
+      <DetailCard title="مدارک درخواست">
         {seesFinancial ? (
           <Typography variant="14/regular" color="neutral-500">
             مدارک مالی فقط برای شرکت، دبیرخانه، صاحب سیستم و مسئول سرمایه‌گذاریِ منتسب قابل مشاهده است.
@@ -277,77 +336,14 @@ export function RequestDossier({
               ))
             : null}
         </div>
-      </section>
+      </DetailCard>
 
-      <ReviewAssignmentPanel
-        id={id}
-        actions={actions}
-        revision={request.revision}
-        proposalRevision={proposalDetail?.revision ?? null}
-        round={round}
-        evaluations={evaluations}
-        people={people}
-        employerId={roundEmployerId}
-      />
-      {round !== null || evaluations !== null ? (
-        <ChiefReviewSummary
-          round={round}
-          evaluations={evaluations}
-          history={roundHistory}
-          people={people}
-          canDecide={actions.includes('decideReview')}
-        />
-      ) : null}
-
-      {followUp && !financialStageOpen ? followUp : null}
-      {actions.includes('assign') ? <RequestAssignmentPanel id={id} /> : null}
-
-      <section className="rounded-2xl border border-neutral-200 bg-background p-6">
-        <Typography as="h2" variant="20/bold" color="neutral-900">روند بررسی</Typography>
-        {workflow.length ? (
-          <ol className="mt-4 space-y-3">
-            {workflow.map((step) => {
-              const isCurrent = step.title === request.currentStep
-              return (
-                <li
-                  key={`${step.order}-${step.title}`}
-                  className={`rounded-lg p-3 ${isCurrent ? 'bg-brand-50' : 'bg-neutral-50'}`}
-                  aria-current={isCurrent ? 'step' : undefined}
-                >
-                  <Typography variant="16/regular" className={isCurrent ? 'text-brand-700' : 'text-neutral-800'}>
-                    {step.order}. {step.title}
-                    {step.roleName ? ` · ${step.roleName}` : ''}
-                  </Typography>
-                </li>
-              )
-            })}
-          </ol>
-        ) : (
-          <Typography variant="14/regular" color="neutral-500" className="mt-4">روندی برای این خدمت ثبت نشده است.</Typography>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-neutral-200 bg-background p-6">
-        <Typography as="h2" variant="20/bold" color="neutral-900">تاریخچه</Typography>
-        {timeline.length ? (
-          <ol className="mt-4 space-y-3">
-            {timeline.map((event) => (
-              <li key={event.id} className="rounded-lg border border-neutral-100 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Typography variant="16/regular" color="neutral-800">{event.title}</Typography>
-                  <Typography variant="12/regular" color="neutral-400" className="font-mono">{formatDate(event.at)}</Typography>
-                </div>
-                {event.description ? (
-                  <Typography variant="14/regular" color="neutral-600" className="mt-1 whitespace-pre-wrap">{event.description}</Typography>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <Typography variant="14/regular" color="neutral-500" className="mt-4">هنوز رویدادی ثبت نشده است.</Typography>
-        )}
-      </section>
-    </main>
+      {showsEventCard ? null : (
+        <CollapsibleCard title="روند بررسی" defaultOpen={false}>
+          <RequestWorkflowStepper workflow={workflow} currentStep={request.currentStep} />
+        </CollapsibleCard>
+      )}
+    </RequestDetailShell>
   )
 }
 
@@ -369,8 +365,7 @@ const PROFILE_FIELDS: [section: 'company' | 'dossier', key: string, label: strin
  */
 function ProfileSnapshot({ profile }: { profile: DossierPart<RequestVerificationDto> }) {
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-6">
-      <Typography as="h2" variant="20/bold" color="neutral-900">اطلاعات شرکت در زمان ثبت</Typography>
+    <DetailCard title="اطلاعات شرکت">
       {profile === 'failed' ? (
         <Typography role="alert" variant="14/regular" color="error">
           دریافت پروفایل ثبت‌شده شرکت انجام نشد. صفحه را دوباره بارگذاری کنید.
@@ -378,27 +373,18 @@ function ProfileSnapshot({ profile }: { profile: DossierPart<RequestVerification
       ) : profile?.verification ? (
         <>
           <Typography variant="14/regular" color="neutral-500">
-            نسخه {profile.verification.revision.toLocaleString('fa-IR')} پروفایل تأییدشده · ثبت در {formatDate(profile.verification.createdAt)}
+            اطلاعات در زمان ثبت · نسخه {profile.verification.revision.toLocaleString('fa-IR')} پروفایل تأییدشده · ثبت در {formatDate(profile.verification.createdAt)}
           </Typography>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {PROFILE_FIELDS.map(([section, key, label]) => (
-              <Field key={`${section}.${key}`} label={label} value={answerText(profile.verification?.snapshot[section]?.[key])} />
+              <ReadonlyField key={`${section}.${key}`} label={label} value={answerText(profile.verification?.snapshot[section]?.[key])} />
             ))}
           </div>
         </>
       ) : (
         <Typography variant="14/regular" color="neutral-500">پروفایلی همراه این درخواست ثبت نشده است.</Typography>
       )}
-    </section>
-  )
-}
-
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="rounded-lg bg-neutral-50 p-3">
-      <Typography variant="12/regular" color="neutral-500">{label}</Typography>
-      <Typography variant="16/regular" color="neutral-800" className={`mt-1 break-words ${mono ? 'font-mono' : ''}`}>{value}</Typography>
-    </div>
+    </DetailCard>
   )
 }
 

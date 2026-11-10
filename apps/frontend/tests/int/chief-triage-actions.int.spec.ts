@@ -294,7 +294,7 @@ describe('chief intake snapshots', () => {
         },
       }),
     )
-    expect(screen.getByRole('heading', { name: 'اطلاعات شرکت در زمان ثبت' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'اطلاعات شرکت' })).toBeTruthy()
     expect(screen.getByText('آریانا فناوران')).toBeTruthy()
     expect(screen.getByText('10101010101')).toBeTruthy()
     expect(screen.getByText('توربین، پمپ')).toBeTruthy()
