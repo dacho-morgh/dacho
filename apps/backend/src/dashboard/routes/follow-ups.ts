@@ -2,17 +2,14 @@
 import type { Router } from 'express'
 import type { Response } from 'express'
 import { isFinancialStageOpen } from '../../access/policy.js'
-import type { OperationalRole } from '../../access/roles.js'
 import { MAX_RESULT_LENGTH, MAX_SUPPLEMENTARY_REQUEST_LENGTH } from '../secretariat-follow-up-repo.js'
 import { actorOf } from '../proxy-auth.js'
 import { isUuid } from '../../exhibitions/catalogue.js'
-import { parsePositiveInt, resolveRequesterNames } from './route-helpers.js'
+import { isFollowUpReader, parsePositiveInt, resolveRequesterNames } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 
 export function registerFollowUpRoutes(router: Router, ctx: DashboardContext): void {
   const { deps, repo, investmentMemos, followUps, resolveScope, withAuthorNames } = ctx
-
-  const isFollowUpReader = (role: OperationalRole) => role === 'central-secretariat' || role === 'system-owner'
 
   /** Answers a closed command, so each route only handles its own success statuses. */
   const respondClosed = (res: Response, status: 'not_found' | 'stage_closed' | 'memo_not_sent' | 'stale_version') => {

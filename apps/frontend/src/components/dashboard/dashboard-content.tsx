@@ -16,7 +16,6 @@ const LIST_ROUTES = new Set([
   '/dashboard/employees',
   '/dashboard/events',
   '/dashboard/exhibitions',
-  '/dashboard/follow-ups',
 ])
 
 /** A company's detail screens fill the page; their section tabs stay put and only the open section scrolls. */
