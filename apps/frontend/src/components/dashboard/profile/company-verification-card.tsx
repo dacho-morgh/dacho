@@ -1,8 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { SupportModal } from '@/components/dashboard/support-modal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
@@ -112,7 +110,6 @@ export function CompanyVerificationCard({
   submitting: boolean
   onSubmit: () => void
 }) {
-  const [supportOpen, setSupportOpen] = useState(false)
   const banner = bannerFor(verification, missing)
   const { status } = verification
   const canSubmit = verification.canRequestVerification && status !== 'pending' && status !== 'approved'
@@ -270,12 +267,11 @@ export function CompanyVerificationCard({
             </Button>
           )}
           {status === 'rejected' && (
-            <Button type="button" size="40" variant="outline-gray" onClick={() => setSupportOpen(true)}>
-              پیام به صندوق
+            <Button asChild size="40" variant="outline-gray">
+              <Link href="/dashboard/letters/new?mode=support">پیام به پشتیبانی</Link>
             </Button>
           )}
         </div>
-        <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
       </div>
     </section>
   )

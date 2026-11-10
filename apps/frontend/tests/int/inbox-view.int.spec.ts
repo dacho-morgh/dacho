@@ -138,7 +138,9 @@ describe('inbox (S1)', () => {
     mocks.role.mockReturnValue('representative')
     mocks.fetch.mockResolvedValue(page([], { unread: 0, actionRequired: 0 }))
     render(await LettersPage(view()))
-    expect(screen.getByRole('button', { name: /پیام به پشتیبانی/ })).toBeTruthy()
+    // «پشتیبانی» goes to the new-letter page in support mode (design QA #280), not to a modal.
+    expect(screen.getByRole('link', { name: /پیام به پشتیبانی/ }).getAttribute('href')).toBe('/dashboard/letters/new?mode=support')
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByRole('link', { name: /نامه جدید/ })).toBeNull()
   })
 })

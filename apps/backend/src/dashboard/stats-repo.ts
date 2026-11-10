@@ -3,6 +3,7 @@ import type { Pool } from 'pg'
 import type { RequestScope } from '../access/policy.js'
 import type { OperationalRole } from '../access/roles.js'
 import { requestFilterClauses, requestScopeClause, type RequestFilters } from './request-repo.js'
+import { COMPANY_REQUEST_PHASES, companyRequestPhaseSql, type CompanyRequestPhase } from './company-request-phase.js'
 import { REQUEST_WORK_QUEUES, requestWorkQueueClause, type RequestWorkQueue } from './work-queues.js'
 
 export interface RequestStats {
@@ -11,15 +12,15 @@ export interface RequestStats {
   approved: number
   action_needed: number
   rejected: number
+  /**
+   * The same rows by company-facing phase (#280, `company-request-phase.ts`), so a company's phase
+   * filter counts what it opens: each count is the size of `GET /requests` with the same filters
+   * plus that `phase`.
+   */
+  phases: Record<CompanyRequestPhase, number>
 }
 
-interface StatsRow {
-  total: number
-  in_review: number
-  approved: number
-  action_needed: number
-  rejected: number
-}
+type StatsRow = Omit<RequestStats, 'phases'> & Record<`phase_${CompanyRequestPhase}`, number>
 
 /** Requests submitted on one Tehran calendar day, and how many of those are approved now. */
 export interface RequestTrendDay {
@@ -64,12 +65,17 @@ export class StatsRepository {
   async forScope(scope: RequestScope, filters: RequestFilters = {}): Promise<RequestStats> {
     const params: unknown[] = []
     const whereSql = [requestScopeClause(scope, params, 'r'), ...requestFilterClauses(filters, params)].join(' AND ')
+    const phaseSql = companyRequestPhaseSql('r')
+    const phaseColumns = COMPANY_REQUEST_PHASES.map(
+      (phase) => `COUNT(*) FILTER (WHERE ${phaseSql} = '${phase}')::int AS phase_${phase}`,
+    )
     const { rows } = await this.pool.query<StatsRow>(
       `SELECT COUNT(*)::int AS total,
               COUNT(*) FILTER (WHERE r.status = 'in_review')::int AS in_review,
               COUNT(*) FILTER (WHERE r.status = 'approved')::int AS approved,
               COUNT(*) FILTER (WHERE r.status = 'action_needed')::int AS action_needed,
-              COUNT(*) FILTER (WHERE r.status = 'rejected')::int AS rejected
+              COUNT(*) FILTER (WHERE r.status = 'rejected')::int AS rejected,
+              ${phaseColumns.join(',\n              ')}
        FROM dashboard.requests r
        WHERE ${whereSql}`,
       params,
@@ -81,6 +87,11 @@ export class StatsRepository {
       approved: row?.approved ?? 0,
       action_needed: row?.action_needed ?? 0,
       rejected: row?.rejected ?? 0,
+      phases: {
+        verification: row?.phase_verification ?? 0,
+        reviewing: row?.phase_reviewing ?? 0,
+        finished: row?.phase_finished ?? 0,
+      },
     }
   }
 

@@ -1,22 +1,23 @@
 import React from 'react'
 import { Typography } from '@/components/ui/typography'
-import type { RequestStatus } from './types'
+import type { CompanyRequestStage } from '@/utilities/company-request-stage'
 
 export interface RequestStatusBadgeProps {
-  status: RequestStatus
+  /** The company-facing stage (design QA #280); staff lists do not use this badge. */
+  stage: CompanyRequestStage
   label: string
   className?: string
 }
 
 /**
- * Status Badge for Requests List (Figma Tag node 32:9838)
+ * Company stage badge of the requests list (Figma Medium tag: grey 32:9854, primary 32:9860)
  */
 export function RequestStatusBadge({
-  status,
+  stage,
   label,
   className = '',
 }: RequestStatusBadgeProps) {
-  const isBlue = status === 'in_review'
+  const isBlue = stage === 'reviewing'
   const bgColor = isBlue ? 'bg-brand-50' : 'bg-neutral-100'
   const textColor = isBlue ? 'text-brand-600' : 'text-neutral-600'
 

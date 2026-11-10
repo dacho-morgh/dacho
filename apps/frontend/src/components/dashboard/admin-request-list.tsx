@@ -35,7 +35,7 @@ const SEARCH_DEBOUNCE_MS = 300
 const STATUS_LABELS: Record<RequestStatus, string> = {
   draft: 'پیش‌نویس',
   in_review: 'درحال بررسی',
-  action_needed: 'نیازمند اصلاح',
+  action_needed: 'نیازمند اقدام',
   approved: 'تایید شده',
   rejected: 'رد شده',
 }

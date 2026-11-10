@@ -19,6 +19,7 @@ import { RequestsPagination } from '@/components/dashboard/requests/requests-pag
 import {
   parseRequestFilters,
   parseRequestPage,
+  type RequestQueueFilters,
   requestFiltersQuery,
   requestQueueHref,
 } from '@/components/dashboard/requests/types'
@@ -29,6 +30,7 @@ import {
   type RequestDto,
   type RequestStats,
 } from '@/utilities/dashboard-api'
+import type { CompanyRequestStage } from '@/utilities/company-request-stage'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import {
   canReadCompanyDossiers,
@@ -53,6 +55,7 @@ export default async function RequestsPage({
 }: {
   searchParams: Promise<{
     status?: string | string[]
+    phase?: string | string[]
     page?: string | string[]
     search?: string | string[]
     eventId?: string | string[]
@@ -70,8 +73,10 @@ export default async function RequestsPage({
   const isInternal = isInternalDashboardUser(user)
   const canFollowUp = canReadFollowUps(user)
   // Only the Secretariat and the owner may ask for the follow-up cases; anyone else gets the whole list.
-  const { followUp, ...otherFilters } = parseRequestFilters(query)
-  const filters = canFollowUp && followUp ? { ...otherFilters, followUp } : otherFilters
+  // `phase` is the company's own stage filter; staff filter by the real status and stage.
+  const { followUp, ...parsedFilters } = parseRequestFilters(query)
+  const otherFilters: RequestQueueFilters = isInternal ? { ...parsedFilters, phase: undefined } : parsedFilters
+  const filters: RequestQueueFilters = canFollowUp && followUp ? { ...otherFilters, followUp } : otherFilters
   const filterQuery = requestFiltersQuery(filters)
 
   // Reviewers and employers work from their own assignment queue (T23), not the generic list.
@@ -81,11 +86,14 @@ export default async function RequestsPage({
     return <ReviewerQueue key={`${view}-${reviewPage}`} view={view} page={reviewPage} />
   }
 
+  const overviewResult = await serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview')
+  const events = overviewResult.kind === 'ok' ? (overviewResult.data.events ?? []) : []
+  const queueNote = <RequestsQueueNote filters={filters} />
+
+  if (!isInternal) return companyRequestsList({ page, filters, filterQuery, events, queueNote })
+
   // Counts come from the same filters as the list, so a tab's number is the size of its list.
-  const [statsResult, overviewResult] = await Promise.all([
-    serverDashboardFetchResult<RequestStats>(`/stats${filterQuery.replace('&', '?')}`),
-    serverDashboardFetchResult<DashboardOverviewDto>('/stats/overview'),
-  ])
+  const statsResult = await serverDashboardFetchResult<RequestStats>(`/stats${filterQuery.replace('&', '?')}`)
   const stats = statsResult.kind === 'ok' ? statsResult.data : undefined
   const counts = stats && {
     all: stats.total,
@@ -94,61 +102,67 @@ export default async function RequestsPage({
     approved: stats.approved,
     rejected: stats.rejected,
   }
-  const filterForm = (
-    <RequestsFilters
+
+  // The page is read here, so the table opens with its rows instead of a skeleton and a loading line.
+  const adminQuery = adminRequestsQuery(status, page, filters)
+  const firstPage = await serverDashboardFetchResult<AdminRequestsApiResponse>(`/admin/requests?${adminQuery}`)
+  const initial = firstPage.kind === 'ok' ? toAdminRequestsPage(firstPage.data, page) : null
+  return (
+    <AdminRequestList
       status={status}
+      page={page}
       filters={filters}
-      events={overviewResult.kind === 'ok' ? (overviewResult.data.events ?? []) : []}
       counts={counts}
+      events={events}
+      canViewCompany={canReadCompanyDossiers(user)}
+      canFollowUp={canFollowUp}
+      initial={initial ? { ...initial, key: adminQuery } : undefined}
     />
   )
+}
 
-  const queueNote = <RequestsQueueNote filters={filters} />
-
-  if (isInternal) {
-    // The page is read here, so the table opens with its rows instead of a skeleton and a loading line.
-    const adminQuery = adminRequestsQuery(status, page, filters)
-    const firstPage = await serverDashboardFetchResult<AdminRequestsApiResponse>(`/admin/requests?${adminQuery}`)
-    const initial = firstPage.kind === 'ok' ? toAdminRequestsPage(firstPage.data, page) : null
-    return (
-      <AdminRequestList
-        status={status}
-        page={page}
-        filters={filters}
-        counts={counts}
-        events={overviewResult.kind === 'ok' ? (overviewResult.data.events ?? []) : []}
-        canViewCompany={canReadCompanyDossiers(user)}
-        canFollowUp={canFollowUp}
-        initial={initial ? { ...initial, key: adminQuery } : undefined}
-      />
-    )
-  }
-
-  // The queue scope is server-side: `status` narrows an already authorized list
-  // and a failed read stays distinguishable from an empty one.
-  const result = await serverDashboardFetchResult<Paginated<RequestDto>>(
-    `/requests?limit=50&page=${page}${status ? `&status=${status}` : ''}${filterQuery}`,
-  )
+/**
+ * The company's list (a plain async function, so the page resolves it like any other branch). The
+ * company filters by its three stages (design QA #280); the API folds status and review stage into
+ * the same `phase`, so the list, its pages and each stage's count all come from the server.
+ */
+async function companyRequestsList({
+  page,
+  filters,
+  filterQuery,
+  events,
+  queueNote,
+}: {
+  page: number
+  filters: RequestQueueFilters
+  filterQuery: string
+  events: { id: string; title: string }[]
+  queueNote: React.ReactNode
+}) {
+  // The counts read every stage under the other filters, as the staff tabs read every status.
+  const [result, statsResult] = await Promise.all([
+    serverDashboardFetchResult<Paginated<RequestDto>>(`/requests?limit=50&page=${page}${filterQuery}`),
+    serverDashboardFetchResult<RequestStats>(`/stats${requestFiltersQuery({ ...filters, phase: undefined }).replace('&', '?')}`),
+  ])
   const notice = unavailableReasonFor(result)
   const items: RequestItem[] = result.kind === 'ok' ? result.data.items.map(mapRequestItem) : []
+  const phases = statsResult.kind === 'ok' ? statsResult.data.phases : undefined
+  const stageCounts: Partial<Record<CompanyRequestStage | 'all', number>> | undefined =
+    statsResult.kind === 'ok' ? { all: statsResult.data.total, ...phases } : undefined
+  const filterForm = <RequestsFilters audience="company" filters={filters} events={events} stageCounts={stageCounts} />
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-neutral-50 px-4 pt-6 pb-4 sm:pt-10">
       <RequestsListView
         items={items}
         notice={notice}
-        retryHref={requestQueueHref('/dashboard/requests', status, page, filters)}
+        retryHref={requestQueueHref('/dashboard/requests', undefined, page, filters)}
         state={result.kind === 'ok' && items.length === 0 ? 'empty' : 'default'}
         filterForm={filterForm}
         queueNote={queueNote}
       />
       {result.kind === 'ok' && (
-        <RequestsPagination
-          page={result.data.page}
-          totalPages={result.data.totalPages}
-          status={status}
-          filters={filters}
-        />
+        <RequestsPagination page={result.data.page} totalPages={result.data.totalPages} filters={filters} />
       )}
     </div>
   )

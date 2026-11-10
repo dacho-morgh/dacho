@@ -1,6 +1,7 @@
 import React from 'react'
 import { ListTableFrame } from '@/components/dashboard/list-table'
 import { RequestsTableHeader } from './requests-table-header'
+import { RequestsListCard } from './requests-list-card'
 import { RequestsListRow } from './requests-list-row'
 import { RequestsLoadingSkeleton } from './requests-loading-skeleton'
 import { RequestsEmptyState } from './requests-empty-state'
@@ -29,7 +30,7 @@ export function RequestsListTable({
 
       {/* Default + Empty states show table */}
       {!isLoading && (
-        <table className="w-full min-w-175 table-fixed border-collapse text-right">
+        <table className="hidden w-full min-w-175 table-fixed border-collapse text-right md:table">
           <colgroup>
             <col />
             <col className="w-50" />
@@ -48,6 +49,17 @@ export function RequestsListTable({
             </tbody>
           )}
         </table>
+      )}
+
+      {/* Phone layout: below md each request is a card, never a table in a scroller. */}
+      {!isLoading && data.length > 0 && (
+        <ul className="flex flex-col gap-3 md:hidden" aria-label="درخواست‌ها">
+          {data.map((item) => (
+            <li key={item.id}>
+              <RequestsListCard item={item} />
+            </li>
+          ))}
+        </ul>
       )}
 
       {/* Empty State (Figma node 50:9422) */}

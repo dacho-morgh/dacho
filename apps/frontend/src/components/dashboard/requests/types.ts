@@ -1,3 +1,4 @@
+import { parseCompanyRequestStage, type CompanyRequestStage } from '@/utilities/company-request-stage'
 import type { RequestAction } from '@/utilities/dashboard-api'
 
 export const REQUEST_STATUS_VALUES: RequestStatus[] = [
@@ -41,6 +42,8 @@ export const REVIEW_STAGE_OPTIONS = [
 export type ReviewStageFilter = (typeof REVIEW_STAGE_OPTIONS)[number]['value']
 
 export interface RequestQueueFilters {
+  /** The company's stage filter (`phase` in the URL); staff filter by the real `stage`. */
+  phase?: CompanyRequestStage
   search?: string
   eventId?: string
   stage?: ReviewStageFilter
@@ -53,6 +56,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Malformed values are dropped, as the status is. Whether a queue is the actor's own is the API's decision. */
 export function parseRequestFilters(query: {
+  phase?: string | string[]
   search?: string | string[]
   eventId?: string | string[]
   stage?: string | string[]
@@ -60,6 +64,8 @@ export function parseRequestFilters(query: {
   followUp?: string | string[]
 }): RequestQueueFilters {
   const filters: RequestQueueFilters = {}
+  const phase = parseCompanyRequestStage(query.phase)
+  if (phase) filters.phase = phase
   const search = typeof query.search === 'string' ? query.search.trim().slice(0, 100) : ''
   if (search) filters.search = search
   if (typeof query.eventId === 'string' && UUID.test(query.eventId)) filters.eventId = query.eventId
@@ -71,6 +77,8 @@ export function parseRequestFilters(query: {
 }
 
 function appendFilters(query: URLSearchParams, filters: RequestQueueFilters) {
+  // The API folds status and review stage into `phase` with the same table (#280).
+  if (filters.phase) query.set('phase', filters.phase)
   if (filters.search) query.set('search', filters.search)
   if (filters.eventId) query.set('eventId', filters.eventId)
   if (filters.stage) query.set('stage', filters.stage)
@@ -107,10 +115,11 @@ export interface RequestItem {
   trackingCode: string
   title: string
   status: RequestStatus
+  /** The company-facing stage name (design QA #280): never an internal secretariat or review stage. */
   statusLabel: string
+  stage?: CompanyRequestStage
   currentStep: string
-  /** The company's view of where the case is, its next step and the case revision (FE13). */
-  stageLabel?: string
+  /** The company's next step and the case revision (FE13). */
   nextAction?: string
   revision?: number | null
   allowedActions: RequestAllowedAction[]

@@ -221,3 +221,31 @@ describe('removed routes', () => {
     expect(callers).toEqual([])
   })
 })
+
+describe('company-facing status (design QA #280)', () => {
+  const allStages = ['احراز هویت', 'در حال داوری', 'تمام‌شده (نتیجهٔ نهایی)']
+  const rawStatuses = ['پیش‌نویس', 'در حال بررسی', 'نیازمند اقدام', 'نیازمند اصلاح', 'تایید شده', 'رد شده']
+
+  it.each([
+    ['draft', null, 'احراز هویت'],
+    ['in_review', 'chief_triage', 'احراز هویت'],
+    ['action_needed', 'chief_triage', 'احراز هویت'],
+    ['in_review', 'triaged', 'در حال داوری'],
+    ['in_review', 'advanced', 'در حال داوری'],
+    ['approved', 'advanced', 'تمام‌شده (نتیجهٔ نهایی)'],
+    ['rejected', 'triaged', 'تمام‌شده (نتیجهٔ نهایی)'],
+  ] as const)('shows a company the stage of %s / %s, never the raw status', (status, reviewStage, label) => {
+    dossier({ role: 'representative', detail: detail(['read'], { status, reviewStage }) })
+    expect(allStages).toContain(label)
+    // The tag, the history header and the «وضعیت» field all read the stage.
+    expect(screen.getAllByText(label).length).toBeGreaterThanOrEqual(2)
+    for (const raw of rawStatuses) expect(screen.queryByText(raw)).toBeNull()
+  })
+
+  it('keeps the real status and stage for staff, with one wording for «action needed»', () => {
+    dossier({ role: 'chief-reviewer', detail: detail(['read'], { status: 'action_needed', reviewStage: 'chief_triage' }) })
+    expect(screen.getAllByText('نیازمند اقدام').length).toBeGreaterThan(0)
+    expect(screen.queryByText('نیازمند اصلاح')).toBeNull()
+    expect(screen.queryByText('احراز هویت')).toBeNull()
+  })
+})

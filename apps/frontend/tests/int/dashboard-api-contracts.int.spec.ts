@@ -129,12 +129,13 @@ describe('parseRequestStatus — queue filter contract', () => {
 
 describe('mapRequestItem', () => {
   it('carries the tracking code, current stage and permitted actions to the row', () => {
-    const item = mapRequestItem(dto)
+    const item = mapRequestItem({ ...dto, reviewStage: 'chief_triage' })
 
     expect(item.trackingCode).toBe('TRK-1001')
     expect(item.currentStep).toBe('بررسی کارشناس')
     expect(item.allowedActions).toEqual(['read', 'uploadDocument'])
-    expect(item.statusLabel).toBe(REQUEST_STATUS_LABELS.action_needed)
+    // The company list shows the company stage, never the internal status (design QA #280).
+    expect(item.statusLabel).toBe('احراز هویت')
   })
 
   it('defaults a missing stage/actions without inventing permissions', () => {

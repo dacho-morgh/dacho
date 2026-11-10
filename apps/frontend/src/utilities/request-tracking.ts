@@ -4,25 +4,19 @@
  * the transition rows of the history. Nothing here decides a transition; it only
  * names what the server already recorded, in Persian.
  */
+import { companyRequestStageLabel } from './company-request-stage'
 import type { ActivityDto, RequestAction, RequestDto } from './dashboard-api'
 
 type TrackedRequest = Pick<RequestDto, 'status' | 'reviewStage' | 'currentStep'> & {
   allowedActions?: RequestAction[]
 }
 
-/** Where the case is, as the company should read it. */
+/**
+ * Where the case is, as the company reads it: one of the three company stages
+ * (design QA #280). Internal secretariat and review stages never reach the company.
+ */
 export function companyStageLabel(request: TrackedRequest): string {
-  const { status, reviewStage } = request
-  if (status === 'draft') return 'پیش‌نویس (ارسال نشده)'
-  if (status === 'action_needed' && reviewStage === 'chief_triage') return 'بازگشت برای اصلاح'
-  if (status === 'rejected') return 'رد نهایی'
-  if (status === 'approved') return 'تأیید شده'
-  if (status === 'in_review') {
-    if (reviewStage === 'chief_triage') return 'بررسی اولیه'
-    if (reviewStage === 'triaged') return 'داوری'
-    if (reviewStage === 'advanced') return 'مالی و سرمایه‌گذاری'
-  }
-  return request.currentStep || 'در حال بررسی'
+  return companyRequestStageLabel(request)
 }
 
 /** The single next step the server leaves to the company, or that none is expected. */
