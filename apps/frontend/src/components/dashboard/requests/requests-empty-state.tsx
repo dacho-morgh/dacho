@@ -23,7 +23,7 @@ export function RequestsEmptyState({
 }: RequestsEmptyStateProps) {
   return (
     <div
-      className={`absolute inset-0 flex items-center justify-center px-4 text-center ${className}`}
+      className={`absolute inset-x-0 top-11 bottom-0 flex items-center justify-center px-4 text-center ${className}`}
     >
       <div className="flex flex-col items-center">
         <EmptyInboxIllustration className="size-20" />
@@ -38,7 +38,7 @@ export function RequestsEmptyState({
 
         <Link
           href={actionHref}
-          className="mt-2 inline-flex h-10 items-center justify-center rounded-[10px] px-2 text-brand-500 transition-colors hover:bg-[#eef2ff] hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+          className="mt-2 inline-flex h-10 items-center justify-center rounded-[10px] px-2 text-brand-500 transition-colors hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
         >
           <Typography as="span" variant="16/semibold" className="text-inherit">
             {actionLabel}

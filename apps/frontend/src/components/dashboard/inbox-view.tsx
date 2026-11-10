@@ -11,21 +11,15 @@ import {
   DashboardMessageTextIcon,
   DashboardUserTagIcon,
   EmptyInboxIllustration,
-  FilterIcon,
-  MoreOptionsIcon,
   TrashIcon,
 } from '@/components/icons'
+import { ListFilterButton } from '@/components/dashboard/list-filter-button'
+import { RowActions } from '@/components/dashboard/list-row-actions'
+import { ListRow, ListTableFrame, useRowLink } from '@/components/dashboard/list-table'
+import { ListToolbar } from '@/components/dashboard/list-toolbar'
 import { SearchField } from '@/components/dashboard/search-field'
 import { SupportModal } from '@/components/dashboard/support-modal'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -121,11 +115,13 @@ function Counterpart({ row }: { row: InboxRow }) {
   )
 }
 
+const letterHref = (row: InboxRow) => `/dashboard/letters/${encodeURIComponent(row.id)}`
+
 function RowTitle({ row }: { row: InboxRow }) {
   const unread = row.received && row.read === false
   return (
     <Link
-      href={`/dashboard/letters/${encodeURIComponent(row.id)}`}
+      href={letterHref(row)}
       className="flex min-w-0 items-center gap-2 text-neutral-600 transition-colors hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500"
     >
       {unread && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-brand-500" />}
@@ -148,43 +144,38 @@ function RowMenu({
 }) {
   // Read state and hiding are the recipient's own mailbox actions.
   if (!row.received) return null
+  // Figma 30865:18777: icon first, then the label, in reading order. The shared RowActions
+  // shows a lone action directly; here a received letter always has at least two.
   return (
-    <DropdownMenu dir="rtl">
-      <DropdownMenuTrigger asChild>
-        <Button variant="text-gray" size="icon-32" type="button" aria-label={`منوی عملیات «${row.title}»`}>
-          <MoreOptionsIcon className="size-5" />
-        </Button>
-      </DropdownMenuTrigger>
-      {/* Figma 30865:18777: icon first, then the label, in reading order */}
-      <DropdownMenuContent
-        align="start"
-        sideOffset={6}
-        className="flex w-[180px] min-w-[180px] flex-col gap-1 rounded-xl border border-neutral-100 bg-background p-1 shadow-xs"
-      >
-        {row.canReply && (
-          <DropdownMenuItem asChild className={menuItemClass}>
-            <Link href={`/dashboard/letters/new?replyTo=${encodeURIComponent(row.id)}`}>
-              <DashboardMessageTextIcon aria-hidden="true" className="size-5 shrink-0" />
-              <Typography as="span" variant="14/regular" className="text-inherit">ثبت بازخورد</Typography>
-            </Link>
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={() => onToggleRead(row)} className={menuItemClass}>
-          <DashboardEyeIcon aria-hidden="true" className="size-5 shrink-0" />
-          <Typography as="span" variant="14/regular" className="text-inherit">
-            {row.read ? 'علامت خوانده‌نشده' : 'علامت خوانده‌شده'}
-          </Typography>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onHide(row)} className={menuItemClass}>
-          <TrashIcon aria-hidden="true" className="size-5 shrink-0" />
-          <Typography as="span" variant="14/regular" className="text-inherit">پاک کردن</Typography>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <RowActions
+      menuLabel={`منوی عملیات «${row.title}»`}
+      actions={[
+        ...(row.canReply
+          ? [
+              {
+                id: 'reply',
+                label: 'ثبت بازخورد',
+                href: `/dashboard/letters/new?replyTo=${encodeURIComponent(row.id)}`,
+                icon: <DashboardMessageTextIcon aria-hidden="true" className="size-5 shrink-0" />,
+              },
+            ]
+          : []),
+        {
+          id: 'toggle-read',
+          label: row.read ? 'علامت خوانده‌نشده' : 'علامت خوانده‌شده',
+          icon: <DashboardEyeIcon aria-hidden="true" className="size-5 shrink-0" />,
+          onSelect: () => onToggleRead(row),
+        },
+        {
+          id: 'hide',
+          label: 'پاک کردن',
+          icon: <TrashIcon aria-hidden="true" className="size-5 shrink-0" />,
+          onSelect: () => onHide(row),
+        },
+      ]}
+    />
   )
 }
-
-const menuItemClass = 'flex h-8 cursor-pointer items-center justify-start gap-2 rounded-[10px] px-1.5 text-neutral-700'
 
 function ActionLink({ row }: { row: InboxRow }) {
   if (!row.action) return null
@@ -196,6 +187,40 @@ function ActionLink({ row }: { row: InboxRow }) {
         </Typography>
       </Link>
     </Button>
+  )
+}
+
+/** The phone layout of a row; like the table row, a click anywhere on it opens the letter. */
+function InboxCard({
+  row,
+  onToggleRead,
+  onHide,
+}: {
+  row: InboxRow
+  onToggleRead: (row: InboxRow) => void
+  onHide: (row: InboxRow) => void
+}) {
+  const link = useRowLink(letterHref(row))
+  return (
+    <div
+      className="cursor-pointer rounded-xl border border-neutral-100 p-4 transition-colors hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-brand-500"
+      {...link}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <RowTag row={row} />
+        <RowMenu row={row} onToggleRead={onToggleRead} onHide={onHide} />
+      </div>
+      <div className="mt-3"><RowTitle row={row} /></div>
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-100 pt-3">
+        <Counterpart row={row} />
+        <Typography as="span" variant="14/regular" className="shrink-0 text-neutral-500">
+          {row.sentDate}
+        </Typography>
+      </div>
+      {row.action && (
+        <div className="mt-3 flex justify-end"><ActionLink row={row} /></div>
+      )}
+    </div>
   )
 }
 
@@ -288,12 +313,12 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
 
-      {/* Toolbar, Figma 30852:17808 */}
-      <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      {/* Toolbar, Figma 30852:17808: search, filter and the box tabs on the right, the compose action on the left. */}
+      <ListToolbar
+        search={
           <form
             role="search"
-            className="w-full sm:w-[400px]"
+            className="w-full min-w-0 sm:w-auto"
             onSubmit={(event) => {
               event.preventDefault()
               navigate({ q: search.trim() || undefined })
@@ -307,107 +332,81 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
               maxLength={100}
             />
           </form>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="filter"
-                size="icon-48"
-                aria-label="فیلتر نامه‌ها"
-                data-active={Boolean(query.status)}
-              >
-                <FilterIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 rounded-xl border border-neutral-100 bg-background p-1.5 shadow-xs">
-              <DropdownMenuLabel>
-                <Typography as="span" variant="12/regular" className="text-neutral-500">
-                  وضعیت
-                </Typography>
-              </DropdownMenuLabel>
-              {STATUS_OPTIONS.map((option) => (
-                <DropdownMenuItem
-                  key={option.label}
-                  onClick={() => navigate({ status: option.value })}
-                  className={cn(
-                    'flex h-9 cursor-pointer items-center justify-between rounded-lg px-2.5',
-                    query.status === option.value ? 'bg-brand-50 text-brand-600' : 'text-neutral-700',
-                  )}
+        }
+        filter={
+          <>
+            <ListFilterButton
+              label="فیلتر نامه‌ها"
+              links={shortcuts}
+              groups={[
+                {
+                  key: 'status',
+                  label: 'وضعیت',
+                  value: query.status,
+                  options: STATUS_OPTIONS.map((option) => ({
+                    value: option.value ?? '',
+                    label: option.label,
+                    count:
+                      option.value === 'action_required'
+                        ? counts.actionRequired
+                        : option.value === 'unread'
+                          ? counts.unread
+                          : undefined,
+                  })),
+                },
+              ]}
+              onChange={(_, value) => navigate({ status: (value as InboxQuery['status']) || undefined })}
+            />
+            {/* Received / sent, Figma 30865:18197 */}
+            <div role="tablist" aria-label="صندوق نامه" className="flex h-12 shrink-0 items-center gap-2 rounded-xl bg-neutral-100 p-1.5">
+              {(['received', 'sent'] as const).map((box) => (
+                <Button
+                  key={box}
+                  type="button"
+                  variant="segment"
+                  size="36"
+                  role="tab"
+                  aria-selected={query.box === box}
+                  onClick={() => navigate({ box, status: box === 'sent' ? undefined : query.status })}
                 >
-                  <Typography as="span" variant="14/regular" className="text-inherit">
-                    {option.label}
+                  <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
+                    {box === 'received' ? 'نامه‌های دریافتی' : 'نامه‌های ارسالی'}
                   </Typography>
-                  {option.value === 'action_required' && counts.actionRequired > 0 && (
-                    <Typography as="span" variant="12/regular" className="text-inherit">
-                      {counts.actionRequired.toLocaleString('fa-IR')}
-                    </Typography>
+                  {box === 'received' && counts.unread > 0 && (
+                    <span className="rounded-full bg-brand-500 px-1.5 text-white">
+                      <Typography as="span" variant="12/regular" className="text-inherit">
+                        {counts.unread.toLocaleString('fa-IR')}
+                      </Typography>
+                    </span>
                   )}
-                  {option.value === 'unread' && counts.unread > 0 && (
-                    <Typography as="span" variant="12/regular" className="text-inherit">
-                      {counts.unread.toLocaleString('fa-IR')}
-                    </Typography>
-                  )}
-                </DropdownMenuItem>
+                </Button>
               ))}
-              {shortcuts.length > 0 && <DropdownMenuSeparator />}
-              {shortcuts.map((shortcut) => (
-                <DropdownMenuItem key={shortcut.href} asChild className="flex h-9 cursor-pointer items-center rounded-lg px-2.5 text-neutral-700">
-                  <Link href={shortcut.href}>
-                    <Typography as="span" variant="14/regular" className="text-inherit">
-                      {shortcut.label}
-                    </Typography>
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {/* Received / sent, Figma 30865:18197 */}
-          <div role="tablist" aria-label="صندوق نامه" className="flex h-12 shrink-0 items-center gap-2 rounded-xl bg-neutral-100 p-1.5">
-            {(['received', 'sent'] as const).map((box) => (
-              <Button
-                key={box}
-                type="button"
-                variant="segment"
-                size="36"
-                role="tab"
-                aria-selected={query.box === box}
-                onClick={() => navigate({ box, status: box === 'sent' ? undefined : query.status })}
-              >
-                <Typography as="span" variant="16/regular" className="whitespace-nowrap text-inherit">
-                  {box === 'received' ? 'نامه‌های دریافتی' : 'نامه‌های ارسالی'}
+            </div>
+          </>
+        }
+        actions={
+          canCompose ? (
+            <Button asChild size="48" className="shrink-0">
+              <Link href="/dashboard/letters/new">
+                <Typography as="span" variant="20/regular" className="text-inherit">
+                  نامه جدید
                 </Typography>
-                {box === 'received' && counts.unread > 0 && (
-                  <span className="rounded-full bg-brand-500 px-1.5 text-white">
-                    <Typography as="span" variant="12/regular" className="text-inherit">
-                      {counts.unread.toLocaleString('fa-IR')}
-                    </Typography>
-                  </span>
-                )}
-              </Button>
-            ))}
-          </div>
-        </div>
-        {canCompose ? (
-          <Button asChild size="48" className="shrink-0">
-            <Link href="/dashboard/letters/new">
+                <DashboardAddIcon className="size-[26px] shrink-0" />
+              </Link>
+            </Button>
+          ) : (
+            <Button type="button" size="48" className="shrink-0" onClick={() => setSupportOpen(true)}>
               <Typography as="span" variant="20/regular" className="text-inherit">
-                نامه جدید
+                پیام به پشتیبانی
               </Typography>
-              <DashboardAddIcon className="size-[26px] shrink-0" />
-            </Link>
-          </Button>
-        ) : (
-          <Button type="button" size="48" className="shrink-0" onClick={() => setSupportOpen(true)}>
-            <Typography as="span" variant="20/regular" className="text-inherit">
-              پیام به پشتیبانی
-            </Typography>
-            <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
-          </Button>
-        )}
-      </div>
+              <DashboardUserTagIcon className="size-[26px] shrink-0 stroke-white" />
+            </Button>
+          )
+        }
+      />
 
-      {/* Table card, Figma 30852:17813 */}
-      <section className="relative mt-4 flex min-h-0 w-full flex-1 flex-col overflow-auto rounded-2xl border border-neutral-200 bg-background p-4">
+      {/* Table card, Figma 30852:17813: it fills the page height; a click on a row opens the letter. */}
+      <ListTableFrame className="mt-4 p-4">
         {pending ? (
           <InboxSkeleton />
         ) : (
@@ -436,7 +435,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="h-[72px] border-b border-neutral-100 transition-colors hover:bg-neutral-50">
+                  <ListRow key={row.id} href={letterHref(row)}>
                     <td className="px-4"><RowTag row={row} /></td>
                     <td className="px-4"><RowTitle row={row} /></td>
                     <td className="px-4"><Counterpart row={row} /></td>
@@ -451,7 +450,7 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
                         <RowMenu row={row} onToggleRead={toggleRead} onHide={hide} />
                       </div>
                     </td>
-                  </tr>
+                  </ListRow>
                 ))}
               </tbody>
             </table>
@@ -459,27 +458,14 @@ export function InboxView({ rows: initialRows, query, counts, page, totalPages, 
 
             <ul className="space-y-3 lg:hidden">
               {rows.map((row) => (
-                <li key={row.id} className="rounded-xl border border-neutral-100 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <RowTag row={row} />
-                    <RowMenu row={row} onToggleRead={toggleRead} onHide={hide} />
-                  </div>
-                  <div className="mt-3"><RowTitle row={row} /></div>
-                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-100 pt-3">
-                    <Counterpart row={row} />
-                    <Typography as="span" variant="14/regular" className="shrink-0 text-neutral-500">
-                      {row.sentDate}
-                    </Typography>
-                  </div>
-                  {row.action && (
-                    <div className="mt-3 flex justify-end"><ActionLink row={row} /></div>
-                  )}
+                <li key={row.id}>
+                  <InboxCard row={row} onToggleRead={toggleRead} onHide={hide} />
                 </li>
               ))}
             </ul>
           </>
         )}
-      </section>
+      </ListTableFrame>
 
       {totalPages > 1 && (
         <nav aria-label="صفحه‌بندی نامه‌ها" className="mt-4 flex flex-wrap items-center justify-center gap-3">

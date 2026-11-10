@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -19,8 +19,9 @@ import {
   type ReviewQueueItemDto,
 } from '@/utilities/reviewer-case'
 
+const nav = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ refresh: vi.fn(), push: nav.push, replace: vi.fn() }),
   usePathname: () => '/dashboard/requests',
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -155,9 +156,67 @@ describe('ReviewerQueue', () => {
     // No generic request listing is read for this role.
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/admin/requests'))).toBe(false)
     // Counts come from the server, over every active assignment of the caller; they sit in the shared filter (FE35).
-    fireEvent.keyDown(screen.getByRole('button', { name: 'فیلتر پرونده‌های داوری' }), { key: 'Enter' })
-    expect((await screen.findByRole('menuitemradio', { name: /بسته‌شده/ })).textContent).toContain('۲')
-    expect(screen.getByRole('menuitemradio', { name: /همه/ }).textContent).toContain('۳')
+    fireEvent.click(screen.getByRole('button', { name: 'فیلتر پرونده‌های داوری' }))
+    const views = await screen.findByRole('combobox', { name: 'نمای صف' })
+    expect(within(views).getByRole('option', { name: /بسته‌شده/ }).textContent).toContain('۲')
+    expect(within(views).getByRole('option', { name: /همه/ }).textContent).toContain('۳')
+  })
+
+  it('opens the case from the whole row, with one direct action instead of a menu', async () => {
+    fetchMock.mockResolvedValue(json(200, queue([item()])))
+    render(createElement(ReviewerQueue, { view: 'open', page: 1 }))
+    await screen.findAllByText('پلتفرم پایش انرژی')
+
+    const row = screen.getAllByRole('row').find((candidate) => candidate.getAttribute('data-row-link') !== null)!
+    // Not started yet: «ارزیابی»; a lone action is shown, never hidden in a «more» menu.
+    expect(within(row).getByRole('link', { name: 'ارزیابی' }).getAttribute('href')).toBe(
+      '/dashboard/requests/11111111-1111-4111-8111-111111111111',
+    )
+    expect(within(row).queryByRole('button', { name: 'عملیات' })).toBeNull()
+    expect(row.className).toContain('hover:bg-neutral-50')
+
+    fireEvent.click(within(row).getByText('EV-1405-0001'))
+    expect(nav.push).toHaveBeenCalledWith('/dashboard/requests/11111111-1111-4111-8111-111111111111')
+    nav.push.mockClear()
+    fireEvent.click(within(row).getByRole('link', { name: 'ارزیابی' }))
+    expect(nav.push).not.toHaveBeenCalled()
+  })
+
+  it('names the single action after the state of the reader’s own evaluation', async () => {
+    const draft = { state: 'draft' as const, revision: 2, updatedAt: '', finalizedAt: null }
+    const final = { state: 'final' as const, revision: 2, updatedAt: '', finalizedAt: '' }
+    fetchMock.mockResolvedValue(
+      json(200, queue([
+        item({ requestId: 'a1111111-1111-4111-8111-111111111111', title: 'طرح الف', evaluation: draft }),
+        item({ requestId: 'b1111111-1111-4111-8111-111111111111', title: 'طرح ب', evaluation: final }),
+        item({ requestId: 'c1111111-1111-4111-8111-111111111111', title: 'طرح ج', actionable: false, round: null }),
+      ])),
+    )
+    render(createElement(ReviewerQueue, { view: 'all', page: 1 }))
+    await screen.findAllByText('طرح الف')
+    const labels = screen.getAllByRole('row').flatMap((row) =>
+      row.getAttribute('data-row-link') === null ? [] : [within(row).getByRole('link', { name: /^(ارزیابی|ادامه|مشاهده)$/ }).textContent],
+    )
+    expect(labels).toEqual(['ادامه', 'مشاهده', 'مشاهده'])
+  })
+
+  it('searches the cases on the page from the toolbar, on the right of the filter', async () => {
+    fetchMock.mockResolvedValue(
+      json(200, queue([item(), item({ requestId: '33333333-3333-4333-8333-333333333333', title: 'طرح دوم', companyName: 'شرکت دوم' })])),
+    )
+    const { container } = render(createElement(ReviewerQueue, { view: 'open', page: 1 }))
+    await screen.findAllByText('پلتفرم پایش انرژی')
+
+    // Search and the filter button share the toolbar's first group (the RTL right), search first.
+    const group = container.querySelector('[data-slot="list-toolbar"]')!.firstElementChild!
+    expect(group.firstElementChild!.getAttribute('role')).toBe('search')
+    expect(group.querySelector('button[aria-label^="فیلتر پرونده‌های داوری"]')).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'جستجو در پرونده‌های این صفحه' }), { target: { value: 'دوم' } })
+    expect(screen.queryAllByText('پلتفرم پایش انرژی')).toHaveLength(0)
+    expect(screen.getAllByText('طرح دوم').length).toBeGreaterThan(0)
+    fireEvent.change(screen.getByRole('searchbox', { name: 'جستجو در پرونده‌های این صفحه' }), { target: { value: 'ناموجود' } })
+    expect(screen.getByText('پرونده‌ای با این جستجو در این صفحه پیدا نشد.')).toBeTruthy()
   })
 
   it('shows only the cases the server returned and never other people’s scores', async () => {

@@ -17,7 +17,7 @@ export function RequestStatusBadge({
   className = '',
 }: RequestStatusBadgeProps) {
   const isBlue = status === 'in_review'
-  const bgColor = isBlue ? 'bg-[#eef2ff]' : 'bg-neutral-100'
+  const bgColor = isBlue ? 'bg-brand-50' : 'bg-neutral-100'
   const textColor = isBlue ? 'text-brand-600' : 'text-neutral-600'
 
   return (

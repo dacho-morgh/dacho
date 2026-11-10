@@ -478,6 +478,7 @@ export function CompanyList({
       }}
       bulkActions={bulkActions}
       getKey={(item) => item.id}
+      getRowHref={(item) => (item.optimistic ? undefined : `/dashboard/companies/${encodeURIComponent(item.id)}`)}
       columns={columns}
       loadState={loadState}
       refreshing={refreshing}

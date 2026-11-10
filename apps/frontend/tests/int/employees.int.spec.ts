@@ -184,7 +184,8 @@ describe('employee list', () => {
     await screen.findByText('کارمند')
     expect(screen.queryByRole('link', { name: 'کارمند جدید' })).toBeNull()
     expect(screen.queryByRole('checkbox')).toBeNull()
-    fireEvent.click(rowActions(0))
+    // With «مشاهده» as its only action the row shows it directly, with no «more» menu.
+    expect(screen.queryByRole('button', { name: 'عملیات' })).toBeNull()
     expect(await screen.findByRole('link', { name: 'مشاهده' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'ویرایش' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'حذف کارمند' })).toBeNull()

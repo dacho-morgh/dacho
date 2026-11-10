@@ -9,7 +9,8 @@ import { REQUEST_STATUS_FILTER_OPTIONS, REVIEW_STAGE_OPTIONS, type RequestQueueF
 /**
  * Search is a plain GET form and the filter button writes the URL, so back
  * navigation, refresh and sharing keep both; the API narrows the list inside
- * the actor's own scope.
+ * the actor's own scope. It renders the two controls only: the list's ListToolbar
+ * puts them on the right.
  */
 export function RequestsFilters({
   basePath = '/dashboard/requests',
@@ -25,10 +26,9 @@ export function RequestsFilters({
   /** From `GET /stats` with the same filters, so each number is the size of the list it opens. */
   counts?: Partial<Record<RequestStatus | 'all', number>>
 }) {
-  const queueLabel = filters.queue ? workQueueLabel(filters.queue) : undefined
   return (
-    <div className="flex flex-wrap items-center gap-2" dir="rtl">
-      <form method="get" action={basePath} className="min-w-0 flex-1 sm:flex-none" role="search">
+    <>
+      <form method="get" action={basePath} className="w-full min-w-0 sm:w-auto" role="search">
         {status && <input type="hidden" name="status" value={status} />}
         {filters.eventId && <input type="hidden" name="eventId" value={filters.eventId} />}
         {filters.stage && <input type="hidden" name="stage" value={filters.stage} />}
@@ -37,7 +37,7 @@ export function RequestsFilters({
           name="search"
           defaultValue={filters.search ?? ''}
           maxLength={100}
-          placeholder="جستجوی عنوان یا کد پیگیری"
+          placeholder="درخواست خود را جست و جو کنید"
           aria-label="جستجوی عنوان یا کد پیگیری"
         />
       </form>
@@ -46,7 +46,7 @@ export function RequestsFilters({
         groups={[
           {
             key: 'status',
-            label: 'وضعیت',
+            label: 'وضعیت درخواست',
             value: status,
             options: REQUEST_STATUS_FILTER_OPTIONS.map((option) => ({
               value: option.value === 'all' ? '' : option.value,
@@ -68,11 +68,17 @@ export function RequestsFilters({
           },
         ]}
       />
-      {queueLabel && (
-        <Typography variant="14/regular" color="secondary" className="w-full">
-          صف: {queueLabel}
-        </Typography>
-      )}
-    </div>
+    </>
+  )
+}
+
+/** «صف: …» under the title when the list is narrowed to a work queue. */
+export function RequestsQueueNote({ filters }: { filters: RequestQueueFilters }) {
+  const queueLabel = filters.queue ? workQueueLabel(filters.queue) : undefined
+  if (!queueLabel) return null
+  return (
+    <Typography variant="14/regular" color="secondary" className="mt-2">
+      صف: {queueLabel}
+    </Typography>
   )
 }

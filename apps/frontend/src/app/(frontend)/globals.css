@@ -40,6 +40,7 @@
 @source inline('bg-warning/30');
 
 @theme {
+  --shadow-filter-panel: 0 0 10px rgb(10 10 10 / 5%);
   --breakpoint-sm: 40rem;
   --breakpoint-md: 48rem;
   --breakpoint-lg: 64rem;

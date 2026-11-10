@@ -14,7 +14,7 @@ import {
   RequestsListView,
   type RequestItem,
 } from '@/components/dashboard/requests'
-import { RequestsFilters } from '@/components/dashboard/requests/requests-filters'
+import { RequestsFilters, RequestsQueueNote } from '@/components/dashboard/requests/requests-filters'
 import { RequestsPagination } from '@/components/dashboard/requests/requests-pagination'
 import {
   parseRequestFilters,
@@ -103,6 +103,8 @@ export default async function RequestsPage({
     />
   )
 
+  const queueNote = <RequestsQueueNote filters={filters} />
+
   if (isInternal) {
     // The page is read here, so the table opens with its rows instead of a skeleton and a loading line.
     const adminQuery = adminRequestsQuery(status, page, filters)
@@ -138,6 +140,7 @@ export default async function RequestsPage({
         retryHref={requestQueueHref('/dashboard/requests', status, page, filters)}
         state={result.kind === 'ok' && items.length === 0 ? 'empty' : 'default'}
         filterForm={filterForm}
+        queueNote={queueNote}
       />
       {result.kind === 'ok' && (
         <RequestsPagination

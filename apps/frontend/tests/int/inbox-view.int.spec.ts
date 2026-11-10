@@ -80,6 +80,46 @@ describe('inbox (S1)', () => {
     expect(mocks.push).toHaveBeenLastCalledWith(`/dashboard/letters?q=${encodeURIComponent('گزارش')}`)
   })
 
+  it('opens the letter from the whole row, while the row menu and the next-step link keep their own action', async () => {
+    mocks.fetch.mockResolvedValue(page([letter({ id: 'l-9', nextStep: 'triage', actionRequired: true })]))
+    render(await LettersPage(view()))
+    const row = screen.getAllByRole('row')[1]!
+    expect(row.className).toContain('hover:bg-neutral-50')
+
+    fireEvent.click(within(row).getByText('سامانه'))
+    expect(mocks.push).toHaveBeenLastCalledWith('/dashboard/letters/l-9')
+    mocks.push.mockClear()
+
+    fireEvent.click(within(row).getByRole('link', { name: 'بررسی اولیه' }))
+    // A received letter has several actions, so they live in the «more» menu.
+    fireEvent.click(within(row).getByRole('button', { name: /منوی عملیات/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'علامت خوانده‌شده' }))
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it('puts search, filter and the box tabs on the right of the toolbar and the compose action on the left', async () => {
+    mocks.fetch.mockResolvedValue(page([letter({})]))
+    const { container } = render(await LettersPage(view()))
+    const toolbar = container.querySelector('[data-slot="list-toolbar"]')!
+    const [start, end] = Array.from(toolbar.children)
+    expect(start!.querySelector('[role="search"]')).toBeTruthy()
+    expect(start!.querySelector('button[aria-label^="فیلتر نامه‌ها"]')).toBeTruthy()
+    expect(start!.querySelector('[role="tablist"]')).toBeTruthy()
+    expect(end!.textContent).toContain('نامه جدید')
+  })
+
+  it('filters through the template: choose a status, apply, and the URL follows', async () => {
+    mocks.fetch.mockResolvedValue(page([letter({})]))
+    render(await LettersPage(view()))
+    fireEvent.click(screen.getByRole('button', { name: /فیلتر نامه‌ها/ }))
+    const status = screen.getByRole('combobox', { name: 'وضعیت' })
+    expect(within(status).getByRole('option', { name: /نیازمند اقدام/ }).textContent).toContain('۱')
+    fireEvent.change(status, { target: { value: 'unread' } })
+    expect(mocks.push).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
+    expect(mocks.push).toHaveBeenLastCalledWith('/dashboard/letters?status=unread')
+  })
+
   it('tells a filtered empty result apart from an empty mailbox', async () => {
     mocks.fetch.mockResolvedValue(page([], { unread: 0, actionRequired: 0 }))
     render(await LettersPage(view({ status: 'action_required' })))

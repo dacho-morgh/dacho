@@ -296,6 +296,7 @@ export function AdminRequestList({
         onPageChange: (next) => writeUrl({ page: next > 1 ? String(next) : undefined }),
       }}
       getKey={(item) => item.id}
+      getRowHref={(item) => `/dashboard/requests/${encodeURIComponent(item.id)}`}
       columns={columns}
       loadState={loadState}
       refreshing={refreshing}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventsView, type EventItem } from '@/components/dashboard/events-view'
@@ -404,5 +404,117 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
       expect(screen.getByText('دسترسی به فایل RFP این زیرعنوان امکان‌پذیر نیست.')).toBeDefined()
     })
     expect(screen.queryByText('فایل RFP بارگذاری نشده است')).toBeNull()
+  })
+})
+
+describe('EventsView design QA #276 - shared list toolbar, card click and event page filter', () => {
+  const older: EventItem = {
+    ...mockEvent,
+    id: 'events-uuid-0',
+    rawId: '00000000-0000-0000-0000-000000000000',
+    title: 'رویداد قدیمی',
+    badgeText: 'تمام شده',
+    badgeType: 'ended',
+    hasActionButton: false,
+    startTimestamp: 1,
+  }
+  const newer: EventItem = { ...mockEvent, startTimestamp: 2 }
+
+  beforeEach(() => {
+    mockPush.mockReset()
+    vi.spyOn(dashboardApi, 'getEventCategories').mockResolvedValue({ items: mockCategories })
+    vi.spyOn(dashboardApi, 'getEventSubtopics').mockResolvedValue({ items: mockSubtopics })
+    vi.spyOn(dashboardApi, 'fetchCompanyVerification').mockResolvedValue({
+      status: 'approved',
+      revision: 1,
+      submittedAt: null,
+      decidedAt: null,
+      reason: null,
+      canRequestVerification: false,
+    })
+    vi.spyOn(dashboardApi, 'fetchProfileDossier').mockResolvedValue({
+      dossier: {} as dashboardApi.CompanyDossierDto,
+      documents: [],
+      missing: { required: [], optional: [], canRequestVerification: true },
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it('puts search and the filter template at the start of the toolbar', () => {
+    const { container } = render(createElement(EventsView, { initialEventsList: [newer] }))
+    const group = container.querySelector('[data-slot="list-toolbar"]')!.firstElementChild!
+    expect(group.querySelector('input[type="search"]')).toBeTruthy()
+    expect(group.querySelector('button[aria-label^="فیلتر رویدادها"]')).toBeTruthy()
+  })
+
+  it('opens an event from a click anywhere on its card; only a card with no page behind it stays inert', async () => {
+    // An upcoming public page with no operational event takes no applications and has nowhere to go.
+    const idle: EventItem = {
+      ...mockEvent,
+      id: 'events-uuid-2',
+      rawId: undefined,
+      title: 'رویداد بدون پرونده عملیاتی',
+      badgeType: 'upcoming',
+      hasActionButton: false,
+      startTimestamp: 0,
+    }
+    render(createElement(EventsView, { initialEventsList: [idle, older, newer] }))
+    const cards = screen.getAllByRole('article')
+    // Newest first: the card with the registration button, then the ended one (its page is read-only).
+    expect(cards[0]!.getAttribute('data-row-link')).not.toBeNull()
+    expect(cards[1]!.getAttribute('data-row-link')).not.toBeNull()
+    expect(cards[1]!.className).toContain('hover:bg-neutral-50')
+    expect(cards[2]!.getAttribute('data-row-link')).toBeNull()
+    expect(cards[2]!.className).not.toContain('hover:bg-neutral-50')
+
+    fireEvent.click(within(cards[0]!).getByText('عسلویه، مرکز همایش‌های بین‌المللی'))
+    expect(mockPush).toHaveBeenCalledWith(`/dashboard/events?eventId=${newer.rawId}`)
+    await waitFor(() => expect(screen.getByText('عنوان ها و زیر عنوان های رویداد')).toBeDefined())
+  })
+
+  it('orders the list from the filter template, and filters by status only after «اعمال»', () => {
+    render(createElement(EventsView, { initialEventsList: [older, newer] }))
+    const titles = () => screen.getAllByRole('article').map((card) => within(card).getByRole('heading').textContent)
+    expect(titles()).toEqual([newer.title, older.title])
+
+    fireEvent.click(screen.getByRole('button', { name: /فیلتر رویدادها/ }))
+    fireEvent.click(screen.getByRole('radio', { name: 'قدیمی ترین رویداد ها' }))
+    expect(titles()).toEqual([newer.title, older.title])
+    fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
+    expect(titles()).toEqual([older.title, newer.title])
+
+    fireEvent.click(screen.getByRole('button', { name: /فیلتر رویدادها/ }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'وضعیت رویداد' }), { target: { value: 'ended' } })
+    fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
+    expect(titles()).toEqual([older.title])
+  })
+
+  it('searches and filters the subtopics on the event page with the same toolbar and template', async () => {
+    const { container } = render(
+      createElement(EventsView, { initialEventsList: [newer], initialSelectedEventId: newer.rawId }),
+    )
+    await screen.findByText('ساخت دستگاه پلیمرزدایی از تاورها')
+    const toolbar = container.querySelector('[data-slot="list-toolbar"]')!
+    expect(toolbar.firstElementChild!.querySelector('input[type="search"]')).toBeTruthy()
+
+    // Search: only the matching subtopic, and the category with nothing left disappears.
+    fireEvent.change(screen.getByRole('searchbox', { name: 'جستجوی زیرعنوان‌ها' }), { target: { value: 'مانیتورینگ' } })
+    expect(screen.getByText('سامانه مانیتورینگ هوشمند ارتعاشات توربین')).toBeDefined()
+    expect(screen.queryByText('ساخت دستگاه پلیمرزدایی از تاورها')).toBeNull()
+    expect(screen.queryByText('تجهیزات ثابت و دوار')).toBeNull()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'جستجوی زیرعنوان‌ها' }), { target: { value: 'ناموجود' } })
+    expect(screen.getByText('زیرعنوانی با این جستجو یا فیلتر پیدا نشد.')).toBeDefined()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'جستجوی زیرعنوان‌ها' }), { target: { value: '' } })
+
+    // Filter: by category through the template.
+    fireEvent.click(screen.getByRole('button', { name: /فیلتر زیرعنوان‌ها/ }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'عنوان' }), { target: { value: 'cat-2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
+    expect(screen.getByText('سامانه مانیتورینگ هوشمند ارتعاشات توربین')).toBeDefined()
+    expect(screen.queryByText('ساخت دستگاه پلیمرزدایی از تاورها')).toBeNull()
   })
 })

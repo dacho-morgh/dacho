@@ -41,6 +41,8 @@ import type { Eligibility } from '@/utilities/participation-eligibility'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { ListFilterButton } from '@/components/dashboard/list-filter-button'
+import { ListToolbar } from '@/components/dashboard/list-toolbar'
+import { rowActivationProps } from '@/components/dashboard/list-table'
 
 export interface EventItem {
   id: string
@@ -79,17 +81,17 @@ function EventsSkeleton() {
           {/* Content skeleton on left */}
           <div className="flex h-[168px] w-full flex-1 flex-col justify-between py-1">
             <div>
-              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-[#f5f5f5]" />
-              <Skeleton className="mt-[16px] h-[32px] w-[400px] max-w-full rounded-[8px] bg-[#f5f5f5]" />
+              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-neutral-100" />
+              <Skeleton className="mt-[16px] h-[32px] w-[400px] max-w-full rounded-[8px] bg-neutral-100" />
             </div>
             <div className="space-y-[16px]">
-              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-[#f5f5f5]" />
-              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-[#f5f5f5]" />
+              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-neutral-100" />
+              <Skeleton className="h-[24px] w-[200px] rounded-[8px] bg-neutral-100" />
             </div>
           </div>
 
           {/* Square thumbnail skeleton on right */}
-          <Skeleton className="size-[200px] shrink-0 rounded-[8px] bg-[#f5f5f5]" />
+          <Skeleton className="size-[200px] shrink-0 rounded-[8px] bg-neutral-100" />
         </div>
       ))}
     </div>
@@ -103,12 +105,12 @@ function TreeSkeleton() {
       {[1, 2, 3].map((i) => (
         <div key={i} className="flex flex-col gap-2 rounded-xl border border-neutral-100 p-3">
           <div className="flex items-center justify-between">
-            <Skeleton className="h-6 w-48 rounded-md bg-[#f5f5f5]" />
-            <Skeleton className="h-6 w-20 rounded-md bg-[#f5f5f5]" />
+            <Skeleton className="h-6 w-48 rounded-md bg-neutral-100" />
+            <Skeleton className="h-6 w-20 rounded-md bg-neutral-100" />
           </div>
           <div className="mr-6 flex flex-col gap-2 pt-2">
-            <Skeleton className="h-5 w-64 rounded-md bg-[#f5f5f5]" />
-            <Skeleton className="h-5 w-56 rounded-md bg-[#f5f5f5]" />
+            <Skeleton className="h-5 w-64 rounded-md bg-neutral-100" />
+            <Skeleton className="h-5 w-56 rounded-md bg-neutral-100" />
           </div>
         </div>
       ))}
@@ -124,10 +126,10 @@ function EventsEmptyState({ noMatch = false }: { noMatch?: boolean }) {
         <div className="flex size-[80px] items-center justify-center">
           <EmptyInboxIllustration className="size-[80px]" />
         </div>
-        <p className="mt-1 font-sans text-[14px] leading-[24px] font-semibold text-[#525252]">
+        <p className="mt-1 font-sans text-[14px] leading-[24px] font-semibold text-neutral-600">
           {noMatch ? 'نتیجه‌ای پیدا نشد' : 'رویداد و نمایشگاهی در سیستم موجود نیست'}
         </p>
-        <p className="font-sans text-[12px] leading-[20px] font-normal text-[#737373]">
+        <p className="font-sans text-[12px] leading-[20px] font-normal text-neutral-500">
           {noMatch ? 'عبارت جستجو یا فیلتر را تغییر دهید' : 'در صورت ایجاد رویداد یا نمایشگاه به شما اطلاع رسانی خواهیم کرد'}
         </p>
       </div>
@@ -297,6 +299,12 @@ export function EventsView({
   const [events] = useState<EventItem[]>(initialEventsList)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name'>('newest')
+
+  // The event page's own search and filter over its subtopics (the shared toolbar and filter template).
+  const [subtopicSearch, setSubtopicSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [selectionFilter, setSelectionFilter] = useState<'' | 'selected' | 'unselected'>('')
 
   // Find initial selected event if provided
   const foundInitial = useMemo(() => {
@@ -481,6 +489,46 @@ export function EventsView({
     })
   }, [events, searchQuery, filterType, state])
 
+  // The server lists the newest first; «قدیمی‌ترین» reverses it and the name order is Persian alphabetical.
+  const sortedEvents = useMemo(() => {
+    const list = [...filteredEvents]
+    if (sortOrder === 'name') return list.sort((a, b) => a.title.localeCompare(b.title, 'fa'))
+    const stamp = (item: EventItem) => item.startTimestamp
+    if (list.every((item) => stamp(item) !== undefined)) {
+      return list.sort((a, b) => (sortOrder === 'oldest' ? stamp(a)! - stamp(b)! : stamp(b)! - stamp(a)!))
+    }
+    return sortOrder === 'oldest' ? list.reverse() : list
+  }, [filteredEvents, sortOrder])
+
+  /** Where a card leads: the booth page of an exhibition, or the event's registration page. */
+  const openEvent = (evt: EventItem) => {
+    if (isOwner && evt.serviceKey === 'exhibitions') {
+      const rawId = evt.id.replace(/^exhibitions-/, '')
+      router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
+    } else if (evt.serviceKey === 'events') {
+      setSelectedEvent(evt)
+      const eventIdParam = evt.rawId || evt.id.replace(/^events-/, '')
+      router.push(`/dashboard/events?eventId=${encodeURIComponent(eventIdParam)}`)
+    } else {
+      // Booth requests replace the generic request form (S7, #245).
+      const rawId = evt.rawId || evt.id.replace(/^exhibitions-/, '')
+      router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
+    }
+  }
+  const eventHasAction = (evt: EventItem) =>
+    (isOwner && evt.serviceKey === 'exhibitions') || (!isOwner && Boolean(evt.hasActionButton))
+  // Every card with a page behind it is clickable: the ones with an action, and an ended event (its page
+  // is read-only). Only a card with no operational event behind it has nowhere to go and stays inert.
+  const eventHasTarget = (evt: EventItem) => eventHasAction(evt) || (!isOwner && evt.badgeType === 'ended')
+
+  // Subtopics that pass the event page's search and filters; a category with none left is hidden.
+  const subtopicQuery = subtopicSearch.trim()
+  const subtopicFiltered = Boolean(subtopicQuery || categoryFilter || selectionFilter)
+  const subtopicMatches = (sub: EventSubtopicDto) =>
+    (!subtopicQuery || sub.title.includes(subtopicQuery)) &&
+    (!categoryFilter || sub.categoryId === categoryFilter) &&
+    (!selectionFilter || (selectionFilter === 'selected') === selectedSubtopicIds.has(sub.id))
+
   const isLoading = state === 'loading'
   const isEmpty = !isLoading && filteredEvents.length === 0
 
@@ -539,16 +587,16 @@ export function EventsView({
         {/* The route keeps the page fixed (list routes scroll their own region), so the details scroll here. */}
         <ScrollArea className="min-h-0 flex-1">
         {/* Slot 1: Event Summary Banner Card - Figma Frame 61 / Frame 46 / Frame 60 */}
-        <section className="relative mt-4 flex w-full flex-col gap-4 rounded-[16px] border border-[#e5e5e5] bg-background p-4 sm:p-6">
+        <section className="relative mt-4 flex w-full flex-col gap-4 rounded-[16px] border border-neutral-200 bg-background p-4 sm:p-6">
           <div className="flex flex-col-reverse items-start justify-end gap-5 sm:flex-row">
             {/* Left Content column */}
             <div className="flex w-full flex-1 flex-col justify-between gap-4 py-1">
               {/* Badge + Title */}
               <div className="flex flex-col items-start gap-3">
-                <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-[#f5f5f5] px-3 py-1 font-sans text-[13px] leading-[24px] font-normal text-[#525252]">
+                <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-neutral-100 px-3 py-1 font-sans text-[13px] leading-[24px] font-normal text-neutral-600">
                   {selectedEvent.badgeText}
                 </span>
-                <h1 className="font-sans text-[20px] leading-[32px] font-bold text-[#404040] sm:text-[22px]">
+                <h1 className="font-sans text-[20px] leading-[32px] font-bold text-neutral-700 sm:text-[22px]">
                   {selectedEvent.title}
                 </h1>
               </div>
@@ -556,14 +604,14 @@ export function EventsView({
               {/* Dates & Location */}
               <div className="flex flex-col gap-2.5 pt-2">
                 <div className="flex items-center gap-2">
-                  <CalendarBulkIcon className="size-[24px] shrink-0 text-[#a3a3a3]" />
-                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-[#525252]">
+                  <CalendarBulkIcon className="size-[24px] shrink-0 text-neutral-400" />
+                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-neutral-600">
                     {selectedEvent.dates}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <LocationBulkIcon className="size-[24px] shrink-0 text-[#a3a3a3]" />
-                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-[#525252]">
+                  <LocationBulkIcon className="size-[24px] shrink-0 text-neutral-400" />
+                  <span className="font-sans text-[15px] leading-[26px] font-semibold text-neutral-600">
                     {selectedEvent.location}
                   </span>
                 </div>
@@ -614,11 +662,11 @@ export function EventsView({
         ) : null}
 
         {/* Slot 2: Categories and Subtopics Tree Card - Figma Slot / Frame 156 */}
-        <section className="relative mt-4 flex w-full flex-col gap-5 rounded-[16px] border border-[#e5e5e5] bg-background p-4 sm:p-6">
+        <section className="relative mt-4 flex w-full flex-col gap-5 rounded-[16px] border border-neutral-200 bg-background p-4 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 pb-4">
             <div className="flex items-center gap-2">
               <Layers className="size-6 text-brand-500" />
-              <h2 className="font-sans text-[18px] leading-[32px] font-bold text-[#404040]">
+              <h2 className="font-sans text-[18px] leading-[32px] font-bold text-neutral-700">
                 عنوان ها و زیر عنوان های رویداد
               </h2>
             </div>
@@ -657,12 +705,61 @@ export function EventsView({
             </div>
           </div>
 
+          {/* Search and the shared filter template over the subtopics (design QA #276) */}
+          {!loadingDetails && !detailsError && categories.length > 0 && (
+            <ListToolbar
+              search={
+                <SearchField
+                  value={subtopicSearch}
+                  onChange={(event) => setSubtopicSearch(event.target.value)}
+                  placeholder="جستجوی زیرعنوان"
+                  aria-label="جستجوی زیرعنوان‌ها"
+                  maxLength={100}
+                />
+              }
+              filter={
+                <ListFilterButton
+                  label="فیلتر زیرعنوان‌ها"
+                  groups={[
+                    ...(categories.length > 1
+                      ? [
+                          {
+                            key: 'category',
+                            label: 'عنوان',
+                            value: categoryFilter,
+                            options: [
+                              { value: '', label: 'همه عنوان‌ها' },
+                              ...categories.map((cat) => ({ value: cat.id, label: cat.title })),
+                            ],
+                          },
+                        ]
+                      : []),
+                    {
+                      key: 'selection',
+                      label: 'وضعیت انتخاب',
+                      value: selectionFilter,
+                      options: [
+                        { value: '', label: 'همه زیرعنوان‌ها' },
+                        { value: 'selected', label: 'انتخاب‌شده' },
+                        { value: 'unselected', label: 'انتخاب‌نشده' },
+                      ],
+                    },
+                  ]}
+                  onChange={(key, value) => {
+                    if (key === 'category') setCategoryFilter(value ?? '')
+                    else setSelectionFilter((value as 'selected' | 'unselected' | undefined) ?? '')
+                  }}
+                />
+              }
+            />
+          )}
+
           {/* Hierarchy Content */}
           {loadingDetails ? (
             <TreeSkeleton />
           ) : detailsError ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-              <p className="font-sans text-[14px] text-red-600">{detailsError}</p>
+              <p className="font-sans text-[14px] text-error-500">{detailsError}</p>
               <Button variant="outline-gray" size="32"
                 type="button"
                 onClick={loadEventHierarchy}
@@ -677,9 +774,17 @@ export function EventsView({
             </div>
           ) : (
             <div className="flex flex-col gap-3">
+              {subtopicFiltered &&
+                !categories.some((cat) => subtopics.some((sub) => sub.categoryId === cat.id && subtopicMatches(sub))) && (
+                  <div role="status" className="py-8 text-center font-sans text-[14px] text-neutral-500">
+                    زیرعنوانی با این جستجو یا فیلتر پیدا نشد.
+                  </div>
+                )}
               {categories.map((cat) => {
-                const catSubtopics = subtopics.filter((sub) => sub.categoryId === cat.id)
-                const isExpanded = expandedCategories[cat.id] ?? false
+                const catSubtopics = subtopics.filter((sub) => sub.categoryId === cat.id && subtopicMatches(sub))
+                // A category with nothing left under the search or filter is not worth showing.
+                if (subtopicFiltered && catSubtopics.length === 0) return null
+                const isExpanded = subtopicFiltered || (expandedCategories[cat.id] ?? false)
 
                 return (
                   <div
@@ -765,7 +870,7 @@ export function EventsView({
                                         <span>در حال دریافت فایل‌های RFP...</span>
                                       </div>
                                     ) : rfp.error ? (
-                                      <div className="text-[13px] text-red-600">{rfp.error}</div>
+                                      <div className="text-[13px] text-error-500">{rfp.error}</div>
                                     ) : !rfp.version || rfp.version.files.length === 0 ? (
                                       <div className="text-[13px] text-neutral-500">
                                         فایل RFP بارگذاری نشده است
@@ -850,25 +955,28 @@ export function EventsView({
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col text-right" dir="rtl">
       {/* Page Title - Figma node 56:13203 */}
-      <h1 className="font-sans text-[24px] leading-[36px] font-bold text-[#404040]">
+      <h1 className="font-sans text-[24px] leading-[36px] font-bold text-neutral-700">
         رویدادها و نمایشگاه‌ها
       </h1>
 
-      {/* Action Bar - Figma Frame 1 (56:13205) */}
-      <div className="mt-5 flex items-center justify-start">
-        <div className="flex h-[48px] w-full items-center gap-[8px] sm:w-[458px]">
+      {/* Action Bar - Figma Frame 1 (56:13205): search and the filter template on the right */}
+      <ListToolbar
+        className="mt-5"
+        search={
           <SearchField
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="درخواست خود را جست و جو کنید"
-                aria-label="جستجوی رویدادها"
-              />
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="درخواست خود را جست و جو کنید"
+            aria-label="جستجوی رویدادها"
+          />
+        }
+        filter={
           <ListFilterButton
             label="فیلتر رویدادها"
             groups={[
               {
                 key: 'state',
-                label: 'وضعیت ثبت‌نام',
+                label: 'وضعیت رویداد',
                 value: filterType === 'all' ? undefined : filterType,
                 options: [
                   { value: '', label: 'همه رویدادها' },
@@ -876,24 +984,44 @@ export function EventsView({
                   { value: 'ended', label: 'تمام شده' },
                 ],
               },
+              {
+                key: 'sort',
+                label: 'مرتب سازی بر اساس',
+                kind: 'radio',
+                value: sortOrder === 'newest' ? undefined : sortOrder,
+                options: [
+                  { value: '', label: 'جدیدترین رویداد ها' },
+                  { value: 'oldest', label: 'قدیمی ترین رویداد ها' },
+                  { value: 'name', label: 'نام رویداد ( الف - ی)' },
+                ],
+              },
             ]}
-            onChange={(_, value) => setFilterType((value as typeof filterType | undefined) ?? 'all')}
+            onChange={(key, value) => {
+              if (key === 'sort') setSortOrder((value as 'oldest' | 'name' | undefined) ?? 'newest')
+              else setFilterType(value ?? 'all')
+            }}
           />
-        </div>
-      </div>
+        }
+      />
 
       {/* Main Events Card - Figma Frame 6 (56:13208) */}
-      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-[#e5e5e5] bg-background p-[16px]">
+      <section className="relative mt-[16px] flex min-h-0 w-full flex-1 flex-col rounded-[16px] border border-neutral-200 bg-background p-[16px]">
         {isLoading ? (
           <EventsSkeleton />
         ) : (
           <ScrollArea className="min-h-0 flex-1">
             {!isEmpty && (
               <div className="flex flex-col gap-[32px]">
-                {filteredEvents.map((evt) => (
+                {sortedEvents.map((evt) => (
                   <article
                     key={evt.id}
-                    className="flex flex-col-reverse items-start justify-end gap-[16px] sm:h-[200px] sm:flex-row"
+                    className={`flex flex-col-reverse items-start justify-end gap-[16px] rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 sm:h-[200px] sm:flex-row ${
+                      eventHasTarget(evt) ? 'cursor-pointer hover:bg-neutral-50' : ''
+                    }`}
+                    {...rowActivationProps(eventHasTarget(evt) ? (newTab) => {
+                      if (newTab) return
+                      openEvent(evt)
+                    } : undefined)}
                   >
                     <div className="relative size-[200px] shrink-0 overflow-hidden rounded-[8px] bg-slate-100">
                       {evt.imageSrc ? (
@@ -917,10 +1045,10 @@ export function EventsView({
                     <div className="flex h-[176px] w-full flex-1 flex-col justify-between py-1">
                       {/* Top Section: Tag and Title (Frame 41) */}
                       <div className="flex flex-col items-start gap-[16px]">
-                        <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-[#f5f5f5] px-[12px] py-[4px] font-sans text-[14px] leading-[24px] font-normal text-[#525252]">
+                        <span className="inline-flex h-[24px] items-center justify-center rounded-[40px] bg-neutral-100 px-[12px] py-[4px] font-sans text-[14px] leading-[24px] font-normal text-neutral-600">
                           {evt.badgeText}
                         </span>
-                        <h2 className="font-sans text-[18px] leading-[32px] font-bold text-[#404040] sm:text-[20px]">
+                        <h2 className="font-sans text-[18px] leading-[32px] font-bold text-neutral-700 sm:text-[20px]">
                           {evt.title}
                         </h2>
                       </div>
@@ -933,14 +1061,14 @@ export function EventsView({
                           {/* Date and Location */}
                           <div className="flex flex-col gap-[16px]">
                             <div className="flex items-center gap-[8px]">
-                              <CalendarBulkIcon className="size-[28px] shrink-0 text-[#a3a3a3]" />
-                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-[#525252]">
+                              <CalendarBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
+                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
                                 {evt.dates}
                               </span>
                             </div>
                             <div className="flex items-center gap-[8px]">
-                              <LocationBulkIcon className="size-[28px] shrink-0 text-[#a3a3a3]" />
-                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-[#525252]">
+                              <LocationBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
+                              <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
                                 {evt.location}
                               </span>
                             </div>
@@ -949,20 +1077,7 @@ export function EventsView({
                           {/* Action Button */}
                           <Button size="40"
                             type="button"
-                            onClick={() => {
-                              if (isOwner && evt.serviceKey === 'exhibitions') {
-                                const rawId = evt.id.replace(/^exhibitions-/, '')
-                                router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
-                              } else if (evt.serviceKey === 'events') {
-                                setSelectedEvent(evt)
-                                const eventIdParam = evt.rawId || evt.id.replace(/^events-/, '')
-                                router.push(`/dashboard/events?eventId=${encodeURIComponent(eventIdParam)}`)
-                              } else {
-                                // Booth requests replace the generic request form (S7, #245).
-                                const rawId = evt.rawId || evt.id.replace(/^exhibitions-/, '')
-                                router.push(`/dashboard/exhibitions/${encodeURIComponent(rawId)}`)
-                              }
-                            }}
+                            onClick={() => openEvent(evt)}
                           >
                             <span className="font-sans text-[16px] leading-[28px] font-semibold">
                               {isOwner && evt.serviceKey === 'exhibitions'
@@ -978,14 +1093,14 @@ export function EventsView({
                         /* Frame 44: Date and Location only */
                         <div className="flex flex-col gap-[16px]">
                           <div className="flex items-center gap-[8px]">
-                            <CalendarBulkIcon className="size-[28px] shrink-0 text-[#a3a3a3]" />
-                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-[#525252]">
+                            <CalendarBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
+                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
                               {evt.dates}
                             </span>
                           </div>
                           <div className="flex items-center gap-[8px]">
-                            <LocationBulkIcon className="size-[28px] shrink-0 text-[#a3a3a3]" />
-                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-[#525252]">
+                            <LocationBulkIcon className="size-[28px] shrink-0 text-neutral-400" />
+                            <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-600">
                               {evt.location}
                             </span>
                           </div>

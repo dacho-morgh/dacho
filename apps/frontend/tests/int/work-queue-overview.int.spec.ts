@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -122,9 +122,10 @@ describe('RequestsPage', () => {
     expect(screen.getByRole('link', { name: 'صفحه بعد' }).getAttribute('href')).toBe(`/dashboard/requests?page=2&${query}`)
     expect(screen.getByText('صف: پیش‌نویس‌های ارسال‌نشده')).toBeTruthy()
     // Status (with its count), event and stage live in the shared filter button (FE35).
-    fireEvent.keyDown(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }), { key: 'Enter' })
-    expect((await screen.findByRole('menuitemradio', { name: /تایید شده/ })).textContent).toContain((1).toLocaleString('fa-IR'))
-    expect(screen.getByRole('menuitemradio', { name: 'رویداد نمونه' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }))
+    const statuses = await screen.findByRole('combobox', { name: 'وضعیت درخواست' })
+    expect(within(statuses).getByRole('option', { name: /تایید شده/ }).textContent).toContain((1).toLocaleString('fa-IR'))
+    expect(within(screen.getByRole('combobox', { name: 'رویداد' })).getByRole('option', { name: 'رویداد نمونه' })).toBeTruthy()
   })
 
   it('hands the same filters to the internal list', async () => {
@@ -150,9 +151,10 @@ describe('RequestsPage', () => {
           : { kind: 'ok', data: { items: [], total: 0, page: 1, totalPages: 1 } },
     )
     render(await RequestsPage({ searchParams: Promise.resolve({}) }))
-    fireEvent.keyDown(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }), { key: 'Enter' })
-    const all = (await screen.findAllByRole('menuitemradio')).find((item) => /^همه\s*[۰-۹]/.test(item.textContent ?? ''))
+    fireEvent.click(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }))
+    const statuses = await screen.findByRole('combobox', { name: 'وضعیت درخواست' })
+    const all = within(statuses).getAllByRole('option').find((item) => /^همه\s*\(/.test(item.textContent ?? ''))
     expect(all?.textContent).toContain((7).toLocaleString('fa-IR'))
-    expect(screen.queryByRole('menuitemradio', { name: 'رویداد نمونه' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'رویداد نمونه' })).toBeNull()
   })
 })
