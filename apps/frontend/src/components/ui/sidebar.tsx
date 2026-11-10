@@ -475,7 +475,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[12px] px-3 py-2 text-start font-sans text-base leading-7 ring-sidebar-ring outline-hidden transition-all group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-2! hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-2 active:bg-neutral-200 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:bg-brand-50 data-active:font-semibold data-active:text-brand-600 data-active:hover:bg-brand-100 data-active:hover:text-brand-600 [&_svg]:size-6 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[12px] p-2 text-start font-sans text-base leading-7 ring-sidebar-ring outline-hidden transition-all group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-2! hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-2 active:bg-neutral-200 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:bg-brand-50 data-active:font-semibold data-active:text-brand-600 data-active:hover:bg-brand-100 data-active:hover:text-brand-600 [&_svg]:size-6 [&_svg]:shrink-0 [&>span:last-child]:truncate",
   {
     variants: {
       variant: {

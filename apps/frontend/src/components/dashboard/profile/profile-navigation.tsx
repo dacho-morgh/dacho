@@ -43,44 +43,57 @@ export function ProfileNavigation({ staffMode = false }: { staffMode?: boolean }
     <Sheet open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
       <nav
         aria-label="بخش‌های پروفایل"
-        className="grid shrink-0 grid-cols-2 gap-3 border-b border-neutral-100 pb-4 sm:grid-cols-4 lg:flex lg:w-52 lg:flex-col lg:gap-4 lg:border-e lg:border-b-0 lg:pe-3 lg:pb-0"
+        dir="rtl"
+        className="grid shrink-0 grid-cols-2 gap-3 border-b border-neutral-100 pb-4 sm:grid-cols-4 lg:sticky lg:top-10 lg:flex lg:w-[200px] lg:flex-col lg:gap-4 lg:self-start lg:border-e lg:border-b-0 lg:pe-2 lg:pb-0"
       >
         {profileRoutes.map((route) => {
           const isActive = pathname === route.href
 
           return (
-            <Typography key={route.href} asChild variant="16/regular">
-              <Link
-                href={route.href}
-                aria-current={isActive ? 'page' : undefined}
+            <div key={route.href} className="flex w-full items-center gap-2">
+              <span
                 className={cn(
-                  'flex min-h-10 w-full items-center justify-between rounded-xl px-3 py-2 text-center transition-colors',
-                  isActive
-                    ? 'bg-brand-50 text-brand-600'
-                    : 'bg-transparent text-neutral-600 hover:bg-neutral-100',
+                  'hidden h-7 w-1 shrink-0 rounded-full lg:block',
+                  isActive ? 'bg-brand-500' : 'bg-transparent',
                 )}
+                aria-hidden="true"
+              />
+              <Typography
+                asChild
+                variant="16/regular"
+                color={isActive ? 'brand-600' : 'neutral-600'}
+                className="min-w-0 flex-1"
               >
-                <span className="w-full">{route.label}</span>
-                {isActive && (
-                  <span
-                    className="hidden h-7 w-1 shrink-0 rounded-full bg-brand-500 lg:block"
-                    aria-hidden="true"
-                  />
-                )}
-              </Link>
-            </Typography>
+                <Link
+                  href={route.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={cn(
+                    'flex min-h-10 w-full items-center rounded-xl p-2 text-start transition-colors',
+                    isActive
+                      ? 'bg-brand-50 hover:bg-brand-100'
+                      : 'bg-transparent hover:bg-neutral-100 hover:text-neutral-900',
+                  )}
+                >
+                  {route.label}
+                </Link>
+              </Typography>
+            </div>
           )
         })}
-        <SheetTrigger asChild>
-          <Button
-            type="button"
-            variant="text-destructive"
-            size="40"
-            onClick={() => setLogoutError(null)}
-          >
-            خروج از حساب کاربری
-          </Button>
-        </SheetTrigger>
+        <div className="flex w-full items-center gap-2">
+          <span className="hidden h-7 w-1 shrink-0 lg:block" aria-hidden="true" />
+          <SheetTrigger asChild>
+            <Button
+              type="button"
+              variant="text-destructive"
+              size="40"
+              className="flex-1 justify-start rounded-xl px-2 text-start font-[325] text-error-600"
+              onClick={() => setLogoutError(null)}
+            >
+              خروج از حساب کاربری
+            </Button>
+          </SheetTrigger>
+        </div>
       </nav>
 
       <SheetContent side="center" showCloseButton={false} overlayClassName="bg-black/40" className="gap-5">

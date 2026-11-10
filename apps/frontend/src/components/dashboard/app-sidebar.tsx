@@ -148,7 +148,7 @@ export function AppSidebar({
           <div className="h-px w-full bg-neutral-200" />
 
           <SidebarContent className="overflow-visible p-0">
-            <SidebarMenu className="flex flex-col gap-2">
+            <SidebarMenu className="flex flex-col gap-4">
               {navItems.map((item) => {
                 const isActive = item.exact
                   ? pathname === item.href
@@ -169,7 +169,7 @@ export function AppSidebar({
                         onClick={() => {
                           if (isMobile) setOpenMobile(false)
                         }}
-                        className={`group relative flex h-10 w-full flex-1 items-center rounded-xl px-3 py-2 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:rounded-xl transition-colors ${
+                        className={`group relative flex h-10 w-full flex-1 items-center rounded-xl p-2 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:rounded-xl transition-colors ${
                           isActive
                             ? 'bg-brand-50 font-normal text-brand-600 hover:bg-brand-100 hover:text-brand-600 active:bg-brand-200'
                             : 'bg-transparent font-normal text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
@@ -177,7 +177,7 @@ export function AppSidebar({
                       >
                         <Link
                           href={item.href}
-                          className="flex w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
+                          className="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
                           aria-label={isCollapsed ? item.title : undefined}
                         >
                           <Icon
@@ -189,7 +189,8 @@ export function AppSidebar({
                           <Typography
                             as="span"
                             variant="16/regular"
-                            className="truncate leading-7 group-data-[collapsible=icon]:hidden"
+                            // Typography defaults to text-foreground; inherit so the active label takes the button's brand-600.
+                            className="truncate text-inherit group-data-[collapsible=icon]:hidden"
                             data-sidebar-anim
                           >
                             {item.title}
