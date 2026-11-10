@@ -7,7 +7,7 @@ import { statementYearPlan } from '../financial-package.js'
 import { actorOf } from '../proxy-auth.js'
 import { AGREEMENT_TEXTS_APPROVED, CURRENT_EVENT_RULES_VERSION, CURRENT_NON_COMPETE_VERSION, parseApplicationTeam } from '../request-repo.js'
 import { isUuid } from '../../exhibitions/catalogue.js'
-import { parseRequestFilters, parsePositiveInt, parseRevisionQuery, acceptsAgreementVersion, isRepresentative, isCompanyAdministrator, safeOwner, requestWithActions, parseExpectedRevision, parseDecisionReason, missingRequiredFields } from './route-helpers.js'
+import { parseRequestFilters, isFollowUpReader, parsePositiveInt, parseRevisionQuery, acceptsAgreementVersion, isRepresentative, isCompanyAdministrator, logoOf, safeOwner, requestWithActions, parseExpectedRevision, parseDecisionReason, missingRequiredFields } from './route-helpers.js'
 import type { DashboardContext } from './context.js'
 import type { RequestScope } from '../../access/policy.js'
 import type { OperationalRole } from '../../access/roles.js'
@@ -247,18 +247,30 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
     })
     const presented = await presentRequests(actor, result.items)
     const companyNames = await requestCompanyNames(deps, actor.operationalRole, result.items)
+    const hidesOwner = isReviewerRole(actor.operationalRole)
+    // One read of the companies names every owner's picture (a read per row would be slow);
+    // a failed read leaves the rows without one.
+    const companyOf = new Map<string, Awaited<ReturnType<typeof deps.companyStore.list>>[number]>()
+    if (!hidesOwner && presented.length > 0) {
+      for (const company of await deps.companyStore.list({ withLogos: true }).catch(() => [])) {
+        if (company.representativeId && !companyOf.has(company.representativeId)) companyOf.set(company.representativeId, company)
+      }
+    }
+    // The Secretariat's follow-up cases carry their state, so the list tags them (they used to have their own page).
+    const followUpOf = isFollowUpReader(actor.operationalRole) && presented.length > 0
+      ? await followUps.followUpStates(presented.map((item) => item.id))
+      : undefined
     const items = await Promise.all(
       presented.map(async (item) => {
         const companyName = companyNames.get(item.id) ?? null
         // One owner the CMS cannot resolve (e.g. an old non-numeric id) must not fail the whole list.
-        const owner = isReviewerRole(actor.operationalRole)
-          ? null
-          : safeOwner(await deps.userStore.findById(item.ownerId).catch(() => undefined))
+        const owner = hidesOwner ? null : safeOwner(await deps.userStore.findById(item.ownerId).catch(() => undefined))
         return {
           ...(await limitRequest(actor, item, false)),
           // The company's own name; `owner.companyName` repeats it for the readers who get an owner.
           companyName,
-          owner: owner ? { ...owner, companyName } : null,
+          owner: owner && { ...owner, companyName, logo: logoOf(companyOf.get(item.ownerId)) },
+          ...(followUpOf ? { followUp: followUpOf.get(item.id) ?? null } : {}),
         }
       }),
     )

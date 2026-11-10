@@ -32,6 +32,8 @@ const badgeVariants = cva(
         amber: "bg-[#fef0cd] text-[#c18404]",
         white: "bg-background text-neutral-600 border-neutral-200 shadow-2xs",
         black: "bg-neutral-800 text-neutral-50",
+        // A solid tag that stands apart from the pale status tags beside it.
+        "brand-solid": "bg-brand-600 text-background",
 
         // Outlines for compatibility
         outline: " bg-transparent text-neutral-600",

@@ -29,7 +29,8 @@ export interface CompanyStore {
   update(id: string, fields: CompanyFields): Promise<Company>
   /** Points the company at an uploaded logo (or clears it) and discards the logo file it replaces. */
   setLogo(id: string, logoId: string | null): Promise<Company>
-  list(options?: { search?: string }): Promise<Company[]>
+  /** `withLogos` resolves each company's logo file (one level deeper); the default list carries only its id. */
+  list(options?: { search?: string; withLogos?: boolean }): Promise<Company[]>
   /**
    * The logo's bytes for a download the backend has already authorized (#288).
    * Undefined when the company has no logo or the file is not a permitted image.
@@ -131,8 +132,8 @@ export class PayloadCompanyStore implements CompanyStore {
     return company
   }
 
-  async list(options: { search?: string } = {}): Promise<Company[]> {
-    const params = new URLSearchParams({ depth: '0', limit: '100', sort: 'name' })
+  async list(options: { search?: string; withLogos?: boolean } = {}): Promise<Company[]> {
+    const params = new URLSearchParams({ depth: options.withLogos ? '1' : '0', limit: '100', sort: 'name' })
     if (options.search) params.set('where[or][0][name][contains]', options.search)
     const res = await this.fetcher(`${this.baseUrl}/api/companies?${params.toString()}`, {
       headers: this.headers(),
@@ -397,7 +398,7 @@ export class InMemoryCompanyStore implements CompanyStore {
     return { body: Buffer.from(ONE_PIXEL_PNG, 'base64'), contentType: 'image/png' }
   }
 
-  async list(options: { search?: string } = {}): Promise<Company[]> {
+  async list(options: { search?: string; withLogos?: boolean } = {}): Promise<Company[]> {
     return [...this.companies.values()].filter((company) => {
       if (!options.search) return true
       const needle = options.search.toLocaleLowerCase()

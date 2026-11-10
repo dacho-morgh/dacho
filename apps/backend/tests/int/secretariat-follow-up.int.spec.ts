@@ -318,6 +318,12 @@ describe('T33: Secretariat follow-up and result publication (int)', () => {
     const queue = await get(app, 'secretariat', '/investment/follow-ups')
     expect(queue.body.items).toEqual([expect.objectContaining({ requestId: id, latestMemoVersion: 1, publishedAt: null })])
 
+    // The requests list tags the case and filters to the follow-up cases (the queue's old page is gone).
+    const listed = await get(app, 'secretariat', '/admin/requests?followUp=1')
+    expect(listed.body.items).toEqual([
+      expect.objectContaining({ id, followUp: { latestMemoSentAt: expect.any(String), publishedAt: null } }),
+    ])
+
     // Sending a memo publishes nothing.
     expect((await get(app, 'company-user-1', `/requests/${id}/result`)).body.result).toBeNull()
 
@@ -361,6 +367,8 @@ describe('T33: Secretariat follow-up and result publication (int)', () => {
     expect((await get(app, 'owner', `/requests/${id}`)).body.request).toMatchObject({ status: 'in_review', reviewStage: 'advanced' })
 
     expect((await get(app, 'secretariat', '/investment/follow-ups')).body.items[0].publishedAt).toBe(published.body.result.publishedAt)
+    expect((await get(app, 'owner', '/admin/requests?followUp=1')).body.items[0].followUp.publishedAt)
+      .toBe(published.body.result.publishedAt)
     const companyHistory = await historyOf(app, 'company-user-1', id)
     expect(companyHistory).toContain('result_publish')
     expect(companyHistory).not.toContain('investment_memo_send')
@@ -478,6 +486,14 @@ describe('T33: Secretariat follow-up and result publication (int)', () => {
       expect((await get(app, user, `/requests/${id}/follow-up`)).status).toBe(403)
       expect((await get(app, user, '/investment/follow-ups')).status).toBe(403)
     }
+    // Whether a memo went out stays with the Secretariat and the owner on the requests list too.
+    for (const user of ['chief', 'reviewer-1', 'employer-1', 'investment']) {
+      expect((await get(app, user, '/admin/requests?followUp=1')).body.error, user).toBe('invalid_follow_up')
+      for (const item of (await get(app, user, '/admin/requests')).body.items ?? []) {
+        expect(item, user).not.toHaveProperty('followUp')
+      }
+    }
+    expect((await get(app, 'company-user-1', '/requests?followUp=1')).body.error).toBe('invalid_follow_up')
     for (const user of ['chief', 'reviewer-1', 'employer-1', 'investment']) {
       expect((await get(app, user, `/requests/${id}/supplementary-requests`)).status).toBe(403)
     }
