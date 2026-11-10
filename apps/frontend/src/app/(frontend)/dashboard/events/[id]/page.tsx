@@ -50,7 +50,7 @@ export default async function EventDetailPage(props: PageProps) {
   const eventItem: EventItem = withOperationalId(mapEvent(eventDoc, 'events'), operationalEventIds(operational?.items))
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8">
+    <div className="flex min-h-screen w-full flex-col items-center bg-neutral-50 px-4 pt-10 pb-12">
       <EventsView
         initialEventsList={[eventItem]}
         isOwner={isOwner}
@@ -78,7 +78,7 @@ function mapEvent(
     serviceKey,
     title: String(item.title ?? ''),
     description: extractDescription(item.description),
-    badgeText: status === 'ended' ? 'تمام شده' : status === 'active' ? 'در حال برگزاری' : 'پیش رو',
+    badgeText: status === 'ended' ? 'تمام شده' : status === 'active' ? 'در حال برگزاری' : 'پیش‌رو',
     badgeType: status as 'ended' | 'active' | 'upcoming',
     dates: formatDateRange(startDate, endDate),
     location: String(item.location ?? 'محل برگزاری ثبت نشده است'),

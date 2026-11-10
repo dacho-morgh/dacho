@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { EventsView, type EventItem } from '@/components/dashboard/events-view'
+import { EVENT_TAG_VARIANT, EventsView, type EventItem } from '@/components/dashboard/events-view'
 import * as dashboardApi from '@/utilities/dashboard-api'
 
 const mockPush = vi.fn()
@@ -516,5 +518,103 @@ describe('EventsView design QA #276 - shared list toolbar, card click and event 
     fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
     expect(screen.getByText('سامانه مانیتورینگ هوشمند ارتعاشات توربین')).toBeDefined()
     expect(screen.queryByText('ساخت دستگاه پلیمرزدایی از تاورها')).toBeNull()
+  })
+})
+
+describe('EventsView design QA #281 - card typography, status tags and spacing', () => {
+  const ended: EventItem = {
+    ...mockEvent,
+    id: 'events-ended',
+    rawId: 'ended-1',
+    title: 'رویداد تمام شده',
+    badgeText: 'تمام شده',
+    badgeType: 'ended',
+    hasActionButton: false,
+    startTimestamp: 1,
+  }
+  const active: EventItem = { ...mockEvent, startTimestamp: 2 }
+  const upcoming: EventItem = {
+    ...mockEvent,
+    id: 'events-upcoming',
+    rawId: 'upcoming-1',
+    title: 'رویداد پیش رو',
+    badgeText: 'پیش‌رو',
+    badgeType: 'upcoming',
+    startTimestamp: 3,
+  }
+
+  beforeEach(() => {
+    mockPush.mockReset()
+    vi.spyOn(dashboardApi, 'getEventCategories').mockResolvedValue({ items: [] })
+    vi.spyOn(dashboardApi, 'getEventSubtopics').mockResolvedValue({ items: [] })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it('maps the three event statuses to the secondary, primary and gray tags', () => {
+    expect(EVENT_TAG_VARIANT).toEqual({ upcoming: 'secondary', active: 'primary', ended: 'gray' })
+    render(createElement(EventsView, { initialEventsList: [ended, active, upcoming] }))
+    const tagIn = (title: string, label: string) =>
+      within(screen.getByRole('heading', { name: title }).closest('article')!).getByText(label)
+    expect(tagIn(upcoming.title, 'پیش‌رو').getAttribute('data-variant')).toBe('secondary')
+    expect(tagIn(active.title, 'در حال برگزاری').getAttribute('data-variant')).toBe('primary')
+    expect(tagIn(ended.title, 'تمام شده').getAttribute('data-variant')).toBe('gray')
+    expect(tagIn(ended.title, 'تمام شده').getAttribute('data-slot')).toBe('badge')
+  })
+
+  it('uses the same status tag on the event page', async () => {
+    render(createElement(EventsView, { initialEventsList: [upcoming], initialSelectedEventId: upcoming.rawId }))
+    expect(screen.getByText('پیش‌رو').getAttribute('data-variant')).toBe('secondary')
+    await waitFor(() => expect(dashboardApi.getEventCategories).toHaveBeenCalled())
+  })
+
+  it('sets the date and place in the 16/semibold body style, neutral-600, icon first', () => {
+    render(createElement(EventsView, { initialEventsList: [active] }))
+    const card = screen.getByRole('article')
+    for (const text of [active.dates, active.location]) {
+      const node = within(card).getByText(text)
+      expect(node.getAttribute('data-variant')).toBe('16/semibold')
+      expect(node.className).toContain('text-neutral-600')
+      // The icon is the first child of the row, so it sits on the right in RTL.
+      expect(node.previousElementSibling?.tagName.toLowerCase()).toBe('svg')
+      expect(node.parentElement!.firstElementChild).toBe(node.previousElementSibling)
+    }
+    expect(within(card).getByText(active.dates).parentElement!.parentElement!.className).toContain('gap-4')
+  })
+
+  it('puts the tick icon of «ثبت درخواست» before the label, which is the right side in RTL', () => {
+    const { container } = render(createElement(EventsView, { initialEventsList: [active] }))
+    expect(container.querySelector('[dir="rtl"]')).toBeTruthy()
+    const button = screen.getByRole('button', { name: 'ثبت درخواست' })
+    expect(button.children).toHaveLength(2)
+    expect(button.children[0]!.tagName.toLowerCase()).toBe('svg')
+    expect(button.children[1]!.textContent).toBe('ثبت درخواست')
+    expect(button.children[1]!.getAttribute('data-variant')).toBe('16/semibold')
+  })
+
+  it('keeps the register button on the event page icon first as well', async () => {
+    render(createElement(EventsView, { initialEventsList: [active], initialSelectedEventId: active.rawId }))
+    const button = screen.getByRole('button', { name: 'ثبت‌نام در رویداد' })
+    expect(button.children[0]!.tagName.toLowerCase()).toBe('svg')
+    await waitFor(() => expect(dashboardApi.getEventCategories).toHaveBeenCalled())
+  })
+
+  it('leaves 16px between the cards of the list and of its skeleton', () => {
+    const { container, rerender } = render(createElement(EventsView, { initialEventsList: [ended, active, upcoming] }))
+    const cards = screen.getAllByRole('article')
+    expect(cards).toHaveLength(3)
+    expect(cards[0]!.parentElement!.className).toContain('gap-4')
+    expect(cards[0]!.parentElement!.className).not.toContain('gap-[32px]')
+    rerender(createElement(EventsView, { initialEventsList: [active], state: 'loading' }))
+    expect(container.querySelector('[role="status"]')!.className).toContain('gap-4')
+  })
+
+  it('uses no physical margin, padding or text-alignment classes', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/components/dashboard/events-view.tsx'), 'utf8')
+    expect(source).not.toMatch(/["'\s](?:[a-z]+:)?-?[mp][lr]-\S/)
+    expect(source).not.toMatch(/["'\s]text-(?:left|right)["'\s]/)
+    expect(source).toContain('ms-6')
   })
 })

@@ -17,7 +17,7 @@ export function BoothPageHeader({
   return (
     <>
       <header className="flex flex-col gap-1">
-        <Typography as="h1" variant="24/bold" color="neutral-800">
+        <Typography as="h1" variant="24/bold" color="neutral-700">
           {title}
         </Typography>
         <nav aria-label="مسیر صفحه">

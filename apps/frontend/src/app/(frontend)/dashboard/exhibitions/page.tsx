@@ -38,7 +38,7 @@ export default async function ExhibitionsPage() {
   const visible =
     role === 'representative' ? exhibitions.filter((item) => item.status !== 'past') : exhibitions
   return (
-    <main dir="rtl" className="flex min-h-0 min-w-0 flex-1 flex-col items-center p-4 sm:p-6">
+    <main dir="rtl" className="flex min-h-0 min-w-0 flex-1 flex-col items-center overflow-y-auto px-4 pt-10 pb-4">
       <ExhibitionPicker
         title={role === 'representative' ? 'رزرو غرفه نمایشگاه' : 'درخواست‌های غرفه نمایشگاه‌ها'}
         actionLabel={role === 'representative' ? 'مشاهده غرفه‌ها' : 'بررسی درخواست‌ها'}

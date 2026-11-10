@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 export default function ExhibitionAdminLoading() {
   return (
     <div
-      className="flex min-h-screen w-full flex-col items-center bg-[#fafafa] px-4 pt-6 pb-12 sm:px-6 sm:pt-10 lg:px-8"
+      className="flex min-h-screen w-full flex-col items-center bg-neutral-50 px-4 pt-10 pb-12"
       dir="rtl"
     >
       <div className="flex w-full max-w-7xl flex-col gap-8">
