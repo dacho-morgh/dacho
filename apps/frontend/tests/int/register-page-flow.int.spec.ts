@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RegisterPage from '@/components/auth/register-page'
 import { todayJalali } from '@/utilities/jalali'
 import { validNationalId } from '../helpers/nationalId'
+
+// These specs drive the whole three-step form (comboboxes, the calendar and the
+// per-step duplicate check) in jsdom. CI runners are two to three times slower
+// than a workstation, so the per-test and Testing Library wait limits are sized
+// for CI; the asserted outcomes are unchanged.
+vi.setConfig({ testTimeout: 20_000 })
+configure({ asyncUtilTimeout: 5_000 })
 
 const VALID_ID = validNationalId(7)
 
@@ -329,16 +336,17 @@ describe('registration form: layout, formats, location and date fields, auto sig
   })
 
   describe('Jalali founding date (shadcn calendar)', () => {
-    const openPicker = () => fireEvent.click(screen.getByRole('button', { name: 'تاریخ تأسیس' }))
+    // Queried afresh each time, so a re-rendered trigger is never read stale.
+    const dateTrigger = () => screen.getByRole('button', { name: 'تاریخ تأسیس' })
+    const openPicker = () => fireEvent.click(dateTrigger())
 
     it('picks a Jalali date from the calendar and submits it as YYYY/MM/DD', async () => {
       mockSignup({ signup: () => signedUp(false) })
       render(createElement(RegisterPage))
-      const trigger = screen.getByRole('button', { name: 'تاریخ تأسیس' })
-      expect(trigger.textContent).toBe('تاریخ تأسیس را انتخاب کنید')
+      expect(dateTrigger().textContent).toBe('تاریخ تأسیس را انتخاب کنید')
 
       await pickFoundingDate()
-      await waitFor(() => expect(trigger.textContent).toBe('۱۳۸۰/۰۵/۱۵'))
+      await waitFor(() => expect(dateTrigger().textContent).toBe('۱۳۸۰/۰۵/۱۵'))
       expect(screen.queryByRole('dialog')).toBeNull()
 
       await finishAllSteps()
@@ -376,13 +384,12 @@ describe('registration form: layout, formats, location and date fields, auto sig
 
     it('sets today from the shortcut and clears it again', async () => {
       render(createElement(RegisterPage))
-      const trigger = screen.getByRole('button', { name: 'تاریخ تأسیس' })
       openPicker()
       fireEvent.click(await screen.findByRole('button', { name: 'امروز' }))
-      await waitFor(() => expect(trigger.textContent).not.toBe('تاریخ تأسیس را انتخاب کنید'))
+      await waitFor(() => expect(dateTrigger().textContent).not.toBe('تاریخ تأسیس را انتخاب کنید'))
       openPicker()
       fireEvent.click(await screen.findByRole('button', { name: 'پاک کردن' }))
-      await waitFor(() => expect(trigger.textContent).toBe('تاریخ تأسیس را انتخاب کنید'))
+      await waitFor(() => expect(dateTrigger().textContent).toBe('تاریخ تأسیس را انتخاب کنید'))
     })
   })
 

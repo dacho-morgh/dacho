@@ -166,7 +166,7 @@ test.describe('Register', () => {
     await expect(page.getByText('شماره موبایل یا ایمیل واردشده قبلاً ثبت شده است.')).toBeVisible()
   })
 
-  test('recovers from a duplicate national id against the real API without a second company', async ({
+  test('stops on the company step for a national id that is already registered (real API)', async ({
     page,
   }) => {
     const suffix = `${Date.now()}`.slice(-9)
@@ -189,8 +189,6 @@ test.describe('Register', () => {
     registeredUserIds.push(firstBody.user.id)
     registeredCompanyIds.push(firstBody.company.id)
 
-    const secondPhone = `09${(Number(suffix) + 1).toString().padStart(9, '0').slice(-9)}`
-    const secondEmail = `dup-second-${suffix}@example.invalid`
     await page.goto(registerUrl)
     await page.waitForFunction(() => document.querySelector('form[data-hydrated="true"]') !== null)
     await page.locator('#register-companyName').fill('شرکت تکراری')
@@ -199,24 +197,43 @@ test.describe('Register', () => {
       .locator('#register-companyNationalId')
       .fill(nationalId.replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]))
     await page.locator('#register-activityDomain').fill('انرژی')
-    await page.getByRole('button', { name: 'ادامه' }).click()
-    await fillRepresentativeStep(page, secondPhone, secondEmail)
-    await fillSecurityStep(page)
-    const [response] = await Promise.all([
-      page.waitForResponse((candidate) => candidate.url().endsWith('/api/users/self-signup')),
-      page.getByRole('button', { name: 'ثبت شرکت' }).click(),
+    await fillCompanyDetails(page)
+    // The duplicate is caught when leaving the step, not only at the final submit.
+    const [availability] = await Promise.all([
+      page.waitForResponse((candidate) => candidate.url().endsWith('/api/users/signup-availability')),
+      page.getByRole('button', { name: 'ادامه' }).click(),
     ])
-    expect(response.status()).toBe(409)
+    expect(availability.status()).toBe(409)
 
-    await expect(page.locator('#register-notice')).toHaveText(
-      'این شرکت قبلاً در سامانه ثبت شده است و شرکت دیگری با این شناسه ملی ایجاد نشد.',
-    )
     await expect(page.locator('#register-companyNationalId')).toBeFocused()
     await expect(page.getByText(/هر شرکت تنها یک نماینده دارد/)).toBeVisible()
+    await expect(page.locator('#register-name')).toHaveCount(0)
+    await expect(page.locator('#register-notice')).toHaveText('برخی اطلاعات واردشده قبلاً در سامانه ثبت شده است.')
     await expect(page.getByRole('link', { name: 'ورود به حساب' })).toHaveAttribute(
       'href',
       '/login?returnUrl=%2Fdashboard',
     )
+
+    // The final submit applies the same rule before any write.
+    const secondEmail = `dup-second-${suffix}@example.invalid`
+    const second = await page.request.post('http://localhost:3000/api/users/self-signup', {
+      headers: cookieRequestHeaders,
+      data: {
+        email: secondEmail,
+        phone: `09${(Number(suffix) + 1).toString().padStart(9, '0').slice(-9)}`,
+        password: 'password123',
+        name: 'Second representative',
+        position: 'CEO',
+        companyName: 'Duplicate company',
+        companyNationalId: nationalId,
+        activityDomain: 'Energy',
+      },
+    })
+    expect(second.status()).toBe(409)
+    expect((await second.json()).errors[0]).toMatchObject({
+      code: 'duplicate_national_id',
+      field: 'companyNationalId',
+    })
 
     // Server state, not the page, proves atomicity: one company and no stray person.
     const companies = await payload.count({
@@ -497,7 +514,8 @@ test.describe('Register', () => {
         companyName: 'Test company',
         activityDomain: 'Energy',
         companyNationalId: validNationalId(`2${suffix}`),
-        companyRegistrationNumber: suffix,
+        // Registration numbers are 3 to 6 digits.
+        companyRegistrationNumber: suffix.slice(-6),
         companyType: 'سهامی خاص',
         companyProvince: 'بوشهر',
         companyCity: 'بوشهر',

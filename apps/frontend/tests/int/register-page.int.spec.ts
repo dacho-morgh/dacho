@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RegisterPage from '@/components/auth/register-page'
@@ -8,6 +8,13 @@ import { toPersianDigits } from '@/utilities/digits'
 import { validNationalId } from '../helpers/nationalId'
 
 const VALID_ID = validNationalId(1)
+
+// These specs drive the whole three-step form (comboboxes, the calendar and the
+// per-step duplicate check) in jsdom. CI runners are two to three times slower
+// than a workstation, so the per-test and Testing Library wait limits are sized
+// for CI; the asserted outcomes are unchanged.
+vi.setConfig({ testTimeout: 20_000 })
+configure({ asyncUtilTimeout: 5_000 })
 
 const { replace, useFormSpy } = vi.hoisted(() => ({ replace: vi.fn(), useFormSpy: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }))
@@ -390,7 +397,9 @@ describe('signup frontend contract (mocked HTTP, not release evidence)', () => {
       await representative()
       fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
       expect(await screen.findByText(message)).toBeTruthy()
-      const input = screen.getByLabelText(label)
+      // By id: once focused, a combobox opens its list, which carries the same label.
+      const input = document.getElementById(`register-${field}`) as HTMLInputElement
+      expect(screen.getAllByLabelText(label)).toContain(input)
       await waitFor(() => expect(document.activeElement).toBe(input))
       expect(input.getAttribute('aria-invalid')).toBe('true')
       expect(screen.queryByText(serverMessage)).toBeNull()
