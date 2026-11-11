@@ -378,6 +378,47 @@ describe('Company Verification and Secretariat Queue (T14)', () => {
       expect(rejectWithoutReason.body.error).toBe('reason_required')
     })
 
+    it('keeps a rejected company from submitting again until the Secretariat reopens it', async () => {
+      const { app, repHeaders, secretariatHeaders } = await setup()
+      const submit = await request(app).post('/profile/verification/submit').set(repHeaders).expect(201)
+      const verifId = submit.body.verification.id
+      await request(app)
+        .post(`/admin/verifications/${verifId}/decision`)
+        .set(secretariatHeaders)
+        .send({ action: 'reject', reason: 'مدارک معتبر نیست' })
+        .expect(200)
+
+      const status = await request(app).get('/profile/verification').set(repHeaders)
+      expect(status.body.status).toBe('rejected')
+      expect(status.body.canRequestVerification).toBe(false)
+      const blocked = await request(app).post('/profile/verification/submit').set(repHeaders)
+      expect(blocked.status).toBe(409)
+      expect(blocked.body.error).toBe('rejected_until_reopened')
+
+      // Reopening needs no reason, and only a rejected verification can be reopened.
+      await request(app)
+        .post(`/admin/verifications/${verifId}/decision`)
+        .set(repHeaders)
+        .send({ action: 'reopen' })
+        .expect(403)
+      await request(app)
+        .post(`/admin/verifications/${verifId}/decision`)
+        .set(secretariatHeaders)
+        .send({ action: 'reopen' })
+        .expect(200)
+      const reopened = await request(app).get('/profile/verification').set(repHeaders)
+      expect(reopened.body.status).toBe('returned')
+      expect(reopened.body.canRequestVerification).toBe(true)
+      await request(app).post('/profile/verification/submit').set(repHeaders).expect(201)
+
+      const again = await request(app)
+        .post(`/admin/verifications/${verifId}/decision`)
+        .set(secretariatHeaders)
+        .send({ action: 'reopen' })
+      expect(again.status).toBe(409)
+      expect(again.body.error).toBe('invalid_verification_state')
+    })
+
     it('rejects decisions with stale revision numbers', async () => {
       const { app, repHeaders, secretariatHeaders } = await setup()
       const submit = await request(app).post('/profile/verification/submit').set(repHeaders)

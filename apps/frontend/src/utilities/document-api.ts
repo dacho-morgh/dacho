@@ -32,7 +32,7 @@ const IMAGE_EXTENSION_MIME: Record<string, string> = {
 }
 
 /** A product/service file or a certificate may also be a photo (mirrors the server policy). */
-export const IMAGE_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = ['productsServices', 'certificatesLicenses']
+export const IMAGE_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = ['productsServices', 'certificatesLicenses', 'supportAttachment']
 
 const acceptsImages = (category?: DocumentCategory) =>
   category !== undefined && IMAGE_DOCUMENT_CATEGORIES.includes(category)
@@ -257,6 +257,7 @@ const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 const AUTHORIZED_DOWNLOAD_PATHS = [
   new RegExp(`^/api/dashboard/documents/${UUID_PATTERN}/download$`, 'i'),
   new RegExp(`^/api/dashboard/letters/${UUID_PATTERN}/attachments/${UUID_PATTERN}/download$`, 'i'),
+  new RegExp(`^/api/dashboard/support/${UUID_PATTERN}/attachments/${UUID_PATTERN}/download$`, 'i'),
 ]
 
 /**
@@ -274,6 +275,10 @@ export function documentDownloadPath(id: string): string {
 
 export function letterAttachmentDownloadPath(letterId: string, attachmentId: string): string {
   return `/api/dashboard/letters/${encodeURIComponent(letterId)}/attachments/${encodeURIComponent(attachmentId)}/download`
+}
+
+export function supportAttachmentDownloadPath(ticketId: string, attachmentId: string): string {
+  return `/api/dashboard/support/${encodeURIComponent(ticketId)}/attachments/${encodeURIComponent(attachmentId)}/download`
 }
 
 export async function downloadDocument(id: string): Promise<{ blob: Blob; filename: string }> {

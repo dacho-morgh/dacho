@@ -33,8 +33,11 @@ const contexts = [
   { name: 'legacy request owner without company', companyId: null, requestOwnerId: 'actor' },
 ] as const
 
+// A support attachment is a company-parented file of a ticket, covered by its own block below.
+const requestAndCompanyCategories = DOCUMENT_CATEGORIES.filter((category) => category !== 'supportAttachment')
+
 describe('T42 current backend document authority matrix', () => {
-  for (const category of DOCUMENT_CATEGORIES) {
+  for (const category of requestAndCompanyCategories) {
     const supported = !unsupportedCategories.includes(category)
     const companyDocument = companyCategories.includes(category)
     for (const role of roles) {
@@ -79,4 +82,34 @@ describe('T42 current backend document authority matrix', () => {
       })
     }
   }
+})
+
+describe('support attachment authority', () => {
+  const parent = (companyId: string | null) => ({ companyId, requestOwnerId: null, requestStatus: null, assigned: false })
+  const document = (companyId: string | null) => ({
+    category: 'supportAttachment' as const,
+    companyId,
+    requestId: null,
+    requestOwnerId: null,
+    requestCompanyId: null,
+    assigned: false,
+  })
+
+  it('lets only the owning company representative upload, never staff or case roles', () => {
+    for (const role of roles) {
+      expect(canUploadOwnedDocument(role, 'supportAttachment', parent('company'), 'actor', 'company'))
+        .toBe(role === 'representative')
+    }
+    expect(canUploadOwnedDocument('representative', 'supportAttachment', parent('other-company'), 'actor', 'company')).toBe(false)
+    expect(canUploadOwnedDocument('representative', 'supportAttachment', parent(null), 'actor', 'company')).toBe(false)
+    expect(canUploadOwnedDocument('representative', 'supportAttachment', {}, 'actor', 'company')).toBe(false)
+  })
+
+  it('opens a file to its company and to staff, and to no case role', () => {
+    for (const role of roles) {
+      const expected = role === 'system-owner' || role === 'central-secretariat' || role === 'representative'
+      expect(canReadDocument(role, { ...document('company'), assigned: true }, 'actor', 'company')).toBe(expected)
+    }
+    expect(canReadDocument('representative', document('other-company'), 'actor', 'company')).toBe(false)
+  })
 })

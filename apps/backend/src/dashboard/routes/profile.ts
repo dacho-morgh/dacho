@@ -282,7 +282,8 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
       const canRequestVerification =
         missing.canRequestVerification &&
         current?.status !== 'pending' &&
-        current?.status !== 'approved'
+        current?.status !== 'approved' &&
+        current?.status !== 'rejected'
       res.json({
         status: current?.status ?? 'unsubmitted',
         revision: current?.revision ?? 0,
@@ -343,6 +344,11 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
       if (!result.ok) {
         if (result.reason === 'already_submitted') {
           res.status(409).json({ error: 'already_submitted' })
+          return
+        }
+        if (result.reason === 'rejected') {
+          // Only the Secretariat can reopen a rejected verification.
+          res.status(409).json({ error: 'rejected_until_reopened' })
           return
         }
         res.status(409).json({ error: 'already_approved' })

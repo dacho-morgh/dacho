@@ -18,6 +18,7 @@ export const DOCUMENT_CATEGORIES = [
   'supplementaryCaseFiles',
   'boothPaymentReceipt',
   'correspondenceAttachment',
+  'supportAttachment',
 ] as const
 
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number]
@@ -42,6 +43,7 @@ export function documentCategoryLabel(category: DocumentCategory): string {
       supplementaryCaseFiles: 'مدارک تکمیلی پرونده',
       boothPaymentReceipt: 'رسید پرداخت غرفه',
       correspondenceAttachment: 'پیوست مکاتبه',
+      supportAttachment: 'پیوست پشتیبانی',
     } satisfies Record<DocumentCategory, string>
   )[category]
 }

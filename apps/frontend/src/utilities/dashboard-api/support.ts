@@ -1,5 +1,12 @@
 import { type Paginated, dashboardFetch } from './core'
 
+export interface SupportAttachmentDto {
+  id: string
+  name: string
+  mimeType: string
+  sizeBytes: number
+}
+
 export interface SupportTicketDto {
   requesterName?: string
   id: string
@@ -10,6 +17,9 @@ export interface SupportTicketDto {
   response: string | null
   respondedBy?: string | null
   messages?: SupportMessageDto[]
+  attachments?: SupportAttachmentDto[]
+  /** For the requesting company: a support answer it has not opened yet. */
+  unread?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -17,7 +27,8 @@ export interface SupportTicketDto {
 export interface SupportMessageDto {
   id: string
   authorId: string
-  authorRole: 'applicant' | 'staff'
+  /** The backend's SupportAuthorRole: the company's representative or a support administrator. */
+  authorRole: 'representative' | 'admin'
   body: string
   createdAt: string
 }
@@ -25,6 +36,7 @@ export interface SupportMessageDto {
 export function createSupportTicket(input: {
   subject: string
   message: string
+  attachmentIds?: string[]
 }): Promise<{ ticket: SupportTicketDto }> {
   return dashboardFetch<{ ticket: SupportTicketDto }>('/support', {
     method: 'POST',

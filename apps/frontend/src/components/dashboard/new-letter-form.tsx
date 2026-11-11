@@ -93,6 +93,8 @@ export interface NewLetterFormProps {
   officialOnly?: boolean
   initialRecipientId?: string
   initialTitle?: string
+  /** The sender's company; a support ticket's files are private documents of this company. */
+  companyId?: string
 }
 
 export function NewLetterForm({
@@ -106,6 +108,7 @@ export function NewLetterForm({
   officialOnly = false,
   initialRecipientId,
   initialTitle,
+  companyId,
 }: NewLetterFormProps) {
   const router = useRouter()
   const submitting = useRef(false)
@@ -144,6 +147,13 @@ export function NewLetterForm({
         setError('موضوع و متن پیام را تکمیل کنید.')
         return
       }
+      if (uploading) {
+        setError('تا پایان بارگذاری پیوست‌ها صبر کنید.')
+        return
+      }
+      const attachmentIds = attachments
+        .filter((document) => document.category === 'supportAttachment' && document.companyId === companyId)
+        .map((document) => document.id)
       submitting.current = true
       setSaving(true)
       setError(null)
@@ -153,7 +163,7 @@ export function NewLetterForm({
         const response = await fetch('/api/dashboard/support', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ subject, message: body }),
+          body: JSON.stringify({ subject, message: body, ...(attachmentIds.length ? { attachmentIds } : {}) }),
         })
         if (!response.ok) throw new DashboardApiError(response.status, 'ticket_not_created')
         const result = await response.json()
@@ -384,13 +394,21 @@ export function NewLetterForm({
         </div>
 
         {isSupport ? (
-          /* Support tickets have no attachment contract on the backend. */
-          <Input
-            label="فایل پیوست"
-            type="file"
-            disabled
-            hint="ارسال فایل پیوست در پیام پشتیبانی پشتیبانی نمی‌شود."
-          />
+          companyId ? (
+            <PrivateDocumentField
+              category="supportAttachment"
+              label="فایل پیوست"
+              companyId={companyId}
+              disabled={saving}
+              sessionOnly
+              onPendingChange={setUploading}
+              onDocumentsChange={setAttachments}
+            />
+          ) : (
+            <Typography role="status" variant="12/regular" className="text-neutral-500">
+              پیوست فایل فقط برای نماینده یک شرکت ثبت‌شده ممکن است.
+            </Typography>
+          )
         ) : (
           <div className="flex flex-col gap-2">
             <Typography as="label" htmlFor="letter-case" variant="16/semibold" className="text-neutral-700">

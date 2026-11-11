@@ -122,9 +122,12 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
       const company = await deps.companyStore.findByRepresentative(target.id)
       const profile = profileRepo.profileFor(target, company)
       const currentVerif = company ? await verificationStore.findCurrentByCompanyId(company.id) : null
-      const allowedActions = currentVerif?.status === 'pending' && target.id !== actor.id && currentVerif.representativeId !== actor.id
+      const otherThanOwn = target.id !== actor.id && currentVerif?.representativeId !== actor.id
+      const allowedActions = currentVerif?.status === 'pending' && otherThanOwn
         ? ['read', 'approve', 'return', 'reject']
-        : ['read']
+        : currentVerif?.status === 'rejected' && otherThanOwn
+          ? ['read', 'reopen']
+          : ['read']
 
       res.json({
         representative: {
@@ -345,9 +348,12 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
       }
       const history = await verificationStore.listHistory(verification.companyId)
       const company = await deps.companyStore.findById(verification.companyId)
-      const allowedActions = verification.status === 'pending' && verification.representativeId !== actor.id && company?.representativeId !== actor.id
+      const otherThanOwn = verification.representativeId !== actor.id && company?.representativeId !== actor.id
+      const allowedActions = verification.status === 'pending' && otherThanOwn
         ? ['read', 'approve', 'return', 'reject']
-        : ['read']
+        : verification.status === 'rejected' && otherThanOwn
+          ? ['read', 'reopen']
+          : ['read']
       res.json({
         verification,
         history,
@@ -364,7 +370,7 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
         return
       }
       const { action, reason, expectedRevision } = req.body ?? {}
-      if (action !== 'approve' && action !== 'return' && action !== 'reject') {
+      if (action !== 'approve' && action !== 'return' && action !== 'reject' && action !== 'reopen') {
         res.status(400).json({ error: 'invalid_action' })
         return
       }

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
+import { EventSeenMarker } from '@/components/dashboard/event-seen-marker'
 import { EventsView, type EventItem } from '@/components/dashboard/events-view'
 import { dashboardOperationalRole, serverDashboardFetch } from '@/utilities/dashboard-server'
 import { operationalEventIds, withOperationalId, type OperationalEvent } from '@/utilities/public-event-ids'
@@ -47,10 +48,14 @@ export default async function EventDetailPage(props: PageProps) {
   // Only a real published event may be shown; an unknown ID is not rendered as a placeholder event.
   if (!eventDoc) notFound()
   const operational = await serverDashboardFetch<{ items?: OperationalEvent[] }>('/events')
-  const eventItem: EventItem = withOperationalId(mapEvent(eventDoc, 'events'), operationalEventIds(operational?.items))
+  const operationalIds = operationalEventIds(operational?.items)
+  const eventItem: EventItem = withOperationalId(mapEvent(eventDoc, 'events'), operationalIds)
+  // Only a company has a «new» state for an event, and only an event with an operational twin is counted.
+  const seenId = dashboardOperationalRole(user) === 'representative' ? operationalIds.get(id) : undefined
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-neutral-50 px-4 pt-10 pb-12">
+      {seenId ? <EventSeenMarker eventId={seenId} /> : null}
       <EventsView
         initialEventsList={[eventItem]}
         isOwner={isOwner}

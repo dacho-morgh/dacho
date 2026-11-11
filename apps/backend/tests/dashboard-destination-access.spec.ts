@@ -13,6 +13,16 @@ describe('current-role dashboard destinations', () => {
     }
   })
 
+  it('opens a support or form mail detail whose id carries an escaped colon, and nothing else escaped', () => {
+    const id = '11111111-1111-4111-8111-111111111111'
+    for (const role of ['representative', 'system-owner', 'central-secretariat'] as const) {
+      expect(canOpenDashboardDestination(role, `/dashboard/letters/support%3A${id}`)).toBe(true)
+      expect(canOpenDashboardDestination(role, `/dashboard/letters/support%3a${id}`)).toBe(true)
+    }
+    expect(canOpenDashboardDestination('representative', '/dashboard/letters/support%2F..%2Fcompanies')).toBe(false)
+    expect(canOpenDashboardDestination('representative', '/dashboard/companies%3Ax')).toBe(false)
+  })
+
   it('allows the shared dashboard exactly without treating it as a route prefix', () => {
     expect(canOpenDashboardDestination('reviewer', '/dashboard')).toBe(true)
     expect(canOpenDashboardDestination('reviewer', '/dashboard/companies')).toBe(false)

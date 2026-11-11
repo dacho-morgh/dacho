@@ -202,6 +202,7 @@ export const DOCUMENT_CATEGORIES = [
   'supplementaryCaseFiles',
   'boothPaymentReceipt',
   'correspondenceAttachment',
+  'supportAttachment',
 ] as const
 
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number]
@@ -235,7 +236,7 @@ export const IMAGE_DOCUMENT_TYPES: readonly DocumentTypeRule[] = [
 ]
 
 /** A product/service file and a certificate may be a photo as well as a PDF or Word file. */
-export const IMAGE_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = ['productsServices', 'certificatesLicenses']
+export const IMAGE_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = ['productsServices', 'certificatesLicenses', 'supportAttachment']
 
 /** The file types a category accepts. */
 export function allowedDocumentTypes(category: DocumentCategory): readonly DocumentTypeRule[] {
@@ -244,7 +245,7 @@ export function allowedDocumentTypes(category: DocumentCategory): readonly Docum
     : ALLOWED_DOCUMENT_TYPES
 }
 
-export type DocumentAudience = 'company' | 'case' | 'financial' | 'unsupported'
+export type DocumentAudience = 'company' | 'case' | 'financial' | 'support' | 'unsupported'
 
 /**
  * Categories whose prerequisite workflow does not exist yet stay denied rather
@@ -278,6 +279,7 @@ export const FINANCIAL_CATEGORIES: readonly DocumentCategory[] = [
 
 export function documentAudience(category: DocumentCategory): DocumentAudience {
   if (UNSUPPORTED_DOCUMENT_CATEGORIES.includes(category)) return 'unsupported'
+  if (category === 'supportAttachment') return 'support'
   if (COMPANY_CATEGORIES.includes(category)) return 'company'
   if (FINANCIAL_CATEGORIES.includes(category)) return 'financial'
   return 'case'
@@ -314,8 +316,12 @@ export function canUploadOwnedDocument(
 ): boolean {
   const audience = documentAudience(category)
   if (audience === 'unsupported') return false
-  if (audience === 'company' && !parent.companyId) return false
-  if (audience !== 'company' && !parent.requestOwnerId && !parent.requestCompanyId) return false
+  if ((audience === 'company' || audience === 'support') && !parent.companyId) return false
+  if (audience !== 'company' && audience !== 'support' && !parent.requestOwnerId && !parent.requestCompanyId) return false
+  // A support attachment belongs to the company that opens the ticket; staff only read it.
+  if (audience === 'support') {
+    return role === 'representative' && Boolean(parent.companyId && parent.companyId === actorCompanyId)
+  }
   if (role === 'system-owner' || role === 'central-secretariat') return true
   if (role !== 'representative') return false
   if (audience === 'company') {
@@ -382,8 +388,8 @@ export function canReadDocument(
         // Legacy unmigrated request without companyId: fallback to creator
         return document.requestOwnerId === actorId
       }
-      // Standalone dossier document:
-      if (audience === 'company') {
+      // Standalone dossier or support document:
+      if (audience === 'company' || audience === 'support') {
         return Boolean(document.companyId && actorCompanyId && document.companyId === actorCompanyId)
       }
       return false

@@ -132,7 +132,7 @@ export interface CompanyDetailResponse {
   }
   executives?: { role?: string; name?: string }[]
   addresses?: { id?: string; title: string; province?: string; city?: string; address: string; postalCode: string }[]
-  allowedActions?: ('read' | 'approve' | 'return' | 'reject')[]
+  allowedActions?: ('read' | 'approve' | 'return' | 'reject' | 'reopen')[]
   verification?: {
     id?: string
     status: VerificationStatus
@@ -433,7 +433,7 @@ export function CompanyDetailView({
     })
 
   // Handle secretariat verification decision (Approve / Return / Reject)
-  const handleSubmitDecision = async (action: 'approve' | 'return' | 'reject') => {
+  const handleSubmitDecision = async (action: 'approve' | 'return' | 'reject' | 'reopen') => {
     if ((action === 'return' || action === 'reject') && !decisionReason.trim()) {
       setDecisionError('ثبت دلیل برای بازگرداندن یا رد الزامی است.')
       return
@@ -472,7 +472,7 @@ export function CompanyDetailView({
           return
         }
         if (result.error === 'invalid_verification_state') {
-          failDecision('وضعیت احراز در انتظار بررسی نیست.')
+          failDecision(action === 'reopen' ? 'وضعیت احراز رد شده نیست.' : 'وضعیت احراز در انتظار بررسی نیست.')
           await loadData()
           return
         }
@@ -509,7 +509,9 @@ export function CompanyDetailView({
           ? 'احراز شرکت با موفقیت تأیید شد.'
           : action === 'return'
             ? 'مدارک شرکت با موفقیت جهت اصلاح بازگردانده شد.'
-            : 'مدارک شرکت با موفقیت رد شد.',
+            : action === 'reopen'
+              ? 'احراز شرکت بازگشایی شد و شرکت می‌تواند دوباره درخواست دهد.'
+              : 'مدارک شرکت با موفقیت رد شد.',
       )
       await loadData()
     } catch {
@@ -606,6 +608,7 @@ export function CompanyDetailView({
   const isPending = verificationStatus === 'pending'
   const canDecide =
     data.allowedActions?.some((a) => ['approve', 'return', 'reject'].includes(a)) ?? false
+  const canReopen = verificationStatus === 'rejected' && (data.allowedActions?.includes('reopen') ?? false)
   const isSelf = isPending && !canDecide
 
   const fields: Array<[string, string | undefined]> = [
@@ -887,6 +890,40 @@ export function CompanyDetailView({
                     onClick={() => void handleSubmitDecision('approve')}
                   >
                     {decisionSubmitting ? 'در حال ثبت...' : 'تایید احراز هویت'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* A rejection is final for the company until the Secretariat reopens it. */}
+            {canReopen && (
+              <div className="flex flex-col gap-3">
+                <Typography variant="14/regular" color="muted">
+                  این شرکت تا زمانی که پرونده را بازگشایی نکنید نمی‌تواند دوباره درخواست احراز هویت بدهد.
+                </Typography>
+                <Typography as="label" htmlFor="decision-reason" variant="14/semibold" sm="16/semibold" color="neutral-700">
+                  توضیحات برای شرکت{' '}
+                  <Typography as="span" variant="12/regular" color="muted">
+                    (اختیاری)
+                  </Typography>
+                </Typography>
+                <Textarea
+                  id="decision-reason"
+                  rows={3}
+                  placeholder="مثلاً چه چیزی را پیش از ارسال دوباره باید اصلاح کند..."
+                  value={decisionReason}
+                  onChange={(e) => handleReasonChange(e.target.value)}
+                  disabled={decisionSubmitting}
+                />
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <Button
+                    size="40"
+                    variant="default"
+                    className="px-4"
+                    disabled={decisionSubmitting}
+                    onClick={() => void handleSubmitDecision('reopen')}
+                  >
+                    {decisionSubmitting ? 'در حال ثبت...' : 'بازگشایی برای ارسال مجدد'}
                   </Button>
                 </div>
               </div>

@@ -235,6 +235,16 @@ export interface CompanyVerificationDto {
   decidedAt: string | null
   reason: string | null
   canRequestVerification: boolean
+  /** Every submission of the company, newest last or first as the server orders them; no snapshot is read from it. */
+  history?: CompanyVerificationHistoryDto[]
+}
+
+export interface CompanyVerificationHistoryDto {
+  revision: number
+  status: CompanyVerificationStatus
+  submittedAt: string
+  decidedAt: string | null
+  reason: string | null
 }
 
 export function fetchCompanyVerification(): Promise<CompanyVerificationDto> {

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
 import { NewLetterForm, type LetterCaseOption, type LetterRecipient } from '@/components/dashboard/new-letter-form'
-import type { LetterDto, Paginated, RequestDto } from '@/utilities/dashboard-api'
+import type { LetterDto, Paginated, ProfileDto, RequestDto } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { dashboardOperationalRole, isSeniorManagerUser, serverDashboardFetchResult } from '@/utilities/dashboard-server'
 import { permittedRecipients, recipientOption, replyRecipient } from '@/utilities/letter-recipients'
@@ -21,6 +21,12 @@ interface PageProps {
   }>
 }
 
+/** The company's own id: support attachments are private files that belong to it. */
+async function supportForm() {
+  const profile = await serverDashboardFetchResult<ProfileDto>('/profile')
+  return <NewLetterForm mode="support" companyId={profile.kind === 'ok' ? (profile.data.companyId ?? undefined) : undefined} />
+}
+
 export default async function NewLetterPage(props: PageProps) {
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers: await headers() })
@@ -32,7 +38,7 @@ export default async function NewLetterPage(props: PageProps) {
   const replyTo = searchParams?.replyTo
 
   if (searchParams?.mode === 'support') {
-    return <NewLetterForm mode="support" />
+    return supportForm()
   }
 
   let requestId = searchParams?.requestId
@@ -54,7 +60,7 @@ export default async function NewLetterPage(props: PageProps) {
 
   // Without a case or a letter to answer, a company writes through support.
   if (role === 'representative' && !requestId && !replyTo) {
-    return <NewLetterForm mode="support" />
+    return supportForm()
   }
 
   const permitted = await permittedRecipients({ requestId })

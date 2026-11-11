@@ -138,6 +138,7 @@ export {
   type DossierResponseDto,
   type CompanyVerificationStatus,
   type CompanyVerificationDto,
+  type CompanyVerificationHistoryDto,
 } from './profile'
 export {
   createSupportTicket,

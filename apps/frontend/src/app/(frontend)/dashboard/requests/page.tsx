@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import React from 'react'
-import { VerificationGate } from '@/components/dashboard/verification-gate'
 import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import {
   adminRequestsQuery,
@@ -16,6 +15,7 @@ import {
   type RequestItem,
 } from '@/components/dashboard/requests'
 import { RequestsFilters, RequestsQueueNote } from '@/components/dashboard/requests/requests-filters'
+import { verificationRequestItem } from '@/components/dashboard/requests/verification-item'
 import { RequestsPagination } from '@/components/dashboard/requests/requests-pagination'
 import {
   parseRequestFilters,
@@ -148,15 +148,18 @@ async function companyRequestsList({
     serverDashboardFetchResult<CompanyVerificationDto>('/profile/verification'),
   ])
   const notice = unavailableReasonFor(result)
-  const items: RequestItem[] = result.kind === 'ok' ? result.data.items.map(mapRequestItem) : []
+  const requestItems: RequestItem[] = result.kind === 'ok' ? result.data.items.map(mapRequestItem) : []
+  // The verification is the company's own request to the Secretariat: it leads the first page of an unfiltered list.
+  const unfiltered = page === 1 && Object.keys(filters).length === 0
+  const items: RequestItem[] =
+    verification.kind === 'ok' && unfiltered ? [verificationRequestItem(verification.data), ...requestItems] : requestItems
   const phases = statsResult.kind === 'ok' ? statsResult.data.phases : undefined
   const stageCounts: Partial<Record<CompanyRequestStage | 'all', number>> | undefined =
     statsResult.kind === 'ok' ? { all: statsResult.data.total, ...phases } : undefined
   const filterForm = <RequestsFilters audience="company" filters={filters} events={events} stageCounts={stageCounts} />
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col bg-neutral-50 px-4 pt-6 pb-4 sm:pt-10">
-      <VerificationGate status={verification.kind === 'ok' ? verification.data.status : undefined} />
+    <div className="flex min-h-0 flex-1 flex-col bg-neutral-50 px-4 pt-6 pb-4 sm:pt-10">
       <RequestsListView
         items={items}
         notice={notice}

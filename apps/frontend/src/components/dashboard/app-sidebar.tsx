@@ -32,7 +32,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { UserMenu } from './user-menu'
-import type { DashboardNavigation } from './sidebar-shell'
+import type { DashboardNavCounts, DashboardNavigation } from './sidebar-shell'
 
 export interface NavItem {
   title: string
@@ -56,15 +56,26 @@ export interface SidebarUser {
   email?: string | null
 }
 
+/** The destinations that carry a number, and which count belongs to each. */
+const COUNT_KEY: Record<string, keyof DashboardNavCounts> = {
+  '/dashboard/letters': 'letters',
+  '/dashboard/requests': 'requests',
+  '/dashboard/events': 'events',
+}
+
+const MAX_SHOWN_COUNT = 99
+
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: SidebarUser | null
   navigation: DashboardNavigation
+  counts?: DashboardNavCounts
   companyName?: string
 }
 
 export function AppSidebar({
   user,
   navigation,
+  counts,
   companyName,
   className,
   ...props
@@ -154,6 +165,9 @@ export function AppSidebar({
                   ? pathname === item.href
                   : pathname === item.href || pathname.startsWith(`${item.href}/`)
                 const Icon = item.icon
+                const key = COUNT_KEY[item.href]
+                const count = key ? (counts?.[key] ?? 0) : 0
+                const countLabel = count > MAX_SHOWN_COUNT ? `+${MAX_SHOWN_COUNT.toLocaleString('fa-IR')}` : count.toLocaleString('fa-IR')
 
                 return (
                   <SidebarMenuItem key={item.href} className="relative">
@@ -178,7 +192,13 @@ export function AppSidebar({
                         <Link
                           href={item.href}
                           className="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
-                          aria-label={isCollapsed ? item.title : undefined}
+                          aria-label={
+                            isCollapsed
+                              ? count > 0
+                                ? `${item.title}، ${countLabel} مورد`
+                                : item.title
+                              : undefined
+                          }
                         >
                           <Icon
                             variant={isActive ? 'bulk' : 'linear'}
@@ -195,6 +215,24 @@ export function AppSidebar({
                           >
                             {item.title}
                           </Typography>
+                          {count > 0 && (
+                            <>
+                              {/* Expanded: the number sits at the end of the row. Collapsed: a dot on the icon. */}
+                              <span
+                                data-testid={`nav-count-${key}`}
+                                className="ms-auto grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-brand-500 px-1.5 group-data-[collapsible=icon]:hidden"
+                              >
+                                <Typography as="span" variant="12/regular" className="leading-none text-white">
+                                  {countLabel}
+                                </Typography>
+                                <span className="sr-only"> مورد جدید</span>
+                              </span>
+                              <span
+                                aria-hidden="true"
+                                className="absolute end-1 top-1 hidden size-2.5 rounded-full bg-brand-500 ring-2 ring-background group-data-[collapsible=icon]:block"
+                              />
+                            </>
+                          )}
                         </Link>
                       </SidebarMenuButton>
                     </div>
