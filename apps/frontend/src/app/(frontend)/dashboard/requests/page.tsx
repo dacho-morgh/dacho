@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import React from 'react'
+import { VerificationGate } from '@/components/dashboard/verification-gate'
 import { AdminRequestList } from '@/components/dashboard/admin-request-list'
 import {
   adminRequestsQuery,
@@ -26,6 +27,7 @@ import {
 import {
   mapRequestItem,
   type DashboardOverviewDto,
+  type CompanyVerificationDto,
   type Paginated,
   type RequestDto,
   type RequestStats,
@@ -140,9 +142,10 @@ async function companyRequestsList({
   queueNote: React.ReactNode
 }) {
   // The counts read every stage under the other filters, as the staff tabs read every status.
-  const [result, statsResult] = await Promise.all([
+  const [result, statsResult, verification] = await Promise.all([
     serverDashboardFetchResult<Paginated<RequestDto>>(`/requests?limit=50&page=${page}${filterQuery}`),
     serverDashboardFetchResult<RequestStats>(`/stats${requestFiltersQuery({ ...filters, phase: undefined }).replace('&', '?')}`),
+    serverDashboardFetchResult<CompanyVerificationDto>('/profile/verification'),
   ])
   const notice = unavailableReasonFor(result)
   const items: RequestItem[] = result.kind === 'ok' ? result.data.items.map(mapRequestItem) : []
@@ -152,7 +155,8 @@ async function companyRequestsList({
   const filterForm = <RequestsFilters audience="company" filters={filters} events={events} stageCounts={stageCounts} />
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-neutral-50 px-4 pt-6 pb-4 sm:pt-10">
+    <div className="relative flex min-h-0 flex-1 flex-col bg-neutral-50 px-4 pt-6 pb-4 sm:pt-10">
+      <VerificationGate status={verification.kind === 'ok' ? verification.data.status : undefined} />
       <RequestsListView
         items={items}
         notice={notice}
