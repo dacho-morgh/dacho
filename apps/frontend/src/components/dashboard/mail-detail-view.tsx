@@ -16,7 +16,8 @@ import {
   DashboardMoreIcon, DashboardTrashIcon,
 } from '@/components/icons'
 import { deleteLetter, describeMutationFailure } from '@/utilities/dashboard-api'
-import { letterAttachmentDownloadPath } from '@/utilities/document-api'
+import { letterAttachmentDownloadPath, supportAttachmentDownloadPath } from '@/utilities/document-api'
+import { useSupportReply } from '@/components/dashboard/support-ticket-actions'
 import { toast } from 'sonner'
 
 export interface MailAttachment {
@@ -58,6 +59,13 @@ interface MailDetailViewProps {
   canDelete?: boolean
 }
 
+function attachmentPath(mailId: string, attachmentId: string): string {
+  // A support ticket's mail id is «support:<ticket id>»; its files are served by the ticket route.
+  return mailId.startsWith('support:')
+    ? supportAttachmentDownloadPath(mailId.slice('support:'.length), attachmentId)
+    : letterAttachmentDownloadPath(mailId, attachmentId)
+}
+
 function LetterAttachments({ letterId, attachments }: { letterId: string; attachments: MailAttachment[] }) {
   return (
     <section aria-label="پیوست‌های نامه" className="flex flex-col gap-2">
@@ -69,7 +77,7 @@ function LetterAttachments({ letterId, attachments }: { letterId: string; attach
               <Typography variant="14/semibold" className="break-all text-neutral-700"><bdi dir="auto">{attachment.name}</bdi></Typography>
               <Typography variant="12/light" className="text-neutral-400">{attachment.size}</Typography>
             </div>
-            <PrivateDocumentDownload path={letterAttachmentDownloadPath(letterId, attachment.id)} filename={attachment.name} />
+            <PrivateDocumentDownload path={attachmentPath(letterId, attachment.id)} filename={attachment.name} />
           </li>
         ))}
       </ul>
@@ -147,6 +155,7 @@ function RepliedLetters({ thread, notice }: { thread: MailData[]; notice?: strin
 
 export function MailDetailView({ mail, showActions = false, supportReply = false, supportClosed = false, replyHref, canDelete = true }: MailDetailViewProps) {
   const router = useRouter()
+  const supportReplyState = useSupportReply()
   const deletingRef = useRef(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -205,11 +214,7 @@ export function MailDetailView({ mail, showActions = false, supportReply = false
           {(!!mail.thread?.length || mail.threadNotice) && <RepliedLetters thread={mail.thread ?? []} notice={mail.threadNotice} />}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <LetterSender mail={mail} />
-            {supportReply && !supportClosed && <Button type="button" variant="white" size="40" onClick={() => {
-              const target = document.getElementById('support-reply') ?? document.getElementById('support-conversation')
-              target?.scrollIntoView({ block: 'center' })
-              target?.focus({ preventScroll: true })
-            }}>
+            {supportReply && !supportClosed && <Button type="button" variant="white" size="40" onClick={() => supportReplyState?.openReply()}>
               <DashboardMessageTextIcon aria-hidden="true" className="size-6" />
               <Typography as="span" variant="16/semibold" className="text-inherit">ثبت بازخورد</Typography>
             </Button>}

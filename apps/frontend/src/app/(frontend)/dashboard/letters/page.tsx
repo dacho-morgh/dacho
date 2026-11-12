@@ -96,6 +96,40 @@ function toInboxRow(dto: LetterDto, names: Map<string, string>, actorId: string)
   }
 }
 
+const TICKET_STATUS_LABELS: Record<SupportTicketDto['status'], string> = {
+  open: 'در انتظار پاسخ',
+  answered: 'پاسخ داده شده',
+  closed: 'بسته شده',
+}
+
+/** The box a ticket belongs to for the reader, by who wrote last. */
+function ticketBoxFor(ticket: SupportTicketDto, reader: boolean): 'received' | 'sent' {
+  const supportSpokeLast = ticket.status === 'answered'
+  if (reader) return supportSpokeLast ? 'received' : 'sent'
+  return supportSpokeLast ? 'sent' : 'received'
+}
+
+/** A ticket as an inbox row, seen from the company (`company`) or from the administrators. */
+function toTicketInboxRow(ticket: SupportTicketDto, company: boolean): InboxRow {
+  const received = ticketBoxFor(ticket, company) === 'received'
+  const href = `/dashboard/letters/${encodeURIComponent(`support:${ticket.id}`)}`
+  return {
+    id: `support:${ticket.id}`,
+    title: ticket.subject,
+    type: ticket.status === 'answered' ? 'approved' : ticket.status === 'closed' ? 'notification' : 'official',
+    typeLabel: company ? TICKET_STATUS_LABELS[ticket.status] : 'تیکت پشتیبانی',
+    counterpartName: company ? 'پشتیبانی کارخانه نوآوری' : (ticket.requesterName || 'شرکت متقاضی'),
+    counterpartRole: company ? (received ? 'فرستنده' : 'گیرنده') : TICKET_STATUS_LABELS[ticket.status],
+    sentDate: formatDate(ticket.updatedAt),
+    received,
+    read: company && received ? !ticket.unread : undefined,
+    canReply: false,
+    // The side that must answer next gets the shortcut into the conversation.
+    action: received && ticket.status !== 'closed' ? { label: 'پاسخ', href } : null,
+    kind: 'ticket',
+  }
+}
+
 function PageFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col bg-neutral-50 px-4 pb-4 pt-10 sm:px-6 lg:px-4" dir="rtl">
@@ -128,15 +162,43 @@ export default async function LettersPage({ searchParams }: { searchParams: Sear
     if (failure || result.kind !== 'ok') return <DashboardReadNotice reason={failure ?? 'unavailable'} retryHref="/dashboard/letters" />
     const actorId = String(user?.id)
     const names = await recipientNamesOf(payload, result.data.items.filter((dto) => dto.recipientId !== actorId))
+    const letterRows = result.data.items.map((dto) => ({ at: dto.sentAt, row: toInboxRow(dto, names, actorId) }))
+
+    // Support tickets share the inbox and follow the conversation: a ticket sits in the box of whoever
+    // wrote last to the reader. «answered» means the support side spoke, so it is received mail for the
+    // company and sent mail for the administrators; a company reply sends it back the other way.
+    const isRepresentative = dashboardOperationalRole(user) === 'representative'
+    let ticketRows: typeof letterRows = []
+    let unreadTicketCount = 0
+    if (isRepresentative || isSeniorManager) {
+      const ticketsRes = await serverDashboardFetchResult<Paginated<SupportTicketDto>>('/support?limit=100')
+      const tickets = ticketsRes.kind === 'ok' ? ticketsRes.data.items : []
+      // Only the company has a read state for a ticket: the answers it has not opened yet.
+      if (isRepresentative) unreadTicketCount = tickets.filter((ticket) => ticket.unread).length
+      const needle = query.q?.toLowerCase()
+      // The unread filter keeps unread answers; the action filter has nothing to say about a ticket.
+      const statusAllows = (ticket: SupportTicketDto) =>
+        !query.status || (query.status === 'unread' && isRepresentative && ticket.unread === true)
+      if (query.page === 1) {
+        ticketRows = tickets
+          .filter((ticket) => ticketBoxFor(ticket, isRepresentative) === query.box)
+          .filter(statusAllows)
+          .filter((ticket) => !needle || ticket.subject.toLowerCase().includes(needle))
+          .map((ticket) => ({ at: ticket.updatedAt, row: toTicketInboxRow(ticket, isRepresentative) }))
+      }
+    }
+    const rows = [...letterRows, ...ticketRows]
+      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+      .map((item) => item.row)
     const shortcuts: InboxShortcut[] = [
       { label: isSeniorManager ? 'همه نامه‌ها، فرم‌ها و پشتیبانی' : 'نامه‌ها و تیکت‌های پشتیبانی', href: '/dashboard/letters?view=all' },
     ]
     return (
       <PageFrame>
         <InboxView
-          rows={result.data.items.map((dto) => toInboxRow(dto, names, actorId))}
+          rows={rows}
           query={query}
-          counts={result.data.counts}
+          counts={{ ...result.data.counts, unread: result.data.counts.unread + unreadTicketCount }}
           page={result.data.page}
           totalPages={result.data.totalPages}
           canCompose={dashboardOperationalRole(user) !== 'representative'}
@@ -186,7 +248,7 @@ export default async function LettersPage({ searchParams }: { searchParams: Sear
         typeLabel: title,
         senderName: String(fields.fullName || 'فرستنده فرم'),
         senderRole: 'فرم وب‌سایت',
-        sentDate: new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date(doc.createdAt)),
+        sentDate: new Intl.DateTimeFormat('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran' }).format(new Date(doc.createdAt)),
         source: 'form',
       }
       return [item]

@@ -67,6 +67,38 @@ export function emailProblem(value: string): SignupFieldReason | undefined {
   return email.length <= EMAIL_MAX_LENGTH && EMAIL_RE.test(email) ? undefined : 'email_format'
 }
 
+/** The economic code (کد اقتصادی) is 11 digits, like the company national ID. */
+export const ECONOMIC_CODE_LENGTH = 11
+export const ECONOMIC_CODE_MESSAGES = {
+  digits_only: 'کد اقتصادی باید فقط شامل رقم باشد.',
+  length: 'کد اقتصادی باید ۱۱ رقم باشد.',
+} as const
+
+export function economicCodeProblem(value: string): keyof typeof ECONOMIC_CODE_MESSAGES | undefined {
+  const code = toEnglishDigits(value.trim())
+  if (!/^\d+$/.test(code)) return 'digits_only'
+  return code.length === ECONOMIC_CODE_LENGTH ? undefined : 'length'
+}
+
+/** The registration number (شماره ثبت) is 3 to 6 digits: older companies have 3-4, newer ones up to 6. */
+export const REGISTRATION_NUMBER_MIN_LENGTH = 3
+export const REGISTRATION_NUMBER_MAX_LENGTH = 6
+export const REGISTRATION_NUMBER_MESSAGES = {
+  digits_only: 'شماره ثبت باید فقط شامل رقم باشد.',
+  length: 'شماره ثبت باید بین ۳ تا ۶ رقم باشد.',
+} as const
+
+export function registrationNumberProblem(
+  value: string,
+): keyof typeof REGISTRATION_NUMBER_MESSAGES | undefined {
+  const number = toEnglishDigits(value.trim())
+  if (!/^\d+$/.test(number)) return 'digits_only'
+  return number.length >= REGISTRATION_NUMBER_MIN_LENGTH &&
+    number.length <= REGISTRATION_NUMBER_MAX_LENGTH
+    ? undefined
+    : 'length'
+}
+
 export function isDigitsOnly(value: string): boolean {
   return /^\d+$/.test(toEnglishDigits(value.trim()))
 }

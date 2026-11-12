@@ -7,7 +7,7 @@ import type {
 export interface VerificationDetailResponse {
   verification?: CompanyDetailResponse['verification']
   history?: VerificationHistoryItem[]
-  allowedActions?: ('read' | 'approve' | 'return' | 'reject')[]
+  allowedActions?: ('read' | 'approve' | 'return' | 'reject' | 'reopen')[]
 }
 
 /**

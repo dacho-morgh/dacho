@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RegisterPage from '@/components/auth/register-page'
 import { todayJalali } from '@/utilities/jalali'
 import { validNationalId } from '../helpers/nationalId'
+
+// These specs drive the whole three-step form (comboboxes, the calendar and the
+// per-step duplicate check) in jsdom. CI runners are two to three times slower
+// than a workstation, so the per-test and Testing Library wait limits are sized
+// for CI; the asserted outcomes are unchanged.
+vi.setConfig({ testTimeout: 20_000 })
+configure({ asyncUtilTimeout: 5_000 })
 
 const VALID_ID = validNationalId(7)
 
@@ -22,10 +29,33 @@ async function advance() {
   })
 }
 
+async function pickOption(label: string, query: string, option: string) {
+  const input = screen.getByRole('combobox', { name: label })
+  fireEvent.focus(input)
+  fireEvent.change(input, { target: { value: query } })
+  fireEvent.click(await screen.findByRole('option', { name: option }))
+}
+
+async function pickFoundingDate() {
+  fireEvent.click(screen.getByRole('button', { name: 'تاریخ تأسیس' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'انتخاب سال' }))
+  fireEvent.click(screen.getByRole('button', { name: '۱۳۸۰' }))
+  fireEvent.click(screen.getByRole('button', { name: 'انتخاب ماه' }))
+  fireEvent.click(screen.getByRole('button', { name: 'مرداد' }))
+  fireEvent.click(await screen.findByRole('button', { name: /۱۵-ام مرداد ۱۳۸۰/ }))
+}
+
+/** Fills every company field; `extra` runs last so a test can overwrite one of them. */
 async function company(extra: () => void = () => {}) {
   fill('نام شرکت', 'شرکت نمونه')
   fill('شناسه ملی', VALID_ID)
   fill('حوزه فعالیت', 'انرژی')
+  fill('شماره ثبت', '12345')
+  await pickOption('نوع شرکت', 'تضام', 'تضامنی')
+  await pickOption('استان', 'بوش', 'بوشهر')
+  await pickOption('شهر', 'برازج', 'برازجان')
+  await pickFoundingDate()
+  fill('کد اقتصادی', '12345678901')
   extra()
   await advance()
 }
@@ -54,7 +84,7 @@ function mockSignup(handlers: {
   capabilities?: () => Response
   access?: () => Response
 }) {
-  vi.mocked(fetch).mockImplementation(async (input) => {
+  signupFetch.mockImplementation(async (input) => {
     const url = String(input)
     if (url === '/api/users/self-signup') return (handlers.signup ?? (() => signedUp(true)))()
     if (url === '/api/dashboard/capabilities') {
@@ -75,13 +105,33 @@ async function finishAllSteps() {
   fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
 }
 
+/**
+ * The register form calls two endpoints: the per-step duplicate check
+ * (`availabilityFetch`, "nothing taken" unless a test says otherwise) and the
+ * signup POST (`signupFetch`), which each test drives.
+ */
+let signupFetch = vi.fn<typeof fetch>()
+let availabilityFetch = vi.fn<typeof fetch>()
+function stubRegisterFetch() {
+  signupFetch = vi.fn<typeof fetch>()
+  availabilityFetch = vi.fn<typeof fetch>(async () => new Response('{}', { status: 200 }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>((input, init) =>
+      String(input).includes('/signup-availability')
+        ? availabilityFetch(input, init)
+        : signupFetch(input, init),
+    ),
+  )
+}
+
 describe('registration form: layout, formats, location and date fields, auto sign-in (#278)', () => {
   const locationReplace = vi.fn()
 
   beforeEach(() => {
     replace.mockReset()
     locationReplace.mockReset()
-    vi.stubGlobal('fetch', vi.fn())
+    stubRegisterFetch()
     vi.stubGlobal('location', { replace: locationReplace, href: 'http://localhost/register' })
     // Radix popovers measure their anchor.
     vi.stubGlobal(
@@ -115,14 +165,15 @@ describe('registration form: layout, formats, location and date fields, auto sig
       expect(next.className).toContain('min-w-32')
     })
 
-    it('lays the company type dropdown out right to left', () => {
+    it('lays the company type dropdown out right to left like the province one', () => {
       render(createElement(RegisterPage))
-      const type = screen.getByRole('combobox', { name: 'نوع شرکت (اختیاری)' })
+      const type = screen.getByRole('combobox', { name: 'نوع شرکت' }) as HTMLInputElement
       expect(type.getAttribute('dir')).toBe('rtl')
-      expect(type.closest('[data-slot="select-field"]')?.getAttribute('dir')).toBe('rtl')
-      // The placeholder is the empty first choice; the options are Persian.
-      expect(within(type).getByRole('option', { name: 'نوع شرکت را انتخاب کنید' })).toBeTruthy()
-      expect(within(type).getByRole('option', { name: 'سهامی خاص' })).toBeTruthy()
+      expect(type.closest('[data-slot="combobox-field"]')?.getAttribute('dir')).toBe('rtl')
+      expect(type.placeholder).toBe('نوع شرکت را جستجو یا انتخاب کنید')
+      fireEvent.focus(type)
+      expect(screen.getByRole('option', { name: 'سهامی خاص' })).toBeTruthy()
+      expect(screen.getByRole('option', { name: 'تعاونی' })).toBeTruthy()
     })
   })
 
@@ -160,7 +211,7 @@ describe('registration form: layout, formats, location and date fields, auto sig
       fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
       expect(await screen.findByText('تکرار رمز عبور را وارد کنید.')).toBeTruthy()
       expect(confirmation.getAttribute('aria-invalid')).toBe('true')
-      expect(fetch).not.toHaveBeenCalled()
+      expect(signupFetch).not.toHaveBeenCalled()
     })
 
     it('flags a short password and a mismatched confirmation only after they are touched', async () => {
@@ -208,208 +259,137 @@ describe('registration form: layout, formats, location and date fields, auto sig
     })
 
     it.each([
-      ['شماره ثبت (اختیاری)', '12ab'],
-      ['کد اقتصادی', '1۲x'],
-    ])('requires %s to be digits when it is filled', async (label, value) => {
+      ['شماره ثبت', '12ab', 'شماره ثبت باید فقط شامل رقم باشد.', '۱۲۳۴'],
+      ['شماره ثبت', '12', 'شماره ثبت باید بین ۳ تا ۶ رقم باشد.', '۱۲۳۴۵۶'],
+      ['شماره ثبت', '1234567', 'شماره ثبت باید بین ۳ تا ۶ رقم باشد.', '123'],
+      ['کد اقتصادی', '1۲x', 'کد اقتصادی باید فقط شامل رقم باشد.', '۱۲۳۴۵۶۷۸۹۰۱'],
+      ['کد اقتصادی', '1234567890', 'کد اقتصادی باید ۱۱ رقم باشد.', '12345678901'],
+      ['کد اقتصادی', '123456789012', 'کد اقتصادی باید ۱۱ رقم باشد.', '12345678901'],
+    ])('rejects %s "%s" and accepts a corrected value', async (label, value, message, fixed) => {
       render(createElement(RegisterPage))
       await company(() => fill(label, value))
-      expect(screen.getByText('این فیلد باید فقط شامل رقم باشد.')).toBeTruthy()
+      expect(screen.getByText(message)).toBeTruthy()
       expect(screen.queryByLabelText('نام و نام خانوادگی')).toBeNull()
-      fill(label, '۱۲۳۴')
+      fill(label, fixed)
       await advance()
       expect(screen.getByLabelText('نام و نام خانوادگی')).toBeTruthy()
     })
   })
 
   describe('province and city', () => {
-    const optionNames = (select: HTMLElement) =>
-      within(select)
-        .getAllByRole('option')
-        .map((option) => option.textContent)
+    const optionNames = () =>
+      within(screen.getByRole('listbox')).getAllByRole('option').map((option) => option.textContent)
 
-    it('offers all 31 provinces and filters the cities by the chosen province', () => {
+    it('offers all 31 provinces and filters the cities by the chosen province', async () => {
       render(createElement(RegisterPage))
-      const province = screen.getByRole('combobox', { name: 'استان (اختیاری)' })
-      const city = screen.getByRole('combobox', { name: 'شهر (اختیاری)' })
-      expect(optionNames(province)).toHaveLength(31 + 1)
-      expect((city as HTMLSelectElement).disabled).toBe(true)
-      expect(optionNames(city)).toEqual(['ابتدا استان را انتخاب کنید'])
+      const province = screen.getByRole('combobox', { name: 'استان' }) as HTMLInputElement
+      const city = screen.getByRole('combobox', { name: 'شهر' }) as HTMLInputElement
+      expect(city.disabled).toBe(true)
+      expect(city.placeholder).toBe('ابتدا استان را انتخاب کنید')
 
+      fireEvent.focus(province)
+      expect(optionNames()).toHaveLength(31)
+      fireEvent.change(province, { target: { value: 'آذربایجان' } })
+      expect(optionNames()).toEqual(['آذربایجان شرقی', 'آذربایجان غربی'])
       fireEvent.change(province, { target: { value: 'بوشهر' } })
-      expect((city as HTMLSelectElement).disabled).toBe(false)
-      expect(optionNames(city)).toContain('برازجان')
-      expect(optionNames(city)).not.toContain('تبریز')
+      fireEvent.click(screen.getByRole('option', { name: 'بوشهر' }))
+      expect(province.value).toBe('بوشهر')
+      expect(city.disabled).toBe(false)
 
-      fireEvent.change(city, { target: { value: 'برازجان' } })
-      expect((city as HTMLSelectElement).value).toBe('برازجان')
+      fireEvent.focus(city)
+      expect(optionNames()).toContain('برازجان')
+      expect(optionNames()).not.toContain('تبریز')
+      fireEvent.change(city, { target: { value: 'برازج' } })
+      expect(optionNames()).toEqual(['برازجان'])
+      fireEvent.change(city, { target: { value: 'زززز' } })
+      expect(screen.getByText('موردی پیدا نشد')).toBeTruthy()
     })
 
-    it('clears the city when the province changes and submits the pair', async () => {
+    it('matches Arabic letters and spaces, and only keeps a listed value', async () => {
+      render(createElement(RegisterPage))
+      await pickOption('استان', 'يزد', 'یزد')
+      await pickOption('استان', 'هرمز', 'هرمزگان')
+      await pickOption('شهر', 'بندر عباس', 'بندرعباس')
+      const province = screen.getByRole('combobox', { name: 'استان' }) as HTMLInputElement
+      // Free text is not a province: it is dropped, and so is the city under it.
+      fireEvent.change(province, { target: { value: 'نامعتبر' } })
+      expect((screen.getByRole('combobox', { name: 'شهر' }) as HTMLInputElement).value).toBe('')
+      fireEvent.blur(province)
+      expect(province.value).toBe('')
+    })
+
+    it('submits the chosen province and city', async () => {
       mockSignup({ signup: () => signedUp(false) })
       render(createElement(RegisterPage))
-      const province = screen.getByRole('combobox', { name: 'استان (اختیاری)' })
-      const city = screen.getByRole('combobox', { name: 'شهر (اختیاری)' })
-      fireEvent.change(province, { target: { value: 'بوشهر' } })
-      fireEvent.change(city, { target: { value: 'برازجان' } })
-      fireEvent.change(province, { target: { value: 'تهران' } })
-      expect((city as HTMLSelectElement).value).toBe('')
-      expect(optionNames(city)).toContain('ری')
-      expect(optionNames(city)).not.toContain('برازجان')
-      fireEvent.change(city, { target: { value: 'ری' } })
-
-      await company(() => {
-        expect((city as HTMLSelectElement).value).toBe('ری')
+      await finishAllSteps()
+      await waitFor(() => expect(signupFetch).toHaveBeenCalledOnce())
+      const body = JSON.parse(String(signupFetch.mock.calls[0]![1]?.body))
+      expect(body).toMatchObject({
+        companyType: 'تضامنی',
+        companyProvince: 'بوشهر',
+        companyCity: 'برازجان',
+        companyRegistrationNumber: '12345',
+        companyEconomicCode: '12345678901',
       })
-      await representative()
-      fill('رمز عبور', 'password123')
-      fill('تکرار رمز عبور', 'password123')
-      fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
-      await waitFor(() => expect(fetch).toHaveBeenCalledOnce())
-      const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]![1]?.body))
-      expect(body).toMatchObject({ companyProvince: 'تهران', companyCity: 'ری' })
+      expect(body).not.toHaveProperty('companyStatus')
     })
   })
 
-  describe('Jalali founding date', () => {
-    const openPicker = () => fireEvent.click(screen.getByLabelText('تاریخ تأسیس'))
+  describe('Jalali founding date (shadcn calendar)', () => {
+    // Queried afresh each time, so a re-rendered trigger is never read stale.
+    const dateTrigger = () => screen.getByRole('button', { name: 'تاریخ تأسیس' })
+    const openPicker = () => fireEvent.click(dateTrigger())
 
     it('picks a Jalali date from the calendar and submits it as YYYY/MM/DD', async () => {
       mockSignup({ signup: () => signedUp(false) })
       render(createElement(RegisterPage))
-      const trigger = screen.getByLabelText('تاریخ تأسیس')
-      expect(trigger.textContent).toBe('تاریخ تأسیس را انتخاب کنید')
+      expect(dateTrigger().textContent).toBe('تاریخ تأسیس را انتخاب کنید')
 
-      openPicker()
-      fireEvent.change(await screen.findByLabelText('سال'), { target: { value: '1380' } })
-      fireEvent.change(screen.getByLabelText('ماه'), { target: { value: '5' } })
-      fireEvent.click(screen.getByRole('button', { name: /۱۵ مرداد ۱۳۸۰$/ }))
+      await pickFoundingDate()
+      await waitFor(() => expect(dateTrigger().textContent).toBe('۱۳۸۰/۰۵/۱۵'))
+      expect(screen.queryByRole('dialog')).toBeNull()
 
-      await waitFor(() => expect(trigger.textContent).toBe('۱۳۸۰/۰۵/۱۵'))
-      expect(screen.queryByLabelText('سال')).toBeNull()
-
-      await company()
-      await representative()
-      fill('رمز عبور', 'password123')
-      fill('تکرار رمز عبور', 'password123')
-      fireEvent.click(screen.getByRole('button', { name: 'ثبت شرکت' }))
-      await waitFor(() => expect(fetch).toHaveBeenCalledOnce())
-      const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]![1]?.body))
+      await finishAllSteps()
+      await waitFor(() => expect(signupFetch).toHaveBeenCalledOnce())
+      const body = JSON.parse(String(signupFetch.mock.calls[0]![1]?.body))
       expect(body.companyEstablishmentDate).toBe('1380/05/15')
     })
 
     it('never offers a year after the current Jalali year and disables later days', async () => {
       render(createElement(RegisterPage))
       openPicker()
-      const years = within(await screen.findByLabelText('سال'))
-        .getAllByRole('option')
-        .map((option) => option.textContent)
       const today = todayJalali()
-      expect(years[0]).toBe(String(today.year).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]!))
-      const days = screen.getAllByRole('button').filter((button) => button.dataset.variant === 'day')
+      const persian = (value: number) => String(value).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]!)
+      // The year grid lists the newest year first and never a later one.
+      fireEvent.click(await screen.findByRole('button', { name: 'انتخاب سال' }))
+      const years = within(screen.getByRole('group', { name: 'سال‌ها' }))
+        .getAllByRole('button')
+        .map((button) => button.textContent)
+      expect(years[0]).toBe(persian(today.year))
+      expect(years.at(-1)).toBe(persian(1300))
+      fireEvent.click(screen.getByRole('button', { name: persian(today.year) }))
+      const days = within(screen.getByRole('dialog'))
+        .getAllByRole('button')
+        .filter((button) => /-ام /.test(button.getAttribute('aria-label') ?? ''))
       for (const day of days) {
         const number = Number(
           (day.textContent ?? '').replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))),
         )
         expect((day as HTMLButtonElement).disabled).toBe(number > today.day)
       }
-      expect(days.some((day) => day.dataset.today === 'true')).toBe(true)
       // The latest month is the current one: there is no next month to go to.
-      expect((screen.getByRole('button', { name: 'ماه بعد' }) as HTMLButtonElement).disabled).toBe(true)
-      expect((screen.getByRole('button', { name: 'ماه قبل' }) as HTMLButtonElement).disabled).toBe(false)
+      const next = screen.getByRole('button', { name: 'ماه بعد' })
+      expect(next.hasAttribute('disabled') || next.getAttribute('aria-disabled') === 'true').toBe(true)
     })
 
-    it('moves between days with the arrow keys (right to left) and closes with Escape', async () => {
+    it('sets today from the shortcut and clears it again', async () => {
       render(createElement(RegisterPage))
       openPicker()
-      await screen.findByLabelText('سال')
-      const todayButton = await waitFor(() => {
-        const focused = document.activeElement as HTMLElement
-        expect(focused.dataset.variant).toBe('day')
-        return focused
-      })
-      expect(todayButton.dataset.today).toBe('true')
-      const todayLabel = todayButton.getAttribute('aria-label')
-      fireEvent.keyDown(todayButton, { key: 'ArrowRight' })
-      await waitFor(() => {
-        const focused = document.activeElement as HTMLElement
-        expect(focused.dataset.variant).toBe('day')
-        expect(focused.getAttribute('aria-label')).not.toBe(todayLabel)
-      })
-      fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' })
-      await waitFor(() => expect(screen.queryByLabelText('سال')).toBeNull())
-      expect(document.activeElement).toBe(screen.getByLabelText('تاریخ تأسیس'))
-    })
-  })
-
-  describe('Jalali date picker keyboard', () => {
-    const dayButton = (label: RegExp) => screen.getByRole('button', { name: label })
-    const pick = async (year: string, month: string) => {
-      fireEvent.click(screen.getByLabelText('تاریخ تأسیس'))
-      fireEvent.change(await screen.findByLabelText('سال'), { target: { value: year } })
-      fireEvent.change(screen.getByLabelText('ماه'), { target: { value: month } })
-    }
-    /** Presses a key on the focused day and waits for focus to land on the expected day. */
-    const press = async (key: string, expected: RegExp) => {
-      fireEvent.keyDown(document.activeElement as HTMLElement, { key })
-      await waitFor(() => {
-        const active = document.activeElement as HTMLElement
-        expect(active.dataset.variant).toBe('day')
-        expect(active.getAttribute('aria-label')).toMatch(expected)
-      })
-    }
-
-    it('moves focus with every navigation key, across month and year boundaries', async () => {
-      render(createElement(RegisterPage))
-      await pick('1380', '5')
-      // 15 Mordad 1380 is a Monday (the 3rd column from the right).
-      dayButton(/ ۱۵ مرداد ۱۳۸۰$/).focus()
-      await press('ArrowRight', /^یکشنبه ۱۴ مرداد ۱۳۸۰$/)
-      await press('ArrowLeft', /^دوشنبه ۱۵ مرداد ۱۳۸۰$/)
-      await press('ArrowDown', /^دوشنبه ۲۲ مرداد ۱۳۸۰$/)
-      await press('ArrowUp', /^دوشنبه ۱۵ مرداد ۱۳۸۰$/)
-      await press('Home', /^شنبه ۱۳ مرداد ۱۳۸۰$/)
-      await press('End', /^جمعه ۱۹ مرداد ۱۳۸۰$/)
-      // Past the end of the week row, the next day is the Saturday of the next row.
-      await press('ArrowLeft', /^شنبه ۲۰ مرداد ۱۳۸۰$/)
-      await press('PageDown', /^.* ۲۰ شهریور ۱۳۸۰$/)
-      await press('PageUp', /^.* ۲۰ مرداد ۱۳۸۰$/)
-      expect((screen.getByLabelText('ماه') as HTMLSelectElement).value).toBe('5')
-
-      // The first of a month steps back into the previous month.
-      dayButton(/ ۱ مرداد ۱۳۸۰$/).focus()
-      await press('ArrowRight', /^.* ۳۱ تیر ۱۳۸۰$/)
-      expect((screen.getByLabelText('ماه') as HTMLSelectElement).value).toBe('4')
-      // ... and the first of the year into the last day of the previous year.
-      fireEvent.change(screen.getByLabelText('ماه'), { target: { value: '1' } })
-      dayButton(/ ۱ فروردین ۱۳۸۰$/).focus()
-      await press('ArrowRight', /^.* ۳۰ اسفند ۱۳۷۹$/)
-      expect((screen.getByLabelText('سال') as HTMLSelectElement).value).toBe('1379')
-    })
-
-    it('starts a move from the day that really has focus, not from a stale tab stop', async () => {
-      render(createElement(RegisterPage))
-      await pick('1380', '5')
-      // The roving tab stop is still on the previously viewed day; focus another one.
-      dayButton(/ ۲۰ مرداد ۱۳۸۰$/).focus()
-      await press('ArrowRight', /^.* ۱۹ مرداد ۱۳۸۰$/)
-    })
-
-    it('does not move past the latest selectable day', async () => {
-      render(createElement(RegisterPage))
-      fireEvent.click(screen.getByLabelText('تاریخ تأسیس'))
-      await screen.findByLabelText('سال')
-      const today = await waitFor(() => {
-        const active = document.activeElement as HTMLElement
-        expect(active.dataset.today).toBe('true')
-        return active
-      })
-      fireEvent.keyDown(today, { key: 'ArrowLeft' })
-      fireEvent.keyDown(today, { key: 'ArrowDown' })
-      fireEvent.keyDown(today, { key: 'PageDown' })
-      expect((document.activeElement as HTMLElement).dataset.today).toBe('true')
-      expect((screen.getByLabelText('سال') as HTMLSelectElement).value).toBe(
-        String(todayJalali().year),
-      )
+      fireEvent.click(await screen.findByRole('button', { name: 'امروز' }))
+      await waitFor(() => expect(dateTrigger().textContent).not.toBe('تاریخ تأسیس را انتخاب کنید'))
+      openPicker()
+      fireEvent.click(await screen.findByRole('button', { name: 'پاک کردن' }))
+      await waitFor(() => expect(dateTrigger().textContent).toBe('تاریخ تأسیس را انتخاب کنید'))
     })
   })
 
@@ -420,7 +400,7 @@ describe('registration form: layout, formats, location and date fields, auto sig
       await finishAllSteps()
       await waitFor(() => expect(locationReplace).toHaveBeenCalledWith('/dashboard/owner'))
       expect(replace).not.toHaveBeenCalled()
-      expect(vi.mocked(fetch).mock.calls.map(([url]) => String(url))).toEqual([
+      expect(signupFetch.mock.calls.map(([url]) => String(url))).toEqual([
         '/api/users/self-signup',
         '/api/dashboard/capabilities',
       ])
@@ -433,7 +413,7 @@ describe('registration form: layout, formats, location and date fields, auto sig
       await waitFor(() =>
         expect(locationReplace).toHaveBeenCalledWith('/dashboard/requests?status=draft'),
       )
-      expect(vi.mocked(fetch).mock.calls.map(([url]) => String(url))).toContain(
+      expect(signupFetch.mock.calls.map(([url]) => String(url))).toContain(
         '/api/dashboard/access?path=%2Fdashboard%2Frequests',
       )
     })
@@ -455,7 +435,7 @@ describe('registration form: layout, formats, location and date fields, auto sig
         ),
       )
       expect(locationReplace).not.toHaveBeenCalled()
-      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+      expect(signupFetch).toHaveBeenCalledTimes(1)
     })
 
     it('falls back to the login page when the panel cannot be resolved after signing in', async () => {

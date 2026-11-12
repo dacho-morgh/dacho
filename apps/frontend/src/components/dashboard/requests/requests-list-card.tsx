@@ -14,7 +14,7 @@ import type { RequestItem } from './types'
  * opens the dossier; the title link and the action keep their own.
  */
 export function RequestsListCard({ item }: { item: RequestItem }) {
-  const href = `/dashboard/requests/${encodeURIComponent(item.id)}`
+  const href = item.href ?? `/dashboard/requests/${encodeURIComponent(item.id)}`
   const link = useRowLink(href)
   return (
     <div
@@ -24,16 +24,18 @@ export function RequestsListCard({ item }: { item: RequestItem }) {
     >
       <div className="flex items-center justify-between gap-3">
         <RequestStatusBadge stage={item.stage ?? 'reviewing'} label={item.statusLabel} />
-        <RequestRowActions requestId={item.id} />
+        <RequestRowActions requestId={item.id} href={item.href} />
       </div>
       <Typography variant="16/regular" className="mt-3 break-words text-neutral-600">
         <Link href={href} className="hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500">
           {item.title}
         </Link>
       </Typography>
-      <Typography variant="12/regular" className="mt-1 font-mono text-neutral-400">
-        کد پیگیری: {item.trackingCode}
-      </Typography>
+      {item.trackingCode ? (
+        <Typography variant="12/regular" className="mt-1 font-mono text-neutral-400">
+          کد پیگیری: {item.trackingCode}
+        </Typography>
+      ) : null}
       {item.nextAction ? (
         <Typography variant="12/regular" className="mt-1 break-words text-neutral-500">
           اقدام شما: {item.nextAction}

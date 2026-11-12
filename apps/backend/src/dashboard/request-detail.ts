@@ -275,6 +275,8 @@ export function ownCompanyProfile(company: Company): OwnCompanyProfile {
       registrationNumber: company.registrationNumber ?? '',
       economicCode: company.economicCode ?? '',
       nationalId: company.nationalId ?? '',
+      province: company.province ?? '',
+      city: company.city ?? '',
     },
     activityDomain: company.activityDomain ?? '',
     province: company.province ?? '',

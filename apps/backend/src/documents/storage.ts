@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import type { DocumentTypeRule } from './policy.js'
 
-const STORAGE_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(pdf|doc|docx)$/
+const STORAGE_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(pdf|doc|docx|jpg|jpeg|png|webp)$/
 
 /**
  * Private bytes live outside every public/static directory and are addressed by

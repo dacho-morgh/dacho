@@ -125,6 +125,8 @@ export interface RequestItem {
   allowedActions: RequestAllowedAction[]
   dueDate: string
   createdDate: string
+  /** Where the row opens when it is not a request dossier (the company's verification). */
+  href?: string
 }
 
 export type RecentRequestStatus = 'draft' | 'in_review' | 'action_needed' | 'approved' | 'rejected'

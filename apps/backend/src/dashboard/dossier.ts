@@ -10,6 +10,7 @@ import {
   type CompanyFields,
   type KeyMember,
   type PastProjectCustomer,
+  type ProductService,
 } from '../auth/user-store.js'
 import { DocumentRepository } from '../documents/repo.js'
 
@@ -23,7 +24,7 @@ export interface CompanyDossier {
   website: string
   centerEstablishment: string
   insuredEmployeeCount: number | null
-  productsServices: string[]
+  productsServices: ProductService[]
   keyMembers: KeyMember[]
   pastProjectsCustomers: PastProjectCustomer[]
   requestedServices: string[]
@@ -51,6 +52,62 @@ export const EMPTY_DOSSIER: CompanyDossier = {
 export class DossierValidationError extends Error {
   constructor(readonly code: string) {
     super(code)
+  }
+}
+
+/** The knowledge-based status choices the profile offers. */
+export const KNOWLEDGE_BASED_STATUS_OPTIONS = [
+  'دانش‌بنیان نوع یک',
+  'دانش‌بنیان نوع دو',
+  'دانش‌بنیان نوپا',
+  'غیر دانش‌بنیان',
+] as const
+
+/** The company classification choices the profile offers. */
+export const CLASSIFICATION_OPTIONS = ['نوپا', 'فناور', 'صنعتی', 'سایر'] as const
+
+/** The value the center-establishment checkbox stores when it is ticked. */
+export const CENTER_ESTABLISHED = 'مستقر در مرکز رشد / پارک علم و فناوری'
+
+/**
+ * The two dropdown fields take one of their listed choices. A value saved
+ * before the lists existed stays acceptable while it is sent back unchanged.
+ */
+export function checkDossierChoices(update: Partial<CompanyFields>, current: CompanyDossier): void {
+  const choices = [
+    ['knowledgeBasedStatus', KNOWLEDGE_BASED_STATUS_OPTIONS],
+    ['classification', CLASSIFICATION_OPTIONS],
+  ] as const
+  for (const [field, options] of choices) {
+    const value = update[field]
+    if (value === undefined || value === '' || value === current[field]) continue
+    if (!(options as readonly string[]).includes(value)) throw new DossierValidationError(`invalid_${field}`)
+  }
+}
+
+/** The private-document category each dossier list attaches its files under. */
+export const DOSSIER_ITEM_DOCUMENT_CATEGORY = {
+  productsServices: 'productsServices',
+  certificatesLicenses: 'certificatesLicenses',
+} as const satisfies Record<string, DocumentCategory>
+
+/**
+ * Every file a product or certificate points to must be one of this company's
+ * own documents in that list's category.
+ */
+export function checkDossierItemDocuments(
+  update: Partial<CompanyFields>,
+  documents: readonly { id: string; category: DocumentCategory }[],
+): void {
+  for (const field of ['productsServices', 'certificatesLicenses'] as const) {
+    const items = update[field]
+    if (!items) continue
+    const category = DOSSIER_ITEM_DOCUMENT_CATEGORY[field]
+    for (const item of items) {
+      if (!item.documentId) continue
+      const owned = documents.some((document) => document.id === item.documentId && document.category === category)
+      if (!owned) throw new DossierValidationError(`invalid_${field}_document`)
+    }
   }
 }
 
@@ -152,14 +209,31 @@ export function pickDossierUpdate(input: unknown): Partial<CompanyFields> {
     }
   }
 
-  if ('productsServices' in input) update.productsServices = strings(input.productsServices, 'productsServices')
+  if ('productsServices' in input) {
+    if (!Array.isArray(input.productsServices)) throw new DossierValidationError('invalid_productsServices')
+    // A plain title is still accepted from older clients.
+    update.productsServices = input.productsServices
+      .map((item): ProductService | undefined => {
+        if (typeof item === 'string') return item.trim() ? { title: item.trim() } : undefined
+        if (!isRecord(item)) throw new DossierValidationError('invalid_productsServices')
+        const documentId = optionalString(item.documentId, 'productsServices')
+        return { title: requiredString(item.title, 'productsServices'), ...(documentId ? { documentId } : {}) }
+      })
+      .filter((item): item is ProductService => item !== undefined)
+  }
   if ('requestedServices' in input) update.requestedServices = strings(input.requestedServices, 'requestedServices')
 
   if ('keyMembers' in input) {
-    update.keyMembers = records(input.keyMembers, 'keyMembers', (item) => ({
-      name: requiredString(item.name, 'keyMembers'),
-      role: requiredString(item.role, 'keyMembers'),
-    }))
+    update.keyMembers = records(input.keyMembers, 'keyMembers', (item) => {
+      const education = optionalString(item.education, 'keyMembers')
+      const degreePlace = optionalString(item.degreePlace, 'keyMembers')
+      return {
+        name: requiredString(item.name, 'keyMembers'),
+        role: requiredString(item.role, 'keyMembers'),
+        ...(education ? { education } : {}),
+        ...(degreePlace ? { degreePlace } : {}),
+      }
+    })
   }
 
   if ('pastProjectsCustomers' in input) {
@@ -177,6 +251,10 @@ export function pickDossierUpdate(input: unknown): Partial<CompanyFields> {
   if ('certificatesLicenses' in input) {
     update.certificatesLicenses = records(input.certificatesLicenses, 'certificatesLicenses', (item) => ({
       title: requiredString(item.title, 'certificatesLicenses'),
+      ...(optionalString(item.documentId, 'certificatesLicenses') !== undefined
+        ? { documentId: optionalString(item.documentId, 'certificatesLicenses')! }
+        : {}),
+      // No longer asked for; an earlier value sent back unchanged is kept.
       ...(optionalString(item.issuer, 'certificatesLicenses') !== undefined
         ? { issuer: optionalString(item.issuer, 'certificatesLicenses')! }
         : {}),
@@ -414,10 +492,9 @@ export function missingDossierItems(
   const requireValue = (key: string, present: boolean) => {
     if (!present) required.push(key)
   }
+  // The legal-entity type, founding year and company status are no longer asked
+  // for (the company type and establishment date from registration cover them).
   requireValue('registrationNumber', nonEmpty(company.registrationNumber))
-  requireValue('legalEntityType', nonEmpty(dossier.legalEntityType))
-  requireValue('foundingYear', nonEmpty(dossier.foundingYear))
-  requireValue('status', nonEmpty(company.status))
   requireValue('classification', nonEmpty(dossier.classification))
   requireValue('knowledgeBasedStatus', nonEmpty(dossier.knowledgeBasedStatus))
   requireValue('activityDomain', nonEmpty(dossier.activityDomain))
@@ -436,7 +513,10 @@ export function missingDossierItems(
   optionalValue('pastProjectsCustomers', dossier.pastProjectsCustomers.length > 0)
   optionalValue('requestedServices', dossier.requestedServices.length > 0)
   optionalValue('catalogues', documentCategories.has('catalogues'))
-  optionalValue('certificatesLicenses', documentCategories.has('certificatesLicenses'))
+  optionalValue(
+    'certificatesLicenses',
+    dossier.certificatesLicenses.length > 0 || documentCategories.has('certificatesLicenses'),
+  )
   optionalValue('amendmentNotices', documentCategories.has('amendmentNotices'))
 
   return { required, optional, canRequestVerification: required.length === 0 }

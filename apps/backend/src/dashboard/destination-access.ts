@@ -7,7 +7,10 @@ const caseRoles: readonly OperationalRole[] = [
 ]
 
 /** Validate a route before applying the current actor's server-side page policy. */
-export function canOpenDashboardDestination(role: OperationalRole, value: string): boolean {
+export function canOpenDashboardDestination(role: OperationalRole, rawValue: string): boolean {
+  // A support or form mail id is «prefix:uuid», which the browser sends as «prefix%3Auuid».
+  // That one escape is a plain colon; every other escape stays refused below.
+  const value = rawValue.replace(/%3a/gi, ':')
   if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\') || /[%\u0000-\u001f]/.test(value)) return false
   const path = value.replace(/\/+$/, '') || '/'
   const segments = path.split('/')

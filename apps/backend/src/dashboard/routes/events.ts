@@ -3,6 +3,7 @@ import type { Router } from 'express'
 import { canActOnEvent, canManageEvents } from '../../access/events.js'
 import { isInternalOperationalRole, operationalRoleOf } from '../../access/roles.js'
 import { isEventId } from '../event-repo.js'
+import { EventViewRepository } from '../event-view-repo.js'
 import { actorOf } from '../proxy-auth.js'
 import { isUuid } from '../../exhibitions/catalogue.js'
 import type { PublicRecord } from '../../exhibitions/exhibition-store.js'
@@ -305,6 +306,18 @@ export function registerEventRoutes(router: Router, ctx: DashboardContext): void
             registrationCloseAt: event.registrationCloseAt,
           })),
       })
+    } catch (error) { next(error) }
+  })
+
+  /** A company opened an event: it no longer counts as new in its sidebar. */
+  router.post('/events/:eventId/seen', async (req, res, next) => {
+    try {
+      const actor = actorOf(res)
+      if (actor.operationalRole !== 'representative') { res.status(403).json({ error: 'forbidden' }); return }
+      const eventId = String(req.params.eventId ?? '')
+      if (!isEventId(eventId) || !(await eventStore.findById(eventId))) { res.status(404).json({ error: 'not_found' }); return }
+      await new EventViewRepository(deps.pool).markSeen(actor.id, eventId)
+      res.status(204).end()
     } catch (error) { next(error) }
   })
 

@@ -1,4 +1,13 @@
-import { isAbsenceField, type Address, type CompanyFields, type Executive, type User } from './user-store.js'
+import {
+  isAbsenceField,
+  type Address,
+  type CertificateLicence,
+  type CompanyFields,
+  type Executive,
+  type KeyMember,
+  type ProductService,
+  type User,
+} from './user-store.js'
 
 export interface CompanyLogo {
   id: string
@@ -204,19 +213,19 @@ export class PayloadCompanyStore implements CompanyStore {
       ...(Array.isArray(d.executives) ? { executives: d.executives as Executive[] } : {}),
       ...(Array.isArray(d.addresses) ? { addresses: d.addresses as Address[] } : {}),
       ...(Array.isArray(d.productsServices)
-        ? { productsServices: d.productsServices.map(textEntry).filter(isPresent) }
+        ? { productsServices: d.productsServices.map(productEntry).filter(isPresent) }
         : {}),
       ...(Array.isArray(d.requestedServices)
         ? { requestedServices: d.requestedServices.map(serviceEntry).filter(isPresent) }
         : {}),
       ...(Array.isArray(d.keyMembers)
-        ? { keyMembers: d.keyMembers as CompanyFields['keyMembers'] }
+        ? { keyMembers: d.keyMembers.map(keyMemberEntry).filter(isPresent) }
         : {}),
       ...(Array.isArray(d.pastProjectsCustomers)
         ? { pastProjectsCustomers: d.pastProjectsCustomers as CompanyFields['pastProjectsCustomers'] }
         : {}),
       ...(Array.isArray(d.certificatesLicenses)
-        ? { certificatesLicenses: d.certificatesLicenses as CompanyFields['certificatesLicenses'] }
+        ? { certificatesLicenses: d.certificatesLicenses.map(certificateEntry).filter(isPresent) }
         : {}),
       ...(Array.isArray(d.notAvailable)
         ? { notAvailable: d.notAvailable.filter(isAbsenceField) }
@@ -252,12 +261,47 @@ function toLogo(value: unknown): CompanyLogo {
   return { id: String(value), filename: null }
 }
 
-function textEntry(value: unknown): string | undefined {
-  if (typeof value === 'string') return value
-  if (value && typeof value === 'object' && typeof (value as { title?: unknown }).title === 'string') {
-    return (value as { title: string }).title
+/** A non-empty string field of a Payload array row, or nothing. */
+function rowText(row: Record<string, unknown>, key: string): string | undefined {
+  const value = row[key]
+  return typeof value === 'string' && value !== '' ? value : undefined
+}
+
+function productEntry(value: unknown): ProductService | undefined {
+  if (typeof value === 'string') return { title: value }
+  if (!value || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  const title = rowText(row, 'title')
+  if (!title) return undefined
+  const documentId = rowText(row, 'documentId')
+  return { title, ...(documentId ? { documentId } : {}) }
+}
+
+function keyMemberEntry(value: unknown): KeyMember | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  const name = rowText(row, 'name')
+  const role = rowText(row, 'role')
+  if (!name || !role) return undefined
+  const education = rowText(row, 'education')
+  const degreePlace = rowText(row, 'degreePlace')
+  return { name, role, ...(education ? { education } : {}), ...(degreePlace ? { degreePlace } : {}) }
+}
+
+function certificateEntry(value: unknown): CertificateLicence | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  const title = rowText(row, 'title')
+  if (!title) return undefined
+  const documentId = rowText(row, 'documentId')
+  const issuer = rowText(row, 'issuer')
+  const reference = rowText(row, 'reference')
+  return {
+    title,
+    ...(documentId ? { documentId } : {}),
+    ...(issuer ? { issuer } : {}),
+    ...(reference ? { reference } : {}),
   }
-  return undefined
 }
 
 function serviceEntry(value: unknown): string | undefined {
@@ -268,7 +312,7 @@ function serviceEntry(value: unknown): string | undefined {
   return undefined
 }
 
-function isPresent(value: string | undefined): value is string {
+function isPresent<T>(value: T | undefined): value is T {
   return value !== undefined
 }
 
@@ -291,10 +335,22 @@ function mapFields(fields: CompanyFields): Record<string, unknown> {
         }
       : {}),
     ...(fields.productsServices !== undefined
-      ? { productsServices: fields.productsServices.map((title) => ({ title })) }
+      ? {
+          productsServices: fields.productsServices.map(({ title, documentId }) => ({
+            title,
+            ...(documentId !== undefined ? { documentId } : {}),
+          })),
+        }
       : {}),
     ...(fields.keyMembers !== undefined
-      ? { keyMembers: fields.keyMembers.map(({ name, role }) => ({ name, role })) }
+      ? {
+          keyMembers: fields.keyMembers.map(({ name, role, education, degreePlace }) => ({
+            name,
+            role,
+            ...(education !== undefined ? { education } : {}),
+            ...(degreePlace !== undefined ? { degreePlace } : {}),
+          })),
+        }
       : {}),
     ...(fields.pastProjectsCustomers !== undefined
       ? {
@@ -310,8 +366,9 @@ function mapFields(fields: CompanyFields): Record<string, unknown> {
       : {}),
     ...(fields.certificatesLicenses !== undefined
       ? {
-          certificatesLicenses: fields.certificatesLicenses.map(({ title, issuer, reference }) => ({
+          certificatesLicenses: fields.certificatesLicenses.map(({ title, documentId, issuer, reference }) => ({
             title,
+            ...(documentId !== undefined ? { documentId } : {}),
             ...(issuer !== undefined ? { issuer } : {}),
             ...(reference !== undefined ? { reference } : {}),
           })),

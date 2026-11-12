@@ -93,13 +93,13 @@ function toStory(doc: Document, kind: 'news' | 'posts'): MagStory {
     category:
       category && typeof category === 'object' ? category.title : kind === 'news' ? 'خبر' : 'مقاله',
     time: date
-      ? new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium' }).format(new Date(date))
+      ? new Intl.DateTimeFormat('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran', dateStyle: 'medium' }).format(new Date(date))
       : '',
     excerpt: doc.excerpt || '',
     label: doc.editorialLabel || '',
     author: author || 'تحریریه صندوق',
     readingTime: doc.readingMinutes ? `${doc.readingMinutes} دقیقه مطالعه` : '',
-    date: date ? new Intl.DateTimeFormat('fa-IR').format(new Date(date)) : '',
+    date: date ? new Intl.DateTimeFormat('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran' }).format(new Date(date)) : '',
     tags: (doc.tags ?? []).map((item) => item.tag).filter(Boolean),
   }
 }

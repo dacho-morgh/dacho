@@ -1,10 +1,10 @@
 'use client'
 
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
 import { RequiredMark } from '@/components/ui/field'
-import { NativeSelect } from '@/components/ui/native-select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Typography, typographyVariants } from '@/components/ui/typography'
 import { toPersianDigits } from '@/utilities/digits'
@@ -13,9 +13,6 @@ import {
   formatJalali,
   formatJalaliDisplay,
   JALALI_MONTHS,
-  JALALI_WEEKDAYS,
-  jalaliMonthLength,
-  jalaliWeekdayIndex,
   parseJalali,
   toGregorian,
   toJalali,
@@ -25,7 +22,13 @@ import {
 import { cn } from '@/utilities/ui'
 
 export type JalaliDatePickerProps = {
-  label: string
+  /** Omit when a surrounding label (`htmlFor` this field's `id`) already names it. */
+  label?: string
+  /** The popover's accessible name when there is no `label`. */
+  ariaLabel?: string
+  /** The error state for a caller that draws the message itself. */
+  invalid?: boolean
+  describedBy?: string
   placeholder?: string
   /** The stored value: `YYYY/MM/DD` (Jalali, ASCII digits) or ''. */
   value: string
@@ -34,6 +37,8 @@ export type JalaliDatePickerProps = {
   id?: string
   name?: string
   required?: boolean
+  /** Keep `aria-required` but draw no `*` (a form where every field is required). */
+  hideRequiredMark?: boolean
   disabled?: boolean
   error?: string
   hint?: string
@@ -45,40 +50,234 @@ export type JalaliDatePickerProps = {
   containerClassName?: string
 }
 
-function addDays(date: JalaliDate, days: number): JalaliDate {
-  const gregorian = toGregorian(date.year, date.month, date.day)
-  const shifted = new Date(Date.UTC(gregorian.year, gregorian.month - 1, gregorian.day + days))
-  return toJalali(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate())
+/** The calendar works with `Date`s; noon keeps the day stable in every time zone. */
+function toDate({ year, month, day }: JalaliDate): Date {
+  const gregorian = toGregorian(year, month, day)
+  return new Date(gregorian.year, gregorian.month - 1, gregorian.day, 12)
 }
 
-function addMonths(date: JalaliDate, months: number): JalaliDate {
-  const index = date.year * 12 + (date.month - 1) + months
-  const year = Math.floor(index / 12)
-  const month = (index % 12) + 1
-  return { year, month, day: Math.min(date.day, jalaliMonthLength(year, month)) }
+function fromDate(date: Date): JalaliDate {
+  return toJalali(date.getFullYear(), date.getMonth() + 1, date.getDate())
 }
 
-const sameDay = (left: JalaliDate | null, right: JalaliDate) =>
-  left !== null && compareJalali(left, right) === 0
+type PanelView = 'days' | 'months' | 'years'
 
-function dayLabel(date: JalaliDate): string {
-  const weekday = JALALI_WEEKDAYS[jalaliWeekdayIndex(date.year, date.month, date.day)].full
-  return `${weekday} ${toPersianDigits(date.day)} ${JALALI_MONTHS[date.month - 1]} ${toPersianDigits(date.year)}`
+type CalendarPanelProps = {
+  selected: JalaliDate | null
+  today: JalaliDate
+  latest: JalaliDate
+  minYear: number
+  onChoose: (date: JalaliDate) => void
+  onClear: () => void
 }
 
 /**
- * A Jalali (Shamsi) date field: a form-styled button that opens a calendar in a
- * popover. The week starts on Saturday, digits are Persian, the month and year
- * can be jumped to from two dropdowns (founding dates are decades back), and
- * days after `maxDate` cannot be chosen. The value is the same `YYYY/MM/DD`
- * string the profile stores, so no Gregorian `Date` is ever involved.
- *
- * Keyboard: arrows move by day (the row runs right to left, so ArrowLeft is the
- * next day), Up/Down by week, PageUp/PageDown by month, Home/End to the week's
- * start/end, Enter or Space to choose, Escape to close.
+ * What the popover shows. The header holds a previous/next month button on each
+ * side (right = earlier, left = later, as the page reads right to left) and two
+ * buttons that swap the day grid for a month grid or a year grid (newest year
+ * first). It is mounted when the popover opens, so it always starts on the
+ * chosen month, or the latest one when nothing is chosen.
+ */
+function CalendarPanel({
+  selected,
+  today,
+  latest,
+  minYear,
+  onChoose,
+  onClear,
+}: CalendarPanelProps) {
+  const start = selected ?? latest
+  const [view, setView] = React.useState<PanelView>('days')
+  const [year, setYear] = React.useState(start.year)
+  const [month, setMonth] = React.useState(start.month)
+  const yearGridRef = React.useRef<HTMLDivElement>(null)
+
+  const lastMonthOfYear = (y: number) => (y === latest.year ? latest.month : 12)
+  const years = React.useMemo(
+    () => Array.from({ length: latest.year - minYear + 1 }, (_, index) => latest.year - index),
+    [latest.year, minYear],
+  )
+  const atEarliest = year === minYear && month === 1
+  const atLatest = year === latest.year && month === latest.month
+
+  const showMonth = (delta: number) => {
+    const index = year * 12 + (month - 1) + delta
+    setYear(Math.floor(index / 12))
+    setMonth((index % 12) + 1)
+  }
+
+  React.useEffect(() => {
+    if (view === 'years') {
+      yearGridRef.current
+        ?.querySelector('[aria-pressed="true"]')
+        ?.scrollIntoView?.({ block: 'center' })
+    }
+  }, [view])
+
+  const toggle = (next: PanelView) => setView((current) => (current === next ? 'days' : next))
+  const latestDate = toDate(latest)
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Button
+          aria-label="ماه قبل"
+          disabled={view !== 'days' || atEarliest}
+          onClick={() => showMonth(-1)}
+          size="icon-36"
+          type="button"
+          variant="outline-gray"
+        >
+          <ChevronRight aria-hidden="true" />
+        </Button>
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
+          <Button
+            aria-expanded={view === 'months'}
+            aria-label="انتخاب ماه"
+            className="flex-1"
+            onClick={() => toggle('months')}
+            size="36"
+            type="button"
+            variant="outline-gray"
+          >
+            <Typography as="span" variant="14/semibold">
+              {JALALI_MONTHS[month - 1]}
+            </Typography>
+            <ChevronDown aria-hidden="true" className="size-4" />
+          </Button>
+          <Button
+            aria-expanded={view === 'years'}
+            aria-label="انتخاب سال"
+            className="flex-1"
+            onClick={() => toggle('years')}
+            size="36"
+            type="button"
+            variant="outline-gray"
+          >
+            <Typography as="span" variant="14/semibold">
+              {toPersianDigits(year)}
+            </Typography>
+            <ChevronDown aria-hidden="true" className="size-4" />
+          </Button>
+        </div>
+        <Button
+          aria-label="ماه بعد"
+          disabled={view !== 'days' || atLatest}
+          onClick={() => showMonth(1)}
+          size="icon-36"
+          type="button"
+          variant="outline-gray"
+        >
+          <ChevronLeft aria-hidden="true" />
+        </Button>
+      </div>
+
+      {/* A fixed height, so the popover does not jump when the view changes. */}
+      <div className="h-62">
+        {view === 'days' && (
+          <Calendar
+            autoFocus
+            disabled={{ after: latestDate }}
+            endMonth={latestDate}
+            mode="single"
+            month={toDate({ year, month, day: 1 })}
+            onMonthChange={(date) => {
+              const next = fromDate(date)
+              setYear(next.year)
+              setMonth(next.month)
+            }}
+            onSelect={(date) => {
+              if (date) onChoose(fromDate(date))
+            }}
+            selected={selected ? toDate(selected) : undefined}
+            startMonth={toDate({ year: minYear, month: 1, day: 1 })}
+          />
+        )}
+
+        {view === 'months' && (
+          <div className="grid grid-cols-3 content-start gap-2" role="group" aria-label="ماه‌ها">
+            {JALALI_MONTHS.map((name, index) => (
+              <Button
+                aria-pressed={index + 1 === month}
+                disabled={index + 1 > lastMonthOfYear(year)}
+                key={name}
+                onClick={() => {
+                  setMonth(index + 1)
+                  setView('days')
+                }}
+                size="36"
+                type="button"
+                variant="chip"
+              >
+                <Typography as="span" variant="14/regular">
+                  {name}
+                </Typography>
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {view === 'years' && (
+          <div
+            aria-label="سال‌ها"
+            className="grid h-full grid-cols-4 content-start gap-2 overflow-y-auto pe-1"
+            ref={yearGridRef}
+            role="group"
+          >
+            {years.map((value) => (
+              <Button
+                aria-pressed={value === year}
+                key={value}
+                onClick={() => {
+                  setYear(value)
+                  setMonth((current) => Math.min(current, lastMonthOfYear(value)))
+                  setView('days')
+                }}
+                size="36"
+                type="button"
+                variant="chip"
+              >
+                <Typography as="span" variant="14/regular">
+                  {toPersianDigits(value)}
+                </Typography>
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 border-t border-neutral-100 pt-3">
+        <Button
+          disabled={compareJalali(today, latest) > 0}
+          onClick={() => onChoose(today)}
+          size="32"
+          type="button"
+          variant="outline-primary"
+        >
+          امروز
+        </Button>
+        {selected && (
+          <Button onClick={onClear} size="32" type="button" variant="outline-gray">
+            پاک کردن
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A Jalali (Shamsi) date field in the shadcn/ui date-picker pattern: a
+ * form-styled button that opens the Persian `Calendar` in a popover. Month and
+ * year are picked from dropdowns (founding dates are decades back) and days
+ * after `maxDate` cannot be chosen. The value is the same `YYYY/MM/DD` string
+ * the profile stores, so no Gregorian date is ever kept in the form.
  */
 function JalaliDatePicker({
   label,
+  ariaLabel,
+  invalid,
+  describedBy,
   placeholder = 'تاریخ را انتخاب کنید',
   value,
   onChange,
@@ -86,6 +285,7 @@ function JalaliDatePicker({
   id,
   name,
   required,
+  hideRequiredMark,
   disabled,
   error,
   hint,
@@ -97,36 +297,13 @@ function JalaliDatePicker({
   const generatedId = React.useId()
   const triggerId = id ?? generatedId
   const helperId = error || hint ? `${triggerId}-description` : undefined
+  const hasError = Boolean(error) || Boolean(invalid)
   const today = React.useMemo(() => todayJalali(), [])
   const latest = maxDate ?? today
   const selected = parseJalali(value)
-
   const [open, setOpen] = React.useState(false)
-  const [focused, setFocused] = React.useState<JalaliDate>(selected ?? latest)
-  const gridRef = React.useRef<HTMLDivElement>(null)
-  const restoreFocus = React.useRef(false)
-
-  const clamp = (date: JalaliDate): JalaliDate => {
-    if (compareJalali(date, latest) > 0) return latest
-    if (date.year < minYear) return { year: minYear, month: 1, day: 1 }
-    return date
-  }
-
-  const moveFocus = (next: JalaliDate) => {
-    restoreFocus.current = true
-    setFocused(clamp(next))
-  }
-
-  // After a keyboard move the focused day may live in another month: focus it
-  // once it has rendered.
-  React.useEffect(() => {
-    if (!open || !restoreFocus.current) return
-    restoreFocus.current = false
-    gridRef.current?.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus()
-  }, [focused, open])
 
   const handleOpenChange = (next: boolean) => {
-    if (next) setFocused(selected ?? latest)
     setOpen(next)
     if (!next) onBlur?.()
   }
@@ -136,77 +313,24 @@ function JalaliDatePicker({
     handleOpenChange(false)
   }
 
-  const viewYear = focused.year
-  const viewMonth = focused.month
-
-  /** The day button an event came from, so a move starts where the browser focus really is. */
-  const dayOf = (target: EventTarget): JalaliDate | null => {
-    const button = (target as HTMLElement).closest<HTMLElement>('[data-day]')
-    return button
-      ? { year: viewYear, month: viewMonth, day: Number(button.dataset.day) }
-      : null
-  }
-
-  const onGridKeyDown = (event: React.KeyboardEvent) => {
-    // Only a focused day moves; the month and year dropdowns keep their own arrow keys.
-    const from = dayOf(event.target)
-    if (!from) return
-    const weekday = jalaliWeekdayIndex(from.year, from.month, from.day)
-    const step: Record<string, JalaliDate | undefined> = {
-      // The week row runs right to left: left is later, right is earlier.
-      ArrowLeft: addDays(from, 1),
-      ArrowRight: addDays(from, -1),
-      ArrowDown: addDays(from, 7),
-      ArrowUp: addDays(from, -7),
-      PageDown: addMonths(from, 1),
-      PageUp: addMonths(from, -1),
-      Home: addDays(from, -weekday),
-      End: addDays(from, 6 - weekday),
-    }
-    const next = step[event.key]
-    if (!next) return
-    event.preventDefault()
-    event.stopPropagation()
-    moveFocus(next)
-  }
-
-  // A day focused by Tab, a click or a script becomes the grid's tab stop.
-  const onGridFocus = (event: React.FocusEvent) => {
-    const day = dayOf(event.target)
-    if (day && day.day !== focused.day) setFocused(day)
-  }
-  const monthLength = jalaliMonthLength(viewYear, viewMonth)
-  const leading = jalaliWeekdayIndex(viewYear, viewMonth, 1)
-  const cells: Array<number | null> = [
-    ...Array.from({ length: leading }, () => null),
-    ...Array.from({ length: monthLength }, (_, index) => index + 1),
-  ]
-  const years = Array.from({ length: latest.year - minYear + 1 }, (_, index) => latest.year - index)
-  const lastMonthOfView = viewYear === latest.year ? latest.month : 12
-  const canGoNext = compareJalali(addMonths({ ...focused, day: 1 }, 1), { ...latest, day: 1 }) <= 0
-  const canGoPrevious = viewYear > minYear || viewMonth > 1
-
-  const showMonth = (delta: number) => {
-    restoreFocus.current = false
-    setFocused(clamp(addMonths(focused, delta)))
-  }
-
   return (
     <div
       data-slot="jalali-date-picker"
       dir="rtl"
       className={cn('flex w-full flex-col gap-2 text-right', wrapperClassName)}
     >
-      <Typography
-        as="label"
-        htmlFor={triggerId}
-        variant="16/regular"
-        color="neutral-600"
-        className="cursor-pointer select-none"
-      >
-        {label}
-        {required ? <RequiredMark className="ms-0.5" /> : null}
-      </Typography>
+      {label ? (
+        <Typography
+          as="label"
+          htmlFor={triggerId}
+          variant="16/regular"
+          color="neutral-600"
+          className="cursor-pointer select-none"
+        >
+          {label}
+          {required && !hideRequiredMark ? <RequiredMark className="ms-0.5" /> : null}
+        </Typography>
+      ) : null}
 
       <div className="flex w-full flex-col gap-1">
         <Popover open={open} onOpenChange={handleOpenChange}>
@@ -218,8 +342,8 @@ function JalaliDatePicker({
               disabled={disabled}
               aria-haspopup="dialog"
               aria-expanded={open}
-              aria-describedby={helperId}
-              data-invalid={error ? 'true' : undefined}
+              aria-describedby={[helperId, describedBy].filter(Boolean).join(' ') || undefined}
+              data-invalid={hasError ? 'true' : undefined}
               data-empty={selected ? undefined : 'true'}
               className={cn(
                 typographyVariants({ variant: '16/regular', color: 'neutral-600' }),
@@ -235,158 +359,24 @@ function JalaliDatePicker({
           <PopoverContent
             dir="rtl"
             align="start"
-            aria-label={`انتخاب ${label}`}
-            className="w-[min(20rem,calc(100vw-2rem))] p-3"
+            aria-label={`انتخاب ${label ?? ariaLabel ?? 'تاریخ'}`}
+            className="w-[min(19rem,calc(100vw-2rem))] p-3"
             onOpenAutoFocus={(event) => {
+              // The day grid focuses the chosen (or latest) day itself.
               event.preventDefault()
-              restoreFocus.current = true
-              // Land on the chosen (or latest) day, as the grid's one tab stop.
-              requestAnimationFrame(() => {
-                gridRef.current?.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus()
-                restoreFocus.current = false
-              })
             }}
           >
-            <div className="flex items-center gap-2">
-              {/* Right to left: the previous month is on the right, the next on the left. */}
-              <Button
-                aria-label="ماه قبل"
-                disabled={!canGoPrevious}
-                onClick={() => showMonth(-1)}
-                size="icon-36"
-                type="button"
-                variant="text-gray"
-              >
-                <ChevronRight aria-hidden="true" />
-              </Button>
-              <NativeSelect
-                aria-label="ماه"
-                containerClassName="flex-1"
-                onChange={(event) =>
-                  setFocused(
-                    clamp({
-                      year: viewYear,
-                      month: Number(event.target.value),
-                      day: Math.min(focused.day, jalaliMonthLength(viewYear, Number(event.target.value))),
-                    }),
-                  )
-                }
-                selectSize="sm"
-                value={viewMonth}
-              >
-                {JALALI_MONTHS.map((month, index) => (
-                  <option disabled={index + 1 > lastMonthOfView} key={month} value={index + 1}>
-                    {month}
-                  </option>
-                ))}
-              </NativeSelect>
-              <NativeSelect
-                aria-label="سال"
-                containerClassName="w-28"
-                onChange={(event) => {
-                  const year = Number(event.target.value)
-                  setFocused(
-                    clamp({
-                      year,
-                      month: focused.month,
-                      day: Math.min(focused.day, jalaliMonthLength(year, focused.month)),
-                    }),
-                  )
-                }}
-                selectSize="sm"
-                value={viewYear}
-              >
-                {years.map((year) => (
-                  <option key={year} value={year}>
-                    {toPersianDigits(year)}
-                  </option>
-                ))}
-              </NativeSelect>
-              <Button
-                aria-label="ماه بعد"
-                disabled={!canGoNext}
-                onClick={() => showMonth(1)}
-                size="icon-36"
-                type="button"
-                variant="text-gray"
-              >
-                <ChevronLeft aria-hidden="true" />
-              </Button>
-            </div>
-
-            <div
-              aria-label={`${JALALI_MONTHS[viewMonth - 1]} ${toPersianDigits(viewYear)}`}
-              className="mt-3 grid grid-cols-7 gap-y-1"
-              onFocus={onGridFocus}
-              onKeyDown={onGridKeyDown}
-              ref={gridRef}
-              role="group"
-            >
-              <div aria-hidden="true" className="col-span-7 grid grid-cols-7">
-                {JALALI_WEEKDAYS.map((weekday) => (
-                  <Typography
-                    as="span"
-                    className="flex h-8 items-center justify-center"
-                    color="neutral-500"
-                    key={weekday.full}
-                    title={weekday.full}
-                    variant="12/regular"
-                  >
-                    {weekday.short}
-                  </Typography>
-                ))}
-              </div>
-              {cells.map((day, index) => {
-                if (day === null) return <span aria-hidden="true" key={`blank-${index}`} />
-                const date = { year: viewYear, month: viewMonth, day }
-                const isFuture = compareJalali(date, latest) > 0
-                return (
-                  <Button
-                    aria-label={dayLabel(date)}
-                    aria-pressed={sameDay(selected, date)}
-                    className="mx-auto"
-                    data-day={day}
-                    data-today={sameDay(today, date) || undefined}
-                    disabled={isFuture}
-                    key={day}
-                    onClick={() => choose(date)}
-                    size="icon-36"
-                    tabIndex={day === focused.day ? 0 : -1}
-                    type="button"
-                    variant="day"
-                  >
-                    <Typography as="span" variant="14/regular">
-                      {toPersianDigits(day)}
-                    </Typography>
-                  </Button>
-                )
-              })}
-            </div>
-
-            <div className="mt-3 flex items-center justify-between">
-              <Button
-                disabled={compareJalali(today, latest) > 0}
-                onClick={() => choose(today)}
-                size="32"
-                type="button"
-                variant="text-primary"
-              >
-                امروز
-              </Button>
-              {selected && (
-                <Button
-                  onClick={() => {
-                    onChange('')
-                    handleOpenChange(false)
-                  }}
-                  size="32"
-                  type="button"
-                  variant="text-gray"
-                >
-                  پاک کردن
-                </Button>
-              )}
-            </div>
+            <CalendarPanel
+              latest={latest}
+              minYear={minYear}
+              onChoose={choose}
+              onClear={() => {
+                onChange('')
+                handleOpenChange(false)
+              }}
+              selected={selected}
+              today={today}
+            />
           </PopoverContent>
         </Popover>
 

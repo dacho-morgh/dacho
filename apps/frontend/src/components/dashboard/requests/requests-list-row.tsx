@@ -12,7 +12,7 @@ export interface RequestsListRowProps {
 
 /** One request; a click (or Enter) anywhere on the row opens its dossier, the link and the action keep their own. */
 export function RequestsListRow({ item }: RequestsListRowProps) {
-  const href = `/dashboard/requests/${encodeURIComponent(item.id)}`
+  const href = item.href ?? `/dashboard/requests/${encodeURIComponent(item.id)}`
   return (
     <ListRow href={href}>
       {/* Column 1: Title (16/regular #525252) + tracking code */}
@@ -22,9 +22,11 @@ export function RequestsListRow({ item }: RequestsListRowProps) {
             {item.title}
           </Link>
         </Typography>
-        <Typography variant="12/regular" className="mt-1 font-mono text-neutral-400">
-          کد پیگیری: {item.trackingCode}
-        </Typography>
+        {item.trackingCode ? (
+          <Typography variant="12/regular" className="mt-1 font-mono text-neutral-400">
+            کد پیگیری: {item.trackingCode}
+          </Typography>
+        ) : null}
         {item.nextAction ? (
           <Typography variant="12/regular" className="mt-1 truncate text-neutral-500" data-testid="row-next-action">
             اقدام شما: {item.nextAction}
@@ -45,7 +47,7 @@ export function RequestsListRow({ item }: RequestsListRowProps) {
       {/* Column 3: Due Date (16/regular #525252) */}
       <td className="h-18 px-4">
         <Typography variant="16/regular" className="whitespace-nowrap text-neutral-600">
-          {item.dueDate}
+          {item.dueDate || '—'}
         </Typography>
       </td>
 
@@ -58,7 +60,7 @@ export function RequestsListRow({ item }: RequestsListRowProps) {
 
       {/* Column 5: Actions */}
       <td className="h-18 px-2 text-end">
-        <RequestRowActions requestId={item.id} />
+        <RequestRowActions requestId={item.id} href={item.href} />
       </td>
     </ListRow>
   )

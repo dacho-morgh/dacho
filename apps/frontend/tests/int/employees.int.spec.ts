@@ -5,6 +5,8 @@ import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EmployeeList } from '@/components/dashboard/employee-list'
 import { EmployeeForm } from '@/components/dashboard/employees/employee-form'
+import { OPERATIONAL_ROLE_LABELS, PERSONNEL_GENDER_LABELS } from '@cms-core/access/roles'
+import { chooseOption } from './combobox-helpers'
 const navigation = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
@@ -263,9 +265,7 @@ function fillEmployee() {
   ]) {
     fireEvent.change(screen.getByLabelText(label), { target: { value } })
   }
-  fireEvent.change(screen.getByLabelText('نقش در سیستم'), {
-    target: { value: 'employer-reviewer' },
-  })
+  chooseOption(screen.getByLabelText('نقش در سیستم'), OPERATIONAL_ROLE_LABELS['employer-reviewer'])
 }
 
 describe('employee form', () => {
@@ -344,8 +344,8 @@ describe('employee form', () => {
     vi.stubGlobal('fetch', request)
     render(createElement(EmployeeForm, { mode: 'create' }))
     fillEmployee()
-    fireEvent.change(screen.getByLabelText('نقش در سیستم'), { target: { value: 'reviewer' } })
-    fireEvent.change(screen.getByLabelText('جنسیت'), { target: { value: 'female' } })
+    chooseOption(screen.getByLabelText('نقش در سیستم'), OPERATIONAL_ROLE_LABELS['reviewer'])
+    chooseOption(screen.getByLabelText('جنسیت'), PERSONNEL_GENDER_LABELS['female'])
     fireEvent.change(screen.getByLabelText('مدرک دانشگاهی'), { target: { value: 'دکتری' } })
     fireEvent.change(screen.getByLabelText('زمینه فعالیت'), { target: { value: 'انرژی' } })
     fireEvent.change(screen.getByLabelText('فایل رزومه'), {
@@ -417,7 +417,7 @@ describe('employee form', () => {
     )
     expect(screen.getByRole('link', { name: 'old.pdf' })).toBeTruthy()
     latest = { ...original, name: 'نسخه جدید', updatedAt: '2026-10-27T11:00:00.000Z' }
-    fireEvent.change(screen.getByLabelText('نقش در سیستم'), { target: { value: 'chief-reviewer' } })
+    chooseOption(screen.getByLabelText('نقش در سیستم'), OPERATIONAL_ROLE_LABELS['chief-reviewer'])
     fireEvent.click(submitButton())
     expect((await screen.findByRole('alert')).textContent).toContain('اطلاعات تغییر کرده')
     expect((screen.getByLabelText('نام و نام خانوادگی') as HTMLInputElement).value).toBe(
@@ -429,7 +429,7 @@ describe('employee form', () => {
         'نسخه جدید',
       ),
     )
-    fireEvent.change(screen.getByLabelText('نقش در سیستم'), { target: { value: 'chief-reviewer' } })
+    chooseOption(screen.getByLabelText('نقش در سیستم'), OPERATIONAL_ROLE_LABELS['chief-reviewer'])
     fireEvent.click(submitButton())
     await waitFor(() =>
       expect(navigation.push).toHaveBeenCalledWith('/dashboard/employees?saved=updated'),

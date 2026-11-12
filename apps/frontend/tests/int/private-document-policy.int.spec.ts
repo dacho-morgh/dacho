@@ -6,8 +6,12 @@ import {
   DOCUMENT_ACCEPT,
   DOCUMENT_CATEGORIES,
   DOCUMENT_SIZE_MESSAGE,
+  IMAGE_DOCUMENT_CATEGORIES,
   MAX_DOCUMENT_BYTES,
+  documentAccept,
   documentCategoryLabel,
+  documentFormatsMessage,
+  type DocumentCategory,
   documentErrorMessage,
   formatDocumentSize,
   validateSelectedFile,
@@ -21,6 +25,8 @@ const approved = JSON.parse(
   multipleFilesPerField: boolean
   maxFilesPerField: number | null
   imagesAllowed: boolean
+  imageFileTypes: { extension: string; mimeType: string }[]
+  imageCategories: string[]
   categories: string[]
 }
 
@@ -49,6 +55,21 @@ describe('FE07 private document policy matches the approved contract', () => {
     expect(validateSelectedFile(file('photo.png', 'image/png', 100))).toBe('invalid_file_type')
     expect(validateSelectedFile(file('sheet.pdf', 'application/msword', 100))).toBe('invalid_file_type')
     expect(validateSelectedFile(file('ok.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 100))).toBeNull()
+  })
+
+  it('accepts photos only in the approved image categories', () => {
+    expect([...IMAGE_DOCUMENT_CATEGORIES].sort()).toEqual([...approved.imageCategories].sort())
+    for (const category of approved.imageCategories as DocumentCategory[]) {
+      for (const type of approved.imageFileTypes) {
+        expect(documentAccept(category)).toContain(type.extension)
+        expect(validateSelectedFile(file(`photo${type.extension}`, type.mimeType, 100), category)).toBeNull()
+      }
+      expect(validateSelectedFile(file('ok.pdf', 'application/pdf', 100), category)).toBeNull()
+      expect(validateSelectedFile(file('photo.gif', 'image/gif', 100), category)).toBe('invalid_file_type')
+      expect(documentFormatsMessage(category)).toContain('عکس')
+    }
+    expect(validateSelectedFile(file('photo.png', 'image/png', 100), 'catalogues')).toBe('invalid_file_type')
+    expect(documentAccept('catalogues')).toBe(DOCUMENT_ACCEPT)
   })
 
   it('provides stable Persian messages for denied/expired/validation states', () => {

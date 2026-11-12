@@ -12,6 +12,7 @@ import { companyDirectory } from '@cms-core/endpoints/companyDirectory'
 import { ownerCreateCompany } from '@cms-core/endpoints/ownerCompany'
 import { validateCompanyAbsenceList } from './companyAbsence'
 import { invalidateCompanyVerification } from '../hooks/invalidateCompanyVerification'
+import { COMPANY_TYPE_OPTIONS } from './companyTypes'
 
 /**
  * A Company (شرکت) — the organization that applies for the Innovation
@@ -128,7 +129,7 @@ export const Companies: CollectionConfig = {
       name: 'type',
       type: 'select',
       label: 'نوع شرکت',
-      options: ['سهامی خاص', 'سهامی عام', 'مسئولیت محدود', 'دانش‌بنیان', 'استارتاپ', 'سایر'],
+      options: [...COMPANY_TYPE_OPTIONS],
     },
     {
       name: 'province',
@@ -210,7 +211,11 @@ export const Companies: CollectionConfig = {
       name: 'productsServices',
       type: 'array',
       label: 'محصولات و خدمات',
-      fields: [{ name: 'title', type: 'text', required: true, label: 'عنوان' }],
+      fields: [
+        { name: 'title', type: 'text', required: true, label: 'عنوان' },
+        // The id of an optional private file (PDF, Word or image) for this item.
+        { name: 'documentId', type: 'text', label: 'شناسه فایل پیوست' },
+      ],
     },
     {
       name: 'keyMembers',
@@ -219,6 +224,8 @@ export const Companies: CollectionConfig = {
       fields: [
         { name: 'name', type: 'text', required: true, label: 'نام' },
         { name: 'role', type: 'text', required: true, label: 'سمت' },
+        { name: 'education', type: 'text', label: 'تحصیلات' },
+        { name: 'degreePlace', type: 'text', label: 'محل اخذ مدرک' },
       ],
     },
     {
@@ -243,8 +250,11 @@ export const Companies: CollectionConfig = {
       label: 'گواهی‌ها و مجوزها',
       fields: [
         { name: 'title', type: 'text', required: true, label: 'عنوان' },
-        { name: 'issuer', type: 'text', label: 'صادرکننده' },
-        { name: 'reference', type: 'text', label: 'شماره یا مرجع' },
+        // The id of an optional private file (PDF, Word or image) for this item.
+        { name: 'documentId', type: 'text', label: 'شناسه فایل پیوست' },
+        // No longer asked for; kept so values entered earlier are not lost.
+        { name: 'issuer', type: 'text', label: 'صادرکننده', admin: { readOnly: true } },
+        { name: 'reference', type: 'text', label: 'شماره یا مرجع', admin: { readOnly: true } },
       ],
     },
     {

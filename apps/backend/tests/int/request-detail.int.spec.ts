@@ -74,7 +74,7 @@ const companyStore = new InMemoryCompanyStore([
     foundingYear: '1395',
     establishmentDate: '2010',
     activityDomain: 'فناوری نفت و گاز',
-    productsServices: ['سامانه پایش خطوط لوله'],
+    productsServices: [{ title: 'سامانه پایش خطوط لوله' }],
     keyMembers: [{ name: 'مریم کاظمی', role: 'مدیرعامل' }],
     pastProjectsCustomers: [{ project: 'پایش خط لوله پارس جنوبی', customer: 'پتروشیمی' }],
     certificatesLicenses: [{ title: 'گواهی دانش‌بنیان' }],
@@ -444,7 +444,7 @@ describe('#288 request page data per role (int)', () => {
       expect(own.dossier).toMatchObject({
         foundingYear: '1395',
         activityDomain: 'فناوری نفت و گاز',
-        productsServices: ['سامانه پایش خطوط لوله'],
+        productsServices: [{ title: 'سامانه پایش خطوط لوله' }],
         keyMembers: [{ name: 'مریم کاظمی', role: 'مدیرعامل' }],
         certificatesLicenses: [{ title: 'گواهی دانش‌بنیان' }],
       })

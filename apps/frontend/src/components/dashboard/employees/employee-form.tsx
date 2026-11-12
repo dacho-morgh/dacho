@@ -11,14 +11,14 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { DashboardAddIcon, DashboardEditIcon, DashboardTrashIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { RequiredMark } from '@/components/ui/field'
 import { FileInput } from '@/components/ui/file-input'
 import { Input } from '@/components/ui/input'
-import { NativeSelect } from '@/components/ui/native-select'
+import { DashboardSelect } from '@/components/dashboard/dashboard-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Typography } from '@/components/ui/typography'
 import { cn } from '@/utilities/ui'
@@ -675,34 +675,47 @@ function EmployeeEditor({
               error={errors.operationalRole?.message}
               required
             >
-              <NativeSelect
-                id="operationalRole"
-                aria-required="true"
-                aria-invalid={!!errors.operationalRole}
-                aria-describedby={errors.operationalRole ? 'operationalRole-error' : undefined}
-                className={CONTROL_TEXT}
-                {...register('operationalRole')}
-              >
-                <option value="" disabled>
-                  نقش را انتخاب کنید
-                </option>
-                {STAFF_ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {OPERATIONAL_ROLE_LABELS[role]}
-                  </option>
-                ))}
-              </NativeSelect>
+              <Controller
+                control={control}
+                name="operationalRole"
+                render={({ field }) => (
+                  <DashboardSelect
+                    ref={field.ref}
+                    id="operationalRole"
+                    label="نقش در سیستم"
+                    required
+                    invalid={!!errors.operationalRole}
+                    aria-describedby={errors.operationalRole ? 'operationalRole-error' : undefined}
+                    placeholder="نقش را جستجو یا انتخاب کنید"
+                    options={STAFF_ROLES.map((role) => ({ value: role, label: OPERATIONAL_ROLE_LABELS[role] }))}
+                    value={String(field.value ?? '')}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
             </FormField>
             {field('age', 'سن', { placeholder: 'مثلا: ۳۲', inputMode: 'numeric' })}
             <FormField id="gender" label="جنسیت" error={errors.gender?.message}>
-              <NativeSelect id="gender" className={CONTROL_TEXT} {...register('gender')}>
-                <option value="">انتخاب نشده</option>
-                {PERSONNEL_GENDERS.map((gender) => (
-                  <option key={gender} value={gender}>
-                    {PERSONNEL_GENDER_LABELS[gender]}
-                  </option>
-                ))}
-              </NativeSelect>
+              <Controller
+                control={control}
+                name="gender"
+                render={({ field }) => (
+                  <DashboardSelect
+                    ref={field.ref}
+                    id="gender"
+                    label="جنسیت"
+                    placeholder="جنسیت را انتخاب کنید"
+                    options={[
+                      { value: '', label: 'انتخاب نشده' },
+                      ...PERSONNEL_GENDERS.map((gender) => ({ value: gender, label: PERSONNEL_GENDER_LABELS[gender] })),
+                    ]}
+                    value={String(field.value ?? '')}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
             </FormField>
             {field('degree', 'مدرک دانشگاهی', {
               placeholder: 'مثلا: کارشناسی ارشد مدیریت بازرگانی',

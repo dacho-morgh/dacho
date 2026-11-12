@@ -6,7 +6,7 @@ import React, { useId, useState } from 'react'
 
 import { DashboardCloseCircle, DashboardFilterIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
-import { NativeSelect } from '@/components/ui/native-select'
+import { DashboardSelect } from '@/components/dashboard/dashboard-select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Typography } from '@/components/ui/typography'
@@ -157,17 +157,14 @@ export function ListFilterButton({ groups, onChange, label = 'فیلتر', links
                 {group.label}
               </Typography>
             </label>
-            <NativeSelect
+            <DashboardSelect
               id={`${fieldId}-${group.key}`}
+              label={group.label}
+              placeholder={`${group.label} را جستجو یا انتخاب کنید`}
+              options={group.options.map((option) => ({ value: option.value, label: optionText(option) }))}
               value={draft[group.key] ?? ''}
-              onChange={(event) => setDraft((current) => ({ ...current, [group.key]: event.target.value }))}
-            >
-              {group.options.map((option, index) => (
-                <option key={`${index}:${option.value}`} value={option.value}>
-                  {optionText(option)}
-                </option>
-              ))}
-            </NativeSelect>
+              onChange={(value) => setDraft((current) => ({ ...current, [group.key]: value }))}
+            />
           </div>
         ))}
 

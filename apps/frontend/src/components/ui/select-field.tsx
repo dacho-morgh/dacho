@@ -15,6 +15,8 @@ export type SelectFieldProps = Omit<React.ComponentProps<'select'>, 'size' | 'ch
   hint?: string
   selectSize?: 'sm' | 'default' | 'lg'
   wrapperClassName?: string
+  /** Keep `aria-required` but draw no `*` (a form where every field is required). */
+  hideRequiredMark?: boolean
 }
 
 /**
@@ -33,6 +35,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(
       hint,
       selectSize = 'lg',
       wrapperClassName,
+      hideRequiredMark,
       className,
       id,
       value,
@@ -63,7 +66,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(
           className="cursor-pointer select-none"
         >
           {label}
-          {isRequired ? <RequiredMark className="ms-0.5" /> : null}
+          {isRequired && !hideRequiredMark ? <RequiredMark className="ms-0.5" /> : null}
         </Typography>
 
         <div className="flex w-full flex-col gap-1">

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import LettersPage from '@/app/(frontend)/dashboard/letters/page'
+import { chooseOption, optionTexts } from './combobox-helpers'
 
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), push: vi.fn(), role: vi.fn(() => 'chief-reviewer') }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -113,8 +114,8 @@ describe('inbox (S1)', () => {
     render(await LettersPage(view()))
     fireEvent.click(screen.getByRole('button', { name: /فیلتر نامه‌ها/ }))
     const status = screen.getByRole('combobox', { name: 'وضعیت' })
-    expect(within(status).getByRole('option', { name: /نیازمند اقدام/ }).textContent).toContain('۱')
-    fireEvent.change(status, { target: { value: 'unread' } })
+    expect(optionTexts(status).find((text) => /نیازمند اقدام/.test(text))).toContain('۱')
+    chooseOption(status, /خوانده‌نشده/)
     expect(mocks.push).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
     expect(mocks.push).toHaveBeenLastCalledWith('/dashboard/letters?status=unread')

@@ -35,7 +35,7 @@ const FULL_SNAPSHOT = {
     phone: '021-000', email: 'secret@example.test', iban: 'IR000',
   },
   dossier: {
-    legalEntityType: 'llc', classification: 'A', activityDomain: 'AI', productsServices: ['x'],
+    legalEntityType: 'llc', classification: 'A', activityDomain: 'AI', productsServices: [{ title: 'x' }],
     keyMembers: [{ name: 'private person', role: 'ceo' }], insuredEmployeeCount: 40,
   },
   documents: [{ id: 'dossier-file' }],
@@ -110,7 +110,7 @@ describe('[T23] review queue helpers', () => {
     const profile = necessaryCompanyProfile(FULL_SNAPSHOT)
     expect(profile).toEqual({
       company: { name: 'شرکت فناور', nationalId: '10100', type: 'knowledge-based', province: 'تهران', city: 'تهران' },
-      dossier: { legalEntityType: 'llc', classification: 'A', activityDomain: 'AI', productsServices: ['x'] },
+      dossier: { legalEntityType: 'llc', classification: 'A', activityDomain: 'AI', productsServices: [{ title: 'x' }] },
     })
     const text = JSON.stringify(profile)
     for (const leaked of ['secret@example.test', 'IR000', '021-000', 'private person', 'dossier-file', 'insuredEmployeeCount']) {

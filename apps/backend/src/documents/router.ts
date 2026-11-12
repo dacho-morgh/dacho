@@ -282,7 +282,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
       const requestedCompanyId = stringField(req.body?.companyId)
       const companyId = await actorCompanyId(actor.id, actor.operationalRole)
 
-      if (audience === 'company') {
+      if (audience === 'company' || audience === 'support') {
         if (requestId || !requestedCompanyId) {
           res.status(400).json({ error: 'invalid_document_parent' })
           return
@@ -332,7 +332,7 @@ export function createDocumentRouter(deps: DocumentRouterDeps): Router {
         actor.operationalRole,
         category,
         {
-          companyId: audience === 'company' ? parentCompanyId : null,
+          companyId: audience === 'company' || audience === 'support' ? parentCompanyId : null,
           requestOwnerId,
           requestStatus,
           requestReviewStage,

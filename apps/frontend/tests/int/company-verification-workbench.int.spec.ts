@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { CompanyList } from '@/components/dashboard/company-list'
 import { CompanyDetailView } from '@/components/dashboard/company-detail-view'
+import { chooseOption, optionTexts } from './combobox-helpers'
 
 const navigation = vi.hoisted(() => ({
   push: vi.fn(),
@@ -120,12 +121,12 @@ describe('FE05: Secretariat Company Verification Workbench', () => {
     // The verification queues live in the shared filter button (FE35), with their counts.
     fireEvent.click(screen.getByRole('button', { name: 'فیلتر شرکت‌ها' }))
     const queues = await screen.findByRole('combobox', { name: 'وضعیت احراز' })
+    const queueTexts = optionTexts(queues)
     for (const name of [/همه/, /در انتظار بررسی/, /تأیید شده/, /برگشت داده شده/, /رد شده/]) {
-      expect(within(queues).getByRole('option', { name })).toBeTruthy()
+      expect(queueTexts.some((text) => name.test(text))).toBe(true)
     }
     // Nothing changes until «اعمال»; then the queue is part of the URL (and restarts at page 1); the API does the filtering.
-    const pending = within(queues).getByRole('option', { name: /در انتظار بررسی/ }) as HTMLOptionElement
-    fireEvent.change(queues, { target: { value: pending.value } })
+    chooseOption(queues, /در انتظار بررسی/)
     expect(navigation.push).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
     // (The filter button reads the path from window.location, which is "/" under jsdom.)

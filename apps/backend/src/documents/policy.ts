@@ -6,6 +6,7 @@ import {
   DOCUMENT_POLICY_VERSION,
   DOCUMENT_SIZE_DISPLAY,
   MAX_DOCUMENT_BYTES,
+  allowedDocumentTypes,
   isDocumentCategory,
   type DocumentCategory,
   type DocumentTypeRule,
@@ -47,10 +48,10 @@ export function safeOriginalFilename(value: unknown): string | null {
   return base
 }
 
-function typeForFile(filename: string, mimeType: string): DocumentTypeRule | null {
+function typeForFile(category: DocumentCategory, filename: string, mimeType: string): DocumentTypeRule | null {
   const extension = extname(filename).toLowerCase()
   return (
-    ALLOWED_DOCUMENT_TYPES.find(
+    allowedDocumentTypes(category).find(
       (rule) => rule.extension === extension && rule.mimeType === mimeType,
     ) ?? null
   )
@@ -74,6 +75,15 @@ function looksLikeDeclaredType(body: Buffer, rule: DocumentTypeRule): boolean {
         body[6] === 0x1a &&
         body[7] === 0xe1
       )
+    case '.jpg':
+    case '.jpeg':
+      return body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff
+    case '.png':
+      return body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    case '.webp':
+      return body.length >= 12 &&
+        body.subarray(0, 4).toString('ascii') === 'RIFF' &&
+        body.subarray(8, 12).toString('ascii') === 'WEBP'
   }
 }
 
@@ -93,7 +103,7 @@ export function validateDocumentFile(input: {
   if (input.body.length === 0) return { ok: false, error: 'empty_file' }
   if (input.body.length > MAX_DOCUMENT_BYTES) return { ok: false, error: 'file_too_large' }
   const mimeType = typeof input.mimeType === 'string' ? (input.mimeType.toLowerCase().split(';')[0]?.trim() ?? '') : ''
-  const rule = typeForFile(filename, mimeType)
+  const rule = typeForFile(input.category, filename, mimeType)
   if (!rule) return { ok: false, error: 'invalid_file_type' }
   if (!looksLikeDeclaredType(input.body, rule)) return { ok: false, error: 'invalid_file_content' }
   return {

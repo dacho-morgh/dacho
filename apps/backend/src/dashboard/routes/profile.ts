@@ -1,8 +1,17 @@
 // Moved verbatim from dashboard/router.ts (S0, #238); keep route order within this file.
 import type { Router } from 'express'
 import type { NextFunction, Request, Response } from 'express'
-import { DossierValidationError, dossierOfCompany, missingDossierItems, mergeDossier, pickDossierUpdate } from '../dossier.js'
+import {
+  checkDossierChoices,
+  checkDossierItemDocuments,
+  DossierValidationError,
+  dossierOfCompany,
+  missingDossierItems,
+  mergeDossier,
+  pickDossierUpdate,
+} from '../dossier.js'
 import { changesAddress, changesCompany, COMPANY_EDIT_REVERIFICATION_REASON } from '../company-edits.js'
+import { companyInfoProblems, normalizeCompanyEdit } from '../company-info-rules.js'
 import { actorOf } from '../proxy-auth.js'
 import { dashboardSelfProfile } from '../self-profile.js'
 import { isRepresentative } from './route-helpers.js'
@@ -26,16 +35,32 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
   router.patch('/profile', async (req, res, next) => {
     try {
     const actor = actorOf(res)
-    const { company, contacts } = req.body ?? {}
+    const { contacts } = req.body ?? {}
+    const rawCompany = req.body?.company
     let profile = await profileRepo.getProfile(actor.id)
     const initialProfile = profile
-    if (company?.nationalId !== undefined && company.nationalId !== profile.company.nationalId) {
+    if (rawCompany?.nationalId !== undefined && rawCompany.nationalId !== profile.company.nationalId) {
       res.status(403).json({ error: 'protected_company_identity' })
+      return
+    }
+    // The registration rules hold on every later edit of the same fields.
+    const company = rawCompany && typeof rawCompany === 'object' && !Array.isArray(rawCompany)
+      ? normalizeCompanyEdit(rawCompany)
+      : undefined
+    const companyProblems = company ? companyInfoProblems(company, profile.company) : []
+    if (companyProblems.length > 0) {
+      res.status(400).json({ error: 'invalid_company_field', fields: companyProblems })
       return
     }
     let dossierUpdate
     try {
       dossierUpdate = pickDossierUpdate(req.body?.dossier ?? req.body)
+      checkDossierChoices(dossierUpdate, profile.dossier)
+      if (dossierUpdate.productsServices || dossierUpdate.certificatesLicenses) {
+        checkDossierItemDocuments(dossierUpdate, profile.companyId
+          ? await dossierDocuments.listCompanyDocuments(profile.companyId)
+          : [])
+      }
       mergeDossier(profile.dossier, dossierUpdate)
     } catch (error) {
       if (error instanceof DossierValidationError) {
@@ -49,7 +74,7 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
     // external write: a later contact/storage failure must not leave the
     // changed company eligible under the old approval.
     const companyEdited = changesCompany(initialProfile, {
-      company: company && typeof company === 'object' ? company : undefined,
+      company,
       executives: Array.isArray(req.body?.executives) ? req.body.executives : undefined,
       dossier: dossierUpdate,
     })
@@ -70,7 +95,7 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
         throw error
       }
     }
-    if (company && typeof company === 'object') {
+    if (company) {
       profile = await profileRepo.updateBasicInfo(actor.id, company)
     }
     if (contacts && typeof contacts === 'object') {
@@ -120,6 +145,12 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
     let update
     try {
       update = pickDossierUpdate(req.body?.dossier ?? req.body)
+      checkDossierChoices(update, currentProfile.dossier)
+      if (update.productsServices || update.certificatesLicenses) {
+        checkDossierItemDocuments(update, currentProfile.companyId
+          ? await dossierDocuments.listCompanyDocuments(currentProfile.companyId)
+          : [])
+      }
       mergeDossier(currentProfile.dossier, update)
     } catch (error) {
       if (error instanceof DossierValidationError) {
@@ -251,7 +282,8 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
       const canRequestVerification =
         missing.canRequestVerification &&
         current?.status !== 'pending' &&
-        current?.status !== 'approved'
+        current?.status !== 'approved' &&
+        current?.status !== 'rejected'
       res.json({
         status: current?.status ?? 'unsubmitted',
         revision: current?.revision ?? 0,
@@ -312,6 +344,11 @@ export function registerProfileRoutes(router: Router, ctx: DashboardContext): vo
       if (!result.ok) {
         if (result.reason === 'already_submitted') {
           res.status(409).json({ error: 'already_submitted' })
+          return
+        }
+        if (result.reason === 'rejected') {
+          // Only the Secretariat can reopen a rejected verification.
+          res.status(409).json({ error: 'rejected_until_reopened' })
           return
         }
         res.status(409).json({ error: 'already_approved' })

@@ -110,7 +110,8 @@ describe('users roles & access control', () => {
         activityDomain: 'انرژی',
         companyEstablishmentDate: '1375',
         companyStatus: 'فعال',
-        companyEconomicCode: '1234567890',
+        // Economic codes are 11 digits (registration rules).
+        companyEconomicCode: '12345678901',
         roles: ['admin'], operationalRole: 'system-owner', contentEditor: true, backendService: true, isActive: false,
       }),
     })
@@ -143,7 +144,7 @@ describe('users roles & access control', () => {
     expect(representative).toBe(body.user.id)
     expect(body.company.establishmentDate).toBe('1375')
     expect(body.company.status).toBe('فعال')
-    expect(body.company.economicCode).toBe('1234567890')
+    expect(body.company.economicCode).toBe('12345678901')
 
     // #278: registration signs the new representative in through the same
     // login operation and HttpOnly cookie as POST /api/users/login; the token

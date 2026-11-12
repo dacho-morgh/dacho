@@ -133,10 +133,11 @@ export class ActivityRepository {
         const compParam = params.length
         if (scope.userId) {
           params.push(scope.userId)
-          whereSql = `a.request_id IN (
+          // The representative's own feed also holds what names no request: verification and support notices.
+          whereSql = `(a.request_id IN (
             SELECT r.id FROM dashboard.requests r
             WHERE r.company_id = $${compParam} OR (r.company_id IS NULL AND r.owner_id = $${params.length})
-          )`
+          ) OR (a.request_id IS NULL AND a.owner_id = $${params.length}))`
         } else {
           whereSql = `a.request_id IN (
             SELECT r.id FROM dashboard.requests r

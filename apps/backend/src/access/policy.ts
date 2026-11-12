@@ -180,7 +180,7 @@ export function canRequestAction(
 
 /* ── Private document policy (docs/system/document-policy.json) ─────────── */
 
-export const DOCUMENT_POLICY_VERSION = 'private-documents-2026-10-23-v1'
+export const DOCUMENT_POLICY_VERSION = 'private-documents-2026-11-10-v2'
 export const MAX_DOCUMENT_BYTES = 10_000_000
 export const DOCUMENT_SIZE_DISPLAY = '10 MB per file'
 
@@ -192,6 +192,7 @@ export const DOCUMENT_CATEGORIES = [
   'amendmentNotices',
   'catalogues',
   'certificatesLicenses',
+  'productsServices',
   'financialStatements',
   'debtFacilityEvidence',
   'taxInsuranceRecords',
@@ -201,6 +202,7 @@ export const DOCUMENT_CATEGORIES = [
   'supplementaryCaseFiles',
   'boothPaymentReceipt',
   'correspondenceAttachment',
+  'supportAttachment',
 ] as const
 
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number]
@@ -210,8 +212,8 @@ export function isDocumentCategory(value: unknown): value is DocumentCategory {
 }
 
 export interface DocumentTypeRule {
-  format: 'PDF' | 'Word'
-  extension: '.pdf' | '.doc' | '.docx'
+  format: 'PDF' | 'Word' | 'Image'
+  extension: '.pdf' | '.doc' | '.docx' | '.jpg' | '.jpeg' | '.png' | '.webp'
   mimeType: string
 }
 
@@ -225,7 +227,25 @@ export const ALLOWED_DOCUMENT_TYPES: readonly DocumentTypeRule[] = [
   },
 ]
 
-export type DocumentAudience = 'company' | 'case' | 'financial' | 'unsupported'
+/** Photos and scans, accepted only where `IMAGE_DOCUMENT_CATEGORIES` allows them. */
+export const IMAGE_DOCUMENT_TYPES: readonly DocumentTypeRule[] = [
+  { format: 'Image', extension: '.jpg', mimeType: 'image/jpeg' },
+  { format: 'Image', extension: '.jpeg', mimeType: 'image/jpeg' },
+  { format: 'Image', extension: '.png', mimeType: 'image/png' },
+  { format: 'Image', extension: '.webp', mimeType: 'image/webp' },
+]
+
+/** A product/service file and a certificate may be a photo as well as a PDF or Word file. */
+export const IMAGE_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = ['productsServices', 'certificatesLicenses', 'supportAttachment']
+
+/** The file types a category accepts. */
+export function allowedDocumentTypes(category: DocumentCategory): readonly DocumentTypeRule[] {
+  return IMAGE_DOCUMENT_CATEGORIES.includes(category)
+    ? [...ALLOWED_DOCUMENT_TYPES, ...IMAGE_DOCUMENT_TYPES]
+    : ALLOWED_DOCUMENT_TYPES
+}
+
+export type DocumentAudience = 'company' | 'case' | 'financial' | 'support' | 'unsupported'
 
 /**
  * Categories whose prerequisite workflow does not exist yet stay denied rather
@@ -245,6 +265,7 @@ const COMPANY_CATEGORIES: readonly DocumentCategory[] = [
   'amendmentNotices',
   'catalogues',
   'certificatesLicenses',
+  'productsServices',
 ]
 
 export const FINANCIAL_CATEGORIES: readonly DocumentCategory[] = [
@@ -258,6 +279,7 @@ export const FINANCIAL_CATEGORIES: readonly DocumentCategory[] = [
 
 export function documentAudience(category: DocumentCategory): DocumentAudience {
   if (UNSUPPORTED_DOCUMENT_CATEGORIES.includes(category)) return 'unsupported'
+  if (category === 'supportAttachment') return 'support'
   if (COMPANY_CATEGORIES.includes(category)) return 'company'
   if (FINANCIAL_CATEGORIES.includes(category)) return 'financial'
   return 'case'
@@ -294,8 +316,12 @@ export function canUploadOwnedDocument(
 ): boolean {
   const audience = documentAudience(category)
   if (audience === 'unsupported') return false
-  if (audience === 'company' && !parent.companyId) return false
-  if (audience !== 'company' && !parent.requestOwnerId && !parent.requestCompanyId) return false
+  if ((audience === 'company' || audience === 'support') && !parent.companyId) return false
+  if (audience !== 'company' && audience !== 'support' && !parent.requestOwnerId && !parent.requestCompanyId) return false
+  // A support attachment belongs to the company that opens the ticket; staff only read it.
+  if (audience === 'support') {
+    return role === 'representative' && Boolean(parent.companyId && parent.companyId === actorCompanyId)
+  }
   if (role === 'system-owner' || role === 'central-secretariat') return true
   if (role !== 'representative') return false
   if (audience === 'company') {
@@ -362,8 +388,8 @@ export function canReadDocument(
         // Legacy unmigrated request without companyId: fallback to creator
         return document.requestOwnerId === actorId
       }
-      // Standalone dossier document:
-      if (audience === 'company') {
+      // Standalone dossier or support document:
+      if (audience === 'company' || audience === 'support') {
         return Boolean(document.companyId && actorCompanyId && document.companyId === actorCompanyId)
       }
       return false

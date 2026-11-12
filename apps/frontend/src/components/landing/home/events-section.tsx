@@ -8,6 +8,7 @@ import type { EventCardData } from './event-card'
 import EventsCarousel from './events-carousel'
 
 const persianDateFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
   day: 'numeric',
   month: 'long',
   year: 'numeric',

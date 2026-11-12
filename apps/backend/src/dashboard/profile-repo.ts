@@ -9,7 +9,7 @@ import {
   type CompanyDossier,
 } from './dossier.js'
 
-export interface CompanyInfo { name: string; establishmentDate: string; status: string; type: string; registrationNumber: string; economicCode: string; nationalId: string }
+export interface CompanyInfo { name: string; establishmentDate: string; status: string; type: string; registrationNumber: string; economicCode: string; nationalId: string; province: string; city: string }
 export interface ContactInfo { phone: string; email: string }
 export interface Executive { role: string; name: string }
 export interface Address { id: string; title: string; province: string; city: string; postalCode: string; address: string }
@@ -25,7 +25,7 @@ export interface UserProfile {
 }
 
 const EMPTY_PROFILE: UserProfile = {
-  company: { name: '', establishmentDate: '', status: '', type: '', registrationNumber: '', economicCode: '', nationalId: '' },
+  company: { name: '', establishmentDate: '', status: '', type: '', registrationNumber: '', economicCode: '', nationalId: '', province: '', city: '' },
   contacts: { phone: '', email: '' }, executives: [], addresses: [], dossier: EMPTY_DOSSIER, companyId: null,
 }
 
@@ -89,6 +89,8 @@ export class ProfileRepository {
       ...(update.type !== undefined ? { type: update.type } : {}),
       ...(update.registrationNumber !== undefined ? { registrationNumber: update.registrationNumber } : {}),
       ...(update.economicCode !== undefined ? { economicCode: update.economicCode } : {}),
+      ...(update.province !== undefined ? { province: update.province } : {}),
+      ...(update.city !== undefined ? { city: update.city } : {}),
     })
     return this.getProfile(userId)
   }
@@ -164,6 +166,8 @@ function fromUserAndCompany(
       registrationNumber: company?.registrationNumber ?? '',
       economicCode: company?.economicCode ?? '',
       nationalId: company?.nationalId ?? '',
+      province: company?.province ?? '',
+      city: company?.city ?? '',
     },
     contacts: { phone: user.phone ?? '', email: user.email ?? '' },
     executives: (company?.executives ?? []).map((item: StoredExecutive) => ({

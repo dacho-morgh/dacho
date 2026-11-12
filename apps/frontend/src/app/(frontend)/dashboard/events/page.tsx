@@ -3,9 +3,11 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import { EventsView, type EventItem } from '@/components/dashboard/events-view'
+import { VerificationGate } from '@/components/dashboard/verification-gate'
 import { OwnerEventsList } from '@/components/dashboard/owner-events-list'
 import { dashboardOperationalRole, serverDashboardFetch } from '@/utilities/dashboard-server'
 import { operationalEventIds, withOperationalId, type OperationalEvent } from '@/utilities/public-event-ids'
+import type { CompanyVerificationDto } from '@/utilities/dashboard-api'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
 
 export const dynamic = 'force-dynamic'
@@ -34,10 +36,11 @@ export default async function EventsPage(props: PageProps = {}) {
   // FE40 (S5): the owner's one list of events and exhibitions; companies keep discovery.
   if (isOwner) return <OwnerEventsList />
 
-  const [eventResult, exhibitionResult, operational] = await Promise.all([
+  const [eventResult, exhibitionResult, operational, verification] = await Promise.all([
     payload.find({ collection: 'events', limit: 100, depth: 1, sort: 'startDate' }),
     payload.find({ collection: 'exhibitions', limit: 100, depth: 1, sort: 'startDate' }),
     serverDashboardFetch<{ items?: OperationalEvent[] }>('/events'),
+    serverDashboardFetch<CompanyVerificationDto>('/profile/verification'),
   ])
   const operationalIds = operationalEventIds(operational?.items)
   const events = [
@@ -46,7 +49,8 @@ export default async function EventsPage(props: PageProps = {}) {
   ].sort((left, right) => left.startTimestamp - right.startTimestamp)
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center bg-neutral-50 px-4 pt-10 pb-4">
+    <div className="relative flex min-h-0 w-full flex-1 flex-col items-center bg-neutral-50 px-4 pt-10 pb-4">
+      <VerificationGate status={verification?.status} />
       <EventsView
         initialEventsList={events}
         isOwner={isOwner}
@@ -125,7 +129,8 @@ function extractDescription(desc: unknown): string {
 
 function formatDateRange(start: string, end: string): string {
   if (!start) return 'تاریخ ثبت نشده است'
-  const formatter = new Intl.DateTimeFormat('fa-IR', {
+  const formatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
     year: 'numeric',
     month: 'long',
     day: 'numeric',

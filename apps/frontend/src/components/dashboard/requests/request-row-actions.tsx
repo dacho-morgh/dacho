@@ -6,6 +6,8 @@ import { EyeIcon } from '@/components/icons'
 
 export interface RequestRowActionsProps {
   requestId: string
+  /** Where «مشاهده» goes when the row is not a request dossier. */
+  href?: string
   /** Further actions after «مشاهده»; with any, the row gets the «more» menu. */
   extraActions?: RowAction[]
   className?: string
@@ -15,7 +17,7 @@ export interface RequestRowActionsProps {
  * A request row's actions (Figma Frame 81, node 53:10769). The shared RowActions shows a single
  * action directly and puts two or more in the «more» menu.
  */
-export function RequestRowActions({ requestId, extraActions = [], className }: RequestRowActionsProps) {
+export function RequestRowActions({ requestId, href, extraActions = [], className }: RequestRowActionsProps) {
   return (
     <RowActions
       className={className}
@@ -24,7 +26,7 @@ export function RequestRowActions({ requestId, extraActions = [], className }: R
         {
           id: 'view',
           label: 'مشاهده',
-          href: `/dashboard/requests/${encodeURIComponent(requestId)}`,
+          href: href ?? `/dashboard/requests/${encodeURIComponent(requestId)}`,
           icon: <EyeIcon aria-hidden="true" className="size-5" />,
         },
         ...extraActions,

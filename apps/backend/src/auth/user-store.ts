@@ -50,6 +50,16 @@ export function isAbsenceField(value: unknown): value is AbsenceField {
 export interface KeyMember {
   name: string
   role: string
+  /** Degree or field of study. */
+  education?: string
+  /** Where the degree was obtained. */
+  degreePlace?: string
+}
+
+/** A product or service, with an optional private file (PDF, Word or image). */
+export interface ProductService {
+  title: string
+  documentId?: string
 }
 
 export interface PastProjectCustomer {
@@ -60,6 +70,9 @@ export interface PastProjectCustomer {
 
 export interface CertificateLicence {
   title: string
+  /** An optional private file (PDF, Word or image) of the certificate. */
+  documentId?: string
+  /** No longer asked for; values entered earlier are kept as they are. */
   issuer?: string
   reference?: string
 }
@@ -86,7 +99,7 @@ export type CompanyFields = {
   website?: string
   centerEstablishment?: string
   insuredEmployeeCount?: number | null
-  productsServices?: string[]
+  productsServices?: ProductService[]
   keyMembers?: KeyMember[]
   pastProjectsCustomers?: PastProjectCustomer[]
   requestedServices?: string[]

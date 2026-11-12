@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
 import { DashboardApiError, describeMutationFailure, LETTER_TYPE_LABELS, type LetterType, type RequestDto } from '@/utilities/dashboard-api'
 import type { PrivateDocumentDto } from '@/utilities/document-api'
-import { NativeSelect } from '@/components/ui/native-select'
+import { DashboardSelect } from '@/components/dashboard/dashboard-select'
 import { toast } from 'sonner'
 
 export interface LetterRecipient {
@@ -93,6 +93,8 @@ export interface NewLetterFormProps {
   officialOnly?: boolean
   initialRecipientId?: string
   initialTitle?: string
+  /** The sender's company; a support ticket's files are private documents of this company. */
+  companyId?: string
 }
 
 export function NewLetterForm({
@@ -106,6 +108,7 @@ export function NewLetterForm({
   officialOnly = false,
   initialRecipientId,
   initialTitle,
+  companyId,
 }: NewLetterFormProps) {
   const router = useRouter()
   const submitting = useRef(false)
@@ -115,6 +118,9 @@ export function NewLetterForm({
   const [error, setError] = useState<string | null>(null)
   const [recipientId, setRecipientId] = useState(initialRecipientId ?? '')
   const [caseId, setCaseId] = useState('')
+  // Read back by the submit handler from the form (hidden inputs named `type` / `priority`).
+  const [letterType, setLetterType] = useState(officialOnly ? 'official' : '')
+  const [priority, setPriority] = useState('normal')
   const [attachments, setAttachments] = useState<PrivateDocumentDto[]>([])
   const [uploading, setUploading] = useState(false)
 
@@ -144,6 +150,13 @@ export function NewLetterForm({
         setError('موضوع و متن پیام را تکمیل کنید.')
         return
       }
+      if (uploading) {
+        setError('تا پایان بارگذاری پیوست‌ها صبر کنید.')
+        return
+      }
+      const attachmentIds = attachments
+        .filter((document) => document.category === 'supportAttachment' && document.companyId === companyId)
+        .map((document) => document.id)
       submitting.current = true
       setSaving(true)
       setError(null)
@@ -153,7 +166,7 @@ export function NewLetterForm({
         const response = await fetch('/api/dashboard/support', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ subject, message: body }),
+          body: JSON.stringify({ subject, message: body, ...(attachmentIds.length ? { attachmentIds } : {}) }),
         })
         if (!response.ok) throw new DashboardApiError(response.status, 'ticket_not_created')
         const result = await response.json()
@@ -279,26 +292,26 @@ export function NewLetterForm({
             />
           ) : (
             <>
-              <NativeSelect
+              <DashboardSelect
                 id="letter-recipient"
                 name="recipientId"
+                label="گیرنده"
                 required
+                placeholder="گیرنده را جستجو یا انتخاب کنید"
+                emptyText="گیرنده‌ای پیدا نشد"
+                options={companies.map((company) => ({
+                  value: company.id,
+                  label: company.companyName || company.name || company.id,
+                }))}
                 value={recipientId}
-                onChange={(event) => {
-                  setRecipientId(event.target.value)
+                onChange={(value) => {
+                  setRecipientId(value)
                   if (requestId) return
                   setCaseId('')
                   setAttachments([])
                 }}
                 disabled={saving || uploading || changingCase || !companies.length}
-              >
-                <option value="" disabled>انتخاب گیرنده</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.companyName || company.name || company.id}
-                  </option>
-                ))}
-              </NativeSelect>
+              />
               {!companies.length && (
                 <Typography
                   role={recipientsError ? 'alert' : 'status'}
@@ -339,30 +352,29 @@ export function NewLetterForm({
               <RequiredMark className="ms-0.5" />
             </Typography>
             {isSupport ? (
-              <NativeSelect
+              <DashboardSelect
                 id="letter-type"
                 name="priority"
+                label="میزان اهمیت"
                 required
-                defaultValue="normal"
+                placeholder="میزان اهمیت را انتخاب کنید"
+                options={Object.entries(SUPPORT_PRIORITY_LABELS).map(([value, label]) => ({ value, label }))}
+                value={priority}
+                onChange={setPriority}
                 disabled={saving}
-              >
-                {Object.entries(SUPPORT_PRIORITY_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </NativeSelect>
+              />
             ) : (
-              <NativeSelect
+              <DashboardSelect
                 id="letter-type"
                 name="type"
+                label="نوع نامه"
                 required
-                defaultValue={officialOnly ? 'official' : ''}
+                placeholder="نوع نامه را انتخاب کنید"
+                options={letterTypes.map(([value, label]) => ({ value, label }))}
+                value={letterType}
+                onChange={setLetterType}
                 disabled={saving}
-              >
-                {!officialOnly && <option value="" disabled>انتخاب نوع نامه</option>}
-                {letterTypes.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </NativeSelect>
+              />
             )}
           </div>
         </div>
@@ -384,13 +396,21 @@ export function NewLetterForm({
         </div>
 
         {isSupport ? (
-          /* Support tickets have no attachment contract on the backend. */
-          <Input
-            label="فایل پیوست"
-            type="file"
-            disabled
-            hint="ارسال فایل پیوست در پیام پشتیبانی پشتیبانی نمی‌شود."
-          />
+          companyId ? (
+            <PrivateDocumentField
+              category="supportAttachment"
+              label="فایل پیوست"
+              companyId={companyId}
+              disabled={saving}
+              sessionOnly
+              onPendingChange={setUploading}
+              onDocumentsChange={setAttachments}
+            />
+          ) : (
+            <Typography role="status" variant="12/regular" className="text-neutral-500">
+              پیوست فایل فقط برای نماینده یک شرکت ثبت‌شده ممکن است.
+            </Typography>
+          )
         ) : (
           <div className="flex flex-col gap-2">
             <Typography as="label" htmlFor="letter-case" variant="16/semibold" className="text-neutral-700">
@@ -399,39 +419,41 @@ export function NewLetterForm({
             {requestId && !caseOptions ? (
               <Input id="letter-case" disabled value={caseTitle ?? 'پرونده این نامه'} />
             ) : caseOptions ? (
-              <NativeSelect
+              <DashboardSelect
                 id="letter-case"
                 name="requestId"
+                label="پرونده مرتبط"
+                placeholder="پرونده را جستجو یا انتخاب کنید"
+                emptyText="پرونده‌ای پیدا نشد"
+                options={[
+                  { value: '', label: 'بدون پرونده' },
+                  ...(requestId && !caseOptions.some((item) => item.id === requestId)
+                    ? [{ value: requestId, label: caseTitle ?? 'پرونده انتخاب‌شده' }]
+                    : []),
+                  ...caseOptions.map((item) => ({ value: item.id, label: caseLabel(item) })),
+                ]}
                 value={requestId ?? ''}
-                onChange={(event) => chooseCase(event.target.value)}
+                onChange={chooseCase}
                 disabled={saving || uploading || changingCase}
-              >
-                <option value="">بدون پرونده</option>
-                {requestId && !caseOptions.some((item) => item.id === requestId) ? (
-                  <option value={requestId}>{caseTitle ?? 'پرونده انتخاب‌شده'}</option>
-                ) : null}
-                {caseOptions.map((item) => (
-                  <option key={item.id} value={item.id}>{caseLabel(item)}</option>
-                ))}
-              </NativeSelect>
+              />
             ) : (
-              <NativeSelect
+              <DashboardSelect
                 id="letter-case"
                 name="requestId"
+                label="پرونده مرتبط"
+                placeholder="پرونده را جستجو یا انتخاب کنید"
+                emptyText="پرونده‌ای پیدا نشد"
+                options={[
+                  { value: '', label: 'بدون پرونده' },
+                  ...(cases.kind === 'ready' ? cases.items.map((item) => ({ value: item.id, label: caseLabel(item) })) : []),
+                ]}
                 value={caseId}
-                onChange={(event) => {
-                  setCaseId(event.target.value)
+                onChange={(value) => {
+                  setCaseId(value)
                   setAttachments([])
                 }}
                 disabled={saving || uploading || cases.kind !== 'ready' || cases.items.length === 0}
-              >
-                <option value="">بدون پرونده</option>
-                {cases.kind === 'ready'
-                  ? cases.items.map((item) => (
-                      <option key={item.id} value={item.id}>{caseLabel(item)}</option>
-                    ))
-                  : null}
-              </NativeSelect>
+              />
             )}
             {casesError ? (
               <Typography role="alert" variant="12/regular" className="text-error-600">

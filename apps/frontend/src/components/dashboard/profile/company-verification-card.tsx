@@ -56,7 +56,7 @@ function bannerFor(verification: CompanyVerificationDto, missing: MissingDossier
       return {
         tone: 'error',
         title: 'احراز هویت شرکت تایید نشد',
-        body: 'علت تصمیم را مطالعه کنید. راهنمای اقدام بعدی در نامه دبیرخانه قرار دارد.',
+        body: 'علت تصمیم را مطالعه کنید. تا زمانی که دبیرخانه پرونده را بازگشایی نکند امکان ارسال دوباره ندارید؛ برای پیگیری به پشتیبانی پیام دهید.',
       }
     case 'returned':
       return verification.reason === COMPANY_EDIT_REVERIFICATION_REASON

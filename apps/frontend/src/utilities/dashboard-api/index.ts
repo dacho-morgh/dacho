@@ -128,6 +128,7 @@ export {
   fetchCompanyVerification,
   submitCompanyVerification,
   type KeyMemberDto,
+  type ProductServiceDto,
   type PastProjectCustomerDto,
   type CertificateLicenceDto,
   type AbsenceField,
@@ -137,6 +138,7 @@ export {
   type DossierResponseDto,
   type CompanyVerificationStatus,
   type CompanyVerificationDto,
+  type CompanyVerificationHistoryDto,
 } from './profile'
 export {
   createSupportTicket,

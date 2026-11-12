@@ -49,6 +49,8 @@ export interface InboxRow {
   canReply: boolean
   /** The recipient's pending next step on the case, if any. */
   action: { label: string; href: string } | null
+  /** A support ticket shown beside letters: it has no read state, reply or hide action of a letter. */
+  kind?: 'ticket'
 }
 
 /** Extra destinations the filter menu offers, such as support tickets or oversight views. */
@@ -142,7 +144,7 @@ function RowMenu({
   onHide: (row: InboxRow) => void
 }) {
   // Read state and hiding are the recipient's own mailbox actions.
-  if (!row.received) return null
+  if (!row.received || row.kind === 'ticket') return null
   // Figma 30865:18777: icon first, then the label, in reading order. The shared RowActions
   // shows a lone action directly; here a received letter always has at least two.
   return (

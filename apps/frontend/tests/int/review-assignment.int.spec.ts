@@ -5,6 +5,7 @@ import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ReviewAssignmentPanel, type ReviewAssignmentPanelProps } from '@/components/dashboard/review-assignment-panel'
+import { chooseOption, optionTexts } from './combobox-helpers'
 import type { EvaluationListDto, ReviewRoundDto, ReviewRoundSlotDto } from '@/utilities/dashboard-api'
 
 const refresh = vi.hoisted(() => vi.fn())
@@ -80,8 +81,9 @@ const panel = (props: Partial<ReviewAssignmentPanelProps> = {}) =>
   )
 
 const dialog = () => screen.getByRole('dialog')
-const selects = () => within(dialog()).getAllByRole('combobox') as HTMLSelectElement[]
-const pick = (select: HTMLSelectElement, value: string) => fireEvent.change(select, { target: { value } })
+const selects = () => within(dialog()).getAllByRole('combobox') as HTMLInputElement[]
+/** Picks the person with this id; the dropdown lists them by name. */
+const pick = (select: HTMLInputElement, id: string) => chooseOption(select, PEOPLE[id]!)
 const confirm = (label: string) => fireEvent.click(within(dialog()).getByRole('button', { name: label }))
 
 /** Answers GETs with the given candidate lists and POSTs with `post`. */
@@ -118,8 +120,8 @@ describe('four-reviewer assignment', () => {
     expect(within(dialog()).getByText('۱/۴')).toBeTruthy()
     pick(selects()[0], 'r1')
     // A person picked in one slot is not offered in the others.
-    const second = Array.from(selects()[1].options).map((option) => option.value)
-    expect(second).not.toContain('r1')
+    const second = optionTexts(selects()[1])
+    expect(second).not.toContain(PEOPLE.r1)
     expect(within(dialog()).getByText('۲/۴')).toBeTruthy()
   })
 
@@ -177,7 +179,7 @@ describe('four-reviewer assignment', () => {
     confirm('ارجاع')
 
     expect((await within(dialog()).findByRole('alert')).textContent).toMatch(message)
-    expect(selects()[0].value).toBe('r1')
+    expect(selects()[0].value).toBe(PEOPLE.r1)
     expect(refresh).toHaveBeenCalled()
   })
 

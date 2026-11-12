@@ -11,7 +11,7 @@ import type { Address, CompanyInfo, Executive, UserProfile } from './profile-rep
 export const COMPANY_EDIT_REVERIFICATION_REASON = 'ویرایش اطلاعات شرکت؛ نیازمند احراز مجدد'
 
 const EDITABLE_COMPANY_FIELDS = [
-  'name', 'establishmentDate', 'status', 'type', 'registrationNumber', 'economicCode',
+  'name', 'establishmentDate', 'status', 'type', 'registrationNumber', 'economicCode', 'province', 'city',
 ] as const satisfies readonly (keyof CompanyInfo)[]
 
 export interface ProfileEdit {

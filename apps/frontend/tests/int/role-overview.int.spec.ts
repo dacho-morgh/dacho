@@ -303,11 +303,12 @@ describe('RoleOverview', () => {
     expect(kpi().getByText(fa(7))).toBeTruthy()
     // The dashboard no longer carries a "new request" button; applications start from an event.
     expect(screen.queryByRole('link', { name: 'ثبت درخواست جدید' })).toBeNull()
-    // Pending verification: the third step is the current one.
-    expect(screen.getByText('احراز هویت').closest('li')?.getAttribute('aria-current')).toBe('step')
     const table = within(screen.getByRole('table'))
+    // The verification leads the table as the company's own case, with where it stands.
+    expect(table.getByText('در انتظار بررسی')).toBeTruthy()
     expect(table.getByRole('link', { name: 'اصلاح' })).toBeTruthy()
-    expect(table.getByRole('link', { name: 'مشاهده' })).toBeTruthy()
+    // One for the verification row, one for the request.
+    expect(table.getAllByRole('link', { name: 'مشاهده' })).toHaveLength(2)
   })
 
   it('gives a new company a profile call to action and the events it can register for', async () => {
@@ -599,7 +600,7 @@ describe('RoleOverview charts and next tasks (S3)', () => {
     ).toContain('queue=evaluation_pending')
   })
 
-  it("charts a company's requests and booths, and lists the receipt it owes", async () => {
+  it("no longer charts a company's requests and booths or lists next tasks", async () => {
     serve({
       '/stats/overview': ok({
         counts: { total: 6, in_review: 2, approved: 1, action_needed: 1, rejected: 0 },
@@ -629,15 +630,9 @@ describe('RoleOverview charts and next tasks (S3)', () => {
     })
     await renderRole({ role: 'representative', userName: null })
 
-    expect(screen.getByRole('progressbar', { name: `پیش‌نویس: ${fa(2)} از ${fa(6)}` })).toBeTruthy()
-    expect(
-      screen.getByRole('progressbar', { name: `در انتظار فیش: ${fa(1)} از ${fa(1)}` }),
-    ).toBeTruthy()
-    expect(
-      screen
-        .getByRole('link', { name: /غرفه‌های تأییدشده در انتظار ارسال فیش/ })
-        .getAttribute('href'),
-    ).toBe('/dashboard/exhibitions')
+    // The breakdown cards and the next-tasks card left the company overview.
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.queryByRole('link', { name: /غرفه‌های تأییدشده در انتظار ارسال فیش/ })).toBeNull()
   })
 
   it('keeps the chief funnel in place with a notice when its counts cannot be read', async () => {

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
@@ -23,17 +23,24 @@ import {
   Field,
   RequestError,
   adminRequest,
-  cardClass,
   loadPeople,
   resolver,
   type Person,
 } from './owner-admin'
-import { NativeSelect } from '@/components/ui/native-select'
+import { DashboardSelect } from './dashboard-select'
 import { Input } from '@/components/ui/input'
 import { RequiredMark } from '@/components/ui/field'
 import { FileInput, SelectedFile } from '@/components/ui/file-input'
 import { toast } from 'sonner'
 import { AdminBreadcrumb } from './owner-events-form'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  DashboardAddIcon,
+  DashboardCloseCircle,
+  DashboardUserTagIcon,
+  DocumentTextIcon,
+} from '@/components/icons/generated'
 
 type Event = {
   id: string
@@ -49,6 +56,9 @@ const categorySchema = z.object({
   title: z.string().trim().min(1, 'عنوان دسته را وارد کنید.'),
 })
 type CategoryValues = z.infer<typeof categorySchema>
+
+/** The add-category / add-subtopic forms open in place, on a quiet tinted panel. */
+const inlineFormClass = 'flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4'
 
 function CategoryForm({
   eventId,
@@ -102,30 +112,35 @@ function CategoryForm({
       aria-label="دسته فناوری جدید"
       noValidate
       onSubmit={handleSubmit(save)}
-      className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50/60 p-4"
+      className={inlineFormClass}
     >
-      <Typography variant="16/semibold">افزودن دسته فناوری</Typography>
-      <Field name="title" label="عنوان دسته فناوری" error={errors.title?.message}>
-        <Input
-          id="title"
-          aria-required="true"
-          placeholder="عنوان را وارد کنید"
-          aria-invalid={!!errors.title}
-          aria-describedby={errors.title ? 'title-error' : undefined}
-          {...register('title')}
-        />
-      </Field>
-      {failure !== null && <RequestError error={failure} returnTo="/dashboard/events" />}
-      <div className="flex flex-wrap gap-3">
-        <Button size="40" type="submit" disabled={isSubmitting}>
-          <Typography variant="14/regular" color="white">
-            {isSubmitting ? 'در حال ذخیره...' : 'ذخیره دسته'}
-          </Typography>
-        </Button>
-        <Button size="40" type="button" variant="outline-gray" disabled={isSubmitting} onClick={onCancel}>
-          <Typography variant="14/regular">انصراف</Typography>
-        </Button>
+      {/* One row on wide screens: the buttons line up with the input, below its label. */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-start">
+        <div className="min-w-0 flex-1">
+          <Field name="title" label="عنوان دسته فناوری" error={errors.title?.message}>
+            <Input
+              id="title"
+              autoFocus
+              aria-required="true"
+              placeholder="مثلاً برق و ابزار دقیق"
+              aria-invalid={!!errors.title}
+              aria-describedby={errors.title ? 'title-error' : undefined}
+              {...register('title')}
+            />
+          </Field>
+        </div>
+        <div className="flex shrink-0 gap-2 md:pt-9">
+          <Button size="40" type="submit" disabled={isSubmitting}>
+            <Typography variant="14/regular" color="white">
+              {isSubmitting ? 'در حال ذخیره...' : 'ذخیره دسته'}
+            </Typography>
+          </Button>
+          <Button size="40" type="button" variant="outline-gray" disabled={isSubmitting} onClick={onCancel}>
+            <Typography variant="14/regular">انصراف</Typography>
+          </Button>
+        </div>
       </div>
+      {failure !== null && <RequestError error={failure} returnTo="/dashboard/events" />}
     </form>
   )
 }
@@ -141,12 +156,15 @@ function SubtopicForm({
   eventId,
   categories,
   people,
+  category,
   onSaved,
   onCancel,
 }: {
   eventId: string
   categories: EventCategoryDto[]
   people: Person[]
+  /** Opened from a category's own row: that category is fixed and its picker hidden. */
+  category?: EventCategoryDto
   onSaved: () => void
   onCancel: () => void
 }) {
@@ -173,6 +191,7 @@ function SubtopicForm({
 
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -180,7 +199,7 @@ function SubtopicForm({
     resolver: resolver(schema),
     defaultValues: {
       title: '',
-      categoryId: categories.length === 1 ? categories[0].id : '',
+      categoryId: category?.id ?? (categories.length === 1 ? categories[0].id : ''),
       employerId: '',
     },
   })
@@ -231,62 +250,98 @@ function SubtopicForm({
       aria-label="زیرعنوان جدید"
       noValidate
       onSubmit={handleSubmit(save)}
-      className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50/60 p-4"
+      className={inlineFormClass}
     >
-      <Typography variant="16/semibold">افزودن زیرعنوان جدید</Typography>
-      <Field name="categoryId" label="دسته فناوری" error={errors.categoryId?.message}>
-        <NativeSelect
-          id="categoryId"
-          aria-required="true"
-          aria-invalid={!!errors.categoryId}
-          aria-describedby={errors.categoryId ? 'categoryId-error' : undefined}
-          {...register('categoryId')}
-        >
-          <option value="">انتخاب دسته</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.title}
-            </option>
-          ))}
-        </NativeSelect>
-      </Field>
+      <div className="flex flex-col gap-1">
+        <Typography variant="16/semibold" color="neutral-700">
+          زیرعنوان جدید
+        </Typography>
+        <Typography variant="14/regular" color="muted">
+          {category
+            ? `در دسته «${category.title}» — شرکت‌ها برای این زیرعنوان درخواست می‌دهند.`
+            : 'شرکت‌ها برای این زیرعنوان درخواست می‌دهند و کارفرمای مسئول، درخواست‌ها را بررسی می‌کند.'}
+        </Typography>
+      </div>
 
-      <Field name="title" label="عنوان زیرعنوان" error={errors.title?.message}>
-        <Input
-          id="title"
-          aria-required="true"
-          placeholder="عنوان را وارد کنید"
-          aria-invalid={!!errors.title}
-          aria-describedby={errors.title ? 'title-error' : undefined}
-          {...register('title')}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {category ? (
+        <input type="hidden" {...register('categoryId')} />
+      ) : (
+        <Field name="categoryId" label="دسته فناوری" required error={errors.categoryId?.message}>
+          <Controller
+            control={control}
+            name="categoryId"
+            render={({ field }) => (
+              <DashboardSelect
+                ref={field.ref}
+                id="categoryId"
+                label="دسته فناوری"
+                required
+                invalid={!!errors.categoryId}
+                aria-describedby={errors.categoryId ? 'categoryId-error' : undefined}
+                placeholder="دسته را جستجو یا انتخاب کنید"
+                options={categories.map((c) => ({ value: c.id, label: c.title }))}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+              />
+            )}
+          />
+        </Field>
+      )}
+
+      <div>
+        <Field name="title" label="عنوان زیرعنوان" error={errors.title?.message}>
+          <Input
+            id="title"
+            autoFocus
+            aria-required="true"
+            placeholder="مثلاً طراحی سیستم‌های پایش آنلاین"
+            aria-invalid={!!errors.title}
+            aria-describedby={errors.title ? 'title-error' : undefined}
+            {...register('title')}
+          />
+        </Field>
+      </div>
+
+      {/* With the category picker shown, the employer takes the second row on its own. */}
+      <div className={category ? undefined : 'md:col-span-2'}>
+      <Field name="employerId" label="کارفرمای مسئول" required error={errors.employerId?.message}>
+        <Controller
+          control={control}
+          name="employerId"
+          render={({ field }) => (
+            <DashboardSelect
+              ref={field.ref}
+              id="employerId"
+              label="کارفرمای مسئول"
+              required
+              invalid={!!errors.employerId}
+              aria-describedby={errors.employerId ? 'employerId-error' : undefined}
+              placeholder="کارفرما را جستجو یا انتخاب کنید"
+              emptyText="کارفرمایی پیدا نشد"
+              options={eligibleEmployers.map((p) => ({
+                value: String(p.id),
+                label: `${p.name || 'بدون نام'} — ${p.phone || p.id}`,
+              }))}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+            />
+          )}
         />
-      </Field>
-
-      <Field name="employerId" label="کارفرمای مسئول" error={errors.employerId?.message}>
-        <NativeSelect
-          id="employerId"
-          aria-required="true"
-          aria-invalid={!!errors.employerId}
-          aria-describedby={errors.employerId ? 'employerId-error' : undefined}
-          {...register('employerId')}
-        >
-          <option value="">انتخاب کارفرما</option>
-          {eligibleEmployers.map((p) => (
-            <option key={p.id} value={String(p.id)}>
-              {p.name || 'بدون نام'} — {p.phone || p.id}
-            </option>
-          ))}
-        </NativeSelect>
         {eligibleEmployers.length === 0 && (
           <Typography variant="14/regular" color="warning">
             شخص کارفرمای واجد شرایط وجود ندارد؛ ابتدا در بخش پرسنل حساب فعال با نقش کارفرما بسازید.
           </Typography>
         )}
       </Field>
+      </div>
+      </div>
 
       {failure !== null && <RequestError error={failure} returnTo="/dashboard/events" />}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2">
         <Button size="40" type="submit" disabled={isSubmitting || eligibleEmployers.length === 0}>
           <Typography variant="14/regular" color="white">
             {isSubmitting ? 'در حال ذخیره...' : 'ذخیره زیرعنوان'}
@@ -433,11 +488,19 @@ function RfpManager({
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-background p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 pb-3">
-        <Typography variant="16/semibold">مدیریت RFP: {subtopic.title}</Typography>
-        <Button size="40" type="button" variant="outline-gray" onClick={onClose}>
-          <Typography variant="14/regular">بستن پنل RFP</Typography>
+    <section
+      aria-label={`فایل RFP ${subtopic.title}`}
+      className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <DocumentTextIcon aria-hidden="true" className="size-5 shrink-0 text-neutral-500" />
+          <Typography variant="16/semibold" color="neutral-700" className="truncate">
+            فایل RFP — {subtopic.title}
+          </Typography>
+        </div>
+        <Button size="icon-32" type="button" variant="text-gray" aria-label="بستن پنل RFP" onClick={onClose}>
+          <DashboardCloseCircle aria-hidden="true" />
         </Button>
       </div>
 
@@ -453,22 +516,22 @@ function RfpManager({
         <RequestError error={loadError} returnTo="/dashboard/events" retry={fetchRfp} />
       ) : (
         <div className="flex flex-col gap-3">
-          <Typography variant="14/semibold">وضعیت نسخه فعال:</Typography>
+          <Typography variant="14/semibold" color="neutral-700">
+            نسخه فعال
+          </Typography>
           {version ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-neutral-100 bg-neutral-50 p-3">
-              <Typography variant="14/regular">
-                شناسه نسخه: {version.id}
-              </Typography>
-              <Typography variant="14/regular">
-                توضیحات نسخه: {version.reason}
-              </Typography>
-              <Typography variant="14/regular" color="muted">
-                تاریخ ایجاد: {new Date(version.createdAt).toLocaleString('fa-IR')}
-              </Typography>
-              <div className="mt-2 flex flex-col gap-2">
-                <Typography variant="14/semibold">فایل‌های مستندات RFP:</Typography>
+            <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-background p-3">
+              <div className="flex flex-col gap-0.5">
+                <Typography variant="14/regular" color="neutral-700">
+                  {version.reason}
+                </Typography>
+                <Typography variant="12/regular" color="muted">
+                  {new Date(version.createdAt).toLocaleString('fa-IR')}
+                </Typography>
+              </div>
+              <div className="flex flex-col gap-2">
                 {version.files.map((file) => (
-                  <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-200 bg-background p-2">
+                  <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-neutral-50 p-2 ps-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <Typography as="span" variant="14/regular" className="break-all">
                         {file.filename}
@@ -477,7 +540,7 @@ function RfpManager({
                         ({formatFileSize(file.sizeBytes)})
                       </Typography>
                     </div>
-                    <Button size="40" asChild variant="outline-gray" className="max-w-full">
+                    <Button size="32" asChild variant="outline-gray" className="max-w-full">
                       <a
                         href={getRfpDownloadUrl(eventId, subtopic.id, version.id, file.id)}
                         download
@@ -603,17 +666,21 @@ function EventSubtopicsManager({
   event,
   people,
   onBack,
+  embedded = false,
 }: {
   event: Event
   people: Person[]
   onBack: () => void
+  /** Inside the event's edit page: no page breadcrumb or back button, only the section card. */
+  embedded?: boolean
 }) {
   const [categories, setCategories] = useState<EventCategoryDto[]>([])
   const [subtopics, setSubtopics] = useState<EventSubtopicDto[]>([])
   const [loading, setLoading] = useState(true)
   const [failure, setFailure] = useState<unknown>(null)
   const [addingCategory, setAddingCategory] = useState(false)
-  const [addingSubtopic, setAddingSubtopic] = useState(false)
+  // null: closed. `category` set: opened from that category's row, so the category is fixed.
+  const [addingSubtopic, setAddingSubtopic] = useState<{ category?: EventCategoryDto } | null>(null)
   const [activeRfpSubtopic, setActiveRfpSubtopic] = useState<EventSubtopicDto | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
@@ -638,162 +705,256 @@ function EventSubtopicsManager({
     void loadData()
   }, [event.id])
 
+  const openCategoryForm = () => {
+    setSuccessMessage(null)
+    setAddingCategory(true)
+    setAddingSubtopic(null)
+  }
+  const openSubtopicForm = (category?: EventCategoryDto) => {
+    setSuccessMessage(null)
+    setAddingSubtopic({ category })
+    setAddingCategory(false)
+  }
+  const subtopicForm = (category?: EventCategoryDto) => (
+    <SubtopicForm
+      eventId={event.id}
+      categories={categories}
+      people={people}
+      category={category}
+      onSaved={() => {
+        setAddingSubtopic(null)
+        setSuccessMessage('زیرعنوان با موفقیت ایجاد شد.')
+        void loadData()
+      }}
+      onCancel={() => setAddingSubtopic(null)}
+    />
+  )
+
+  const ready = !loading && failure === null
+  const withoutRfp = subtopics.filter((s) => !s.currentRfpVersionId).length
+  const count = (value: number) => value.toLocaleString('fa-IR')
+
   return (
-    <section className="flex flex-col gap-5">
-      <AdminBreadcrumb
-        title={`عناوین، زیرعنوان‌ها و RFP رویداد: ${event.title}`}
-        actions={
-          <Button size="40" type="button" variant="outline-gray" onClick={onBack}>
-            <Typography variant="14/regular">بازگشت به فهرست رویدادها</Typography>
-          </Button>
-        }
-      />
-
-      {successMessage && (
-        <Typography role="status" variant="14/regular" color="success">
-          {successMessage}
-        </Typography>
+    <div className="flex flex-col gap-5">
+      {!embedded && (
+        <AdminBreadcrumb
+          title={`عناوین، زیرعنوان‌ها و RFP رویداد: ${event.title}`}
+          actions={
+            <Button size="40" type="button" variant="outline-gray" onClick={onBack}>
+              <Typography variant="14/regular">بازگشت به فهرست رویدادها</Typography>
+            </Button>
+          }
+        />
       )}
 
-      {failure !== null && (
-        <RequestError error={failure} returnTo="/dashboard/events" retry={loadData} />
-      )}
+      {/* Same card as the event form's sections above it (FormSection). */}
+      <section
+        aria-labelledby="event-subtopics-heading"
+        className="flex flex-col gap-5 rounded-2xl border border-neutral-200 bg-background p-4"
+      >
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <Typography as="h2" id="event-subtopics-heading" variant="20/bold" color="neutral-600">
+              دسته‌ها و زیرعنوان‌ها
+            </Typography>
+            <Typography variant="14/regular" color="muted">
+              شرکت‌ها برای یکی از زیرعنوان‌ها درخواست می‌دهند؛ هر زیرعنوان یک کارفرمای مسئول و یک فایل RFP دارد.
+            </Typography>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button size="40" type="button" variant="outline-gray" onClick={openCategoryForm}>
+              <DashboardAddIcon aria-hidden="true" />
+              <Typography variant="14/regular" className="text-inherit">
+                دسته جدید
+              </Typography>
+            </Button>
+            <Button
+              size="40"
+              type="button"
+              disabled={!ready || categories.length === 0}
+              onClick={() => openSubtopicForm()}
+            >
+              <DashboardAddIcon aria-hidden="true" />
+              <Typography variant="14/regular" color="white">
+                زیرعنوان جدید
+              </Typography>
+            </Button>
+          </div>
+        </header>
 
-      <div className="flex flex-wrap gap-3">
-        <Button size="40"
-          type="button"
-          onClick={() => {
-            setSuccessMessage(null)
-            setAddingCategory(true)
-            setAddingSubtopic(false)
-          }}
-        >
-          <Typography variant="14/regular" color="white">
-            دسته جدید
+        {ready && categories.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="gray">{count(categories.length)} دسته</Badge>
+            <Badge variant="gray">{count(subtopics.length)} زیرعنوان</Badge>
+            {withoutRfp > 0 ? (
+              <Badge variant="warning">{count(withoutRfp)} زیرعنوان بدون RFP</Badge>
+            ) : subtopics.length > 0 ? (
+              <Badge variant="success">RFP همه زیرعنوان‌ها بارگذاری شده</Badge>
+            ) : null}
+          </div>
+        )}
+
+        {successMessage && (
+          <Typography role="status" variant="14/regular" color="success" className="rounded-xl bg-success-50 px-3 py-2">
+            {successMessage}
           </Typography>
-        </Button>
-        <Button size="40"
-          type="button"
-          variant="outline-gray"
-          disabled={loading || failure !== null || categories.length === 0}
-          onClick={() => {
-            setSuccessMessage(null)
-            setAddingSubtopic(true)
-            setAddingCategory(false)
-          }}
-        >
-          <Typography variant="14/regular">زیرعنوان جدید</Typography>
-        </Button>
-      </div>
+        )}
 
-      {addingCategory && (
-        <CategoryForm
-          eventId={event.id}
-          onSaved={() => {
-            setAddingCategory(false)
-            setSuccessMessage('دسته با موفقیت ایجاد شد.')
-            void loadData()
-          }}
-          onCancel={() => setAddingCategory(false)}
-        />
-      )}
+        {failure !== null && (
+          <RequestError error={failure} returnTo="/dashboard/events" retry={loadData} />
+        )}
 
-      {addingSubtopic && (
-        <SubtopicForm
-          eventId={event.id}
-          categories={categories}
-          people={people}
-          onSaved={() => {
-            setAddingSubtopic(false)
-            setSuccessMessage('زیرعنوان با موفقیت ایجاد شد.')
-            void loadData()
-          }}
-          onCancel={() => setAddingSubtopic(false)}
-        />
-      )}
+        {addingCategory && (
+          <CategoryForm
+            eventId={event.id}
+            onSaved={() => {
+              setAddingCategory(false)
+              setSuccessMessage('دسته با موفقیت ایجاد شد.')
+              void loadData()
+            }}
+            onCancel={() => setAddingCategory(false)}
+          />
+        )}
 
-      {activeRfpSubtopic && (
-        <RfpManager
-          key={activeRfpSubtopic.id}
-          eventId={event.id}
-          subtopic={activeRfpSubtopic}
-          onUpdated={(versionId) => {
-            setSubtopics((prev) =>
-              prev.map((s) =>
-                s.id === activeRfpSubtopic.id ? { ...s, currentRfpVersionId: versionId } : s,
-              ),
-            )
-          }}
-          onClose={() => setActiveRfpSubtopic(null)}
-        />
-      )}
+        {addingSubtopic && !addingSubtopic.category && subtopicForm()}
 
-      {loading ? (
-        <Typography variant="16/regular">در حال بارگذاری عناوین و زیرعنوان‌ها...</Typography>
-      ) : failure !== null ? null : categories.length === 0 ? (
-        <div className={`${cardClass} py-8 text-center`}>
-          <Typography variant="14/regular" color="muted">
-            هنوز دسته‌ای برای این رویداد تعریف نشده است.
-          </Typography>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {categories.map((cat) => {
-            const catSubtopics = subtopics.filter((s) => s.categoryId === cat.id)
-            return (
-              <article key={cat.id} className={`${cardClass} flex flex-col gap-3`}>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-2">
-                  <Typography variant="16/semibold">{cat.title}</Typography>
-                  <Typography variant="12/regular" color="muted">
-                    {catSubtopics.length} زیرعنوان
-                  </Typography>
-                </div>
-
-                {catSubtopics.length === 0 ? (
-                  <Typography variant="14/regular" color="muted">
-                    زیرعنوانی در این دسته موجود نیست.
-                  </Typography>
-                ) : (
-                  <div className="flex flex-col divide-y divide-neutral-100">
-                    {catSubtopics.map((sub) => {
-                      const employer = people.find((p) => String(p.id) === sub.employerId)
-                      return (
-                        <div key={sub.id} className="flex flex-col gap-2 py-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <Typography variant="14/semibold">{sub.title}</Typography>
-                            <Button
-                              type="button"
-                              variant="outline-gray"
-                              size="40"
-                              aria-label={`مدیریت فایل RFP ${sub.title}`}
-                              onClick={() => {
-                                setSuccessMessage(null)
-                                setActiveRfpSubtopic(sub)
-                              }}
-                            >
-                              <Typography variant="12/regular">مدیریت فایل RFP</Typography>
-                            </Button>
-                          </div>
-                          <Typography variant="14/regular" color="muted">
-                            کارفرمای مسئول:{' '}
-                            {employer ? `${employer.name || 'بدون نام'} (${employer.phone || employer.id})` : sub.employerId}
-                          </Typography>
-                          <Typography variant="12/regular" color="muted">
-                            {sub.currentRfpVersionId
-                              ? `نسخه فعلی RFP: ${sub.currentRfpVersionId}`
-                              : 'فایل RFP هنوز بارگذاری نشده است.'}
-                          </Typography>
-                        </div>
-                      )
-                    })}
+        {loading ? (
+          <div role="status" aria-label="در حال بارگذاری عناوین و زیرعنوان‌ها" className="flex flex-col gap-3">
+            {[0, 1].map((index) => (
+              <Skeleton key={index} className="h-28 w-full rounded-xl bg-neutral-100 motion-reduce:animate-none" />
+            ))}
+          </div>
+        ) : failure !== null ? null : categories.length === 0 ? (
+          !addingCategory && (
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center">
+              <Typography variant="16/semibold" color="neutral-700">
+                هنوز دسته‌ای برای این رویداد تعریف نشده است.
+              </Typography>
+              <Typography variant="14/regular" color="muted">
+                ابتدا یک دسته فناوری بسازید، سپس زیرعنوان‌های آن را اضافه کنید.
+              </Typography>
+              <Button size="40" type="button" variant="outline-gray" onClick={openCategoryForm}>
+                <DashboardAddIcon aria-hidden="true" />
+                <Typography variant="14/regular" className="text-inherit">
+                  ساخت نخستین دسته
+                </Typography>
+              </Button>
+            </div>
+          )
+        ) : (
+          <div className="flex flex-col gap-4">
+            {categories.map((cat) => {
+              const catSubtopics = subtopics.filter((s) => s.categoryId === cat.id)
+              const addingHere = addingSubtopic?.category?.id === cat.id
+              return (
+                <article key={cat.id} className="overflow-hidden rounded-xl border border-neutral-200">
+                  <div className="flex items-center justify-between gap-3 bg-neutral-50 px-4 py-2.5">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Typography as="h3" variant="16/semibold" color="neutral-700" className="truncate">
+                        {cat.title}
+                      </Typography>
+                      <Badge variant="white" size="sm">
+                        {count(catSubtopics.length)} زیرعنوان
+                      </Badge>
+                    </div>
+                    <Button
+                      size="32"
+                      type="button"
+                      variant="text-primary"
+                      aria-label={`افزودن زیرعنوان به ${cat.title}`}
+                      aria-expanded={addingHere}
+                      onClick={() => (addingHere ? setAddingSubtopic(null) : openSubtopicForm(cat))}
+                    >
+                      <DashboardAddIcon aria-hidden="true" />
+                      <Typography variant="14/regular" className="text-inherit">
+                        زیرعنوان
+                      </Typography>
+                    </Button>
                   </div>
-                )}
-              </article>
-            )
-          })}
-        </div>
-      )}
-    </section>
+
+                  {addingHere && <div className="border-t border-neutral-200 p-3">{subtopicForm(cat)}</div>}
+
+                  {catSubtopics.length === 0 ? (
+                    !addingHere && (
+                      <Typography variant="14/regular" color="muted" className="border-t border-neutral-200 px-4 py-4">
+                        زیرعنوانی در این دسته موجود نیست.
+                      </Typography>
+                    )
+                  ) : (
+                    <ul className="divide-y divide-neutral-100 border-t border-neutral-200">
+                      {catSubtopics.map((sub) => {
+                        const employer = people.find((p) => String(p.id) === sub.employerId)
+                        const open = activeRfpSubtopic?.id === sub.id
+                        return (
+                          <li key={sub.id} className="flex flex-col">
+                            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <Typography variant="14/semibold" color="neutral-700">
+                                  {sub.title}
+                                </Typography>
+                                <div className="flex min-w-0 items-center gap-1.5 text-neutral-400">
+                                  <DashboardUserTagIcon aria-hidden="true" className="size-4 shrink-0" />
+                                  <Typography as="span" variant="12/regular" color="muted" className="truncate">
+                                    <span className="sr-only">کارفرمای مسئول: </span>
+                                    {employer ? `${employer.name || 'بدون نام'} (${employer.phone || employer.id})` : sub.employerId}
+                                  </Typography>
+                                </div>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-2">
+                                {sub.currentRfpVersionId ? (
+                                  <Badge variant="success" size="sm">
+                                    RFP بارگذاری شده
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="warning" size="sm">
+                                    بدون RFP
+                                  </Badge>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="outline-gray"
+                                  size="32"
+                                  aria-label={`مدیریت فایل RFP ${sub.title}`}
+                                  aria-expanded={open}
+                                  onClick={() => {
+                                    setSuccessMessage(null)
+                                    setActiveRfpSubtopic(open ? null : sub)
+                                  }}
+                                >
+                                  <DocumentTextIcon aria-hidden="true" />
+                                  <Typography variant="12/regular" className="text-inherit">
+                                    فایل RFP
+                                  </Typography>
+                                </Button>
+                              </div>
+                            </div>
+                            {open && (
+                              <div className="px-3 pb-3">
+                                <RfpManager
+                                  key={sub.id}
+                                  eventId={event.id}
+                                  subtopic={sub}
+                                  onUpdated={(versionId) => {
+                                    setSubtopics((prev) =>
+                                      prev.map((s) => (s.id === sub.id ? { ...s, currentRfpVersionId: versionId } : s)),
+                                    )
+                                  }}
+                                  onClose={() => setActiveRfpSubtopic(null)}
+                                />
+                              </div>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
+    </div>
   )
 }
 
@@ -801,7 +962,7 @@ function EventSubtopicsManager({
  * The owner's categories, subtopics and RFP page for one event (FE10), reached
  * from the events and exhibitions list (S5).
  */
-export function OwnerEventSubtopics({ eventId }: { eventId: string }) {
+export function OwnerEventSubtopics({ eventId, embedded = false }: { eventId: string; embedded?: boolean }) {
   const router = useRouter()
   const [loaded, setLoaded] = useState<{ event: Event; people: Person[] } | null>(null)
   const [failure, setFailure] = useState<unknown>(null)
@@ -820,12 +981,13 @@ export function OwnerEventSubtopics({ eventId }: { eventId: string }) {
       current = false
     }
   }, [eventId, attempt])
+  const Shell = embedded ? 'section' : 'main'
   return (
-    <main dir="rtl" className="flex min-w-0 flex-1 flex-col gap-5 p-4 lg:pt-10">
+    <Shell dir="rtl" className={embedded ? 'flex min-w-0 flex-col gap-5 px-4 pb-10' : 'flex min-w-0 flex-1 flex-col gap-5 p-4 lg:pt-10'}>
       {failure !== null ? (
         <RequestError
           error={failure}
-          returnTo={`/dashboard/events/${eventId}/subtopics`}
+          returnTo={embedded ? `/dashboard/events/${eventId}/edit` : `/dashboard/events/${eventId}/subtopics`}
           retry={() => {
             setFailure(null)
             setAttempt((value) => value + 1)
@@ -839,9 +1001,10 @@ export function OwnerEventSubtopics({ eventId }: { eventId: string }) {
         <EventSubtopicsManager
           event={loaded.event}
           people={loaded.people}
+          embedded={embedded}
           onBack={() => router.push('/dashboard/events?type=event')}
         />
       )}
-    </main>
+    </Shell>
   )
 }

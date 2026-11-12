@@ -3,6 +3,7 @@ import {
   formatJalali,
   formatJalaliDisplay,
   isValidJalaliDate,
+  jalaliAgeInYears,
   jalaliMonthLength,
   jalaliWeekdayIndex,
   parseJalali,
@@ -75,5 +76,19 @@ describe('Jalali calendar utilities (#278, shared with #261)', () => {
       month: 12,
       day: 29,
     })
+  })
+})
+
+describe('jalaliAgeInYears', () => {
+  const now = { year: 1405, month: 8, day: 20 }
+
+  it('counts completed Jalali years, not the Gregorian year gap', () => {
+    expect(jalaliAgeInYears({ year: 1374, month: 5, day: 15 }, now)).toBe(31)
+    expect(jalaliAgeInYears({ year: 1374, month: 8, day: 21 }, now)).toBe(30)
+    expect(jalaliAgeInYears({ year: 1374, month: 8, day: 20 }, now)).toBe(31)
+  })
+
+  it('is null for a date in the future', () => {
+    expect(jalaliAgeInYears({ year: 1406, month: 1, day: 1 }, now)).toBeNull()
   })
 })

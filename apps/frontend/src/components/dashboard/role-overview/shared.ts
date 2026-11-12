@@ -12,12 +12,12 @@ export const FIXED_CARD_HEIGHT = 'h-[360px]'
 export const CARD_BODY = 'min-h-0 flex-1 overflow-y-auto'
 export const READ_FAILED = 'دریافت اطلاعات انجام نشد'
 
-const todayFormat = new Intl.DateTimeFormat('fa-IR', {
+const todayFormat = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
   weekday: 'long',
   day: 'numeric',
   month: 'long',
   year: 'numeric',
-  timeZone: 'Asia/Tehran',
 })
 
 /** "جمعه ۱۵ آبان ۱۴۰۵": the format's own order puts the year first, which reads backwards in Persian. */

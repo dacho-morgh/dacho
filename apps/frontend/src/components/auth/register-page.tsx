@@ -13,40 +13,36 @@ import {
 } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
+import { ComboboxField } from '@/components/ui/combobox-field'
 import { Input } from '@/components/ui/input'
 import { JalaliDatePicker } from '@/components/ui/jalali-date-picker'
-import { SelectField } from '@/components/ui/select-field'
 import { Typography } from '@/components/ui/typography'
-import {
-  citiesOfProvince,
-  IRAN_PROVINCES,
-  isCityOfProvince,
-} from '@/data/iran-locations'
+import { citiesOfProvince } from '@/data/iran-locations'
 import { getExplicitSafeReturnUrl, getLoginUrl, getSafeReturnUrl } from '@/utilities/auth-return-url'
 import { toEnglishDigits } from '@/utilities/digits'
-import { compareJalali, parseJalali, todayJalali } from '@/utilities/jalali'
+import {
+  activityDomainError,
+  cityError,
+  COMPANY_TYPES,
+  companyNameError,
+  companyTypeError,
+  economicCodeError,
+  establishmentDateError,
+  PROVINCE_NAMES,
+  provinceError,
+  registrationNumberError,
+} from '@/utilities/company-basic-rules'
 import { resolvePostSignInDestination } from '@/utilities/post-sign-in'
 import {
-  DIGITS_ONLY_MESSAGE,
+  ECONOMIC_CODE_MESSAGES,
   emailProblem,
-  isDigitsOnly,
   mobileProblem,
   nationalIdProblem,
+  REGISTRATION_NUMBER_MESSAGES,
   SIGNUP_REASON_MESSAGES,
 } from '@/utilities/signup-validation'
 
 const steps = ['اطلاعات شرکت', 'اطلاعات نماینده', 'امنیت حساب'] as const
-
-const COMPANY_TYPES = [
-  'سهامی خاص',
-  'سهامی عام',
-  'مسئولیت محدود',
-  'دانش‌بنیان',
-  'استارتاپ',
-  'سایر',
-] as const
-
-const PROVINCE_NAMES = IRAN_PROVINCES.map((province) => province.name)
 
 // Form field names mirror the Users collection: the representative's
 // fullName/mobile/email map to name/phone/email, and company fields carry a
@@ -63,7 +59,6 @@ const EMPTY_FORM: FormState = {
   companyProvince: '',
   companyCity: '',
   companyEstablishmentDate: '',
-  companyStatus: '',
   companyEconomicCode: '',
   name: '',
   position: '',
@@ -94,6 +89,8 @@ type SignupSuccessBody = {
 }
 
 const registerInputClasses = {
+  // Every field of the form is required, so none is marked with a `*`.
+  hideRequiredMark: true,
   // Figma 242:10534: placeholder 16/Light, grey/400. The label keeps the shared
   // 16/Regular neutral-600 (Figma 242:10530).
   className: 'text-base leading-7 text-neutral-800 placeholder:font-light placeholder:text-neutral-400',
@@ -121,28 +118,31 @@ const requiredWithRule = (label: string, problem: (value: string) => string | un
     if (message) ctx.addIssue({ code: 'custom', message })
   })
 
-const optionalDigits = z.string().refine((value) => !value.trim() || isDigitsOnly(value), DIGITS_ONLY_MESSAGE)
+/** A required dropdown: the message asks to choose, not to type. */
+const requiredChoice = (label: string) =>
+  z.string().refine((value) => value.trim().length > 0, `${label} را انتخاب کنید.`)
+
+/** A field checked by one of the shared company rules (`company-basic-rules.ts`). */
+const companyRule = (rule: (value: string) => string | undefined) =>
+  z.string().superRefine((value, ctx) => {
+    const message = rule(value)
+    if (message) ctx.addIssue({ code: 'custom', message })
+  })
 
 const signupSchema = z.object({
-  companyName: requiredText('نام شرکت'),
+  companyName: companyRule(companyNameError),
   companyNationalId: requiredWithRule('شناسه ملی', (value) => {
     const reason = nationalIdProblem(value)
     return reason ? SIGNUP_REASON_MESSAGES[reason] : undefined
   }),
-  activityDomain: requiredText('حوزه فعالیت'),
-  companyRegistrationNumber: optionalDigits,
-  companyType: z.string(),
-  companyProvince: z.string(),
-  companyCity: z.string(),
-  companyEstablishmentDate: z.string().superRefine((value, ctx) => {
-    if (!value.trim()) return
-    const date = parseJalali(value)
-    if (!date) ctx.addIssue({ code: 'custom', message: 'تاریخ تأسیس معتبر نیست.' })
-    else if (compareJalali(date, todayJalali()) > 0)
-      ctx.addIssue({ code: 'custom', message: 'تاریخ تأسیس نمی‌تواند در آینده باشد.' })
-  }),
-  companyStatus: z.string(),
-  companyEconomicCode: optionalDigits,
+  activityDomain: companyRule(activityDomainError),
+  companyRegistrationNumber: companyRule(registrationNumberError),
+  companyType: companyRule((value) => companyTypeError(value)),
+  companyProvince: companyRule(provinceError),
+  // The province check needs both values; see `crossFieldIssues`.
+  companyCity: requiredChoice('شهر'),
+  companyEstablishmentDate: companyRule(establishmentDateError),
+  companyEconomicCode: companyRule(economicCodeError),
   name: requiredText('نام و نام خانوادگی'),
   position: requiredText('سمت'),
   phone: requiredWithRule('شماره موبایل', (value) => {
@@ -171,17 +171,58 @@ function crossFieldIssues(values: FormState): Array<{ name: keyof FormState; mes
     issues.push({ name: 'passwordConfirmation', message: 'رمز عبور و تکرار آن یکسان نیستند.' })
   }
   if (values.companyCity) {
-    if (!values.companyProvince) {
-      issues.push({ name: 'companyCity', message: 'ابتدا استان را انتخاب کنید.' })
-    } else if (!isCityOfProvince(values.companyProvince, values.companyCity)) {
-      issues.push({ name: 'companyCity', message: 'این شهر در استان انتخاب‌شده نیست.' })
-    }
+    const message = cityError(values.companyCity, values.companyProvince)
+    if (message) issues.push({ name: 'companyCity', message })
   }
   return issues
 }
 
+/** Field messages for values that already belong to an account or company. */
+const TAKEN_MESSAGES = {
+  phone: 'این شماره موبایل قبلاً ثبت شده است.',
+  email: 'این ایمیل قبلاً ثبت شده است.',
+  companyNationalId:
+    'این شناسه ملی قبلاً ثبت شده است. هر شرکت تنها یک نماینده دارد؛ برای افزودن نماینده جدید با دبیرخانه تماس بگیرید.',
+} as const
+
+const TAKEN_CODES: Record<string, TakenField> = {
+  phone_taken: 'phone',
+  email_taken: 'email',
+  duplicate_national_id: 'companyNationalId',
+}
+
+/** The fields a server answer reports as already registered, with their messages. */
+function takenFieldErrors(errors: PayloadError[]): FormErrors {
+  const taken: FormErrors = {}
+  for (const error of errors) {
+    const field = typeof error.code === 'string' ? TAKEN_CODES[error.code] : undefined
+    if (field) taken[field] = TAKEN_MESSAGES[field]
+  }
+  return taken
+}
+
+type TakenField = keyof typeof TAKEN_MESSAGES
+
+/**
+ * Values the server reported as already registered, normalized. The resolver
+ * keeps reporting them, so the error survives blur/revalidation and clears only
+ * once the person changes the value.
+ */
+type TakenValues = Record<TakenField, Set<string>>
+
+const normalizeTakenValue = (field: TakenField, value: string) => {
+  const normalized = toEnglishDigits(value.trim())
+  return field === 'email' ? normalized.toLocaleLowerCase() : normalized
+}
+
+/** The fields of each step whose values must not already be registered. */
+const STEP_UNIQUE_FIELDS: Partial<Record<number, Array<TakenField>>> = {
+  1: ['companyNationalId'],
+  2: ['phone', 'email'],
+}
+
 // ponytail: flat fields need only Zod's first issue; use a resolver package if nested fields arrive.
-const signupResolver: Resolver<FormState> = (values) => {
+const signupResolver: Resolver<FormState, TakenValues | undefined> = (values, taken) => {
   const result = signupSchema.safeParse(values)
   const errors: FieldErrors<FormState> = {}
   if (!result.success) {
@@ -192,6 +233,10 @@ const signupResolver: Resolver<FormState> = (values) => {
   }
   for (const issue of crossFieldIssues(values)) {
     errors[issue.name] ??= { type: 'custom', message: issue.message }
+  }
+  for (const field of Object.keys(TAKEN_MESSAGES) as TakenField[]) {
+    if (taken?.[field]?.has(normalizeTakenValue(field, values[field])))
+      errors[field] ??= { type: 'server', message: TAKEN_MESSAGES[field] }
   }
   if (result.success && Object.keys(errors).length === 0) return { values: result.data, errors: {} }
   return { values: {}, errors }
@@ -206,7 +251,6 @@ const fieldStep: Record<keyof FormState, number> = {
   companyProvince: 1,
   companyCity: 1,
   companyEstablishmentDate: 1,
-  companyStatus: 1,
   companyEconomicCode: 1,
   name: 2,
   position: 2,
@@ -225,7 +269,6 @@ const fieldElementId: Partial<Record<keyof FormState, string>> = {
   companyProvince: 'register-companyProvince',
   companyCity: 'register-companyCity',
   companyEstablishmentDate: 'register-companyEstablishmentDate',
-  companyStatus: 'register-companyStatus',
   companyEconomicCode: 'register-companyEconomicCode',
   name: 'register-name',
   position: 'register-position',
@@ -254,7 +297,7 @@ function payloadErrorField(error: PayloadError): keyof FormState | undefined {
 /**
  * The Persian message for a server `invalid_field`, chosen by the server's
  * stable `reason` (digits_only | length | checksum | mobile_format |
- * email_format). The server's English text is never shown.
+ * email_format | registration_number_* | economic_code_* | company_type). The server's English text is never shown.
  */
 function invalidFieldMessage(field: keyof FormState, reason: unknown): string {
   if (field === 'companyNationalId') {
@@ -262,6 +305,17 @@ function invalidFieldMessage(field: keyof FormState, reason: unknown): string {
       ? SIGNUP_REASON_MESSAGES[reason]
       : SIGNUP_REASON_MESSAGES.checksum
   }
+  if (field === 'companyRegistrationNumber') {
+    return reason === 'registration_number_digits'
+      ? REGISTRATION_NUMBER_MESSAGES.digits_only
+      : REGISTRATION_NUMBER_MESSAGES.length
+  }
+  if (field === 'companyEconomicCode') {
+    return reason === 'economic_code_digits'
+      ? ECONOMIC_CODE_MESSAGES.digits_only
+      : ECONOMIC_CODE_MESSAGES.length
+  }
+  if (field === 'companyType' && reason === 'company_type') return 'نوع شرکت را از فهرست انتخاب کنید.'
   if (field === 'phone') return SIGNUP_REASON_MESSAGES.mobile_format
   if (field === 'email') return SIGNUP_REASON_MESSAGES.email_format
   return 'مقدار واردشده معتبر نیست.'
@@ -284,6 +338,7 @@ const NOTICES = {
   correctFields: 'لطفاً موارد مشخص‌شده را اصلاح کنید.',
   rejected: 'اطلاعات ارسالی پذیرفته نشد. موارد واردشده را بررسی و دوباره تلاش کنید.',
   duplicateIdentity: 'شماره موبایل یا ایمیل واردشده قبلاً ثبت شده است.',
+  alreadyRegistered: 'برخی اطلاعات واردشده قبلاً در سامانه ثبت شده است.',
   duplicateCompany:
     'این شرکت قبلاً در سامانه ثبت شده است و شرکت دیگری با این شناسه ملی ایجاد نشد.',
   duplicateAfterUncertain:
@@ -309,6 +364,13 @@ function isDuplicateError(error: PayloadError): boolean {
 
 export default function RegisterPage({ returnUrl }: { returnUrl?: string | string[] }) {
   const router = useRouter()
+  // One stable object for the form's lifetime; the sets are filled from
+  // server answers and read by the resolver through RHF's `context`.
+  const [takenValues] = useState<TakenValues>(() => ({
+    phone: new Set(),
+    email: new Set(),
+    companyNationalId: new Set(),
+  }))
   const safeReturnUrl = getSafeReturnUrl(returnUrl)
   const explicitReturnUrl = getExplicitSafeReturnUrl(returnUrl)
   const [step, setStep] = useState(1)
@@ -323,9 +385,10 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
     getFieldState,
     handleSubmit,
     formState: { errors, isSubmitting: submitting },
-  } = useForm<FormState>({
+  } = useForm<FormState, TakenValues>({
     defaultValues: EMPTY_FORM,
     resolver: signupResolver,
+    context: takenValues,
     // A field reports its error after the person has left it (or a step or the
     // form was submitted), never while the step is first shown (design QA #278).
     mode: 'onTouched',
@@ -335,6 +398,9 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [confirmationVisible, setConfirmationVisible] = useState(false)
   const [notice, setNoticeState] = useState<Notice | null>(null)
+  // True while the current step's phone/email/national ID is checked against
+  // existing records before moving on.
+  const [checking, setChecking] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const submissionLock = useRef(false)
   const pendingRequest = useRef<AbortController | null>(null)
@@ -395,18 +461,57 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
     }
   }
 
+  /**
+   * Asks the server whether this step's phone/email/national ID is already
+   * registered and puts each conflict on its field. Resolves `true` when the
+   * step may continue; a failed check never blocks it, since the final submit
+   * applies the same rule.
+   */
+  const stepValuesAvailable = async (currentStep: number): Promise<boolean> => {
+    const fields = STEP_UNIQUE_FIELDS[currentStep]
+    if (!fields) return true
+    const values = getValues()
+    const query: Record<string, string> = {}
+    for (const field of fields) query[field] = normalizeTakenValue(field, values[field])
+    setChecking(true)
+    try {
+      const response = await fetch('/api/users/signup-availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(query),
+      })
+      if (response.status !== 409) return true
+      const body = (await response.json().catch(() => null)) as PayloadErrorBody | null
+      const taken = takenFieldErrors(payloadErrors(body))
+      const takenFields = fields.filter((field) => taken[field])
+      if (!mounted.current || takenFields.length === 0) return true
+      for (const field of takenFields) {
+        takenValues[field].add(query[field]!)
+        setError(field, { type: 'server', message: taken[field] })
+      }
+      setNotice(NOTICES.alreadyRegistered, 'login')
+      focusField(takenFields[0]!)
+      return false
+    } catch {
+      return true
+    } finally {
+      if (mounted.current) setChecking(false)
+    }
+  }
+
   const goBack = () => {
-    if (submitting) return
+    if (submitting || checking) return
     setNotice(null)
     setStep((current) => Math.max(1, current - 1))
   }
   const goForward = async () => {
-    if (submitting) return
+    if (submitting || checking) return
     const fields = (Object.keys(fieldStep) as Array<keyof FormState>).filter(
       (name) => fieldStep[name] === step,
     )
     if (await trigger(fields)) {
       setNotice(null)
+      if (!(await stepValuesAvailable(step))) return
       setStep(Math.min(3, step + 1))
       return
     }
@@ -439,7 +544,6 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
           companyProvince: form.companyProvince.trim(),
           companyCity: form.companyCity.trim(),
           companyEstablishmentDate: toEnglishDigits(form.companyEstablishmentDate.trim()),
-          companyStatus: form.companyStatus.trim(),
           companyEconomicCode: toEnglishDigits(form.companyEconomicCode.trim()),
         }),
       })
@@ -457,21 +561,25 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
           ),
         )
 
+        const takenErrors = takenFieldErrors(responseErrors)
         for (const error of responseErrors) {
           const field = payloadErrorField(error)
           if (!field) continue
+          if (takenErrors[field]) {
+            if (field in TAKEN_MESSAGES) {
+              const takenField = field as TakenField
+              takenValues[takenField].add(normalizeTakenValue(takenField, form[takenField]))
+            }
+            serverErrors[field] = takenErrors[field]
+            continue
+          }
           const message = typeof error.message === 'string' ? error.message : ''
           const code = typeof error.code === 'string' ? error.code : ''
           const payloadInvalidUniqueField = /field is invalid:\s*(username|phone|email)/i.test(
             message,
           )
 
-          // One company, one representative: a national id that already belongs
-          // to a company cannot register a second person.
-          if (code === 'duplicate_national_id' && field === 'companyNationalId') {
-            serverErrors.companyNationalId =
-              'این شناسه ملی قبلاً ثبت شده است. هر شرکت تنها یک نماینده دارد؛ برای افزودن نماینده جدید با دبیرخانه تماس بگیرید.'
-          } else if (code === 'missing_field') {
+          if (code === 'missing_field') {
             serverErrors[field] = 'این فیلد الزامی است.'
           } else if (code === 'invalid_field') {
             serverErrors[field] = invalidFieldMessage(field, error.reason)
@@ -506,6 +614,8 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
                 : NOTICES.duplicateCompany,
               'login',
             )
+          } else if (Object.keys(takenErrors).length > 0) {
+            setNotice(NOTICES.alreadyRegistered, 'login')
           } else {
             setNotice(NOTICES.correctFields)
           }
@@ -655,7 +765,7 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
             make the visible form disagree with what the server receives. */}
         <fieldset
           className="m-0 flex min-w-0 flex-col gap-7 border-0 p-0 ps-0.5 pe-3.5 lg:min-h-0 lg:flex-1 lg:[scrollbar-width:thin] lg:[scrollbar-color:var(--neutral-300)_transparent] lg:overflow-y-auto"
-          disabled={submitting}
+          disabled={submitting || checking}
           key={step}
         >
           {step === 1 && (
@@ -697,7 +807,8 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
                 id="register-companyRegistrationNumber"
                 inputMode="numeric"
                 inputSize="lg"
-                label="شماره ثبت (اختیاری)"
+                label="شماره ثبت"
+                aria-required="true"
                 {...registerField('companyRegistrationNumber')}
                 placeholder="شماره ثبت شرکت را وارد کنید"
               />
@@ -705,19 +816,21 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
                 control={control}
                 name="companyType"
                 render={({ field }) => (
-                  <SelectField
-                    {...registerFieldClasses}
+                  <ComboboxField
+                    hideRequiredMark
+                    required
+                    wrapperClassName={registerFieldClasses.wrapperClassName}
                     error={errors.companyType?.message}
                     id="register-companyType"
-                    label="نوع شرکت (اختیاری)"
+                    label="نوع شرکت"
                     name={field.name}
                     onBlur={field.onBlur}
-                    onChange={(event) => {
-                      field.onChange(event.target.value)
+                    onChange={(value) => {
+                      field.onChange(value)
                       clearFieldError('companyType')
                     }}
                     options={COMPANY_TYPES}
-                    placeholder="نوع شرکت را انتخاب کنید"
+                    placeholder="نوع شرکت را جستجو یا انتخاب کنید"
                     ref={field.ref}
                     value={field.value}
                   />
@@ -727,23 +840,29 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
                 control={control}
                 name="companyProvince"
                 render={({ field }) => (
-                  <SelectField
-                    {...registerFieldClasses}
+                  <ComboboxField
+                    hideRequiredMark
+                    required
+                    wrapperClassName={registerFieldClasses.wrapperClassName}
                     error={errors.companyProvince?.message}
                     id="register-companyProvince"
-                    label="استان (اختیاری)"
+                    label="استان"
                     name={field.name}
                     onBlur={field.onBlur}
-                    onChange={(event) => {
-                      field.onChange(event.target.value)
+                    onChange={(value) => {
+                      const changed = value !== getValues('companyProvince')
+                      field.onChange(value)
                       // The city list depends on the province: a city of the old
-                      // province must not survive a change of province.
-                      setValue('companyCity', '')
-                      clearErrors('companyCity')
+                      // province must not survive a change of province. Choosing the
+                      // same province again leaves the city alone.
+                      if (changed) {
+                        setValue('companyCity', '')
+                        clearErrors('companyCity')
+                      }
                       clearFieldError('companyProvince')
                     }}
                     options={PROVINCE_NAMES}
-                    placeholder="استان محل ثبت را انتخاب کنید"
+                    placeholder="استان محل ثبت را جستجو یا انتخاب کنید"
                     ref={field.ref}
                     value={field.value}
                   />
@@ -753,21 +872,23 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
                 control={control}
                 name="companyCity"
                 render={({ field }) => (
-                  <SelectField
-                    {...registerFieldClasses}
+                  <ComboboxField
+                    hideRequiredMark
+                    required
+                    wrapperClassName={registerFieldClasses.wrapperClassName}
                     disabled={!province}
                     error={errors.companyCity?.message}
                     id="register-companyCity"
-                    label="شهر (اختیاری)"
+                    label="شهر"
                     name={field.name}
                     onBlur={field.onBlur}
-                    onChange={(event) => {
-                      field.onChange(event.target.value)
+                    onChange={(value) => {
+                      field.onChange(value)
                       clearFieldError('companyCity')
                     }}
                     options={citiesOfProvince(province)}
                     placeholder={
-                      province ? 'شهر محل ثبت را انتخاب کنید' : 'ابتدا استان را انتخاب کنید'
+                      province ? 'شهر محل ثبت را جستجو یا انتخاب کنید' : 'ابتدا استان را انتخاب کنید'
                     }
                     ref={field.ref}
                     value={field.value}
@@ -781,6 +902,8 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
                   <JalaliDatePicker
                     {...registerFieldClasses}
                     containerClassName="h-12 rounded-lg border-neutral-200 text-base leading-7"
+                    hideRequiredMark
+                    required
                     error={errors.companyEstablishmentDate?.message}
                     id="register-companyEstablishmentDate"
                     label="تاریخ تأسیس"
@@ -797,22 +920,14 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
               />
               <Input
                 {...registerInputClasses}
-                error={errors.companyStatus?.message}
-                id="register-companyStatus"
-                inputSize="lg"
-                label="وضعیت شرکت"
-                {...registerField('companyStatus')}
-                placeholder="فعال"
-              />
-              <Input
-                {...registerInputClasses}
                 error={errors.companyEconomicCode?.message}
                 id="register-companyEconomicCode"
                 inputMode="numeric"
                 inputSize="lg"
                 label="کد اقتصادی"
+                aria-required="true"
                 {...registerField('companyEconomicCode')}
-                placeholder="کد اقتصادی شرکت"
+                placeholder="کد اقتصادی ۱۱ رقمی شرکت را وارد کنید"
               />
             </>
           )}
@@ -958,7 +1073,7 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
         >
           {step > 1 && (
             <Button
-              disabled={submitting}
+              disabled={submitting || checking}
               icon={<ArrowRight />}
               onClick={goBack}
               size="clear"
@@ -975,8 +1090,9 @@ export default function RegisterPage({ returnUrl }: { returnUrl?: string | strin
           {step < 3 ? (
             <Button
               className="min-w-32"
-              disabled={submitting}
+              disabled={submitting || checking}
               key="continue"
+              loading={checking}
               onClick={goForward}
               size="48"
               type="button"

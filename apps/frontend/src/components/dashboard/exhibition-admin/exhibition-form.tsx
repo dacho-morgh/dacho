@@ -142,6 +142,7 @@ function ExhibitionEditor({
   const [reloading, setReloading] = useState(false)
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -249,7 +250,7 @@ function ExhibitionEditor({
         )}
         <fieldset disabled={isSubmitting || reloading} className="flex min-w-0 flex-col gap-5">
           <FormSection title="اطلاعات عمومی">
-            <PublicFields<ExhibitionValues> register={register} errors={errors} titleLabel="عنوان نمایشگاه" />
+            <PublicFields<ExhibitionValues> register={register} control={control} errors={errors} titleLabel="عنوان نمایشگاه" />
           </FormSection>
           <FormSection title="تنظیمات غرفه">
             <FormRow id="companyBoothLimit" label="سقف غرفه برای هر شرکت" error={errors.companyBoothLimit?.message}>

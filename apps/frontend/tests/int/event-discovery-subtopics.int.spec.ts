@@ -7,6 +7,7 @@ import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EVENT_TAG_VARIANT, EventsView, type EventItem } from '@/components/dashboard/events-view'
 import * as dashboardApi from '@/utilities/dashboard-api'
+import { chooseOption } from './combobox-helpers'
 
 const mockPush = vi.fn()
 vi.mock('next/navigation', () => ({
@@ -307,10 +308,10 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
 
     // Select category and subtopic in modal
     const catSelect = screen.getByLabelText('عنوان')
-    fireEvent.change(catSelect, { target: { value: 'cat-2' } })
+    chooseOption(catSelect, 'دیجیتالیزاسیون و هوش مصنوعی')
 
     const subSelect = screen.getByLabelText('زیر عنوان')
-    fireEvent.change(subSelect, { target: { value: 'sub-3' } })
+    chooseOption(subSelect, 'سامانه مانیتورینگ هوشمند ارتعاشات توربین')
 
     // Confirm selection
     const confirmBtn = screen.getByRole('button', { name: /^تایید$/i })
@@ -490,7 +491,7 @@ describe('EventsView design QA #276 - shared list toolbar, card click and event 
     expect(titles()).toEqual([older.title, newer.title])
 
     fireEvent.click(screen.getByRole('button', { name: /فیلتر رویدادها/ }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'وضعیت رویداد' }), { target: { value: 'ended' } })
+    chooseOption(screen.getByRole('combobox', { name: 'وضعیت رویداد' }), /تمام شده/)
     fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
     expect(titles()).toEqual([older.title])
   })
@@ -514,7 +515,7 @@ describe('EventsView design QA #276 - shared list toolbar, card click and event 
 
     // Filter: by category through the template.
     fireEvent.click(screen.getByRole('button', { name: /فیلتر زیرعنوان‌ها/ }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'عنوان' }), { target: { value: 'cat-2' } })
+    chooseOption(screen.getByRole('combobox', { name: 'عنوان' }), /دیجیتالیزاسیون و هوش مصنوعی/)
     fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
     expect(screen.getByText('سامانه مانیتورینگ هوشمند ارتعاشات توربین')).toBeDefined()
     expect(screen.queryByText('ساخت دستگاه پلیمرزدایی از تاورها')).toBeNull()

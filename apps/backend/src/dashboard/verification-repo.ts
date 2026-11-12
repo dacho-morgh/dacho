@@ -1,6 +1,10 @@
 import type { Pool, PoolClient } from 'pg'
 import { isUuid } from '../db/uuid.js'
 
+export const VERIFICATION_RECEIVED_TITLE = 'درخواست احراز هویت شما دریافت شد'
+export const VERIFICATION_RECEIVED_BODY =
+  'درخواست احراز هویت شرکت شما دریافت شد و دبیرخانه در حال پیگیری و بررسی آن است. نتیجه بررسی از همین کارتابل و صفحه پیگیری احراز هویت به شما اطلاع داده می‌شود.'
+
 export type VerificationStatus = 'unsubmitted' | 'pending' | 'approved' | 'returned' | 'rejected'
 
 export interface CompanyVerificationDto {
@@ -26,12 +30,13 @@ export interface SubmitVerificationInput {
 
 export type VerificationSubmitResult =
   | { ok: true; verification: CompanyVerificationDto }
-  | { ok: false; reason: 'already_submitted' | 'already_approved' }
+  | { ok: false; reason: 'already_submitted' | 'already_approved' | 'rejected' }
 
 export interface VerificationDecisionInput {
   id?: string
   companyId?: string
-  action: 'approve' | 'return' | 'reject'
+  /** `reopen` lets the company submit again after a rejection; the others decide a pending submission. */
+  action: 'approve' | 'return' | 'reject' | 'reopen'
   reviewerId: string
   reason?: string | null
   expectedRevision?: number
@@ -265,6 +270,11 @@ export class PostgresVerificationStore implements VerificationStore {
         await client.query('ROLLBACK')
         return { ok: false, reason: 'already_approved' }
       }
+      // A rejection is final for the company until the Secretariat reopens it.
+      if (existing?.status === 'rejected') {
+        await client.query('ROLLBACK')
+        return { ok: false, reason: 'rejected' }
+      }
 
       const nextRevision = (existing?.revision ?? 0) + 1
       const insertRes = await client.query<VerificationRow>(
@@ -284,6 +294,19 @@ export class PostgresVerificationStore implements VerificationStore {
             actor_id, action, reason, from_state, to_state, revision)
          VALUES ($1, NULL, NULL, 'transition', 'ارسال مدارک برای احراز', NULL, $2, 'verification_submit', NULL, $3, 'pending', $4)`,
         [input.representativeId, input.representativeId, existing?.status ?? 'unsubmitted', nextRevision],
+      )
+
+      // The company's inbox hears that its request arrived; it commits with the submission itself.
+      // The system sends it, like every other workflow notice (see notification-outbox).
+      await client.query(
+        `INSERT INTO dashboard.letters
+           (type, title, body, sender_id, sender_name, sender_role, recipient_id, request_id, read)
+         VALUES ('notification', $1, $2, NULL, 'سامانه', 'system', $3, NULL, false)`,
+        [
+          VERIFICATION_RECEIVED_TITLE,
+          VERIFICATION_RECEIVED_BODY,
+          input.representativeId,
+        ],
       )
 
       await client.query('COMMIT')
@@ -316,7 +339,7 @@ export class PostgresVerificationStore implements VerificationStore {
         await client.query('ROLLBACK')
         return { ok: false, reason: 'not_found' }
       }
-      if (row.status !== 'pending') {
+      if (row.status !== (input.action === 'reopen' ? 'rejected' : 'pending')) {
         await client.query('ROLLBACK')
         return { ok: false, reason: 'not_pending' }
       }
@@ -328,7 +351,7 @@ export class PostgresVerificationStore implements VerificationStore {
       const targetStatus: VerificationStatus =
         input.action === 'approve'
           ? 'approved'
-          : input.action === 'return'
+          : input.action === 'return' || input.action === 'reopen'
             ? 'returned'
             : 'rejected'
 
@@ -347,13 +370,15 @@ export class PostgresVerificationStore implements VerificationStore {
           ? 'تأیید مدارک احراز'
           : input.action === 'return'
             ? 'برگشت مدارک احراز جهت اصلاح'
-            : 'رد مدارک احراز'
+            : input.action === 'reopen'
+              ? 'بازگشایی درخواست احراز هویت'
+              : 'رد مدارک احراز'
 
       await client.query(
         `INSERT INTO dashboard.activities
            (owner_id, request_id, letter_id, type, title, description,
             actor_id, action, reason, from_state, to_state, revision)
-         VALUES ($1, NULL, NULL, 'transition', $2, $3, $4, $5, $6, 'pending', $7, $8)`,
+         VALUES ($1, NULL, NULL, 'transition', $2, $3, $4, $5, $6, $9, $7, $8)`,
         [
           row.representative_id,
           title,
@@ -363,6 +388,7 @@ export class PostgresVerificationStore implements VerificationStore {
           input.reason ?? null,
           targetStatus,
           row.revision,
+          row.status,
         ],
       )
 
@@ -371,16 +397,24 @@ export class PostgresVerificationStore implements VerificationStore {
           ? 'approved'
           : input.action === 'return'
             ? 'needs_fix'
-            : 'rejected'
+            : input.action === 'reopen'
+              ? 'notification'
+              : 'rejected'
       const letterTitle =
         input.action === 'approve'
           ? 'تأیید مدارک احراز هویت شرکت'
           : input.action === 'return'
             ? 'برگشت مدارک احراز هویت شرکت جهت اصلاح'
-            : 'رد مدارک احراز هویت شرکت'
+            : input.action === 'reopen'
+              ? 'درخواست احراز هویت شرکت بازگشایی شد'
+              : 'رد مدارک احراز هویت شرکت'
       const letterBody = input.reason?.trim()
         ? input.reason.trim()
-        : (input.action === 'approve' ? 'مدارک احراز هویت شرکت شما توسط دبیرخانه تأیید شد.' : '')
+        : input.action === 'approve'
+          ? 'مدارک احراز هویت شرکت شما توسط دبیرخانه تأیید شد.'
+          : input.action === 'reopen'
+            ? 'دبیرخانه درخواست احراز هویت شرکت شما را بازگشایی کرد. اطلاعات را اصلاح کنید و دوباره درخواست دهید.'
+            : ''
 
       await client.query(
         `INSERT INTO dashboard.letters
@@ -511,6 +545,9 @@ export class InMemoryVerificationStore implements VerificationStore {
     if (existing?.status === 'approved') {
       return { ok: false, reason: 'already_approved' }
     }
+    if (existing?.status === 'rejected') {
+      return { ok: false, reason: 'rejected' }
+    }
 
     const nextRevision = (existing?.revision ?? 0) + 1
     const now = new Date().toISOString()
@@ -543,7 +580,7 @@ export class InMemoryVerificationStore implements VerificationStore {
         .sort((a, b) => b.revision - a.revision)[0]
     }
     if (!target) return { ok: false, reason: 'not_found' }
-    if (target.status !== 'pending') return { ok: false, reason: 'not_pending' }
+    if (target.status !== (input.action === 'reopen' ? 'rejected' : 'pending')) return { ok: false, reason: 'not_pending' }
     if (typeof input.expectedRevision === 'number' && target.revision !== input.expectedRevision) {
       return { ok: false, reason: 'stale_revision' }
     }
@@ -551,7 +588,7 @@ export class InMemoryVerificationStore implements VerificationStore {
     const targetStatus: VerificationStatus =
       input.action === 'approve'
         ? 'approved'
-        : input.action === 'return'
+        : input.action === 'return' || input.action === 'reopen'
           ? 'returned'
           : 'rejected'
 

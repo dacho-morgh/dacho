@@ -90,7 +90,8 @@ test.describe('Frontend', () => {
         position: 'مدیرعامل',
         companyName: 'شرکت تست داشبورد',
         companyNationalId: validNationalId(`6${suffix}`),
-        companyRegistrationNumber: suffix,
+        // Registration numbers are 3 to 6 digits.
+        companyRegistrationNumber: suffix.slice(-6),
         companyType: 'سهامی خاص',
         companyProvince: 'بوشهر',
         companyCity: 'بوشهر',

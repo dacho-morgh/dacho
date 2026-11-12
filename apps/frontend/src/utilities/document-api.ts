@@ -23,6 +23,32 @@ const EXTENSION_MIME: Record<string, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 }
 
+/** Photos the server accepts for the categories in `IMAGE_DOCUMENT_CATEGORIES`. */
+const IMAGE_EXTENSION_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+}
+
+/** A product/service file or a certificate may also be a photo (mirrors the server policy). */
+export const IMAGE_DOCUMENT_CATEGORIES: readonly DocumentCategory[] = ['productsServices', 'certificatesLicenses', 'supportAttachment']
+
+const acceptsImages = (category?: DocumentCategory) =>
+  category !== undefined && IMAGE_DOCUMENT_CATEGORIES.includes(category)
+
+/** The `accept` list of a file input for this category. */
+export function documentAccept(category?: DocumentCategory): string {
+  return acceptsImages(category)
+    ? `${DOCUMENT_ACCEPT},.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp`
+    : DOCUMENT_ACCEPT
+}
+
+/** The formats line shown next to a file field of this category. */
+export function documentFormatsMessage(category?: DocumentCategory): string {
+  return acceptsImages(category) ? 'PDF، Word یا عکس (jpg / png / webp)' : DOCUMENT_FORMATS_MESSAGE
+}
+
 export function formatDocumentSize(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return '—'
   if (bytes < 1000) return `${bytes.toLocaleString('fa-IR')} بایت`
@@ -32,11 +58,11 @@ export function formatDocumentSize(bytes: number): string {
 export type LocalDocumentError = 'invalid_file_type' | 'file_too_large' | 'empty_file'
 
 /** Fast local validation; the 10,000,000-byte boundary is inclusive. */
-export function validateSelectedFile(file: File): LocalDocumentError | null {
+export function validateSelectedFile(file: File, category?: DocumentCategory): LocalDocumentError | null {
   if (file.size === 0) return 'empty_file'
   if (file.size > MAX_DOCUMENT_BYTES) return 'file_too_large'
   const extension = file.name.toLowerCase().split('.').pop() ?? ''
-  const expected = EXTENSION_MIME[extension]
+  const expected = EXTENSION_MIME[extension] ?? (acceptsImages(category) ? IMAGE_EXTENSION_MIME[extension] : undefined)
   if (!expected) return 'invalid_file_type'
   if (file.type && file.type !== expected) return 'invalid_file_type'
   return null
@@ -231,6 +257,7 @@ const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 const AUTHORIZED_DOWNLOAD_PATHS = [
   new RegExp(`^/api/dashboard/documents/${UUID_PATTERN}/download$`, 'i'),
   new RegExp(`^/api/dashboard/letters/${UUID_PATTERN}/attachments/${UUID_PATTERN}/download$`, 'i'),
+  new RegExp(`^/api/dashboard/support/${UUID_PATTERN}/attachments/${UUID_PATTERN}/download$`, 'i'),
 ]
 
 /**
@@ -248,6 +275,10 @@ export function documentDownloadPath(id: string): string {
 
 export function letterAttachmentDownloadPath(letterId: string, attachmentId: string): string {
   return `/api/dashboard/letters/${encodeURIComponent(letterId)}/attachments/${encodeURIComponent(attachmentId)}/download`
+}
+
+export function supportAttachmentDownloadPath(ticketId: string, attachmentId: string): string {
+  return `/api/dashboard/support/${encodeURIComponent(ticketId)}/attachments/${encodeURIComponent(attachmentId)}/download`
 }
 
 export async function downloadDocument(id: string): Promise<{ blob: Blob; filename: string }> {

@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 
 import { DashboardReadNotice } from '@/components/dashboard/dashboard-read-notice'
 import { MailDetailView, type MailData } from '@/components/dashboard/mail-detail-view'
-import { SupportTicketActions } from '@/components/dashboard/support-ticket-actions'
+import { SupportReplyProvider, SupportTicketActions } from '@/components/dashboard/support-ticket-actions'
 import { formatDate, formatTime, formatWeekday, letterAction, mapMailData, type LetterDto, type Paginated, type SupportTicketDto } from '@/utilities/dashboard-api'
 import { unavailableReasonFor } from '@/utilities/dashboard-fetch-result'
 import { isSeniorManagerUser, serverDashboardFetchResult } from '@/utilities/dashboard-server'
@@ -52,10 +52,10 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
     const t = result.data.ticket
     supportClosed = t.status === 'closed'
     const messages = t.messages?.length ? t.messages : [
-      { id: `${id}:initial`, authorId: t.requesterId, authorRole: 'applicant' as const, body: t.message, createdAt: t.createdAt },
-      ...(t.response ? [{ id: `${id}:response`, authorId: t.respondedBy ?? 'staff', authorRole: 'staff' as const, body: t.response, createdAt: t.updatedAt }] : []),
+      { id: `${id}:initial`, authorId: t.requesterId, authorRole: 'representative' as const, body: t.message, createdAt: t.createdAt },
+      ...(t.response ? [{ id: `${id}:response`, authorId: t.respondedBy ?? 'staff', authorRole: 'admin' as const, body: t.response, createdAt: t.updatedAt }] : []),
     ]
-    mail = { id: raw, title: t.subject, category: 'پشتیبانی', senderName: t.requesterName || 'شرکت متقاضی', senderRole: 'فرستنده تیکت', datePersian: formatDate(t.createdAt), dayOfWeek: formatWeekday(t.createdAt), timeStr: formatTime(t.createdAt), body: t.message }
+    mail = { id: raw, title: t.subject, category: 'پشتیبانی', senderName: t.requesterName || 'شرکت متقاضی', senderRole: 'فرستنده تیکت', datePersian: formatDate(t.createdAt), dayOfWeek: formatWeekday(t.createdAt), timeStr: formatTime(t.createdAt), body: t.message, attachments: (t.attachments ?? []).map((item) => ({ id: item.id, name: item.name, size: `${Math.max(1, Math.round(item.sizeBytes / 1024)).toLocaleString('fa-IR')} کیلوبایت` })) }
     actions = <SupportTicketActions key={t.updatedAt} id={id} status={t.status} isAdmin={admin} requesterName={t.requesterName} initialMessageId={messages[0]?.id} initialMessages={messages} />
   } else if (prefix === 'form') {
     if (!admin) notFound()
@@ -80,9 +80,9 @@ export default async function LetterDetailPage({ params }: { params: Promise<{ i
     mail = { ...mapMailData(letter), ...(await caseThread(letter)), action }
   }
   return (
-    <>
+    <SupportReplyProvider>
       <MailDetailView mail={mail} showActions={prefix === 'letter'} replyHref={replyHref} canDelete={canDelete} supportReply={prefix === 'support' && !!actions} supportClosed={supportClosed} />
       {actions}
-    </>
+    </SupportReplyProvider>
   )
 }

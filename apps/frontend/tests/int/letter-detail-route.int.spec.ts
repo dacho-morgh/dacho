@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { createElement } from 'react'
+import { createElement, type ReactNode } from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import LetterDetailPage from '@/app/(frontend)/dashboard/letters/[id]/page'
@@ -22,6 +22,8 @@ vi.mock('@/utilities/dashboard-server', () => ({
 }))
 vi.mock('@/components/dashboard/support-ticket-actions', () => ({
   SupportTicketActions: () => createElement('div', null, 'Support actions'),
+  SupportReplyProvider: ({ children }: { children: ReactNode }) => children,
+  useSupportReply: () => null,
 }))
 
 afterEach(() => { cleanup(); vi.resetAllMocks() })

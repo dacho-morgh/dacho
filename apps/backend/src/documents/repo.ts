@@ -175,7 +175,7 @@ export class DocumentRepository {
   async listForCompany(companyId: string): Promise<PrivateDocumentRecord[]> {
     const { rows } = await this.pool.query<DocumentRow>(
       `SELECT ${DOCUMENT_COLUMNS} ${DOCUMENT_FROM}
-       WHERE d.company_id = $1 AND d.request_id IS NULL
+       WHERE d.company_id = $1 AND d.request_id IS NULL AND d.category <> 'supportAttachment'
        ORDER BY d.category ASC, d.logical_version DESC, d.created_at ASC`,
       [companyId],
     )

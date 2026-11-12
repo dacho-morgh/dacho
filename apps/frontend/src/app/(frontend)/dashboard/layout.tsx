@@ -8,7 +8,7 @@ import { getPayload } from 'payload'
 import React from 'react'
 import { MenuIcon } from '@/components/icons'
 import { DashboardContent } from '@/components/dashboard/dashboard-content'
-import { DashboardSidebar, type DashboardNavigation } from '@/components/dashboard/sidebar-shell'
+import { DashboardSidebar, type DashboardNavCounts, type DashboardNavigation } from '@/components/dashboard/sidebar-shell'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
 import { DirectionProvider } from '@/components/ui/direction'
 import { Toaster } from '@/components/ui/sonner'
@@ -73,9 +73,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const requestedPath = requestHeaders.get('x-dacho-dashboard-path') || '/dashboard'
   // The two reads do not depend on each other, so they run together instead of one after the other.
-  const [capabilityResult, accessResult] = await Promise.all([
+  const [capabilityResult, accessResult, countsResult] = await Promise.all([
     serverDashboardFetchResult<DashboardNavigation>('/capabilities'),
     serverDashboardFetchResult<{ allowed: boolean }>(`/access?path=${encodeURIComponent(requestedPath)}`),
+    // The numbers beside the menu are a hint: a failed read leaves them out and never blocks the page.
+    serverDashboardFetchResult<DashboardNavCounts>('/nav-counts'),
   ])
   if (capabilityResult.kind === 'unauthenticated') redirect(getLoginUrl(returnUrl, { expired: true }))
   if (capabilityResult.kind === 'denied') return <AccessState denied />
@@ -115,6 +117,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <DashboardSidebar
           user={{ name: user.name, email: user.email }}
           navigation={navigation}
+          counts={countsResult.kind === 'ok' ? countsResult.data : undefined}
         />
         <SidebarInset id="dashboard-content" tabIndex={-1} className="flex h-svh min-w-0 flex-1 flex-col overflow-hidden bg-neutral-50 outline-none">
           <SidebarTrigger

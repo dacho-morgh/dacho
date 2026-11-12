@@ -122,6 +122,9 @@ export interface CompanyInfoDto {
   registrationNumber: string
   economicCode: string
   nationalId: string
+  /** Optional for responses from a backend that predates them. */
+  province?: string
+  city?: string
 }
 
 export interface ContactInfoDto {
@@ -185,6 +188,7 @@ export const SERVICE_KEY_LABELS: Record<string, string> = {
 }
 
 const persianDate = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
@@ -200,8 +204,8 @@ export function formatDate(iso: string | null | undefined): string {
   }
 }
 
-const persianWeekday = new Intl.DateTimeFormat('fa-IR', { weekday: 'long' })
-const persianTime = new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' })
+const persianWeekday = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran', weekday: 'long' })
+const persianTime = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran', hour: '2-digit', minute: '2-digit' })
 
 export function formatWeekday(iso: string | null | undefined): string {
   if (!iso) return ''

@@ -39,7 +39,7 @@ describe('T15: Re-verification and participation eligibility', () => {
         classification: 'فناوری اطلاعات',
         foundingYear: '1398',
         activityDomain: 'هوش مصنوعی',
-        productsServices: ['سامانه ابری'],
+        productsServices: [{ title: 'سامانه ابری' }],
         addresses: [
           {
             id: 'addr-1',

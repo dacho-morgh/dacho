@@ -39,7 +39,7 @@ import {
   type RfpVersionDto,
 } from '@/utilities/dashboard-api'
 import type { Eligibility } from '@/utilities/participation-eligibility'
-import { NativeSelect } from '@/components/ui/native-select'
+import { DashboardSelect } from '@/components/dashboard/dashboard-select'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 import { ListToolbar } from '@/components/dashboard/list-toolbar'
@@ -249,41 +249,29 @@ function QuickSelectModal({
             <label htmlFor="modal-cat-select" className="font-sans text-[14px] leading-[24px] font-semibold text-neutral-700">
               عنوان
             </label>
-            <NativeSelect
+            <DashboardSelect
               id="modal-cat-select"
-              aria-label="عنوان"
+              label="عنوان"
+              placeholder="عنوان را جستجو یا انتخاب کنید"
+              options={categories.map((c) => ({ value: c.id, label: c.title }))}
               value={selectedCatId}
-              onChange={(e) => setSelectedCatId(e.target.value)}
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </NativeSelect>
+              onChange={setSelectedCatId}
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="modal-sub-select" className="font-sans text-[14px] leading-[24px] font-semibold text-neutral-700">
               زیر عنوان
             </label>
-            <NativeSelect
+            <DashboardSelect
               id="modal-sub-select"
-              aria-label="زیر عنوان"
-              value={selectedSubId}
+              label="زیر عنوان"
+              placeholder={availableSubtopics.length === 0 ? 'زیرعنوانی یافت نشد' : 'زیرعنوان را جستجو یا انتخاب کنید'}
               disabled={availableSubtopics.length === 0}
-              onChange={(e) => setSelectedSubId(e.target.value)}
-            >
-              {availableSubtopics.length === 0 ? (
-                <option value="">زیرعنوانی یافت نشد</option>
-              ) : (
-                availableSubtopics.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.title}
-                  </option>
-                ))
-              )}
-            </NativeSelect>
+              options={availableSubtopics.map((s) => ({ value: s.id, label: s.title }))}
+              value={selectedSubId}
+              onChange={setSelectedSubId}
+            />
           </div>
         </div>
 

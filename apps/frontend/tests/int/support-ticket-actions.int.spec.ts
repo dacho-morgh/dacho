@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 const initialMessages = [{
-  id: 'message-1', authorId: 'company-1', authorRole: 'applicant' as const,
+  id: 'message-1', authorId: 'company-1', authorRole: 'representative' as const,
   body: 'پیام شرکت', createdAt: '2026-09-18T08:00:00Z',
 }]
 
@@ -28,7 +28,7 @@ describe('SupportTicketActions', () => {
     const request = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ ticket: {
         id: 'ticket-1', status: isAdmin ? 'answered' : 'open', messages: [...initialMessages, {
-          id: 'message-2', authorId: isAdmin ? 'staff-1' : 'company-1', authorRole: isAdmin ? 'staff' : 'applicant',
+          id: 'message-2', authorId: isAdmin ? 'staff-1' : 'company-1', authorRole: isAdmin ? 'admin' : 'representative',
           body: 'پاسخ جدید', createdAt: '2026-09-18T09:00:00Z',
         }],
       } })))
