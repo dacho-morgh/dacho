@@ -14,7 +14,6 @@ import { ComboboxField } from '@/components/ui/combobox-field'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { JalaliDatePicker } from '@/components/ui/jalali-date-picker'
-import { SelectField } from '@/components/ui/select-field'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
 import {
@@ -1038,23 +1037,27 @@ export function CompanyProfileView({ initialProfile, initialDossier, initialVeri
             value={addressForm.title}
             onChange={(event) => setAddressForm({ ...addressForm, title: event.target.value })}
           />
-          <SelectField
+          <ComboboxField
             label="استان"
-            placeholder="استان را انتخاب کنید"
+            placeholder="استان را جستجو یا انتخاب کنید"
             options={provinceOptions}
             value={addressForm.province}
-            onChange={(event) =>
+            containerClassName="h-10"
+            onChange={(province) =>
               // A city of the old province must not survive a change of province.
-              setAddressForm({ ...addressForm, province: event.target.value, city: '' })
+              setAddressForm((current) =>
+                province === current.province ? current : { ...current, province, city: '' },
+              )
             }
           />
-          <SelectField
+          <ComboboxField
             label="شهر"
-            placeholder="شهر را انتخاب کنید"
+            placeholder={addressForm.province ? 'شهر را جستجو یا انتخاب کنید' : 'ابتدا استان را انتخاب کنید'}
             options={cityOptions}
             value={addressForm.city}
             disabled={!addressForm.province}
-            onChange={(event) => setAddressForm({ ...addressForm, city: event.target.value })}
+            containerClassName="h-10"
+            onChange={(city) => setAddressForm((current) => ({ ...current, city }))}
           />
           <Input
             label="کد پستی"

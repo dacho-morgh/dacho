@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { useForm, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form'
+import { Controller, useForm, type Control, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { RequiredMark, hasRequiredControl } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { NativeSelect } from '@/components/ui/native-select'
+import { JalaliDateTimeField } from '@/components/ui/jalali-datetime-field'
+import { DashboardSelect } from './dashboard-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
@@ -46,7 +47,8 @@ export type OwnerEvent = {
   revision: number
 }
 
-/* Times are entered in UTC, to the millisecond, so an unchanged field round-trips exactly. */
+/* The form keeps each time as a UTC instant, to the millisecond, so an unchanged field round-trips
+   exactly; the people editing it see and enter a Jalali date and a Tehran time (JalaliDateTimeField). */
 export const toUtcInput = (iso?: string) => (iso ? iso.replace(/Z$/, '') : '')
 export const fromUtcInput = (value: string) => new Date(`${value}Z`).toISOString()
 const isUtcInput = (value: string) => Number.isFinite(Date.parse(`${value}Z`))
@@ -228,13 +230,50 @@ export function FormSkeleton({ sections }: { sections: number[] }) {
   )
 }
 
+/** A Jalali date and Tehran time bound to a form field that holds the UTC instant. */
+export function DateTimeControl<T extends FieldValues>({
+  control,
+  name,
+  id,
+  label,
+  invalid,
+  describedBy,
+}: {
+  control: Control<T>
+  name: string
+  id: string
+  label: string
+  invalid: boolean
+  describedBy?: string
+}) {
+  return (
+    <Controller
+      control={control}
+      name={name as Path<T>}
+      render={({ field }) => (
+        <JalaliDateTimeField
+          describedBy={describedBy}
+          id={id}
+          invalid={invalid}
+          label={label}
+          onBlur={field.onBlur}
+          onChange={field.onChange}
+          value={typeof field.value === 'string' ? field.value : ''}
+        />
+      )}
+    />
+  )
+}
+
 /** The public page fields of both forms (title, place, dates, status, description). */
 export function PublicFields<T extends ReturnType<typeof publicDefaults>>({
   register,
+  control,
   errors,
   titleLabel,
 }: {
   register: ReturnType<typeof useForm<T>>['register']
+  control: Control<T>
   errors: Partial<Record<keyof ReturnType<typeof publicDefaults>, { message?: string }>>
   titleLabel: string
 }) {
@@ -248,20 +287,35 @@ export function PublicFields<T extends ReturnType<typeof publicDefaults>>({
       <FormRow id="location" label="محل برگزاری" error={errors.location?.message}>
         <Input id="location" aria-required placeholder="مثلا: بوشهر، سالن همایش‌ها" variant={errors.location ? 'error' : 'default'} aria-describedby={describedBy('location')} {...reg('location')} />
       </FormRow>
-      <FormRow id="startDate" label="شروع برگزاری (UTC)" error={errors.startDate?.message}>
-        <Input id="startDate" type="datetime-local" step="0.001" dir="ltr" aria-required variant={errors.startDate ? 'error' : 'default'} aria-describedby={describedBy('startDate')} {...reg('startDate')} />
+      <FormRow required id="startDate" label="شروع برگزاری" error={errors.startDate?.message}>
+        <DateTimeControl control={control} name="startDate" id="startDate" label="شروع برگزاری" invalid={Boolean(errors.startDate)} describedBy={describedBy('startDate')} />
       </FormRow>
-      <FormRow id="endDate" label="پایان برگزاری (UTC)" error={errors.endDate?.message}>
-        <Input id="endDate" type="datetime-local" step="0.001" dir="ltr" aria-required variant={errors.endDate ? 'error' : 'default'} aria-describedby={describedBy('endDate')} {...reg('endDate')} />
+      <FormRow required id="endDate" label="پایان برگزاری" error={errors.endDate?.message}>
+        <DateTimeControl control={control} name="endDate" id="endDate" label="پایان برگزاری" invalid={Boolean(errors.endDate)} describedBy={describedBy('endDate')} />
       </FormRow>
       <FormRow id="status" label="وضعیت در سایت" error={errors.status?.message}>
-        <NativeSelect id="status" aria-describedby={describedBy('status')} {...reg('status')}>
-          {(Object.keys(PUBLIC_STATUS_LABELS) as PublicStatus[]).map((status) => (
-            <option key={status} value={status}>
-              {PUBLIC_STATUS_LABELS[status]}
-            </option>
-          ))}
-        </NativeSelect>
+        <Controller
+          control={control}
+          name={'status' as Path<T>}
+          render={({ field }) => (
+            <DashboardSelect
+              ref={field.ref}
+              id="status"
+              label="وضعیت در سایت"
+              invalid={Boolean(errors.status)}
+              aria-describedby={describedBy('status')}
+              placeholder="وضعیت را انتخاب کنید"
+              options={(Object.keys(PUBLIC_STATUS_LABELS) as PublicStatus[]).map((status) => ({
+                value: status,
+                label: PUBLIC_STATUS_LABELS[status],
+              }))}
+              value={typeof field.value === 'string' ? field.value : ''}
+              // Status always has a value: clearing the text keeps the stored one.
+              onChange={(value) => value && field.onChange(value)}
+              onBlur={field.onBlur}
+            />
+          )}
+        />
       </FormRow>
       <div className="hidden md:block" />
       <FormRow id="description" label="شرح عمومی" error={errors.description?.message} className="md:col-span-2">
@@ -421,6 +475,7 @@ function EventEditor({
   })
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -475,15 +530,30 @@ function EventEditor({
     const role = name === 'responsibleChiefId' ? 'chief-reviewer' : 'investment-reviewer'
     const eligible = people.filter((person) => person.isActive && person.operationalRole === role)
     return (
-      <FormRow id={name} label={label} error={errors[name]?.message}>
-        <NativeSelect id={name} aria-required aria-invalid={!!errors[name]} aria-describedby={errors[name] ? `${name}-error` : undefined} {...register(name)}>
-          <option value="">انتخاب شخص</option>
-          {eligible.map((person) => (
-            <option key={person.id} value={String(person.id)}>
-              {person.name || 'بدون نام'} — {person.phone || person.id}
-            </option>
-          ))}
-        </NativeSelect>
+      <FormRow required id={name} label={label} error={errors[name]?.message}>
+        <Controller
+          control={control}
+          name={name}
+          render={({ field }) => (
+            <DashboardSelect
+              ref={field.ref}
+              id={name}
+              label={label}
+              required
+              invalid={!!errors[name]}
+              aria-describedby={errors[name] ? `${name}-error` : undefined}
+              placeholder="شخص را جستجو یا انتخاب کنید"
+              emptyText="شخصی پیدا نشد"
+              options={eligible.map((person) => ({
+                value: String(person.id),
+                label: `${person.name || 'بدون نام'} — ${person.phone || person.id}`,
+              }))}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+            />
+          )}
+        />
         {eligible.length === 0 && (
           <Typography variant="12/regular" color="warning">
             شخص واجد شرایط وجود ندارد؛ ابتدا از بخش کارکنان حساب فعال بسازید.
@@ -557,14 +627,14 @@ function EventEditor({
         )}
         <fieldset disabled={isSubmitting || reloading} className="flex min-w-0 flex-col gap-5">
           <FormSection title="اطلاعات عمومی">
-            <PublicFields<EventValues> register={register} errors={errors} titleLabel="عنوان رویداد" />
+            <PublicFields<EventValues> register={register} control={control} errors={errors} titleLabel="عنوان رویداد" />
           </FormSection>
           <FormSection title="ثبت‌نام و مسئولان">
-            <FormRow id="registrationOpenAt" label="شروع ثبت‌نام (UTC)" error={errors.registrationOpenAt?.message}>
-              <Input id="registrationOpenAt" type="datetime-local" step="0.001" dir="ltr" aria-required variant={errors.registrationOpenAt ? 'error' : 'default'} {...register('registrationOpenAt')} />
+            <FormRow required id="registrationOpenAt" label="شروع ثبت‌نام" error={errors.registrationOpenAt?.message}>
+              <DateTimeControl control={control} name="registrationOpenAt" id="registrationOpenAt" label="شروع ثبت‌نام" invalid={Boolean(errors.registrationOpenAt)} describedBy={errors.registrationOpenAt ? 'registrationOpenAt-error' : undefined} />
             </FormRow>
-            <FormRow id="registrationCloseAt" label="پایان ثبت‌نام (UTC)" error={errors.registrationCloseAt?.message}>
-              <Input id="registrationCloseAt" type="datetime-local" step="0.001" dir="ltr" aria-required variant={errors.registrationCloseAt ? 'error' : 'default'} {...register('registrationCloseAt')} />
+            <FormRow required id="registrationCloseAt" label="پایان ثبت‌نام" error={errors.registrationCloseAt?.message}>
+              <DateTimeControl control={control} name="registrationCloseAt" id="registrationCloseAt" label="پایان ثبت‌نام" invalid={Boolean(errors.registrationCloseAt)} describedBy={errors.registrationCloseAt ? 'registrationCloseAt-error' : undefined} />
             </FormRow>
             {select('responsibleChiefId', 'سردبیر مسئول')}
             {select('responsibleInvestmentId', 'مسئول سرمایه‌گذاری')}

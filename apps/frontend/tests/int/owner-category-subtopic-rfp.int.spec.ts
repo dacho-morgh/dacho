@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OwnerEventSubtopics } from '@/components/dashboard/owner-events'
+import { chooseOption, optionTexts } from './combobox-helpers'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -171,22 +172,21 @@ describe('owner category and subtopic administration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'زیرعنوان جدید' }))
 
     // Verify category select only contains categories for this event
-    const categorySelect = (await screen.findByLabelText('دسته فناوری')) as HTMLSelectElement
-    expect(categorySelect.options).toHaveLength(2) // "انتخاب دسته" + "برق و ابزار دقیق"
+    const categorySelect = await screen.findByLabelText('دسته فناوری')
+    expect(optionTexts(categorySelect)).toEqual(['برق و ابزار دقیق'])
 
     // Verify employer select only lists active employer-reviewer persons
-    const employerSelect = screen.getByLabelText('کارفرمای مسئول') as HTMLSelectElement
-    expect(employerSelect.multiple).toBe(false)
-    expect(screen.queryByRole('option', { name: /سردبیر مسئول/ })).toBeNull()
-    expect(screen.queryByRole('option', { name: /نماینده شرکت/ })).toBeNull()
-    expect(screen.queryByRole('option', { name: /کارفرمای غیرفعال/ })).toBeNull()
-    expect(screen.getByRole('option', { name: /مهندس رضایی/ })).toBeTruthy()
-    expect(screen.getByRole('option', { name: /دکتر محمدی/ })).toBeTruthy()
+    const employerSelect = screen.getByLabelText('کارفرمای مسئول')
+    expect(employerSelect.getAttribute('role')).toBe('combobox')
+    const employers = optionTexts(employerSelect)
+    expect(employers.some((text) => /سردبیر مسئول|نماینده شرکت|کارفرمای غیرفعال/.test(text))).toBe(false)
+    expect(employers.some((text) => /مهندس رضایی/.test(text))).toBe(true)
+    expect(employers.some((text) => /دکتر محمدی/.test(text))).toBe(true)
 
     // Fill valid form
-    fireEvent.change(categorySelect, { target: { value: cat1.id } })
+    chooseOption(categorySelect, cat1.title)
     fireEvent.change(screen.getByLabelText('عنوان زیرعنوان'), { target: { value: 'ساخت سنسورهای حرارتی' } })
-    fireEvent.change(employerSelect, { target: { value: 'emp-2' } })
+    chooseOption(employerSelect, /دکتر محمدی/)
 
     fireEvent.click(screen.getByRole('button', { name: 'ذخیره زیرعنوان' }))
     await screen.findByText('زیرعنوان با موفقیت ایجاد شد.')
@@ -471,7 +471,7 @@ describe('owner administration failure and isolation behavior', () => {
     await screen.findByText(cat1.title)
     fireEvent.click(screen.getByRole('button', { name: 'زیرعنوان جدید' }))
     fireEvent.change(screen.getByLabelText('عنوان زیرعنوان'), { target: { value: 'عنوان حفظ‌شده' } })
-    fireEvent.change(screen.getByLabelText('کارفرمای مسئول'), { target: { value: 'emp-1' } })
+    chooseOption(screen.getByLabelText('کارفرمای مسئول'), /مهندس رضایی/)
     fireEvent.click(screen.getByRole('button', { name: 'ذخیره زیرعنوان' }))
     await screen.findByText('کارفرمای انتخاب‌شده نامعتبر یا دارای شرکت است.')
     expect((screen.getByLabelText('عنوان زیرعنوان') as HTMLInputElement).value).toBe('عنوان حفظ‌شده')

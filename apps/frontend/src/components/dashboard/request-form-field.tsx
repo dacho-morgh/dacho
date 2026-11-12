@@ -4,7 +4,8 @@ import { RequiredMark } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Typography } from '@/components/ui/typography'
-import { NativeSelect } from '@/components/ui/native-select'
+import { useId } from 'react'
+import { DashboardSelect } from '@/components/dashboard/dashboard-select'
 
 export interface RequestFormOption { label: string; value: string }
 export interface RequestFormField { name: string; label?: string; blockType: string; required?: boolean; options?: RequestFormOption[] }
@@ -38,21 +39,7 @@ export function RequestFormFieldInput({
     )
   }
   if (field.blockType.includes('select') && field.options?.length) {
-    return (
-      <label className="block">
-        <Typography variant="14/semibold" className="mb-2 block text-neutral-700">{label}{field.required ? <RequiredMark className="ms-0.5" /> : null}</Typography>
-        <NativeSelect
-          name={field.name}
-          required={field.required}
-          disabled={disabled}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          <option value="">انتخاب کنید</option>
-          {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </NativeSelect>
-      </label>
-    )
+    return <RequestFormSelect field={field} options={field.options} label={label} value={value} disabled={disabled} onChange={onChange} />
   }
   return (
     <Input
@@ -64,5 +51,42 @@ export function RequestFormFieldInput({
       value={value}
       onChange={(event) => onChange(event.target.value)}
     />
+  )
+}
+
+function RequestFormSelect({
+  field,
+  options,
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  field: RequestFormField
+  options: RequestFormOption[]
+  label: string
+  value: string
+  disabled?: boolean
+  onChange: (value: string) => void
+}) {
+  const id = useId()
+  return (
+    <div className="block">
+      <Typography as="label" htmlFor={id} variant="14/semibold" className="mb-2 block text-neutral-700">
+        {label}
+        {field.required ? <RequiredMark className="ms-0.5" /> : null}
+      </Typography>
+      <DashboardSelect
+        id={id}
+        name={field.name}
+        label={label}
+        required={field.required}
+        disabled={disabled}
+        placeholder={`${label} را جستجو یا انتخاب کنید`}
+        options={options}
+        value={value}
+        onChange={onChange}
+      />
+    </div>
   )
 }

@@ -8,6 +8,7 @@ import { MailDetailView, type MailData } from '@/components/dashboard/mail-detai
 import { NewLetterForm } from '@/components/dashboard/new-letter-form'
 import { ApplicantLettersView, type ApplicantLetterItem } from '@/components/dashboard/applicant-letters-view'
 import { mapMailData, type LetterDto } from '@/utilities/dashboard-api'
+import { chooseOption } from './combobox-helpers'
 
 const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => navigation }))
@@ -145,7 +146,7 @@ describe('FE22 - role-scoped correspondence', () => {
         caseOptions: [{ id: 'req-2', trackingCode: 'T-2', title: 'پرونده دو' }],
       }))
       expect(screen.getByText('برای نوشتن نامه، ابتدا پرونده مرتبط را انتخاب کنید.')).toBeTruthy()
-      fireEvent.change(screen.getByLabelText('پرونده مرتبط (اختیاری)'), { target: { value: 'req-2' } })
+      chooseOption(screen.getByLabelText('پرونده مرتبط (اختیاری)'), 'T-2 — پرونده دو')
       expect(navigation.push).toHaveBeenCalledWith('/dashboard/letters/new?requestId=req-2')
     })
   })

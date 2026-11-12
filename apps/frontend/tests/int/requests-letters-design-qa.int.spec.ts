@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MailDetailView, type MailData } from '@/components/dashboard/mail-detail-view'
 import { RequestsFilters } from '@/components/dashboard/requests'
 import { RequestStatusBadge } from '@/components/dashboard/requests/request-status-badge'
+import { optionTexts } from './combobox-helpers'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -23,7 +24,7 @@ describe('requests filter by audience (design QA #280)', () => {
   it('offers a company only its three stages', () => {
     render(createElement(RequestsFilters, { audience: 'company', filters: {}, events: [] }))
     const panel = openFilter()
-    const options = within(panel).getAllByRole('option').map((option) => option.textContent)
+    const options = within(panel).getAllByRole('combobox').flatMap(optionTexts)
     expect(options).toEqual(['همه', 'احراز هویت', 'در حال داوری', 'تمام‌شده (نتیجهٔ نهایی)', 'همه رویدادها'])
     // None of the internal stages or statuses reaches the company.
     for (const internal of ['بررسی اولیه', 'سرمایه‌گذاری', 'نیازمند اقدام', 'پیش‌نویس']) {
@@ -39,12 +40,12 @@ describe('requests filter by audience (design QA #280)', () => {
       stageCounts: { all: 4, verification: 1, reviewing: 2, finished: 1 },
     }))
     const panel = openFilter()
-    expect(within(panel).getByRole('option', { name: 'در حال داوری (۲)' })).toBeTruthy()
+    expect(within(panel).getAllByRole('combobox').flatMap(optionTexts)).toContain('در حال داوری (۲)')
   })
 
   it('keeps the real status and review stages for staff', () => {
     render(createElement(RequestsFilters, { filters: {}, events: [] }))
-    const labels = within(openFilter()).getAllByRole('option').map((option) => option.textContent)
+    const labels = within(openFilter()).getAllByRole('combobox').flatMap(optionTexts)
     expect(labels).toEqual(expect.arrayContaining(['نیازمند اقدام', 'پیش‌نویس', 'بررسی اولیه', 'داوری', 'سرمایه‌گذاری']))
     expect(labels).not.toContain('احراز هویت')
   })

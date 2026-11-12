@@ -16,6 +16,7 @@ import {
   updateProfile,
   updateProfileDossier,
 } from '@/utilities/dashboard-api'
+import { chooseOption } from './combobox-helpers'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -528,26 +529,26 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
     expect(document.querySelector('[data-slot="basic-info-actions"]')).toBeNull()
   })
 
-  it('address dialog: province and city are selects, every field has a placeholder, save is first', () => {
+  it('address dialog: province and city are the registration dropdowns, every field has a placeholder, save is first', () => {
     render(
       createElement(CompanyProfileView, { initialProfile: mockProfile, initialDossier: mockDossierResponse }),
     )
     fireEvent.click(screen.getByRole('button', { name: 'آدرس جدید' }))
     // The basic-info grid also has استان/شهر (the registration location).
     const dialog = within(screen.getByRole('dialog'))
-    const province = dialog.getByLabelText('استان') as HTMLSelectElement
-    const city = dialog.getByLabelText('شهر') as HTMLSelectElement
-    expect(province.tagName).toBe('SELECT')
-    expect(city.tagName).toBe('SELECT')
+    const province = dialog.getByLabelText('استان') as HTMLInputElement
+    const city = dialog.getByLabelText('شهر') as HTMLInputElement
+    expect(province.getAttribute('role')).toBe('combobox')
+    expect(city.getAttribute('role')).toBe('combobox')
     expect(city.disabled).toBe(true)
-    expect(screen.getByRole('option', { name: 'استان را انتخاب کنید' })).toBeTruthy()
+    expect(province.placeholder).toBe('استان را جستجو یا انتخاب کنید')
 
-    fireEvent.change(province, { target: { value: 'بوشهر' } })
+    chooseOption(province, 'بوشهر')
     expect(city.disabled).toBe(false)
-    fireEvent.change(city, { target: { value: 'بوشهر' } })
+    chooseOption(city, 'بوشهر')
     expect(city.value).toBe('بوشهر')
     // Changing the province drops the old city.
-    fireEvent.change(province, { target: { value: 'اصفهان' } })
+    chooseOption(province, 'اصفهان')
     expect(city.value).toBe('')
 
     expect(screen.getByPlaceholderText('مثال: دفتر مرکزی')).toBeTruthy()
@@ -566,8 +567,8 @@ describe('Company Profile Dossier Contracts (FE04, FE30)', () => {
     render(createElement(CompanyProfileView, { initialProfile: legacy, initialDossier: mockDossierResponse }))
     fireEvent.click(screen.getByTitle('ویرایش آدرس'))
     const dialog = within(screen.getByRole('dialog'))
-    expect((dialog.getByLabelText('استان') as HTMLSelectElement).value).toBe('استان قدیمی')
-    expect((dialog.getByLabelText('شهر') as HTMLSelectElement).value).toBe('شهر قدیمی')
+    expect((dialog.getByLabelText('استان') as HTMLInputElement).value).toBe('استان قدیمی')
+    expect((dialog.getByLabelText('شهر') as HTMLInputElement).value).toBe('شهر قدیمی')
   })
 
   it('resume certificates have no ready-made file slot, only the add button', () => {

@@ -248,7 +248,7 @@ export default async function LettersPage({ searchParams }: { searchParams: Sear
         typeLabel: title,
         senderName: String(fields.fullName || 'فرستنده فرم'),
         senderRole: 'فرم وب‌سایت',
-        sentDate: new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date(doc.createdAt)),
+        sentDate: new Intl.DateTimeFormat('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran' }).format(new Date(doc.createdAt)),
         source: 'form',
       }
       return [item]

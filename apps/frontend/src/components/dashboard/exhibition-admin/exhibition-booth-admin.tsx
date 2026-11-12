@@ -3,7 +3,7 @@
 import { SearchField } from '@/components/dashboard/search-field'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import {
   InfoCircleIcon as AlertCircle,
   CarouselArrowRightIcon as ArrowRight,
@@ -35,7 +35,7 @@ import {
   type ExhibitionCatalogueDto,
   type UpdateBoothInput,
 } from '@/utilities/dashboard-api'
-import { NativeSelect } from '@/components/ui/native-select'
+import { DashboardSelect } from '@/components/dashboard/dashboard-select'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 
@@ -398,22 +398,23 @@ export function ExhibitionBoothAdmin({
               placeholder="جستجو در غرفه‌ها..."
               aria-label="جستجو در غرفه‌ها"
             />
-            <NativeSelect
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as 'all' | 'available' | 'unavailable')
-              }
-            >
-              <Typography as="option" variant="14/regular" value="all">
-                همه وضعیت‌ها
-              </Typography>
-              <Typography as="option" variant="14/regular" value="available">
-                فقط در دسترس
-              </Typography>
-              <Typography as="option" variant="14/regular" value="unavailable">
-                غیرقابل دسترس
-              </Typography>
-            </NativeSelect>
+            <div className="sm:w-56 sm:shrink-0">
+              <label htmlFor="booth-status-filter" className="sr-only">
+                وضعیت غرفه
+              </label>
+              <DashboardSelect
+                id="booth-status-filter"
+                label="وضعیت غرفه"
+                placeholder="وضعیت غرفه"
+                options={[
+                  { value: 'all', label: 'همه وضعیت‌ها' },
+                  { value: 'available', label: 'فقط در دسترس' },
+                  { value: 'unavailable', label: 'غیرقابل دسترس' },
+                ]}
+                value={statusFilter}
+                onChange={(value) => setStatusFilter((value || 'all') as 'all' | 'available' | 'unavailable')}
+              />
+            </div>
           </div>
         </div>
 
@@ -652,6 +653,7 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<BoothFormData>({
@@ -881,17 +883,24 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                 >
                   وضعیت کاتالوگ
                 </Typography>
-                <NativeSelect
-                  id="booth-status-select"
-                  {...register('status')}
-                >
-                  <Typography as="option" variant="14/regular" value="available">
-                    در دسترس
-                  </Typography>
-                  <Typography as="option" variant="14/regular" value="unavailable">
-                    غیرقابل دسترس
-                  </Typography>
-                </NativeSelect>
+                <Controller
+                  control={control}
+                  name="status"
+                  render={({ field }) => (
+                    <DashboardSelect
+                      ref={field.ref}
+                      id="booth-status-select"
+                      label="وضعیت کاتالوگ"
+                      options={[
+                        { value: 'available', label: 'در دسترس' },
+                        { value: 'unavailable', label: 'غیرقابل دسترس' },
+                      ]}
+                      value={field.value}
+                      onChange={(value) => value && field.onChange(value)}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
               </div>
 
               <div>
@@ -903,19 +912,24 @@ function BoothModal({ exhibitionId, booth, onClose, onSaved }: BoothModalProps) 
                 >
                   وضعیت نمایش
                 </Typography>
-                <NativeSelect
-                  id="booth-active-select"
-                  {...register('active', {
-                    setValueAs: (v) => v === 'true' || v === true,
-                  })}
-                >
-                  <Typography as="option" variant="14/regular" value="true">
-                    فعال در کاتالوگ
-                  </Typography>
-                  <Typography as="option" variant="14/regular" value="false">
-                    غیرفعال (مخفی)
-                  </Typography>
-                </NativeSelect>
+                <Controller
+                  control={control}
+                  name="active"
+                  render={({ field }) => (
+                    <DashboardSelect
+                      ref={field.ref}
+                      id="booth-active-select"
+                      label="وضعیت نمایش"
+                      options={[
+                        { value: 'true', label: 'فعال در کاتالوگ' },
+                        { value: 'false', label: 'غیرفعال (مخفی)' },
+                      ]}
+                      value={String(field.value)}
+                      onChange={(value) => value && field.onChange(value === 'true')}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
               </div>
             </div>
 

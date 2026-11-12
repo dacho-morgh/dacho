@@ -74,7 +74,8 @@ export default async function ExhibitionAdminPage({ params }: PageProps) {
 function formatDate(iso: string): string {
   if (!iso) return ''
   try {
-    return new Intl.DateTimeFormat('fa-IR', {
+    return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
       year: 'numeric',
       month: 'long',
       day: 'numeric',

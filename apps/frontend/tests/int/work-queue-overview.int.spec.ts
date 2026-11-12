@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RequestsPage from '@/app/(frontend)/dashboard/requests/page'
 import { parseRequestFilters, requestFiltersQuery, requestQueueHref } from '@/components/dashboard/requests/types'
 import { WorkQueueOverview } from '@/components/dashboard/work-queue-overview'
+import { optionTexts } from './combobox-helpers'
 
 const backend = vi.hoisted(() => ({ fetch: vi.fn(), auth: vi.fn(), list: vi.fn() }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -158,14 +159,14 @@ describe('RequestsPage', () => {
     // The company filters by its three stages, with each stage's size, and by event.
     fireEvent.click(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }))
     const stages = await screen.findByRole('combobox', { name: 'مرحله درخواست' })
-    expect(within(stages).getAllByRole('option').map((option) => option.textContent)).toEqual([
+    expect(optionTexts(stages)).toEqual([
       `همه (${(1240).toLocaleString('fa-IR')})`,
       `احراز هویت (${(610).toLocaleString('fa-IR')})`,
       `در حال داوری (${(400).toLocaleString('fa-IR')})`,
       `تمام‌شده (نتیجهٔ نهایی) (${(230).toLocaleString('fa-IR')})`,
     ])
     expect(screen.queryByRole('combobox', { name: 'وضعیت درخواست' })).toBeNull()
-    expect(within(screen.getByRole('combobox', { name: 'رویداد' })).getByRole('option', { name: 'رویداد نمونه' })).toBeTruthy()
+    expect(optionTexts(screen.getByRole('combobox', { name: 'رویداد' }))).toContain('رویداد نمونه')
   })
 
   it('hands the same filters to the internal list', async () => {
@@ -193,6 +194,7 @@ describe('RequestsPage', () => {
     render(await RequestsPage({ searchParams: Promise.resolve({}) }))
     fireEvent.click(screen.getByRole('button', { name: /فیلتر درخواست‌ها/ }))
     await screen.findByRole('combobox', { name: 'مرحله درخواست' })
-    expect(screen.queryByRole('option', { name: 'رویداد نمونه' })).toBeNull()
+    const event = screen.queryByRole('combobox', { name: 'رویداد' })
+    expect(event ? optionTexts(event) : []).not.toContain('رویداد نمونه')
   })
 })

@@ -18,6 +18,7 @@ import {
   type ReviewQueueDto,
   type ReviewQueueItemDto,
 } from '@/utilities/reviewer-case'
+import { optionTexts } from './combobox-helpers'
 
 const nav = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -158,8 +159,9 @@ describe('ReviewerQueue', () => {
     // Counts come from the server, over every active assignment of the caller; they sit in the shared filter (FE35).
     fireEvent.click(screen.getByRole('button', { name: 'فیلتر پرونده‌های داوری' }))
     const views = await screen.findByRole('combobox', { name: 'نمای صف' })
-    expect(within(views).getByRole('option', { name: /بسته‌شده/ }).textContent).toContain('۲')
-    expect(within(views).getByRole('option', { name: /همه/ }).textContent).toContain('۳')
+    const viewTexts = optionTexts(views)
+    expect(viewTexts.find((text) => /بسته‌شده/.test(text))).toContain('۲')
+    expect(viewTexts.find((text) => /همه/.test(text))).toContain('۳')
   })
 
   it('opens the case from the whole row, with one direct action instead of a menu', async () => {

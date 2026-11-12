@@ -57,6 +57,7 @@ import {
 } from '@/utilities/document-api'
 import { DashboardApiError } from '@/utilities/dashboard-api'
 import { toast } from 'sonner'
+import { jalaliAgeInYears, parseJalali } from '@/utilities/jalali'
 
 export type VerificationStatus =
   | 'unsubmitted'
@@ -1159,13 +1160,6 @@ const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹'
 const toLatinDigits = (value: string) => value.replace(/[۰-۹]/g, (digit) => String(PERSIAN_DIGITS.indexOf(digit)))
 const toPersianDigits = (value: string) => value.replace(/\d/g, (digit) => PERSIAN_DIGITS[Number(digit)] ?? digit)
 
-function currentJalaliYear(): number | undefined {
-  const year = new Intl.DateTimeFormat('en-u-ca-persian-nu-latn', { year: 'numeric' })
-    .formatToParts(new Date())
-    .find((part) => part.type === 'year')?.value
-  return year ? Number(year) : undefined
-}
-
 /** "۱۳۵۱/۰۴/۱۲ (۵۴ سال)": the establishment date as stored (Jalali) or converted (ISO), with the company's age. */
 function establishmentLabel(value?: string): string | undefined {
   if (!value) return undefined
@@ -1173,8 +1167,8 @@ function establishmentLabel(value?: string): string | undefined {
   if (!match) return value
   const year = Number(match[1])
   const isJalali = year >= 1200 && year <= 1600
-  const now = isJalali ? currentJalaliYear() : new Date().getFullYear()
-  const age = now ? now - year : undefined
+  const jalali = isJalali ? parseJalali(`${match[1]}/${match[2]}/${match[3]}`) : null
+  const age = jalali ? (jalaliAgeInYears(jalali) ?? undefined) : isJalali ? undefined : new Date().getFullYear() - year
   const date = isJalali ? toPersianDigits(`${match[1]}/${match[2].padStart(2, '0')}/${match[3].padStart(2, '0')}`) : formatDate(value)
   return age !== undefined && age >= 0 ? `${date} (${age.toLocaleString('fa-IR')} سال)` : date
 }

@@ -6,6 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ExhibitionForm } from '@/components/dashboard/exhibition-admin/exhibition-form'
 import { OwnerEventForm } from '@/components/dashboard/owner-events-form'
 import { OwnerEventsList } from '@/components/dashboard/owner-events-list'
+import { toPersianDigits } from '@/utilities/digits'
+import { JALALI_MONTHS } from '@/utilities/jalali'
+import { utcInputToTehran } from '@/utilities/jalali-datetime'
+import { chooseOption, optionTexts } from './combobox-helpers'
 
 const push = vi.fn()
 let search = new URLSearchParams()
@@ -14,6 +18,22 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard/events',
   useSearchParams: () => search,
 }))
+/** Enters an instant through the Jalali picker and the Tehran hour/minute dropdowns, as a person would. */
+async function setUtc(label: string, utc: string) {
+  const { date, hour, minute } = utcInputToTehran(`${utc}:00.000`)!
+  const digits = (value: number) => toPersianDigits(value)
+  const month = JALALI_MONTHS[date.month - 1]!
+  fireEvent.click(await screen.findByRole('button', { name: label }))
+  fireEvent.click(await screen.findByRole('button', { name: 'انتخاب سال' }))
+  fireEvent.click(within(screen.getByRole('group', { name: 'سال‌ها' })).getByRole('button', { name: digits(date.year) }))
+  fireEvent.click(screen.getByRole('button', { name: 'انتخاب ماه' }))
+  fireEvent.click(within(screen.getByRole('group', { name: 'ماه‌ها' })).getByRole('button', { name: month }))
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(`(?:^|[\\s،])${digits(date.day)}-ام ${month} ${digits(date.year)}`) }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  const time = (value: number) => toPersianDigits(String(value).padStart(2, '0'))
+  chooseOption(screen.getByLabelText(`ساعت ${label}`), time(hour))
+  chooseOption(screen.getByLabelText(`دقیقه ${label}`), time(minute))
+}
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status })
 afterEach(() => {
   cleanup()
@@ -208,16 +228,16 @@ describe('owner event form (FE41)', () => {
     })
     vi.stubGlobal('fetch', request)
     render(createElement(OwnerEventForm, { mode: 'edit', id: 'e1' }))
-    fireEvent.change(await screen.findByLabelText('پایان ثبت‌نام (UTC)'), { target: { value: '2026-09-01T10:00' } })
-    fireEvent.change(screen.getByLabelText('پایان برگزاری (UTC)'), { target: { value: '2026-11-01T10:00' } })
+    await setUtc('پایان ثبت‌نام', '2026-09-01T10:00')
+    await setUtc('پایان برگزاری', '2026-11-01T10:00')
     fireEvent.click(screen.getByRole('button', { name: 'ذخیره رویداد' }))
     expect(await screen.findByText('پایان ثبت‌نام باید پس از شروع باشد.')).toBeTruthy()
     expect(screen.getByText('پایان برگزاری باید پس از شروع باشد.')).toBeTruthy()
     expect(screen.getByText('دلیل تغییر را وارد کنید.')).toBeTruthy()
     expect(lastWrite(request, 'PATCH')).toBeUndefined()
 
-    fireEvent.change(screen.getByLabelText('پایان ثبت‌نام (UTC)'), { target: { value: '2026-10-02T10:00' } })
-    fireEvent.change(screen.getByLabelText('پایان برگزاری (UTC)'), { target: { value: '2026-12-02T16:00' } })
+    await setUtc('پایان ثبت‌نام', '2026-10-02T10:00')
+    await setUtc('پایان برگزاری', '2026-12-02T16:00')
     fireEvent.change(screen.getByLabelText('دلیل تغییر'), { target: { value: 'اصلاح عنوان' } })
     fireEvent.change(screen.getByLabelText('عنوان رویداد'), { target: { value: 'پیش‌نویس من' } })
     fireEvent.click(screen.getByRole('button', { name: 'ذخیره رویداد' }))
@@ -240,14 +260,14 @@ describe('owner event form (FE41)', () => {
     render(createElement(OwnerEventForm, { mode: 'create' }))
     fireEvent.change(await screen.findByLabelText('عنوان رویداد'), { target: { value: 'رویداد دوم' } })
     fireEvent.change(screen.getByLabelText('محل برگزاری'), { target: { value: 'بوشهر' } })
-    fireEvent.change(screen.getByLabelText('شروع برگزاری (UTC)'), { target: { value: '2026-12-01T08:00' } })
-    fireEvent.change(screen.getByLabelText('پایان برگزاری (UTC)'), { target: { value: '2026-12-02T16:00' } })
-    fireEvent.change(screen.getByLabelText('شروع ثبت‌نام (UTC)'), { target: { value: '2026-11-01T10:00' } })
-    fireEvent.change(screen.getByLabelText('پایان ثبت‌نام (UTC)'), { target: { value: '2026-11-02T10:00' } })
-    fireEvent.change(screen.getByLabelText('سردبیر مسئول'), { target: { value: 'chief' } })
-    fireEvent.change(screen.getByLabelText('مسئول سرمایه‌گذاری'), { target: { value: 'investment' } })
-    expect(screen.queryByRole('option', { name: /سردبیر غیرفعال/ })).toBeNull()
-    expect(screen.queryByRole('option', { name: /^کارفرما/ })).toBeNull()
+    await setUtc('شروع برگزاری', '2026-12-01T08:00')
+    await setUtc('پایان برگزاری', '2026-12-02T16:00')
+    await setUtc('شروع ثبت‌نام', '2026-11-01T10:00')
+    await setUtc('پایان ثبت‌نام', '2026-11-02T10:00')
+    chooseOption(screen.getByLabelText('سردبیر مسئول'), /سردبیر فعال/)
+    chooseOption(screen.getByLabelText('مسئول سرمایه‌گذاری'), /سرمایه‌گذار فعال/)
+    const chiefs = optionTexts(screen.getByLabelText('سردبیر مسئول'))
+    expect(chiefs.some((text) => /سردبیر غیرفعال|^کارفرما/.test(text))).toBe(false)
     expect(screen.queryByLabelText('دلیل تغییر')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'ثبت رویداد' }))
     await waitFor(() => expect(push).toHaveBeenCalledWith('/dashboard/events?saved=event-created'))
@@ -274,10 +294,10 @@ describe('owner event form (FE41)', () => {
     render(createElement(OwnerEventForm, { mode: 'create', adoptPublicEventId: '12' }))
     expect(((await screen.findByLabelText('عنوان رویداد')) as HTMLInputElement).value).toBe('منتشرشده')
     expect(screen.getByText(/همان صفحه به‌روز و به رویداد متصل می‌شود/)).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('شروع ثبت‌نام (UTC)'), { target: { value: '2026-11-01T10:00' } })
-    fireEvent.change(screen.getByLabelText('پایان ثبت‌نام (UTC)'), { target: { value: '2026-11-02T10:00' } })
-    fireEvent.change(screen.getByLabelText('سردبیر مسئول'), { target: { value: 'chief' } })
-    fireEvent.change(screen.getByLabelText('مسئول سرمایه‌گذاری'), { target: { value: 'investment' } })
+    await setUtc('شروع ثبت‌نام', '2026-11-01T10:00')
+    await setUtc('پایان ثبت‌نام', '2026-11-02T10:00')
+    chooseOption(screen.getByLabelText('سردبیر مسئول'), /سردبیر فعال/)
+    chooseOption(screen.getByLabelText('مسئول سرمایه‌گذاری'), /سرمایه‌گذار فعال/)
     fireEvent.click(screen.getByRole('button', { name: 'ثبت رویداد' }))
     await waitFor(() => expect(push).toHaveBeenCalled())
     expect(lastWrite(request, 'POST')!.body).toMatchObject({ publicEventId: '12', location: 'بوشهر' })
@@ -318,13 +338,13 @@ describe('owner exhibition form (FE41, T60)', () => {
     render(createElement(ExhibitionForm, { mode: 'create' }))
     fireEvent.change(screen.getByLabelText('عنوان نمایشگاه'), { target: { value: 'نمایشگاه نفت' } })
     fireEvent.change(screen.getByLabelText('محل برگزاری'), { target: { value: 'عسلویه' } })
-    fireEvent.change(screen.getByLabelText('شروع برگزاری (UTC)'), { target: { value: '2027-01-10T06:00' } })
-    fireEvent.change(screen.getByLabelText('پایان برگزاری (UTC)'), { target: { value: '2027-01-09T06:00' } })
+    await setUtc('شروع برگزاری', '2027-01-10T06:00')
+    await setUtc('پایان برگزاری', '2027-01-09T06:00')
     fireEvent.click(screen.getByRole('button', { name: 'ثبت نمایشگاه' }))
     expect(await screen.findByText('پایان برگزاری باید پس از شروع باشد.')).toBeTruthy()
     expect(screen.getByText('سقف غرفه هر شرکت را با عدد صحیح مثبت وارد کنید.')).toBeTruthy()
 
-    fireEvent.change(screen.getByLabelText('پایان برگزاری (UTC)'), { target: { value: '2027-01-12T14:00' } })
+    await setUtc('پایان برگزاری', '2027-01-12T14:00')
     fireEvent.change(screen.getByLabelText('سقف غرفه برای هر شرکت'), { target: { value: '۲' } })
     fireEvent.click(screen.getByRole('button', { name: 'ثبت نمایشگاه' }))
     await waitFor(() => expect(push).toHaveBeenCalledWith('/dashboard/events?type=exhibition&saved=exhibition-created'))

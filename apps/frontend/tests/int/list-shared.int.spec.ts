@@ -9,6 +9,7 @@ import { ListRow, ListTableFrame } from '@/components/dashboard/list-table'
 import { ListToolbar } from '@/components/dashboard/list-toolbar'
 import { RequestsFilters, RequestsListView, type RequestItem } from '@/components/dashboard/requests'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { chooseOption, optionTexts } from './combobox-helpers'
 
 const nav = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -53,9 +54,9 @@ describe('ListFilterButton (the one filter template)', () => {
     const panel = screen.getByRole('dialog', { name: 'فیلتر درخواست‌ها' })
     expect(within(panel).getByRole('heading', { name: 'فیلتر' })).toBeTruthy()
     expect(within(panel).getByRole('button', { name: 'بستن فیلتر' })).toBeTruthy()
-    const status = within(panel).getByRole('combobox', { name: 'وضعیت درخواست' }) as HTMLSelectElement
-    expect(status.value).toBe('approved')
-    expect(within(status).getByRole('option', { name: /تایید شده/ }).textContent).toContain('۲')
+    const status = within(panel).getByRole('combobox', { name: 'وضعیت درخواست' }) as HTMLInputElement
+    expect(status.value).toBe('تایید شده (۲)')
+    expect(optionTexts(status)).toEqual(['همه (۵)', 'تایید شده (۲)', 'رد شده (۱)'])
     expect(within(panel).getByRole('radiogroup', { name: 'مرتب سازی بر اساس' })).toBeTruthy()
     // The primary action comes first in the DOM: it sits on the right of the RTL panel.
     const buttons = within(panel).getAllByRole('button').map((button) => button.textContent)
@@ -67,7 +68,7 @@ describe('ListFilterButton (the one filter template)', () => {
     render(createElement(ListFilterButton, { groups }))
     fireEvent.click(screen.getByRole('button', { name: /فیلتر/ }))
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'وضعیت درخواست' }), { target: { value: 'rejected' } })
+    chooseOption(screen.getByRole('combobox', { name: 'وضعیت درخواست' }), /رد شده/)
     fireEvent.click(screen.getByRole('radio', { name: 'قدیمی ترین' }))
     expect(nav.push).not.toHaveBeenCalled()
 
@@ -84,12 +85,12 @@ describe('ListFilterButton (the one filter template)', () => {
     const open = () => fireEvent.click(screen.getByRole('button', { name: /فیلتر/ }))
 
     open()
-    fireEvent.change(screen.getByRole('combobox', { name: 'وضعیت درخواست' }), { target: { value: 'rejected' } })
+    chooseOption(screen.getByRole('combobox', { name: 'وضعیت درخواست' }), /رد شده/)
     fireEvent.click(screen.getByRole('button', { name: 'لغو' }))
     expect(screen.queryByRole('dialog')).toBeNull()
 
     open()
-    expect((screen.getByRole('combobox', { name: 'وضعیت درخواست' }) as HTMLSelectElement).value).toBe('approved')
+    expect((screen.getByRole('combobox', { name: 'وضعیت درخواست' }) as HTMLInputElement).value).toBe('تایید شده (۲)')
     fireEvent.click(screen.getByRole('button', { name: 'بستن فیلتر' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(onChange).not.toHaveBeenCalled()
@@ -100,7 +101,7 @@ describe('ListFilterButton (the one filter template)', () => {
     const onChange = vi.fn()
     render(createElement(ListFilterButton, { groups, onChange }))
     fireEvent.click(screen.getByRole('button', { name: /فیلتر/ }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'وضعیت درخواست' }), { target: { value: '' } })
+    chooseOption(screen.getByRole('combobox', { name: 'وضعیت درخواست' }), /همه/)
     fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenCalledWith('status', undefined)

@@ -15,10 +15,10 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = createPageMetadata({ title: 'رویدادها', path: '/events' })
 
 const dateFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
   day: 'numeric',
   month: 'long',
   year: 'numeric',
-  timeZone: 'Asia/Tehran',
 })
 
 export default async function EventsPage() {

@@ -22,7 +22,13 @@ import {
 import { cn } from '@/utilities/ui'
 
 export type JalaliDatePickerProps = {
-  label: string
+  /** Omit when a surrounding label (`htmlFor` this field's `id`) already names it. */
+  label?: string
+  /** The popover's accessible name when there is no `label`. */
+  ariaLabel?: string
+  /** The error state for a caller that draws the message itself. */
+  invalid?: boolean
+  describedBy?: string
   placeholder?: string
   /** The stored value: `YYYY/MM/DD` (Jalali, ASCII digits) or ''. */
   value: string
@@ -269,6 +275,9 @@ function CalendarPanel({
  */
 function JalaliDatePicker({
   label,
+  ariaLabel,
+  invalid,
+  describedBy,
   placeholder = 'تاریخ را انتخاب کنید',
   value,
   onChange,
@@ -288,6 +297,7 @@ function JalaliDatePicker({
   const generatedId = React.useId()
   const triggerId = id ?? generatedId
   const helperId = error || hint ? `${triggerId}-description` : undefined
+  const hasError = Boolean(error) || Boolean(invalid)
   const today = React.useMemo(() => todayJalali(), [])
   const latest = maxDate ?? today
   const selected = parseJalali(value)
@@ -309,16 +319,18 @@ function JalaliDatePicker({
       dir="rtl"
       className={cn('flex w-full flex-col gap-2 text-right', wrapperClassName)}
     >
-      <Typography
-        as="label"
-        htmlFor={triggerId}
-        variant="16/regular"
-        color="neutral-600"
-        className="cursor-pointer select-none"
-      >
-        {label}
-        {required && !hideRequiredMark ? <RequiredMark className="ms-0.5" /> : null}
-      </Typography>
+      {label ? (
+        <Typography
+          as="label"
+          htmlFor={triggerId}
+          variant="16/regular"
+          color="neutral-600"
+          className="cursor-pointer select-none"
+        >
+          {label}
+          {required && !hideRequiredMark ? <RequiredMark className="ms-0.5" /> : null}
+        </Typography>
+      ) : null}
 
       <div className="flex w-full flex-col gap-1">
         <Popover open={open} onOpenChange={handleOpenChange}>
@@ -330,8 +342,8 @@ function JalaliDatePicker({
               disabled={disabled}
               aria-haspopup="dialog"
               aria-expanded={open}
-              aria-describedby={helperId}
-              data-invalid={error ? 'true' : undefined}
+              aria-describedby={[helperId, describedBy].filter(Boolean).join(' ') || undefined}
+              data-invalid={hasError ? 'true' : undefined}
               data-empty={selected ? undefined : 'true'}
               className={cn(
                 typographyVariants({ variant: '16/regular', color: 'neutral-600' }),
@@ -347,7 +359,7 @@ function JalaliDatePicker({
           <PopoverContent
             dir="rtl"
             align="start"
-            aria-label={`انتخاب ${label}`}
+            aria-label={`انتخاب ${label ?? ariaLabel ?? 'تاریخ'}`}
             className="w-[min(19rem,calc(100vw-2rem))] p-3"
             onOpenAutoFocus={(event) => {
               // The day grid focuses the chosen (or latest) day itself.

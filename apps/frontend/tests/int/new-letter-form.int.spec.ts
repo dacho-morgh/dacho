@@ -4,6 +4,8 @@ import { createElement } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NewLetterForm } from '@/components/dashboard/new-letter-form'
+import { chooseOption } from './combobox-helpers'
+import { LETTER_TYPE_LABELS } from '@/utilities/dashboard-api'
 
 const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => navigation }))
@@ -25,9 +27,9 @@ function stubFetch(request: (...args: unknown[]) => unknown) {
 }
 
 function fillLetter() {
-  fireEvent.change(screen.getByLabelText('گیرنده'), { target: { value: 'company-1' } })
+  chooseOption(screen.getByLabelText('گیرنده'), 'شرکت نمونه')
   fireEvent.change(screen.getByLabelText('عنوان نامه'), { target: { value: 'عنوان' } })
-  fireEvent.change(screen.getByLabelText('نوع نامه'), { target: { value: 'official' } })
+  chooseOption(screen.getByLabelText('نوع نامه'), LETTER_TYPE_LABELS['official'])
   fireEvent.change(screen.getByLabelText('متن نامه'), { target: { value: 'متن' } })
 }
 
@@ -84,7 +86,7 @@ describe('NewLetterForm', () => {
     render(createElement(NewLetterForm, { companies: [], recipientsError: true }))
     expect(screen.getByRole('alert').textContent).toContain('دریافت گیرندگان انجام نشد')
     expect((screen.getByRole('button', { name: 'ارسال نامه' }) as HTMLButtonElement).disabled).toBe(true)
-    expect((screen.getByLabelText('پرونده مرتبط (اختیاری)') as HTMLSelectElement).disabled).toBe(true)
+    expect((screen.getByLabelText('پرونده مرتبط (اختیاری)') as HTMLInputElement).disabled).toBe(true)
     expect(screen.queryByLabelText('فایل پیوست')).toBeNull()
   })
 
@@ -97,9 +99,9 @@ describe('NewLetterForm', () => {
     stubFetch(request)
     render(createElement(NewLetterForm, { companies }))
 
-    fireEvent.change(screen.getByLabelText('گیرنده'), { target: { value: 'company-1' } })
+    chooseOption(screen.getByLabelText('گیرنده'), 'شرکت نمونه')
     fireEvent.change(screen.getByLabelText('عنوان نامه'), { target: { value: ' عنوان تست ' } })
-    fireEvent.change(screen.getByLabelText('نوع نامه'), { target: { value: 'notification' } })
+    chooseOption(screen.getByLabelText('نوع نامه'), LETTER_TYPE_LABELS['notification'])
     fireEvent.change(screen.getByLabelText('متن نامه'), { target: { value: ' متن تست ' } })
     fireEvent.click(screen.getByRole('button', { name: 'ارسال نامه' }))
 
@@ -131,7 +133,7 @@ describe('NewLetterForm', () => {
       render(createElement(NewLetterForm, { mode: 'support' }))
 
       fireEvent.change(screen.getByLabelText('موضوع پیام پشتیبانی'), { target: { value: ' مشکل در ورود ' } })
-      fireEvent.change(screen.getByLabelText('میزان اهمیت'), { target: { value: 'urgent' } })
+      chooseOption(screen.getByLabelText('میزان اهمیت'), 'فوری')
       fireEvent.change(screen.getByLabelText('متن پیام'), { target: { value: ' شرح مشکل در بخش لاگین ' } })
       fireEvent.click(screen.getByRole('button', { name: 'ارسال پیام' }))
 

@@ -175,3 +175,10 @@ export function parseJalali(value: string): JalaliDate | null {
   const date = { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) }
   return isValidJalaliDate(date) ? date : null
 }
+
+/** Completed years from a Jalali date to `now` (Tehran's today); null when it lies in the future. */
+export function jalaliAgeInYears(from: JalaliDate, now: JalaliDate = todayJalali()): number | null {
+  if (compareJalali(from, now) > 0) return null
+  const birthdayPassed = now.month > from.month || (now.month === from.month && now.day >= from.day)
+  return now.year - from.year - (birthdayPassed ? 0 : 1)
+}

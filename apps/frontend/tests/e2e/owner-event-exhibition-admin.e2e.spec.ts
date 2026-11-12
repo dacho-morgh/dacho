@@ -1,7 +1,9 @@
-import { expect, test, type Browser, type BrowserContext } from '@playwright/test'
+import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { randomInt } from 'node:crypto'
 import { getPayload } from 'payload'
 import config from '../../src/payload.config.js'
+import { JALALI_MONTHS } from '../../src/utilities/jalali'
+import { utcInputToTehran } from '../../src/utilities/jalali-datetime'
 
 /**
  * S5 (#243): the System Owner creates an event and an exhibition from the dashboard's
@@ -10,6 +12,26 @@ import config from '../../src/payload.config.js'
  */
 
 test.describe.configure({ mode: 'serial' })
+
+const persianDigits = (value: number | string) => String(value).replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]!)
+
+/** Enters a UTC instant the way a person does: a Jalali date from the calendar, then the Tehran hour and minute. */
+async function setInstant(page: Page, label: string, utc: string) {
+  const { date, hour, minute } = utcInputToTehran(`${utc}:00.000`)!
+  const month = JALALI_MONTHS[date.month - 1]!
+  await page.getByRole('button', { name: label, exact: true }).click()
+  await page.getByRole('button', { name: 'انتخاب سال' }).click()
+  await page.getByRole('group', { name: 'سال‌ها' }).getByRole('button', { name: persianDigits(date.year) }).click()
+  await page.getByRole('button', { name: 'انتخاب ماه' }).click()
+  await page.getByRole('group', { name: 'ماه‌ها' }).getByRole('button', { name: month }).click()
+  await page.getByRole('button', { name: new RegExp(`(^|[\\s،])${persianDigits(date.day)}-ام ${month} ${persianDigits(date.year)}`) }).click()
+  // Hour and minute are searchable dropdowns that show two Persian digits.
+  for (const [part, value] of [['ساعت', hour], ['دقیقه', minute]] as const) {
+    const text = persianDigits(String(value).padStart(2, '0'))
+    await page.getByLabel(`${part} ${label}`).fill(text)
+    await page.getByRole('option', { name: text, exact: true }).click()
+  }
+}
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:3000'
 const password = 'owner-admin-test-only'
@@ -83,13 +105,16 @@ test('the owner creates an event and its public page from the dashboard', async 
 
   await page.getByLabel('عنوان رویداد').fill(eventTitle)
   await page.getByLabel('محل برگزاری').fill('بوشهر، سالن همایش')
-  await page.getByLabel('شروع برگزاری (UTC)').fill('2030-03-01T08:00')
-  await page.getByLabel('پایان برگزاری (UTC)').fill('2030-03-02T16:00')
+  await setInstant(page, 'شروع برگزاری', '2030-03-01T08:00')
+  await setInstant(page, 'پایان برگزاری', '2030-03-02T16:00')
   await page.getByLabel('شرح عمومی').fill('شرح عمومی رویداد آزمون')
-  await page.getByLabel('شروع ثبت‌نام (UTC)').fill('2030-01-01T00:00')
-  await page.getByLabel('پایان ثبت‌نام (UTC)').fill('2030-02-01T00:00')
-  await page.getByLabel('سردبیر مسئول').selectOption(ids.chief)
-  await page.getByLabel('مسئول سرمایه‌گذاری').selectOption(ids.investment)
+  await setInstant(page, 'شروع ثبت‌نام', '2030-01-01T00:00')
+  await setInstant(page, 'پایان ثبت‌نام', '2030-02-01T00:00')
+  // The people dropdowns are the registration combobox: type to narrow, then pick by name.
+  for (const [label, role] of [['سردبیر مسئول', 'chief'], ['مسئول سرمایه‌گذاری', 'investment']] as const) {
+    await page.getByLabel(label).fill(`آزمون ${role} ${suffix}`)
+    await page.getByRole('option', { name: new RegExp(`^آزمون ${role} ${suffix}`) }).click()
+  }
   await page.getByRole('button', { name: 'ثبت رویداد' }).click()
 
   await page.waitForURL(/\/dashboard\/events\?saved=event-created/)
@@ -119,8 +144,8 @@ test('the owner creates an exhibition with its booth limit from the same list', 
 
   await page.getByLabel('عنوان نمایشگاه').fill(exhibitionTitle)
   await page.getByLabel('محل برگزاری').fill('عسلویه')
-  await page.getByLabel('شروع برگزاری (UTC)').fill('2030-05-01T06:00')
-  await page.getByLabel('پایان برگزاری (UTC)').fill('2030-05-03T14:00')
+  await setInstant(page, 'شروع برگزاری', '2030-05-01T06:00')
+  await setInstant(page, 'پایان برگزاری', '2030-05-03T14:00')
   await page.getByLabel('سقف غرفه برای هر شرکت').fill('۲')
   await page.getByRole('button', { name: 'ثبت نمایشگاه' }).click()
 

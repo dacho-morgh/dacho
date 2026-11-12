@@ -10,6 +10,7 @@ import { ProfileDialog } from '@/components/dashboard/profile/profile-dialog'
 import { RequestAssignmentPanel } from '@/components/dashboard/request-assignment-panel'
 import { proxy } from '@/proxy'
 import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
+import { chooseOption, optionTexts } from './combobox-helpers'
 
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), senior: vi.fn() }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -134,12 +135,12 @@ describe('write failures', () => {
     vi.stubGlobal('fetch', fetchMock)
     render(createElement(RequestAssignmentPanel, { id: 'request-1' }))
     await screen.findByText('هنوز انتسابی ثبت نشده است.')
-    const select = (await screen.findByRole('combobox')) as HTMLSelectElement
-    await screen.findByRole('option', { name: /داور/ })
-    fireEvent.change(select, { target: { value: 'e1' } })
+    const select = (await screen.findByRole('combobox')) as HTMLInputElement
+    await waitFor(() => expect(optionTexts(select).some((text) => /داور/.test(text))).toBe(true))
+    chooseOption(select, /داور/)
     fireEvent.click(screen.getByRole('button', { name: 'ثبت انتساب' }))
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('ارتباط'))
-    expect(select.value).toBe('e1')
+    expect(select.value).toMatch(/^داور/)
   })
 
   it('does not call an unread assignment list empty', async () => {

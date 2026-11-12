@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
+import { OwnerEventSubtopics } from '@/components/dashboard/owner-events'
 import { OwnerEventForm } from '@/components/dashboard/owner-events-form'
 import { dashboardOperationalRole } from '@/utilities/dashboard-server'
 import { getPayloadAuthHeaders } from '@/utilities/payload-auth-headers'
@@ -20,5 +21,11 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   if (dashboardOperationalRole(user) !== 'system-owner') redirect('/dashboard?access=denied')
 
   const { id } = await params
-  return <OwnerEventForm mode="edit" id={id} />
+  return (
+    <>
+      <OwnerEventForm mode="edit" id={id} />
+      {/* Companies apply to a subtopic, so the owner adds the categories, subtopics and RFP files here too. */}
+      <OwnerEventSubtopics eventId={id} embedded />
+    </>
+  )
 }

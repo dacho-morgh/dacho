@@ -3,6 +3,9 @@
  * table renders with its rows) and the client list (which fetches every later page, queue or search).
  */
 
+import { toPersianDigits } from '@/utilities/digits'
+import { jalaliAgeInYears, parseJalali, toJalali, todayJalali } from '@/utilities/jalali'
+
 export type VerificationStatus =
   | 'unsubmitted'
   | 'pending'
@@ -113,16 +116,19 @@ export function toCompaniesPage(data: CompaniesApiResponse, requestedPage: numbe
   }
 }
 
+/** Companies store the founding date as Jalali (`1380/05/15`); an ISO date is still understood. */
 function activityAgeLabel(value?: string): string {
-  if (!value) return '—'
-  const date = new Date(value)
+  const text = value?.trim()
+  if (!text) return '—'
+  const jalali = parseJalali(text)
+  if (jalali) {
+    const age = jalaliAgeInYears(jalali)
+    return age === null ? '—' : `${toPersianDigits(age)} سال`
+  }
+  const date = new Date(text)
   if (Number.isNaN(date.getTime()) || date.getTime() > Date.now()) return '—'
-  const years =
-    new Date().getFullYear() -
-    date.getFullYear() -
-    (new Date().getTime() <
-    new Date(new Date().getFullYear(), date.getMonth(), date.getDate()).getTime()
-      ? 1
-      : 0)
-  return `${Math.max(0, years).toLocaleString('fa-IR')} سال`
+  const today = todayJalali()
+  const from = toJalali(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate())
+  const age = jalaliAgeInYears(from, today)
+  return age === null ? '—' : `${toPersianDigits(age)} سال`
 }

@@ -22,7 +22,7 @@ import {
   type ReviewRoundDto,
   type ReviewRoundSlotDto,
 } from '@/utilities/dashboard-api'
-import { NativeSelect } from '@/components/ui/native-select'
+import { DashboardSelect } from '@/components/dashboard/dashboard-select'
 import { toast } from 'sonner'
 
 /** Each optional read: null when this role has no such read, `failed` when it did not arrive. */
@@ -349,17 +349,15 @@ function PersonSelect({
       <label htmlFor={selectId}>
         <Typography as="span" variant="14/semibold" color="neutral-700">{label}</Typography>
       </label>
-      <NativeSelect
+      <DashboardSelect
         id={selectId}
+        label={label}
         value={value}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)} containerClassName="min-w-0"
-      >
-        <option value="">انتخاب کنید</option>
-        {options.map((person) => (
-          <option key={person.id} value={person.id}>{person.name ?? 'بدون نام'}</option>
-        ))}
-      </NativeSelect>
+        placeholder={`${label} را جستجو یا انتخاب کنید`}
+        options={options.map((person) => ({ value: person.id, label: person.name ?? 'بدون نام' }))}
+        onChange={onChange}
+      />
     </div>
   )
 }

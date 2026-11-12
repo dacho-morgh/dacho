@@ -44,12 +44,14 @@ type MetaItem = {
 }
 
 const dateFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
   day: 'numeric',
   month: 'long',
   year: 'numeric',
 })
 
-const timeFormatter = new Intl.DateTimeFormat('fa-IR', {
+const timeFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
   hour: 'numeric',
   minute: '2-digit',
 })

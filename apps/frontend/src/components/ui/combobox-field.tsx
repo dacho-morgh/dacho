@@ -5,13 +5,17 @@ import * as React from 'react'
 import { RequiredMark } from '@/components/ui/field'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { Typography, typographyVariants } from '@/components/ui/typography'
+import { toEnglishDigits } from '@/utilities/digits'
 import { cn } from '@/utilities/ui'
+
+/** A plain string is its own value; a pair shows `label` and stores `value` (an id). */
+export type ComboboxOption = string | { value: string; label: string }
 
 export type ComboboxFieldProps = {
   label: string
   placeholder: string
-  options: readonly string[]
-  /** The chosen option, or '' — never free text. */
+  options: readonly ComboboxOption[]
+  /** The chosen option's value, or '' — never free text. */
   value: string
   onChange: (value: string) => void
   onBlur?: () => void
@@ -26,11 +30,25 @@ export type ComboboxFieldProps = {
   emptyText?: string
   wrapperClassName?: string
   containerClassName?: string
+  /**
+   * Draw no label or helper line: a surrounding field row (the dashboard's FormRow)
+   * already does, and must point a <label htmlFor={id}> at this field so the
+   * visible label stays its name. `label` still names the popup list.
+   */
+  hideLabel?: boolean
+  /** Error styling without an error line (the surrounding row prints it). */
+  invalid?: boolean
+  'aria-describedby'?: string
+  /** The field's name when no <label> points at it (with `hideLabel`). */
+  'aria-label'?: string
 }
 
-/** Folds Arabic letter forms, half-spaces and spaces so «بندر عباس» finds «بندرعباس». */
+/**
+ * Folds Arabic letter forms, half-spaces, spaces and digits so «بندر عباس» finds
+ * «بندرعباس» and «08» finds «۰۸».
+ */
 function fold(text: string): string {
-  return text
+  return toEnglishDigits(text)
     .replace(/ي/g, 'ی')
     .replace(/ك/g, 'ک')
     .replace(/[‌\s]/g, '')
@@ -63,16 +81,28 @@ const ComboboxField = React.forwardRef<HTMLInputElement, ComboboxFieldProps>(
       emptyText = 'موردی پیدا نشد',
       wrapperClassName,
       containerClassName,
+      hideLabel,
+      invalid,
+      'aria-describedby': describedBy,
+      'aria-label': ariaLabel,
     },
     ref,
   ) => {
     const generatedId = React.useId()
     const inputId = id ?? generatedId
     const listId = `${inputId}-listbox`
-    const helperId = error || hint ? `${inputId}-description` : undefined
+    const helperId = !hideLabel && (error || hint) ? `${inputId}-description` : undefined
+    const ariaDescribedBy = [helperId, describedBy].filter(Boolean).join(' ') || undefined
+
+    const items = React.useMemo(
+      () => options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option)),
+      [options],
+    )
+    const labelOf = (stored: string) => items.find((item) => item.value === stored)?.label ?? ''
+    const selectedLabel = labelOf(value)
 
     const [open, setOpen] = React.useState(false)
-    const [text, setText] = React.useState(value)
+    const [text, setText] = React.useState(selectedLabel)
     // The list shows every option until the person types; only typing filters.
     const [typed, setTyped] = React.useState(false)
     const [activeIndex, setActiveIndex] = React.useState(0)
@@ -82,17 +112,18 @@ const ComboboxField = React.forwardRef<HTMLInputElement, ComboboxFieldProps>(
     const valueRef = React.useRef(value)
     valueRef.current = value
 
-    // The value can change from outside (the province resets the city).
+    // The value can change from outside (the province resets the city), and an
+    // option list loaded later gives a stored id its label.
     React.useEffect(() => {
-      setText(value)
+      setText(selectedLabel)
       setTyped(false)
-    }, [value])
+    }, [value, selectedLabel])
 
     const visible = React.useMemo(() => {
       const query = fold(text)
-      if (!typed || !query) return options
-      return options.filter((option) => fold(option).includes(query))
-    }, [options, text, typed])
+      if (!typed || !query) return items
+      return items.filter((item) => fold(item.label).includes(query))
+    }, [items, text, typed])
 
     React.useEffect(() => {
       if (!open) return
@@ -102,27 +133,27 @@ const ComboboxField = React.forwardRef<HTMLInputElement, ComboboxFieldProps>(
         ?.scrollIntoView?.({ block: 'nearest' })
     }, [activeIndex, open])
 
-    const choose = (option: string) => {
-      setText(option)
+    const choose = (item: { value: string; label: string }) => {
+      setText(item.label)
       setTyped(false)
       setOpen(false)
-      if (option !== valueRef.current) onChange(option)
+      if (item.value !== valueRef.current) onChange(item.value)
     }
 
     const openList = () => {
       if (disabled) return
-      const index = options.indexOf(value)
+      const index = items.findIndex((item) => item.value === value)
       setActiveIndex(index >= 0 && !typed ? index : 0)
       setOpen(true)
     }
 
     const settle = () => {
       setOpen(false)
-      const exact = options.find((option) => fold(option) === fold(text))
+      const exact = items.find((item) => fold(item.label) === fold(text))
       if (exact && text.trim()) choose(exact)
       else {
         // Free text is never a value: fall back to what is stored.
-        setText(value)
+        setText(labelOf(valueRef.current))
         setTyped(false)
       }
       onBlur?.()
@@ -143,7 +174,7 @@ const ComboboxField = React.forwardRef<HTMLInputElement, ComboboxFieldProps>(
         event.preventDefault()
         event.stopPropagation()
         setOpen(false)
-        setText(value)
+        setText(selectedLabel)
         setTyped(false)
       }
     }
@@ -155,23 +186,27 @@ const ComboboxField = React.forwardRef<HTMLInputElement, ComboboxFieldProps>(
         className={cn('flex w-full flex-col gap-2 text-right', wrapperClassName)}
         ref={wrapperRef}
       >
-        <Typography
-          as="label"
-          htmlFor={inputId}
-          variant="16/regular"
-          color="neutral-600"
-          className="cursor-pointer select-none"
-        >
-          {label}
-          {required && !hideRequiredMark ? <RequiredMark className="ms-0.5" /> : null}
-        </Typography>
+        {!hideLabel && (
+          <Typography
+            as="label"
+            htmlFor={inputId}
+            variant="16/regular"
+            color="neutral-600"
+            className="cursor-pointer select-none"
+          >
+            {label}
+            {required && !hideRequiredMark ? <RequiredMark className="ms-0.5" /> : null}
+          </Typography>
+        )}
+        {/* The form gets the stored value (an id), not the label the person sees. */}
+        {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
 
         <div className="flex w-full flex-col gap-1">
           <Popover open={open && !disabled} onOpenChange={(next) => !next && settle()}>
             <PopoverAnchor asChild>
               <div
                 data-slot="input-container"
-                data-invalid={error ? 'true' : undefined}
+                data-invalid={error || invalid ? 'true' : undefined}
                 className={cn(
                   'group relative flex h-12 w-full items-center gap-2 rounded-lg border border-neutral-200 bg-background px-3 py-2 transition-colors duration-150 focus-within:border-brand-500 hover:border-brand-500 data-[invalid=true]:border-error-100 data-[invalid=true]:focus-within:border-error-500',
                   disabled && 'cursor-not-allowed border-neutral-100 bg-neutral-50 hover:border-neutral-100',
@@ -181,7 +216,6 @@ const ComboboxField = React.forwardRef<HTMLInputElement, ComboboxFieldProps>(
                 <input
                   ref={ref}
                   id={inputId}
-                  name={name}
                   type="text"
                   dir="rtl"
                   role="combobox"
@@ -190,9 +224,12 @@ const ComboboxField = React.forwardRef<HTMLInputElement, ComboboxFieldProps>(
                   aria-controls={listId}
                   aria-expanded={open}
                   aria-activedescendant={open && visible[activeIndex] ? `${listId}-${activeIndex}` : undefined}
-                  aria-describedby={helperId}
-                  aria-invalid={error ? true : undefined}
+                  aria-label={ariaLabel}
+                  aria-describedby={ariaDescribedBy}
+                  aria-invalid={error || invalid ? true : undefined}
                   aria-required={required || undefined}
+                  // A native form's required check: the text is the chosen label, or ''.
+                  required={required}
                   disabled={disabled}
                   placeholder={placeholder}
                   value={text}
@@ -266,23 +303,23 @@ const ComboboxField = React.forwardRef<HTMLInputElement, ComboboxFieldProps>(
                     {emptyText}
                   </li>
                 ) : (
-                  visible.map((option, index) => (
+                  visible.map((item, index) => (
                     <li
-                      key={option}
+                      key={`${index}:${item.value}`}
                       id={`${listId}-${index}`}
                       role="option"
-                      aria-selected={option === value}
+                      aria-selected={item.value === value}
                       data-active={index === activeIndex ? 'true' : undefined}
                       // Keep focus in the input so the field is not "left" by a click.
                       onMouseDown={(event) => event.preventDefault()}
                       onMouseEnter={() => setActiveIndex(index)}
-                      onClick={() => choose(option)}
+                      onClick={() => choose(item)}
                       className={cn(
                         typographyVariants({ variant: '16/regular', color: 'neutral-700' }),
                         'cursor-pointer rounded-md px-3 py-2 text-right data-[active=true]:bg-neutral-100 aria-selected:font-semibold aria-selected:text-brand-500',
                       )}
                     >
-                      {option}
+                      {item.label}
                     </li>
                   ))
                 )}
@@ -290,7 +327,7 @@ const ComboboxField = React.forwardRef<HTMLInputElement, ComboboxFieldProps>(
             </PopoverContent>
           </Popover>
 
-          {(error || hint) && (
+          {!hideLabel && (error || hint) && (
             <Typography
               as="p"
               id={helperId}

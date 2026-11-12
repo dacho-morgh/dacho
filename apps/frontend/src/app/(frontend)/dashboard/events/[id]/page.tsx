@@ -123,7 +123,8 @@ function extractDescription(desc: unknown): string {
 
 function formatDateRange(start: string, end: string): string {
   if (!start) return 'تاریخ ثبت نشده است'
-  const formatter = new Intl.DateTimeFormat('fa-IR', {
+  const formatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  timeZone: 'Asia/Tehran',
     year: 'numeric',
     month: 'long',
     day: 'numeric',

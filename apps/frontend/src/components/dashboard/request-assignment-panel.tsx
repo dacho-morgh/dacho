@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import { DashboardApiError, describeMutationFailure } from '@/utilities/dashboard-api'
-import { NativeSelect } from '@/components/ui/native-select'
+import { DashboardSelect } from '@/components/dashboard/dashboard-select'
 import { toast } from 'sonner'
 
 interface Assignment {
@@ -152,20 +152,22 @@ export function RequestAssignmentPanel({ id }: { id: string }) {
         <Typography variant="14/regular" color="neutral-400">هنوز انتسابی ثبت نشده است.</Typography>
       ) : null}
       <div className="flex flex-wrap items-end gap-2">
-        <label className="flex w-full flex-col gap-1 sm:w-auto sm:min-w-60">
-          <Typography variant="12/regular" color="neutral-500">شخص</Typography>
-          <NativeSelect
+        <div className="flex w-full flex-col gap-1 sm:w-auto sm:min-w-72">
+          <Typography as="label" htmlFor="request-assignment-person" variant="12/regular" color="neutral-500">
+            شخص
+          </Typography>
+          <DashboardSelect
+            id="request-assignment-person"
+            label="شخص"
+            placeholder="شخص را جستجو یا انتخاب کنید"
+            options={employees.map((employee) => ({
+              value: employee.id,
+              label: `${employee.name ?? employee.id} — ${assignmentRoleLabel(employee.operationalRole)}`,
+            }))}
             value={selectedEmployee}
-            onChange={(event) => setSelectedEmployee(event.target.value)}
-          >
-            <option value="">انتخاب کنید</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.name ?? employee.id} — {assignmentRoleLabel(employee.operationalRole)}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
+            onChange={setSelectedEmployee}
+          />
+        </div>
         <Button type="button" size="40" disabled={!selectedEmployee || busy} onClick={assign}>
           <Typography variant="14/regular" className="text-inherit">ثبت انتساب</Typography>
         </Button>

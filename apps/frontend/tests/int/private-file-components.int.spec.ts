@@ -28,6 +28,8 @@ import {
   isAuthorizedDownloadPath,
   letterAttachmentDownloadPath,
 } from '@/utilities/document-api'
+import { chooseOption, optionTexts } from './combobox-helpers'
+import { LETTER_TYPE_LABELS } from '@/utilities/dashboard-api'
 
 const DOC_ID = '11111111-1111-4111-8111-111111111111'
 const LETTER_ID = '22222222-2222-4222-8222-222222222222'
@@ -221,16 +223,16 @@ describe('NewLetterForm correspondence attachments', () => {
   }
 
   function fill() {
-    fireEvent.change(screen.getByLabelText('گیرنده'), { target: { value: 'rep-1' } })
+    chooseOption(screen.getByLabelText('گیرنده'), 'شرکت نمونه')
     fireEvent.change(screen.getByLabelText('عنوان نامه'), { target: { value: 'عنوان' } })
-    fireEvent.change(screen.getByLabelText('نوع نامه'), { target: { value: 'official' } })
+    chooseOption(screen.getByLabelText('نوع نامه'), LETTER_TYPE_LABELS['official'])
     fireEvent.change(screen.getByLabelText('متن نامه'), { target: { value: 'متن' } })
   }
 
   async function chooseCase(id = CASE_ID) {
-    const select = screen.getByLabelText('پرونده مرتبط (اختیاری)') as HTMLSelectElement
+    const select = screen.getByLabelText('پرونده مرتبط (اختیاری)') as HTMLInputElement
     await waitFor(() => expect(select.disabled).toBe(false))
-    fireEvent.change(select, { target: { value: id } })
+    chooseOption(select, id === CASE_ID ? 'REQ-1 — پرونده یک' : 'REQ-2 — پرونده دیگر')
   }
 
   it('lists only the recipient cases from the authorized request API', async () => {
@@ -238,7 +240,7 @@ describe('NewLetterForm correspondence attachments', () => {
     render(createElement(NewLetterForm, { companies }))
     fill()
     await chooseCase()
-    const options = Array.from((screen.getByLabelText('پرونده مرتبط (اختیاری)') as HTMLSelectElement).options).map((option) => option.textContent)
+    const options = optionTexts(screen.getByLabelText('پرونده مرتبط (اختیاری)'))
     expect(options).toEqual(['بدون پرونده', 'REQ-1 — پرونده یک'])
   })
 
@@ -293,7 +295,10 @@ describe('NewLetterForm correspondence attachments', () => {
     await chooseCase()
     fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [pdf()] } })
     expect(await screen.findByText('reply.pdf')).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('پرونده مرتبط (اختیاری)'), { target: { value: '' } })
+    // The dropdown is disabled while the upload runs; a person changes the case after it.
+    const caseField = screen.getByLabelText('پرونده مرتبط (اختیاری)') as HTMLInputElement
+    await waitFor(() => expect(caseField.disabled).toBe(false))
+    chooseOption(caseField, 'بدون پرونده')
     expect(screen.queryByText('reply.pdf')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'ارسال نامه' }))
     await waitFor(() => expect(send).toHaveBeenCalledTimes(1))
@@ -317,13 +322,13 @@ describe('NewLetterForm correspondence attachments', () => {
   it('explains denied and failed case lookups', async () => {
     stubApi(undefined, () => jsonResponse({ error: 'forbidden' }, 403))
     const view = render(createElement(NewLetterForm, { companies }))
-    fireEvent.change(screen.getByLabelText('گیرنده'), { target: { value: 'rep-1' } })
+    chooseOption(screen.getByLabelText('گیرنده'), 'شرکت نمونه')
     expect((await screen.findByText(/دسترسی به پرونده‌های این گیرنده/)).textContent).toContain('بدون پیوست')
     view.unmount()
 
     stubApi(undefined, () => jsonResponse({ error: 'boom' }, 500))
     render(createElement(NewLetterForm, { companies }))
-    fireEvent.change(screen.getByLabelText('گیرنده'), { target: { value: 'rep-1' } })
+    chooseOption(screen.getByLabelText('گیرنده'), 'شرکت نمونه')
     expect((await screen.findByRole('alert')).textContent).toContain('دریافت پرونده‌های گیرنده انجام نشد')
   })
 })
