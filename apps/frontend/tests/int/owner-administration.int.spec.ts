@@ -168,7 +168,11 @@ describe('owner events and exhibitions list (FE40)', () => {
   })
 })
 
-describe('owner event form (FE41)', () => {
+// Each date is a picker plus two searchable hour/minute lists (24 and 60 options), so a form
+// filled end to end runs several seconds on a shared CI runner.
+const FORM_TIMEOUT = { timeout: 15_000 }
+
+describe('owner event form (FE41)', FORM_TIMEOUT, () => {
   const formFetch = (handlers: { patch?: (body: Record<string, unknown>) => Response; post?: Response; single?: () => Response } = {}) =>
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url.startsWith('/api/users?')) return json({ docs: people, hasNextPage: false })
@@ -329,7 +333,7 @@ describe('owner event form (FE41)', () => {
   })
 })
 
-describe('owner exhibition form (FE41, T60)', () => {
+describe('owner exhibition form (FE41, T60)', FORM_TIMEOUT, () => {
   it('creates an exhibition with its public page and booth limit', async () => {
     const request = vi.fn(async (_url: string, init?: RequestInit) =>
       init?.method === 'POST' ? json({ exhibition: exhibition1 }, 201) : json({}, 404),
