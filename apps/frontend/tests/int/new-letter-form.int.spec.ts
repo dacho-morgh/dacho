@@ -90,9 +90,13 @@ describe('NewLetterForm', () => {
     expect(screen.queryByLabelText('فایل پیوست')).toBeNull()
   })
 
-  it('keeps support-message attachments explicitly unsupported', () => {
+  it('offers support-message attachments only to a company representative', () => {
     render(createElement(NewLetterForm, { mode: 'support' }))
-    expect((screen.getByLabelText('فایل پیوست') as HTMLInputElement).disabled).toBe(true)
+    expect(screen.queryByRole('heading', { name: 'فایل پیوست' })).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain('پیوست فایل فقط برای نماینده یک شرکت ثبت‌شده ممکن است.')
+    cleanup()
+    render(createElement(NewLetterForm, { mode: 'support', companyId: 'company-1' }))
+    expect(screen.getByRole('heading', { name: 'فایل پیوست' })).toBeTruthy()
   })
   it('sends the selected recipient and type with trimmed text, then returns to letters', async () => {
     const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ letter: { id: 'letter-1' } })))

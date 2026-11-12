@@ -75,18 +75,42 @@ describe('Postgres Company Verification Integration (T14)', () => {
     expect(activities.rows).toEqual([{ action: 'verification_submit' }])
   })
 
-  it.each(['return', 'reject'] as const)('serializes resubmissions after %s and preserves the previous decision', async (action) => {
+  it('serializes resubmissions after return and preserves the previous decision', async () => {
     const store = new PostgresVerificationStore(pool)
     const input = submission()
     await store.submit(input)
-    await store.decide({ companyId: input.companyId, action, reviewerId: randomUUID(), reason: 'Correct documents', expectedRevision: 1 })
+    await store.decide({ companyId: input.companyId, action: 'return', reviewerId: randomUUID(), reason: 'Correct documents', expectedRevision: 1 })
     const results = await Promise.all(Array.from({ length: 10 }, () => store.submit(input)))
     expect(results.filter((result) => result.ok)).toHaveLength(1)
     expect(results.filter((result) => !result.ok)).toHaveLength(9)
     const history = await store.listHistory(input.companyId)
     expect(history).toHaveLength(2)
     expect(history[0]).toMatchObject({ revision: 2, status: 'pending' })
-    expect(history[1]).toMatchObject({ revision: 1, status: action === 'return' ? 'returned' : 'rejected', reason: 'Correct documents' })
+    expect(history[1]).toMatchObject({ revision: 1, status: 'returned', reason: 'Correct documents' })
+  })
+
+  it('blocks resubmission after reject until reopened, then serializes it', async () => {
+    const store = new PostgresVerificationStore(pool)
+    const input = submission()
+    await store.submit(input)
+    await store.decide({ companyId: input.companyId, action: 'reject', reviewerId: randomUUID(), reason: 'Invalid documents', expectedRevision: 1 })
+    const blocked = await Promise.all(Array.from({ length: 3 }, () => store.submit(input)))
+    expect(blocked).toEqual(Array.from({ length: 3 }, () => ({ ok: false, reason: 'rejected' })))
+
+    expect((await store.decide({ companyId: input.companyId, action: 'reopen', reviewerId: randomUUID() })).ok).toBe(true)
+    const results = await Promise.all(Array.from({ length: 10 }, () => store.submit(input)))
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toHaveLength(9)
+    const history = await store.listHistory(input.companyId)
+    expect(history).toHaveLength(2)
+    expect(history[0]).toMatchObject({ revision: 2, status: 'pending' })
+    expect(history[1]).toMatchObject({ revision: 1, status: 'returned' })
+    const trail = await pool.query(
+      "SELECT action, reason FROM dashboard.activities WHERE owner_id = $1 AND action IN ('verification_reject', 'verification_reopen')",
+      [input.representativeId],
+    )
+    // The rejection's reason stays in the trail after the reopen.
+    expect(trail.rows).toEqual(expect.arrayContaining([{ action: 'verification_reject', reason: 'Invalid documents' }]))
   })
 
   it('records only one decision and one letter when reviewers decide concurrently', async () => {
@@ -101,7 +125,8 @@ describe('Postgres Company Verification Integration (T14)', () => {
     expect(results.filter((result) => !result.ok)).toEqual(
       Array.from({ length: 4 }, () => ({ ok: false, reason: 'not_pending' })),
     )
-    const letters = await pool.query('SELECT type FROM dashboard.letters WHERE recipient_id = $1', [input.representativeId])
+    // Besides the decision letter, the inbox holds the "we received your request" notice from the submission.
+    const letters = await pool.query("SELECT type FROM dashboard.letters WHERE recipient_id = $1 AND type <> 'notification'", [input.representativeId])
     expect(letters.rows).toEqual([{ type: 'approved' }])
     const activities = await pool.query("SELECT action FROM dashboard.activities WHERE owner_id = $1 AND action = 'verification_approve'", [input.representativeId])
     expect(activities.rows).toHaveLength(1)

@@ -23,7 +23,7 @@ async function setInstant(page: Page, label: string, utc: string) {
   await page.getByRole('button', { name: 'انتخاب سال' }).click()
   await page.getByRole('group', { name: 'سال‌ها' }).getByRole('button', { name: persianDigits(date.year) }).click()
   await page.getByRole('button', { name: 'انتخاب ماه' }).click()
-  await page.getByRole('group', { name: 'ماه‌ها' }).getByRole('button', { name: month }).click()
+  await page.getByRole('group', { name: 'ماه‌ها' }).getByRole('button', { name: month, exact: true }).click()
   await page.getByRole('button', { name: new RegExp(`(^|[\\s،])${persianDigits(date.day)}-ام ${month} ${persianDigits(date.year)}`) }).click()
   // Hour and minute are searchable dropdowns that show two Persian digits.
   for (const [part, value] of [['ساعت', hour], ['دقیقه', minute]] as const) {

@@ -541,8 +541,8 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
         expect(res.status).toBe(200)
         const ids = visibleCases(role, idle)()
         const items = res.body.items as { id: string }[]
-        const rows = (await pool.query<{ request_id: string | null }>(
-          'SELECT request_id FROM dashboard.activities WHERE id = ANY($1::uuid[])',
+        const rows = (await pool.query<{ request_id: string | null; owner_id: string }>(
+          'SELECT request_id, owner_id FROM dashboard.activities WHERE id = ANY($1::uuid[])',
           [items.map((item) => item.id)],
         )).rows
         expect(rows).toHaveLength(items.length)
@@ -550,7 +550,11 @@ describe('T42: seven roles across own, other and unassigned records (int)', () =
         if (idle) expect(res.body.total).toBe(0)
         else expect(rows.map((row) => row.request_id)).toEqual(expect.arrayContaining([caseA.id]))
         if (!FUND_WIDE.includes(role)) {
-          for (const row of rows) expect(ids).toContain(row.request_id)
+          for (const row of rows) {
+            // The company's own feed also lists what names no case (verification, support), but only its own.
+            if (role === 'company' && row.request_id === null) expect(row.owner_id).toBe(actor)
+            else expect(ids).toContain(row.request_id)
+          }
         }
       })
     }

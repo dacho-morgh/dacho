@@ -185,7 +185,7 @@ describe('RequestsPage', () => {
   it('offers no event when the overview cannot be read, and the list still renders', async () => {
     asUser('representative')
     backend.fetch.mockImplementation(async (path: string) =>
-      path.startsWith('/stats/overview')
+      path.startsWith('/stats/overview') || path === '/profile/verification'
         ? { kind: 'denied' }
         : path.startsWith('/stats')
           ? { kind: 'ok', data: stats }

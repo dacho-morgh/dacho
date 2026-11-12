@@ -232,13 +232,19 @@ const EXPECTED_REPORT = {
 const reconcile = (database: string) => withClient(database, collectMigrationReconciliation)
 
 /** Every legacy table and column, read back from another database. */
-async function legacyRows(source: string, tables: { table: string; columns: string[] }[]) {
+async function legacyRows(
+  source: string,
+  tables: { table: string; columns: string[] }[],
+  /** Per table, a filter that leaves out rows the upgrade adds on purpose. */
+  where: Record<string, string> = {},
+) {
   return withClient(source, async (client) => {
     const rows: Record<string, string[]> = {}
     for (const { table, columns } of tables) {
       const list = columns.map((column) => `"${column}"`).join(', ')
+      const filter = where[table] ? ` WHERE ${where[table]}` : ''
       const result = await client.query<{ row: string }>(
-        `SELECT row_to_json(t)::text AS row FROM (SELECT ${list} FROM ${table}) t ORDER BY 1`,
+        `SELECT row_to_json(t)::text AS row FROM (SELECT ${list} FROM ${table}${filter}) t ORDER BY 1`,
       )
       rows[table] = result.rows.map(({ row }) => row)
     }
@@ -321,7 +327,15 @@ describe('migration rehearsal on separate populated data (T41)', () => {
     const shape = (await legacyShape()).filter(({ table }) => ![
       'public.users_roles', 'public.payload_migrations', 'dashboard.pgmigrations',
     ].includes(table))
-    expect(await legacyRows(CMS_FIRST, shape)).toEqual(await legacyRows(LEGACY, shape))
+    // The support-ticket migration backfills one feed entry per ticket (and per support answer).
+    const backfilled = "action IN ('support_ticket_created', 'support_ticket_answered')"
+    expect(await legacyRows(CMS_FIRST, shape, { 'dashboard.activities': `action IS NULL OR NOT (${backfilled})` }))
+      .toEqual(await legacyRows(LEGACY, shape))
+    const feed = await withClient(CMS_FIRST, (client) => client.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM dashboard.activities WHERE action = 'support_ticket_created'`))
+    const tickets = await withClient(LEGACY, (client) => client.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM dashboard.support_tickets'))
+    expect(feed.rows[0]!.count).toBe(tickets.rows[0]!.count)
 
     await withClient(CMS_FIRST, async (client) => {
       const users = await client.query(`SELECT id, operational_role::text AS role, is_active AS active,
