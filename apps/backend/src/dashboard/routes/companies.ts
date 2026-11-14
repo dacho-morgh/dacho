@@ -1,6 +1,7 @@
 // Moved verbatim from dashboard/router.ts (S0, #238); keep route order within this file.
 import type { Router } from 'express'
 import type { NextFunction, Request, Response } from 'express'
+import { bindRequestScope, requestScopeFor } from '../../access/policy.js'
 import { operationalRoleOf } from '../../access/roles.js'
 import { changesAddress, changesCompany, COMPANY_EDIT_REVERIFICATION_REASON } from '../company-edits.js'
 import type { CompanyInfo } from '../profile-repo.js'
@@ -23,7 +24,7 @@ function shortText(value: unknown): string | undefined {
 }
 
 export function registerCompanyRoutes(router: Router, ctx: DashboardContext): void {
-  const { deps, profileRepo, verificationStore } = ctx
+  const { deps, profileRepo, verificationStore, repo } = ctx
 
   router.get('/admin/companies', async (req, res, next) => {
     try {
@@ -109,7 +110,10 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
   router.get('/admin/companies/:id', async (req, res, next) => {
     try {
       const actor = actorOf(res)
-      if (!isCompanyAdministrator(actor.operationalRole)) {
+      // The owner and the Secretariat manage companies. A chief reviewer may read (never change) the profile of a
+      // company that has a case in their own scope, which is how the case page links to it.
+      const chief = actor.operationalRole === 'chief-reviewer'
+      if (!isCompanyAdministrator(actor.operationalRole) && !chief) {
         res.status(403).json({ error: 'forbidden' })
         return
       }
@@ -118,12 +122,26 @@ export function registerCompanyRoutes(router: Router, ctx: DashboardContext): vo
         res.status(404).json({ error: 'not_found' })
         return
       }
+      if (chief) {
+        const cases = await repo.listScoped(bindRequestScope(requestScopeFor('chief-reviewer'), actor.id), {
+          ownerId: target.id,
+          page: 1,
+          limit: 1,
+        })
+        if (cases.total === 0) {
+          // The same answer as a company that does not exist: a chief learns nothing about unrelated companies.
+          res.status(404).json({ error: 'not_found' })
+          return
+        }
+      }
       // One company read serves the profile and the logo; the user was read above.
       const company = await deps.companyStore.findByRepresentative(target.id)
       const profile = profileRepo.profileFor(target, company)
       const currentVerif = company ? await verificationStore.findCurrentByCompanyId(company.id) : null
       const otherThanOwn = target.id !== actor.id && currentVerif?.representativeId !== actor.id
-      const allowedActions = currentVerif?.status === 'pending' && otherThanOwn
+      const allowedActions = chief
+        ? ['read']
+        : currentVerif?.status === 'pending' && otherThanOwn
         ? ['read', 'approve', 'return', 'reject']
         : currentVerif?.status === 'rejected' && otherThanOwn
           ? ['read', 'reopen']

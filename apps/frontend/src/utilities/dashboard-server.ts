@@ -120,6 +120,14 @@ export function canReadCompanyDossiers(user: SeniorManagerCandidate | null | und
   return role === 'system-owner' || role === 'central-secretariat'
 }
 
+/**
+ * A single company's page. The owner and the Secretariat manage companies; a chief reviewer may open the page of a
+ * company that has a case in their scope (the server refuses any other) and only read it.
+ */
+export function canReadCompanyDetail(user: SeniorManagerCandidate | null | undefined): boolean {
+  return canReadCompanyDossiers(user) || dashboardOperationalRole(user) === 'chief-reviewer'
+}
+
 /** The Secretariat's follow-up cases (sent investment memos), as the API's follow-up readers. */
 export function canReadFollowUps(user: SeniorManagerCandidate | null | undefined): boolean {
   const role = dashboardOperationalRole(user)

@@ -26,7 +26,14 @@ export type AdminRequestRow = {
   pending: string | null
   /** The case can be evaluated by this person (initial review or the review decision). */
   canEvaluate: boolean
+  /** What the server lists for this person on this case; the row menu offers the triage commands from it. */
+  allowedActions: RequestAction[]
+  /** The case revision a command is sent against. */
+  revision?: number
+  /** The real review stage, which decides the status tag of a case in review. */
+  reviewStage: string | null
   createdAt: string | null
+  dueDate: string | null
   /**
    * A Secretariat follow-up case (its investment memo was sent): whether the result is published.
    * Null for every other case, and for readers who may not know about memos.
@@ -53,7 +60,9 @@ export type AdminRequestsApiResponse = {
     status: RequestStatus
     reviewStage?: string | null
     allowedActions?: RequestAction[]
+    revision?: number
     createdAt?: string | null
+    dueDate?: string | null
     /** Sent only to the Secretariat and the owner; null when no memo was sent. */
     followUp?: { latestMemoSentAt: string; publishedAt: string | null } | null
     owner?: {
@@ -97,7 +106,11 @@ export function toAdminRequestsPage(data: AdminRequestsApiResponse, requestedPag
       stage: (item.reviewStage && STAGE_LABELS[item.reviewStage]) || '—',
       pending: PENDING_LABELS.find(([action]) => item.allowedActions?.includes(action))?.[1] ?? null,
       canEvaluate: item.allowedActions?.some((action) => action === 'triage' || action === 'decideReview') ?? false,
+      allowedActions: item.allowedActions ?? [],
+      revision: item.revision,
+      reviewStage: item.reviewStage ?? null,
       createdAt: item.createdAt ?? null,
+      dueDate: item.dueDate ?? null,
       followUp: item.followUp ? { published: Boolean(item.followUp.publishedAt) } : null,
     })),
     page: data.page ?? requestedPage,

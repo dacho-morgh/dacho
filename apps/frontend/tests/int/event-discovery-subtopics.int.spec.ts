@@ -203,7 +203,7 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
 
     // Click on RFP button for subtopic 1
     const rfpButton = screen.getByRole('button', {
-      name: /دریافت فایل RFP برای ساخت دستگاه پلیمرزدایی از تاورها|مشاهده و دانلود RFP/i,
+      name: /ساخت دستگاه پلیمرزدایی از تاورها/i,
     })
     fireEvent.click(rfpButton)
 
@@ -227,7 +227,7 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
 
     // Click on RFP button for subtopic 2 (which has currentRfpVersionId: null)
     const rfpButton2 = screen.getByRole('button', {
-      name: /دریافت فایل RFP برای طراحی و ساخت پمپ مگنتی مقاوم به خوردگی/i,
+      name: /طراحی و ساخت پمپ مگنتی مقاوم به خوردگی/i,
     })
     fireEvent.click(rfpButton2)
 
@@ -236,7 +236,7 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
     })
   })
 
-  it('allows multi-selection of subtopics and warns each becomes a separate application', async () => {
+  it('opens a title and subtitle popup on «ثبت نام» and continues to the application for the chosen subtitle', async () => {
     render(
       createElement(EventsView, {
         initialEventsList: [mockEvent],
@@ -247,80 +247,21 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
     await waitFor(() => {
       expect(screen.getByText('ساخت دستگاه پلیمرزدایی از تاورها')).toBeDefined()
     })
+    expect(screen.queryByRole('checkbox')).toBeNull()
 
-    // Must clearly state each selected subtopic becomes a separate application
-    expect(
-      screen.getByText(/برای هر زیرعنوان انتخاب‌شده، یک پرونده و کد رهگیری جداگانه تشکیل خواهد شد/i),
-    ).toBeDefined()
-
-    // Select subtopic 1
-    const checkbox1 = screen.getByRole('checkbox', {
-      name: /انتخاب زیرعنوان ساخت دستگاه پلیمرزدایی از تاورها/i,
-    })
-    fireEvent.click(checkbox1)
-    expect(checkbox1.getAttribute('aria-checked')).toBe('true')
-
-    // Select subtopic 2
-    const checkbox2 = screen.getByRole('checkbox', {
-      name: /انتخاب زیرعنوان طراحی و ساخت پمپ مگنتی مقاوم به خوردگی/i,
-    })
-    fireEvent.click(checkbox2)
-    expect(checkbox2.getAttribute('aria-checked')).toBe('true')
-
-    // Counter badge shows 2 selected
-    expect(screen.getByText(/۲ زیرعنوان انتخاب شده/i)).toBeDefined()
-
-    // Register button reflects count
-    const registerBtn = screen.getByRole('button', { name: /ثبت درخواست \(۲ زیرعنوان\)/i })
-    expect(registerBtn).toBeDefined()
+    const registerBtn = screen.getByRole('button', { name: 'ثبت نام' })
     await waitFor(() => expect((registerBtn as HTMLButtonElement).disabled).toBe(false))
-
-    // Clicking register passes real server IDs
     fireEvent.click(registerBtn)
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `eventId=${encodeURIComponent(mockEvent.rawId!)}&subtopicId=sub-1%2Csub-2`,
-      ),
-    )
-  })
+    expect(mockPush).not.toHaveBeenCalled()
 
-  it('provides quick selection modal matching Figma Frame 120', async () => {
-    render(
-      createElement(EventsView, {
-        initialEventsList: [mockEvent],
-        initialSelectedEventId: mockEvent.rawId,
-      }),
-    )
-
-    await waitFor(() => {
-      expect(screen.getByText('عنوان ها و زیر عنوان های رویداد')).toBeDefined()
-    })
-
-    // Open quick select modal
-    const modalTrigger = screen.getByRole('button', { name: /انتخاب سریع عنوان/i })
-    fireEvent.click(modalTrigger)
-
-    // Modal appears with title "انتخاب عنوان"
     expect(screen.getByText('انتخاب عنوان')).toBeDefined()
-    expect(
-      screen.getByText('برای مشاهده فرم عنوان و زیر عنوان مورد نظر خود را انتخاب کنید.'),
-    ).toBeDefined()
+    chooseOption(screen.getByLabelText('عنوان'), 'دیجیتالیزاسیون و هوش مصنوعی')
+    chooseOption(screen.getByLabelText('زیر عنوان'), 'سامانه مانیتورینگ هوشمند ارتعاشات توربین')
 
-    // Select category and subtopic in modal
-    const catSelect = screen.getByLabelText('عنوان')
-    chooseOption(catSelect, 'دیجیتالیزاسیون و هوش مصنوعی')
-
-    const subSelect = screen.getByLabelText('زیر عنوان')
-    chooseOption(subSelect, 'سامانه مانیتورینگ هوشمند ارتعاشات توربین')
-
-    // Confirm selection
-    const confirmBtn = screen.getByRole('button', { name: /^تایید$/i })
-    fireEvent.click(confirmBtn)
-
-    // Subtopic 3 is now selected
-    await waitFor(() => {
-      expect(screen.getByText(/۱ زیرعنوان انتخاب شده/i)).toBeDefined()
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'تایید' }))
+    expect(mockPush).toHaveBeenCalledWith(
+      `/dashboard/new-request?service=events&eventId=${encodeURIComponent(mockEvent.rawId!)}&subtopicId=sub-3`,
+    )
   })
 
   it('renders empty and error states for categories gracefully', async () => {
@@ -399,7 +340,7 @@ describe('EventsView FE11 - Event discovery, subtopic selection and RFP reading'
     )
 
     const open = await screen.findByRole('button', {
-      name: 'دریافت فایل RFP برای ساخت دستگاه پلیمرزدایی از تاورها',
+      name: 'ساخت دستگاه پلیمرزدایی از تاورها',
     })
     fireEvent.click(open)
 
@@ -496,30 +437,6 @@ describe('EventsView design QA #276 - shared list toolbar, card click and event 
     expect(titles()).toEqual([older.title])
   })
 
-  it('searches and filters the subtopics on the event page with the same toolbar and template', async () => {
-    const { container } = render(
-      createElement(EventsView, { initialEventsList: [newer], initialSelectedEventId: newer.rawId }),
-    )
-    await screen.findByText('ساخت دستگاه پلیمرزدایی از تاورها')
-    const toolbar = container.querySelector('[data-slot="list-toolbar"]')!
-    expect(toolbar.firstElementChild!.querySelector('input[type="search"]')).toBeTruthy()
-
-    // Search: only the matching subtopic, and the category with nothing left disappears.
-    fireEvent.change(screen.getByRole('searchbox', { name: 'جستجوی زیرعنوان‌ها' }), { target: { value: 'مانیتورینگ' } })
-    expect(screen.getByText('سامانه مانیتورینگ هوشمند ارتعاشات توربین')).toBeDefined()
-    expect(screen.queryByText('ساخت دستگاه پلیمرزدایی از تاورها')).toBeNull()
-    expect(screen.queryByText('تجهیزات ثابت و دوار')).toBeNull()
-    fireEvent.change(screen.getByRole('searchbox', { name: 'جستجوی زیرعنوان‌ها' }), { target: { value: 'ناموجود' } })
-    expect(screen.getByText('زیرعنوانی با این جستجو یا فیلتر پیدا نشد.')).toBeDefined()
-    fireEvent.change(screen.getByRole('searchbox', { name: 'جستجوی زیرعنوان‌ها' }), { target: { value: '' } })
-
-    // Filter: by category through the template.
-    fireEvent.click(screen.getByRole('button', { name: /فیلتر زیرعنوان‌ها/ }))
-    chooseOption(screen.getByRole('combobox', { name: 'عنوان' }), /دیجیتالیزاسیون و هوش مصنوعی/)
-    fireEvent.click(screen.getByRole('button', { name: 'اعمال' }))
-    expect(screen.getByText('سامانه مانیتورینگ هوشمند ارتعاشات توربین')).toBeDefined()
-    expect(screen.queryByText('ساخت دستگاه پلیمرزدایی از تاورها')).toBeNull()
-  })
 })
 
 describe('EventsView design QA #281 - card typography, status tags and spacing', () => {
@@ -595,10 +512,10 @@ describe('EventsView design QA #281 - card typography, status tags and spacing',
     expect(button.children[1]!.getAttribute('data-variant')).toBe('16/semibold')
   })
 
-  it('keeps the register button on the event page icon first as well', async () => {
+  it('shows the register button on the event page as the plain «ثبت نام» label (Figma 31981:77644)', async () => {
     render(createElement(EventsView, { initialEventsList: [active], initialSelectedEventId: active.rawId }))
-    const button = screen.getByRole('button', { name: 'ثبت‌نام در رویداد' })
-    expect(button.children[0]!.tagName.toLowerCase()).toBe('svg')
+    const button = screen.getByRole('button', { name: 'ثبت نام' })
+    expect(button.querySelector('svg')).toBeNull()
     await waitFor(() => expect(dashboardApi.getEventCategories).toHaveBeenCalled())
   })
 

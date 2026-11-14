@@ -105,7 +105,8 @@ export function CompanyCorrectionPanel({ request, fields, after }: CompanyCorrec
   const submit = async () => {
     if (busy || done) return
     const missing: string[] = []
-    if (!isTeamComplete(team)) missing.push('applicationTeam')
+    // Naming team members is optional; a member who was started still needs a name and a role.
+    if (teamForAnswers(team).length > 0 && !isTeamComplete(team)) missing.push('applicationTeam')
     if (!documentsReady) missing.push('proposalDocuments')
     if (!acceptNonCompete) missing.push('nonCompeteAcceptance')
     if (!acceptRules) missing.push('eventRulesAcceptance')

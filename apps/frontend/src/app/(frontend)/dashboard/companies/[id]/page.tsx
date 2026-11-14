@@ -6,7 +6,7 @@ import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { CompanyDetailView } from '@/components/dashboard/company-detail-view'
 import { loadCompanyDetail } from '@/components/dashboard/company-detail/company-detail-server'
 import type { CompanyTab } from '@/components/dashboard/company-detail/company-detail-shell'
-import { canReadCompanyDossiers, dashboardOperationalRole } from '@/utilities/dashboard-server'
+import { canReadCompanyDetail, dashboardOperationalRole } from '@/utilities/dashboard-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +28,7 @@ export default async function CompanyDetailPage({
     searchParams,
   ])
   const { user } = await payload.auth({ headers: await headers() })
-  if (!canReadCompanyDossiers(user)) redirect('/dashboard?access=denied')
+  if (!canReadCompanyDetail(user)) redirect('/dashboard?access=denied')
 
   if (detail.kind === 'missing') notFound()
   if (detail.kind === 'unavailable') {
@@ -47,6 +47,7 @@ export default async function CompanyDetailPage({
       tab={active}
       initial={detail.data}
       canManageAccount={dashboardOperationalRole(user) === 'system-owner'}
+      readOnly={dashboardOperationalRole(user) === 'chief-reviewer'}
     />
   )
 }

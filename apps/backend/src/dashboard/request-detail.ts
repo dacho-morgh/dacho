@@ -38,6 +38,8 @@ export interface RequestEventDto {
   title: string
   category: { id: string; title: string } | null
   subtopic: { id: string; title: string } | null
+  /** The public page's description (plain text); null without one or when the CMS did not answer. */
+  description: string | null
   /** The public page's poster, a public media URL; null without one or when the CMS did not answer. */
   image: { url: string; alt: string | null } | null
   /** When and where the event is held, from its public page; null when the CMS did not answer. */
@@ -83,6 +85,7 @@ export async function requestEvent(pool: Pool, publicRecords: PublicRecordStore,
     title: row.title,
     category: row.category_id && row.category_title ? { id: row.category_id, title: row.category_title } : null,
     subtopic: row.subtopic_id && row.subtopic_title ? { id: row.subtopic_id, title: row.subtopic_title } : null,
+    description: page?.description || null,
     image: page?.image ?? null,
     startDate: page?.startDate || null,
     endDate: page?.endDate || null,

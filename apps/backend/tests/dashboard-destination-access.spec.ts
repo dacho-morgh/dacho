@@ -32,6 +32,10 @@ describe('current-role dashboard destinations', () => {
   it('restricts company, employee, and company-profile routes to their current role', () => {
     expect(canOpenDashboardDestination('central-secretariat', '/dashboard/companies/42')).toBe(true)
     expect(canOpenDashboardDestination('reviewer', '/dashboard/companies/42')).toBe(false)
+    // A chief reviewer opens one company's page from a case, never the list or the pages beneath it.
+    expect(canOpenDashboardDestination('chief-reviewer', '/dashboard/companies/42')).toBe(true)
+    expect(canOpenDashboardDestination('chief-reviewer', '/dashboard/companies')).toBe(false)
+    expect(canOpenDashboardDestination('chief-reviewer', '/dashboard/companies/42/requests/7')).toBe(false)
     expect(canOpenDashboardDestination('reviewer', '/dashboard/employees')).toBe(false)
     expect(canOpenDashboardDestination('reviewer', '/dashboard/profile/company')).toBe(false)
     expect(canOpenDashboardDestination('representative', '/dashboard/profile/company')).toBe(true)

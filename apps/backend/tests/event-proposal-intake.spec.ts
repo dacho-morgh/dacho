@@ -347,7 +347,7 @@ describe('T20: Fixed form, draft saving, server validation and versioned proposa
               owner_id: 'rep-1',
               company_id: '1',
               service_id: 'srv-event',
-              answers: {}, // No applicationTeam
+              answers: {}, // No applicationTeam: naming team members is optional
               created_at: new Date(),
               updated_at: new Date(),
             },
@@ -369,7 +369,8 @@ describe('T20: Fixed form, draft saving, server validation and versioned proposa
     const res = await request(app).post(`/requests/${reqId}/submit`).set(authHeaders).send({})
     expect(res.status).toBe(400)
     expect(res.body.error).toBe('invalid_answers')
-    expect(res.body.missingFields).toContain('applicationTeam')
+    // The key team is optional now, so an empty one is not reported; the documents and agreements still are.
+    expect(res.body.missingFields).not.toContain('applicationTeam')
     expect(res.body.missingFields).toContain('proposalDocuments')
     expect(res.body.missingFields).toContain('nonCompeteAcceptance')
     expect(res.body.missingFields).toContain('eventRulesAcceptance')

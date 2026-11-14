@@ -10,12 +10,14 @@ import { CompanyRequestTracking } from '@/components/dashboard/company-request-t
 import { FinancialOutcomeCard } from '@/components/dashboard/financial-outcome-card'
 import { FinancialPackagePanel } from '@/components/dashboard/financial-package-panel'
 import { RequestDossier, type DossierPart } from '@/components/dashboard/request-dossier'
+import { EventApplicationCards } from '@/components/dashboard/request-detail/event-application-cards'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
 import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
   formatDate,
   type CompanySupplementaryRequestDto,
+  type RfpVersionDto,
   type EvaluationListDto,
   type PublishedResultDto,
   type RequestDetail,
@@ -216,10 +218,40 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const correctionFields = correcting ? await serviceFields(payload, result.data.request.serviceId) : []
   const outcome = isCompany ? trackingOutcome(result.data.request, result.data.timeline) : null
 
+  // An event application opens with the event, its chosen title and files, the submitted proposal and the notes.
+  const event = result.data.event ?? null
+  let eventCards: ReactNode = null
+  if (event) {
+    const rfp = await readPart<{ version: RfpVersionDto }>(`${path}/rfp`)
+    eventCards = (
+      <EventApplicationCards
+        variant={role === 'chief-reviewer' ? 'chief' : 'cards'}
+        requestId={id}
+        event={event}
+        rfpFiles={rfp && rfp !== 'failed' ? (rfp.version.files ?? []) : []}
+        notes={typeof result.data.request.answers?.proposalNotes === 'string' ? result.data.request.answers.proposalNotes : ''}
+        submittedProposals={(proposal && proposal !== 'failed' ? (proposal.proposal?.proposalDocuments ?? []) : []).map((file) => ({
+          id: file.id,
+          filename: file.filename,
+        }))}
+      />
+    )
+  }
+
   return (
     <RequestDossier
       role={role}
       correctionHandled={correcting}
+      eventCards={eventCards}
+      headerActions={
+        isCompany ? (
+          <Button asChild variant="outline-gray" size="40">
+            <Link href={`/dashboard/letters/new?requestId=${encodeURIComponent(id)}`}>
+              <Typography as="span" variant="16/semibold" className="text-inherit">نامه به دبیرخانه</Typography>
+            </Link>
+          </Button>
+        ) : null
+      }
       detail={result.data}
       proposal={proposal}
       round={round}
@@ -236,6 +268,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
             proposalRevision={proposal === 'failed' ? 'failed' : (proposal?.proposal?.revision ?? null)}
             publishedResult={publishedResult}
             supplementary={supplementary}
+            showTracking={!event}
             correction={
               correcting ? (
                 <CompanyCorrectionPanel
@@ -260,6 +293,7 @@ function CompanySections({
   publishedResult,
   supplementary,
   correction,
+  showTracking,
 }: {
   request: RequestDetail['request']
   timeline: RequestDetail['timeline']
@@ -267,6 +301,7 @@ function CompanySections({
   publishedResult: DossierPart<{ result: PublishedResultDto | null }>
   supplementary: DossierPart<{ items: CompanySupplementaryRequestDto[] }>
   correction: ReactNode
+  showTracking: boolean
 }) {
   const requestId = request.id
   const result = publishedResult === 'failed' ? null : (publishedResult?.result ?? null)
@@ -282,21 +317,19 @@ function CompanySections({
           resultPublished={Boolean(result)}
         />
       ) : null}
-      <CompanyRequestTracking
-        request={request}
-        timeline={timeline}
-        proposalRevision={proposalRevision}
-        publishedResult={publishedResult}
-        correction={correction}
-        resultShownElsewhere
-      />
-      <div className="flex justify-end">
-        <Button asChild variant="outline-gray" size="40">
-          <Link href={`/dashboard/letters/new?requestId=${encodeURIComponent(requestId)}`}>
-            <Typography as="span" variant="16/semibold" className="text-inherit">نامه به دبیرخانه</Typography>
-          </Link>
-        </Button>
-      </div>
+      {/* An event application shows its stepper in its own card; only the correction form still has to appear. */}
+      {showTracking ? (
+        <CompanyRequestTracking
+          request={request}
+          timeline={timeline}
+          proposalRevision={proposalRevision}
+          publishedResult={publishedResult}
+          correction={correction}
+          resultShownElsewhere
+        />
+      ) : (
+        correction
+      )}
       {supplementary === 'failed' ? (
         <Typography role="alert" variant="14/regular" color="error">
           دریافت درخواست‌های دبیرخانه انجام نشد. صفحه را دوباره بارگذاری کنید.

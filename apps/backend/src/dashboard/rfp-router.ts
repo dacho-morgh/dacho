@@ -8,6 +8,11 @@ import { DOCUMENT_POLICY_VERSION, MAX_DOCUMENT_BYTES, validateDocumentFile } fro
 import type { PrivateDocumentStorage } from '../documents/storage.js'
 import { RequestRepository } from './request-repo.js'
 import { bindRequestScope, requestScopeFor } from '../access/policy.js'
+import {
+  DEFAULT_PROPOSAL_TEMPLATE_FILENAME,
+  DEFAULT_PROPOSAL_TEMPLATE_MIME,
+  defaultProposalTemplateBody,
+} from './default-proposal-template.js'
 
 interface Deps {
   pool: Pool
@@ -16,6 +21,7 @@ interface Deps {
 }
 
 const base = '/events/:eventId/subtopics/:subtopicId/rfp'
+const templatePath = '/events/:eventId/proposal-template'
 const fileColumns = 'id, filename, mime_type AS "mimeType", size_bytes AS "sizeBytes", policy_version AS "policyVersion"'
 
 export function createRfpRouter({ pool, companyStore, privateDocumentStorage: storage }: Deps): Router {
@@ -147,6 +153,179 @@ export function createRfpRouter({ pool, companyStore, privateDocumentStorage: st
       }
     },
   )
+
+  // ── The event's sample proposal form (نمونه فرم پروپوزال) ───────────────────────────────────────────
+  // Every event offers one. Until the owner replaces it, the bundled default below is served; a reset
+  // deletes the replacement so the default applies again.
+  router.use(`/admin${templatePath}`, (_req, res, next) => {
+    if (actorOf(res).operationalRole !== 'system-owner') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+    next()
+  })
+
+  const eventExists = async (eventId: string | undefined): Promise<boolean> =>
+    typeof eventId === 'string' &&
+    isUuid(eventId) &&
+    ((await pool.query('SELECT 1 FROM dashboard.events WHERE id=$1', [eventId])).rowCount ?? 0) > 0
+
+  interface TemplateRow {
+    storage_key: string
+    filename: string
+    mimeType: string
+    sizeBytes: number
+    updatedAt: string
+  }
+  const readTemplateRow = async (eventId: string): Promise<TemplateRow | undefined> =>
+    (
+      await pool.query<TemplateRow>(
+        `SELECT storage_key, filename, mime_type AS "mimeType", size_bytes AS "sizeBytes", updated_at AS "updatedAt"
+         FROM dashboard.event_proposal_templates WHERE event_id=$1`,
+        [eventId],
+      )
+    ).rows[0]
+
+  const describeTemplate = (row: TemplateRow | undefined) =>
+    row
+      ? { filename: row.filename, mimeType: row.mimeType, sizeBytes: row.sizeBytes, isDefault: false, updatedAt: row.updatedAt }
+      : {
+          filename: DEFAULT_PROPOSAL_TEMPLATE_FILENAME,
+          mimeType: DEFAULT_PROPOSAL_TEMPLATE_MIME,
+          sizeBytes: defaultProposalTemplateBody().length,
+          isDefault: true,
+          updatedAt: null,
+        }
+
+  router.get(templatePath, async (req, res, next) => {
+    try {
+      const { eventId } = req.params
+      if (!(await eventExists(eventId))) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      res.set('Cache-Control', 'private, no-store').json({ template: describeTemplate(await readTemplateRow(eventId!)) })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  router.get(`${templatePath}/file`, async (req, res, next) => {
+    try {
+      const { eventId } = req.params
+      if (!(await eventExists(eventId))) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const row = await readTemplateRow(eventId!)
+      const meta = describeTemplate(row)
+      const body = row ? await storage.read(row.storage_key) : defaultProposalTemplateBody()
+      if (!body) {
+        res.status(410).json({ error: 'document_unavailable' })
+        return
+      }
+      res
+        .set({
+          'Content-Type': meta.mimeType,
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(meta.filename)}`,
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Security-Policy': "default-src 'none'; sandbox",
+        })
+        .send(body)
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  const uploadTemplate = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_DOCUMENT_BYTES + 1 },
+  }).single('file')
+
+  router.put(
+    `/admin${templatePath}`,
+    (req, res, next) => {
+      uploadTemplate(req, res, (error: unknown) => {
+        if (error instanceof multer.MulterError) {
+          res
+            .status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400)
+            .json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'file_too_large' : 'invalid_file' })
+          return
+        }
+        if (error) {
+          next(error)
+          return
+        }
+        next()
+      })
+    },
+    async (req, res, next) => {
+      let savedKey: string | null = null
+      try {
+        const { eventId } = req.params
+        if (!(await eventExists(eventId))) {
+          res.status(404).json({ error: 'not_found' })
+          return
+        }
+        if (!req.file) {
+          res.status(400).json({ error: 'invalid_file' })
+          return
+        }
+        const result = validateDocumentFile({
+          category: 'rfp',
+          filename: req.file.originalname,
+          mimeType: req.file.mimetype,
+          body: req.file.buffer,
+        })
+        if (!result.ok) {
+          res.status(result.error === 'file_too_large' ? 413 : 400).json({ error: result.error })
+          return
+        }
+        const file = result.file
+        savedKey = await storage.save(file.body, file.extension)
+        const previous = await readTemplateRow(eventId!)
+        await pool.query(
+          `INSERT INTO dashboard.event_proposal_templates
+             (event_id, storage_key, filename, mime_type, size_bytes, policy_version, updated_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (event_id) DO UPDATE SET
+             storage_key=EXCLUDED.storage_key, filename=EXCLUDED.filename, mime_type=EXCLUDED.mime_type,
+             size_bytes=EXCLUDED.size_bytes, policy_version=EXCLUDED.policy_version,
+             updated_by=EXCLUDED.updated_by, updated_at=now()`,
+          [eventId, savedKey, file.filename, file.mimeType, file.sizeBytes, DOCUMENT_POLICY_VERSION, actorOf(res).id],
+        )
+        const keep = savedKey
+        savedKey = null
+        if (previous && previous.storage_key !== keep) await storage.remove(previous.storage_key).catch(() => undefined)
+        res.json({ template: describeTemplate(await readTemplateRow(eventId!)) })
+      } catch (error) {
+        if (savedKey) await storage.remove(savedKey).catch(() => undefined)
+        next(error)
+      }
+    },
+  )
+
+  router.delete(`/admin${templatePath}`, async (req, res, next) => {
+    try {
+      const { eventId } = req.params
+      if (!(await eventExists(eventId))) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const removed = (
+        await pool.query<{ storage_key: string }>(
+          'DELETE FROM dashboard.event_proposal_templates WHERE event_id=$1 RETURNING storage_key',
+          [eventId],
+        )
+      ).rows[0]
+      if (removed) await storage.remove(removed.storage_key).catch(() => undefined)
+      res.json({ template: describeTemplate(undefined) })
+    } catch (error) {
+      next(error)
+    }
+  })
+
 
   async function readRfp(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

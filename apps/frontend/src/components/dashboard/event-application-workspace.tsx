@@ -5,36 +5,37 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ParticipationEligibilityPanel } from '@/components/dashboard/participation-eligibility-panel'
 import { RequestFormFieldInput, type RequestFormField } from '@/components/dashboard/request-form-field'
 import { PrivateDocumentField } from '@/components/documents/private-document-field'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { DownloadRow } from '@/components/dashboard/download-row'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { Typography } from '@/components/ui/typography'
 import {
   DashboardApiError,
-  REQUEST_STATUS_LABELS,
   createRequest,
   fetchCompanyVerification,
   getEventSubtopics,
   getRequest,
+  getProposalTemplateDownloadUrl,
+  getRfpDownloadUrl,
+  getSubtopicRfp,
   listAgreements,
   submitRequest,
   updateRequest,
   type AgreementDefinition,
   type EventSubtopicDto,
   type RequestDto,
+  type RfpFileDto,
+  type RfpVersionDto,
 } from '@/utilities/dashboard-api'
 import {
   applicationTitle,
   describeWorkspaceLoadFailure,
-  emptyTeamMember,
-  isTeamComplete,
   loadExistingApplications,
   missingFieldLabels,
-  teamForAnswers,
-  teamFromAnswers,
   type ExistingApplication,
-  type TeamMember,
 } from '@/utilities/event-application'
 import {
   describeSubmissionFailure,
@@ -117,16 +118,20 @@ export function EventApplicationWorkspace({
   }, [loadWorkspace])
 
   const eligible = eligibility?.canParticipate === true
+
   const verificationChanged = useCallback(() => setEligibilityRefresh((key) => key + 1), [])
 
   return (
     <div className="flex min-w-0 flex-col gap-5" dir="rtl">
-      <ParticipationEligibilityPanel
-        target={target}
-        returnTo={destination}
-        refreshKey={eligibilityRefresh}
-        onEligibilityChange={setEligibility}
-      />
+      {/* Stays mounted to read the verification state, but only shows itself when something blocks the applicant. */}
+      <div className={eligible ? 'hidden' : undefined}>
+        <ParticipationEligibilityPanel
+          target={target}
+          returnTo={destination}
+          refreshKey={eligibilityRefresh}
+          onEligibilityChange={setEligibility}
+        />
+      </div>
 
       {load.status === 'loading' ? (
         <div role="status" className="rounded-2xl border border-neutral-200 bg-background p-4">
@@ -168,9 +173,6 @@ export function EventApplicationWorkspace({
 
       {load.status === 'ready' && load.subtopics.length > 0 ? (
         <>
-          <Typography variant="14/regular" color="neutral-600">
-            برای هر زیرعنوان یک درخواست مستقل با پیش‌نویس، کد پیگیری و نتیجه جداگانه ثبت می‌شود.
-          </Typography>
           {load.subtopics.map((subtopic, index) => (
             <ApplicationCard
               key={subtopic.id}
@@ -257,7 +259,6 @@ function ApplicationCard({
     ...initialAnswers,
     ...stringAnswers(fields, existing?.request.answers ?? {}),
   }))
-  const [team, setTeam] = useState<TeamMember[]>(() => teamFromAnswers(existing?.request.answers?.applicationTeam))
   const [acceptNonCompete, setAcceptNonCompete] = useState(false)
   const [acceptRules, setAcceptRules] = useState(false)
   const [documentsReady, setDocumentsReady] = useState(false)
@@ -284,7 +285,6 @@ function ApplicationCard({
   const buildAnswers = (): Record<string, unknown> => ({
     ...(request?.answers ?? {}),
     ...answers,
-    applicationTeam: teamForAnswers(team),
   })
 
   const begin = () => {
@@ -334,7 +334,7 @@ function ApplicationCard({
     setRequest(found.request)
     setPinnedRfpVersionId(found.rfpVersionId)
     if (found.request.status === 'draft') {
-      const saved = await updateRequest(found.request.id, { answers: { ...found.request.answers, ...answers, applicationTeam: teamForAnswers(team) } })
+      const saved = await updateRequest(found.request.id, { answers: { ...found.request.answers, ...answers } })
       if (current !== attempt.current) return true
       setRequest(saved.request)
       setNotice('برای این زیرعنوان پیش‌تر پیش‌نویسی ساخته شده بود؛ همان پیش‌نویس بازیابی و اطلاعات شما در آن ذخیره شد.')
@@ -390,27 +390,32 @@ function ApplicationCard({
     return false
   }
 
-  const save = async () => {
-    if (busy || !eligible || !isDraft) return
+  /** The page has no «save» button: the draft is created as soon as the applicant may apply, so the upload can attach to it. */
+  const ensureDraft = async () => {
     const current = begin()
     setBusy('save')
     try {
-      const saved = await persistDraft(current)
-      if (saved && current === attempt.current) toast.success('پیش‌نویس ذخیره شد. می‌توانید بعداً از همین صفحه ادامه دهید.')
+      await persistDraft(current)
     } catch (cause) {
       if (current !== attempt.current) return
       if (await handleConflict(cause, current)) return
-      toast.error('ذخیره پیش‌نویس انجام نشد.')
-      fail(cause, 'ذخیره پیش‌نویس انجام نشد. اطلاعات واردشده حفظ شده است؛ دوباره تلاش کنید.')
+      fail(cause, 'ساخت پیش‌نویس انجام نشد. دوباره تلاش کنید.')
     } finally {
       if (current === attempt.current) setBusy(null)
     }
   }
+  const draftRequested = useRef<string | null>(null)
+  const [completeOpen, setCompleteOpen] = useState(false)
+  useEffect(() => {
+    if (!eligible || request || !subtopic.currentRfpVersionId || draftRequested.current === subtopic.id) return
+    draftRequested.current = subtopic.id
+    void ensureDraft()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eligible, request, subtopic.id, subtopic.currentRfpVersionId])
 
   const submit = async () => {
     if (busy || !eligible || !isDraft) return
     const missing: string[] = []
-    if (!isTeamComplete(team)) missing.push('applicationTeam')
     if (!request || !documentsReady) missing.push('proposalDocuments')
     if (!acceptNonCompete) missing.push('nonCompeteAcceptance')
     if (!acceptRules) missing.push('eventRulesAcceptance')
@@ -461,42 +466,66 @@ function ApplicationCard({
     }
   }
 
-  const updateMember = (position: number, key: keyof TeamMember, value: string) =>
-    setTeam((rows) => rows.map((row, i) => (i === position ? { ...row, [key]: value } : row)))
-
   const locked = !isDraft || busy !== null
-  const statusBadge = submitted ? (
-    <Badge variant="success" size="md">{REQUEST_STATUS_LABELS[request.status] ?? request.status}</Badge>
-  ) : request ? (
-    <Badge variant="primary" size="md">پیش‌نویس ذخیره‌شده</Badge>
-  ) : (
-    <Badge variant="gray" size="md">بدون پیش‌نویس</Badge>
-  )
+  // The RFP files of the chosen subtitle: they change together with it.
+  const rfpKey = `${subtopic.id}:${subtopic.currentRfpVersionId ?? ''}`
+  const [loadedRfp, setLoadedRfp] = useState<{ key: string; version: RfpVersionDto | null; failed: boolean } | null>(null)
+  useEffect(() => {
+    if (!subtopic.currentRfpVersionId) return
+    let active = true
+    getSubtopicRfp(eventId, subtopic.id)
+      .then((result) => {
+        if (active) setLoadedRfp({ key: rfpKey, version: result.version, failed: false })
+      })
+      .catch(() => {
+        if (active) setLoadedRfp({ key: rfpKey, version: null, failed: true })
+      })
+    return () => {
+      active = false
+    }
+  }, [eventId, subtopic.id, subtopic.currentRfpVersionId, rfpKey])
+  const currentRfp = loadedRfp?.key === rfpKey ? loadedRfp : null
+  const rfpVersion = subtopic.currentRfpVersionId ? (currentRfp?.version ?? null) : null
+  const rfpState: 'loading' | 'ready' | 'error' = !subtopic.currentRfpVersionId
+    ? 'ready'
+    : currentRfp
+      ? currentRfp.failed
+        ? 'error'
+        : 'ready'
+      : 'loading'
+  const rfpFiles: RfpFileDto[] = rfpVersion?.files ?? []
 
   return (
     <section
       aria-labelledby={headingId}
       data-testid={`application-${subtopic.id}`}
-      className="flex min-w-0 flex-col gap-5 rounded-2xl border border-neutral-200 bg-background p-4 sm:p-6"
+      className="flex min-w-0 flex-col gap-5"
     >
-      <header className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-1">
-          <Typography as="h2" id={headingId} variant="16/bold" color="neutral-800" className="break-words">
-            درخواست {toPersianDigits(index + 1)}: {subtopic.title}
-          </Typography>
-          {subtopic.categoryTitle ? (
-            <Typography variant="12/regular" color="neutral-500" className="break-words">عنوان: {subtopic.categoryTitle}</Typography>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {statusBadge}
-          {request ? (
-            <Typography as="span" variant="12/semibold" color="neutral-600" data-testid="tracking-code">
-              کد پیگیری: <span dir="ltr">{request.trackingCode}</span>
-            </Typography>
-          ) : null}
-        </div>
-      </header>
+      {/* Header (Figma 31983:86041): the breadcrumb at the start, the actions at the end */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {index === 0 ? (
+          <nav aria-label="مسیر راهنما" className="flex min-w-0 items-center gap-2">
+            <Link href="/dashboard/events">
+              <Typography as="span" variant="16/regular" color="neutral-500">لیست رویدادها</Typography>
+            </Link>
+            <Typography as="span" variant="16/regular" color="neutral-500">/</Typography>
+            <Typography as="h1" variant="24/bold" color="neutral-700">ثبت نام در رویداد</Typography>
+          </nav>
+        ) : (
+          <span />
+        )}
+        {isDraft ? (
+          <Button
+            type="button"
+            variant="primary"
+            size="40"
+            disabled={busy !== null || !eligible || uploadPending || staleDraft}
+            onClick={() => setCompleteOpen(true)}
+          >
+            ثبت درخواست
+          </Button>
+        ) : null}
+      </div>
 
       {submitted ? (
         <Notice tone="neutral" testId="application-result">
@@ -518,125 +547,6 @@ function ApplicationCard({
             <Typography as="span" variant="14/semibold" color="brand-600">مطالعه نسخه جدید RFP در صفحه رویداد</Typography>
           </Link>
         </Notice>
-      ) : null}
-
-      {isDraft ? (
-        <>
-          {fields.length > 0 ? (
-            <fieldset className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
-              <legend className="mb-3">
-                <Typography as="span" variant="14/semibold" color="neutral-800">اطلاعات ثبت‌نام</Typography>
-              </legend>
-              {fields.map((field) => (
-                <RequestFormFieldInput
-                  key={field.name}
-                  field={field}
-                  disabled={locked}
-                  value={answers[field.name] ?? ''}
-                  onChange={(value) => setAnswers((current) => ({ ...current, [field.name]: value }))}
-                />
-              ))}
-            </fieldset>
-          ) : null}
-
-          <fieldset className="flex min-w-0 flex-col gap-3">
-            <legend className="mb-1">
-              <Typography as="span" variant="14/semibold" color="neutral-800">اعضای کلیدی تیم این پروپوزال</Typography>
-            </legend>
-            <Typography variant="12/regular" color="neutral-500">
-              دست‌کم یک عضو با نام و نقش وارد کنید. نسبت با شرکت اختیاری است.
-            </Typography>
-            {team.map((member, position) => (
-              <div key={position} className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border border-neutral-100 p-3 md:grid-cols-3">
-                <Input
-                  label={`نام عضو ${toPersianDigits(position + 1)}`}
-                  value={member.name}
-                  disabled={locked}
-                  onChange={(event) => updateMember(position, 'name', event.target.value)}
-                />
-                <Input
-                  label="نقش در پروژه"
-                  value={member.role}
-                  disabled={locked}
-                  onChange={(event) => updateMember(position, 'role', event.target.value)}
-                />
-                <Input
-                  label="نسبت با شرکت (اختیاری)"
-                  value={member.relation}
-                  disabled={locked}
-                  onChange={(event) => updateMember(position, 'relation', event.target.value)}
-                />
-                {team.length > 1 ? (
-                  <Button
-                    type="button"
-                    variant="text-gray"
-                    size="32"
-                    className="self-start md:col-span-3"
-                    disabled={locked}
-                    onClick={() => setTeam((rows) => rows.filter((_, i) => i !== position))}
-                  >
-                    حذف عضو {toPersianDigits(position + 1)}
-                  </Button>
-                ) : null}
-              </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline-gray"
-              size="36"
-              className="self-start"
-              disabled={locked}
-              onClick={() => setTeam((rows) => [...rows, emptyTeamMember()])}
-            >
-              افزودن عضو
-            </Button>
-          </fieldset>
-
-          <div className="flex min-w-0 flex-col gap-2">
-            <Typography as="span" variant="14/semibold" color="neutral-800">فایل پروپوزال</Typography>
-            {request ? (
-              <PrivateDocumentField
-                category="proposal"
-                label="پروپوزال"
-                requestId={request.id}
-                required
-                canUpload={!locked}
-                canDelete={!locked}
-                onPendingChange={setUploadPending}
-                onReadyChange={setDocumentsReady}
-              />
-            ) : (
-              <Typography variant="12/regular" color="neutral-500">
-                ابتدا پیش‌نویس را ذخیره کنید؛ سپس پروپوزال این زیرعنوان را بارگذاری کنید.
-              </Typography>
-            )}
-          </div>
-
-          <fieldset className="flex min-w-0 flex-col gap-3">
-            <legend className="mb-1">
-              <Typography as="span" variant="14/semibold" color="neutral-800">تعهدنامه‌ها</Typography>
-            </legend>
-            {[nonCompete, eventRules].some((agreement) => agreement && !agreement.approved) ? (
-              <Typography variant="12/regular" color="neutral-500" data-testid="agreement-unapproved">
-                متن نهایی تعهدنامه‌ها هنوز منتشر نشده است. پذیرش فعلی با نسخه موقت ثبت می‌شود و پس از انتشار متن نهایی دوباره از شما خواسته خواهد شد.
-              </Typography>
-            ) : null}
-            <AgreementCheckbox
-              id={`${headingId}-non-compete`}
-              label={`${nonCompete?.title ?? 'قرارداد عدم رقابت'} را مطالعه کرده‌ام و می‌پذیرم.`}
-              checked={acceptNonCompete}
-              disabled={locked || !nonCompete}
-              onChange={setAcceptNonCompete}
-            />
-            <AgreementCheckbox
-              id={`${headingId}-rules`}
-              label={`${eventRules?.title ?? 'قوانین رویداد'} را مطالعه کرده‌ام و می‌پذیرم.`}
-              checked={acceptRules}
-              disabled={locked || !eventRules}
-              onChange={setAcceptRules}
-            />
-          </fieldset>
-        </>
       ) : null}
 
       {notice ? <Typography role="status" variant="14/regular" color="neutral-600">{notice}</Typography> : null}
@@ -662,31 +572,183 @@ function ApplicationCard({
         </Link>
       ) : null}
 
-      {isDraft ? (
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="outline-primary"
-            size="40"
-            loading={busy === 'save'}
-            disabled={busy !== null || !eligible}
-            onClick={() => void save()}
-          >
-            ذخیره پیش‌نویس
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="40"
-            loading={busy === 'submit'}
-            disabled={busy !== null || !eligible || uploadPending || staleDraft}
-            onClick={() => void submit()}
-          >
-            ارسال پروپوزال
-          </Button>
+      {/* Card 1 (Figma 31983:86020): the title, the subtitle and their RFP files */}
+      <div className="flex min-w-0 flex-col gap-8 rounded-[16px] border border-neutral-200 bg-background p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-col gap-1">
+            <Typography as="h2" id={headingId} variant="20/bold" color="neutral-600">
+              عنوان و فایل‌های درخواست پروپوزال
+            </Typography>
+            <Typography as="p" variant="14/regular" color="neutral-500">
+              عنوان و زیر عنوان در صفحه رویداد انتخاب شده‌اند. فایل RFP و نمونه فرم پروپوزال را دانلود کنید.
+            </Typography>
+          </div>
         </div>
+
+        <div className="grid grid-cols-1 gap-x-5 gap-y-8 md:grid-cols-2">
+          {/* The title and the subtitle come from the subtitle chosen on the event page; they are not editable here. */}
+          <ApplicationField label="عنوان" htmlFor={`${headingId}-category`}>
+            <Input
+              id={`${headingId}-category`}
+              aria-label="عنوان"
+              value={subtopic.categoryTitle ?? ''}
+              disabled
+              readOnly
+            />
+          </ApplicationField>
+          <ApplicationField label="زیر عنوان" htmlFor={`${headingId}-subtopic`}>
+            <Input id={`${headingId}-subtopic`} aria-label="زیر عنوان" value={subtopic.title} disabled readOnly />
+          </ApplicationField>
+
+          {rfpFiles.map((file, position) => (
+            <DownloadRow
+              key={file.id}
+              label={rfpFiles.length > 1 ? `فایل RFP ${rfpOrdinal(position)}` : 'فایل RFP'}
+              href={getRfpDownloadUrl(eventId, subtopic.id, rfpVersion!.id, file.id)}
+              filename={file.filename}
+            />
+          ))}
+          {rfpFiles.length === 0 && rfpState !== 'loading' ? (
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <Typography as="span" variant="16/semibold" color="neutral-700">فایل RFP</Typography>
+              <Typography variant="14/regular" color="neutral-500">
+                {rfpState === 'error' ? 'دریافت فایل RFP انجام نشد.' : 'بارگذاری نشده است.'}
+              </Typography>
+            </div>
+          ) : null}
+          {/* The sample proposal form: the bundled default, or the owner's replacement for this event. */}
+          <DownloadRow label="نمونه فرم پروپوزال" href={getProposalTemplateDownloadUrl(eventId)} />
+        </div>
+      </div>
+
+      {isDraft ? (
+        <>
+          {/* Card 2 (Figma 31983:86030): the proposal file and the notes */}
+          <div className="flex min-w-0 flex-col gap-4 rounded-[16px] border border-neutral-200 bg-background p-4">
+            <div className="flex flex-col gap-1">
+              <Typography as="h2" variant="20/bold" color="neutral-600">بارگذاری پروپوزال</Typography>
+              <Typography as="p" variant="14/regular" color="neutral-500">
+                پروپوزال خود را متناسب با عنوان های انتخاب شده و RFP های ارائه شده در یک فایل نوشته و در یکی از فرمت‌های گفته شده بارگذاری کنید
+              </Typography>
+            </div>
+            {request ? (
+              <PrivateDocumentField
+                category="proposal"
+                variant="dropzone"
+                label="پروپوزال"
+                requestId={request.id}
+                required
+                canUpload={!locked}
+                canDelete={!locked}
+                onPendingChange={setUploadPending}
+                onReadyChange={setDocumentsReady}
+              />
+            ) : (
+              <Typography variant="14/regular" color="neutral-500">
+                ابتدا پیش‌نویس را ذخیره کنید؛ سپس پروپوزال این زیرعنوان را بارگذاری کنید.
+              </Typography>
+            )}
+            <ApplicationField label="توضیحات" htmlFor={`${headingId}-notes`}>
+              <Textarea
+                id={`${headingId}-notes`}
+                name="proposalNotes"
+                placeholder="توضیحات خود را در اینجا وارد کنید"
+                disabled={locked}
+                className="min-h-[140px]"
+                value={answers.proposalNotes ?? ''}
+                onChange={(event) => setAnswers((current) => ({ ...current, proposalNotes: event.target.value }))}
+              />
+            </ApplicationField>
+          </div>
+
+          {/* What the server still requires beyond the page: form fields and agreements, asked on submit */}
+          <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
+            <DialogContent className="max-w-2xl">
+              <div className="flex flex-col gap-1">
+                <DialogTitle>تکمیل اطلاعات ثبت‌نام</DialogTitle>
+                <DialogDescription>
+                  پیش از ثبت درخواست، اطلاعات زیر و تعهدنامه‌ها را تکمیل کنید.
+                </DialogDescription>
+              </div>
+              <div className="flex min-w-0 flex-col gap-5">
+            {fields.length > 0 ? (
+              <fieldset className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+                <legend className="mb-3">
+                  <Typography as="span" variant="14/semibold" color="neutral-800">اطلاعات ثبت‌نام</Typography>
+                </legend>
+                {fields.map((field) => (
+                  <RequestFormFieldInput
+                    key={field.name}
+                    field={field}
+                    disabled={locked}
+                    value={answers[field.name] ?? ''}
+                    onChange={(value) => setAnswers((current) => ({ ...current, [field.name]: value }))}
+                  />
+                ))}
+              </fieldset>
+            ) : null}
+
+            <fieldset className="flex min-w-0 flex-col gap-3">
+              <legend className="mb-1">
+                <Typography as="span" variant="14/semibold" color="neutral-800">تعهدنامه‌ها</Typography>
+              </legend>
+              {[nonCompete, eventRules].some((agreement) => agreement && !agreement.approved) ? (
+                <Typography variant="12/regular" color="neutral-500" data-testid="agreement-unapproved">
+                  متن نهایی تعهدنامه‌ها هنوز منتشر نشده است. پذیرش فعلی با نسخه موقت ثبت می‌شود و پس از انتشار متن نهایی دوباره از شما خواسته خواهد شد.
+                </Typography>
+              ) : null}
+              <AgreementCheckbox
+                id={`${headingId}-non-compete`}
+                label={`${nonCompete?.title ?? 'قرارداد عدم رقابت'} را مطالعه کرده‌ام و می‌پذیرم.`}
+                checked={acceptNonCompete}
+                disabled={locked || !nonCompete}
+                onChange={setAcceptNonCompete}
+              />
+              <AgreementCheckbox
+                id={`${headingId}-rules`}
+                label={`${eventRules?.title ?? 'قوانین رویداد'} را مطالعه کرده‌ام و می‌پذیرم.`}
+                checked={acceptRules}
+                disabled={locked || !eventRules}
+                onChange={setAcceptRules}
+              />
+            </fieldset>
+              </div>
+              {error ? <Typography role="alert" variant="14/regular" className="text-error-600">{error}</Typography> : null}
+              <DialogFooter className="border-t-0 pt-0">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="40"
+                  loading={busy === 'submit'}
+                  disabled={busy !== null || !eligible || uploadPending || staleDraft}
+                  onClick={() => void submit()}
+                >
+                  تایید و ثبت
+                </Button>
+                <Button type="button" variant="outline-primary" size="40" onClick={() => setCompleteOpen(false)}>
+                  لغو
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       ) : null}
     </section>
+  )
+}
+
+const RFP_ORDINALS = ['یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه', 'ده']
+const rfpOrdinal = (position: number) => RFP_ORDINALS[position] ?? toPersianDigits(position + 1)
+
+/** A label above a control, as the Figma text field draws it: 16/SemiBold neutral-700, 8px gap. */
+function ApplicationField({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <label htmlFor={htmlFor}>
+        <Typography as="span" variant="16/semibold" color="neutral-700">{label}</Typography>
+      </label>
+      {children}
+    </div>
   )
 }
 

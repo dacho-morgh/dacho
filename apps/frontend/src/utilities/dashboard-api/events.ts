@@ -80,3 +80,25 @@ export function formatFileSize(bytes: number): string {
 }
 
 /* ── Participation eligibility (FE06; T15/T19/T55) ─────────────────────── */
+
+/** The event's sample proposal form (نمونه فرم پروپوزال): the bundled default until an owner replaces it. */
+export interface ProposalTemplateDto {
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  isDefault: boolean
+  updatedAt: string | null
+}
+
+export function getProposalTemplate(eventId: string): Promise<{ template: ProposalTemplateDto }> {
+  return dashboardFetch<{ template: ProposalTemplateDto }>(`/events/${encodeURIComponent(eventId)}/proposal-template`)
+}
+
+export function getProposalTemplateDownloadUrl(eventId: string): string {
+  return `/api/dashboard/events/${encodeURIComponent(eventId)}/proposal-template/file`
+}
+
+/** A file of the RFP version a request is pinned to; the server resolves the version from the request. */
+export function getRequestRfpFileUrl(requestId: string, fileId: string): string {
+  return `/api/dashboard/requests/${encodeURIComponent(requestId)}/rfp/files/${encodeURIComponent(fileId)}`
+}

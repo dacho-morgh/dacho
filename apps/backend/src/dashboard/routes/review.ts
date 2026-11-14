@@ -114,7 +114,8 @@ export function registerReviewRoutes(router: Router, ctx: DashboardContext): voi
       const items = users
         .filter((user) => operationalRoleOf(user) === 'reviewer' && user.id !== employerId && !seen.has(user.id))
         .map((user) => ({ id: user.id, name: user.name ?? null }))
-      res.json({ items, employerId })
+      const employer = employerId ? await deps.userStore.findById(employerId).catch(() => undefined) : undefined
+      res.json({ items, employerId, employerName: employer?.name ?? null })
     } catch (error) { next(error) }
   })
 

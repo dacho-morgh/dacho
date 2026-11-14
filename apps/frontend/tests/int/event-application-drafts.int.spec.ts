@@ -305,7 +305,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
     expect(nonCompete.getAttribute('data-state')).toBe('unchecked')
     expect(first.getByTestId('agreement-unapproved')).toBeDefined()
     acceptAgreements(first)
-    fireEvent.click(await enabledButton(first, 'ارسال پروپوزال'))
+    fireEvent.click(await enabledButton(first, 'ثبت درخواست'))
 
     const result = await first.findByTestId('application-result')
     expect(result.textContent).toContain('TRK-req-1')
@@ -318,7 +318,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
     const second = await card(SUB_2)
     expect(second.getByTestId('tracking-code').textContent).toContain('TRK-req-2')
     expect(second.queryByTestId('application-result')).toBeNull()
-    expect(second.getByRole('button', { name: 'ارسال پروپوزال' })).toBeDefined()
+    expect(second.getByRole('button', { name: 'ثبت درخواست' })).toBeDefined()
   })
 
   it('recovers after draft-create succeeds but final submit fails, without creating a duplicate', async () => {
@@ -337,13 +337,13 @@ describe('EventApplicationWorkspace proposal submission', () => {
     fireEvent.click(await enabledButton(first, 'ذخیره پیش‌نویس'))
     await first.findByTestId('proposal-field-req-1')
     acceptAgreements(first)
-    fireEvent.click(await enabledButton(first, 'ارسال پروپوزال'))
+    fireEvent.click(await enabledButton(first, 'ثبت درخواست'))
 
     expect(await first.findByText(/ارتباط با سرور برقرار نشد/)).toBeDefined()
     expect((first.getByLabelText('نام عضو ۱') as HTMLInputElement).value).toBe('مریم احمدی')
     expect(first.getByRole('checkbox', { name: /قوانین رویداد/ }).getAttribute('data-state')).toBe('checked')
 
-    fireEvent.click(await enabledButton(first, 'ارسال پروپوزال'))
+    fireEvent.click(await enabledButton(first, 'ثبت درخواست'))
     await first.findByTestId('application-result')
     expect(create).toHaveBeenCalledTimes(1)
     expect(submit).toHaveBeenCalledTimes(2)
@@ -359,7 +359,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
     const first = await card(SUB_1)
     await screen.findByTestId('eligibility-state')
     expect((first.getByRole('button', { name: 'ذخیره پیش‌نویس' }) as HTMLButtonElement).disabled).toBe(true)
-    expect((first.getByRole('button', { name: 'ارسال پروپوزال' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((first.getByRole('button', { name: 'ثبت درخواست' }) as HTMLButtonElement).disabled).toBe(true)
     expect(create).not.toHaveBeenCalled()
   })
 
@@ -378,7 +378,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
 
     const first = await card(SUB_1)
     acceptAgreements(first)
-    fireEvent.click(await enabledButton(first, 'ارسال پروپوزال'))
+    fireEvent.click(await enabledButton(first, 'ثبت درخواست'))
 
     expect(await first.findByText(/دیگر تأییدشده نیست/)).toBeDefined()
     expect(submit).not.toHaveBeenCalled()
@@ -395,7 +395,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
 
     const first = await card(SUB_1)
     acceptAgreements(first)
-    fireEvent.click(await enabledButton(first, 'ارسال پروپوزال'))
+    fireEvent.click(await enabledButton(first, 'ثبت درخواست'))
     expect(await first.findByText(/در حین تکمیل فرم تغییر کرده/)).toBeDefined()
     expect(first.queryByTestId('application-result')).toBeNull()
   })
@@ -409,7 +409,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
 
     const first = await card(SUB_1)
     acceptAgreements(first)
-    fireEvent.click(await enabledButton(first, 'ارسال پروپوزال'))
+    fireEvent.click(await enabledButton(first, 'ثبت درخواست'))
     expect(await first.findByText(/نسخه RFP این زیرعنوان/)).toBeDefined()
     expect(first.getByRole('link', { name: 'بازگشت به رویداد و مطالعه نسخه جدید RFP' }).getAttribute('href')).toBe(
       `/dashboard/events?eventId=${EVENT_ID}&subtopicId=${SUB_1}`,
@@ -424,7 +424,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
     const first = await card(SUB_1)
     expect(await first.findByTestId('stale-draft')).toBeDefined()
     await enabledButton(first, 'ذخیره پیش‌نویس')
-    expect((first.getByRole('button', { name: 'ارسال پروپوزال' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((first.getByRole('button', { name: 'ثبت درخواست' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('shows an already-submitted application from another tab instead of resubmitting', async () => {
@@ -441,7 +441,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
 
     const first = await card(SUB_1)
     acceptAgreements(first)
-    fireEvent.click(await enabledButton(first, 'ارسال پروپوزال'))
+    fireEvent.click(await enabledButton(first, 'ثبت درخواست'))
     expect(await first.findByText(/پیش‌تر ارسال شده است/)).toBeDefined()
     await first.findByTestId('application-result')
     expect(submit).not.toHaveBeenCalled()
@@ -458,7 +458,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
 
     const first = await card(SUB_1)
     acceptAgreements(first)
-    fireEvent.click(await enabledButton(first, 'ارسال پروپوزال'))
+    fireEvent.click(await enabledButton(first, 'ثبت درخواست'))
     expect(await first.findByText(/عنوان طرح، فایل پروپوزال/)).toBeDefined()
     expect((first.getByLabelText('نام عضو ۱') as HTMLInputElement).value).toBe('رضا')
   })
@@ -470,7 +470,7 @@ describe('EventApplicationWorkspace proposal submission', () => {
     renderWorkspace([SUB_1])
 
     const first = await card(SUB_1)
-    fireEvent.click(await enabledButton(first, 'ارسال پروپوزال'))
+    fireEvent.click(await enabledButton(first, 'ثبت درخواست'))
     expect(
       await first.findByText(/اعضای کلیدی تیم، پذیرش توافق‌نامه عدم رقابت، پذیرش قوانین رویداد/),
     ).toBeDefined()

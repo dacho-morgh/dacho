@@ -23,6 +23,9 @@ import {
   type ReviewRoundSlotDto,
 } from '@/utilities/dashboard-api'
 import { DashboardSelect } from '@/components/dashboard/dashboard-select'
+import { DashboardCloseCircle, InformationBulkIcon } from '@/components/icons'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 
 /** Each optional read: null when this role has no such read, `failed` when it did not arrive. */
@@ -57,10 +60,11 @@ const fa = (value: number) => value.toLocaleString('fa-IR')
 
 type SlotState = 'final' | 'draft' | 'pending'
 
-const SLOT_STATE: Record<SlotState, { label: string; className: string }> = {
-  final: { label: 'ارزیابی نهایی شد', className: 'bg-success-50 text-success-700' },
-  draft: { label: 'در حال ارزیابی', className: 'bg-brand-50 text-brand-700' },
-  pending: { label: 'در انتظار ارزیابی', className: 'bg-neutral-100 text-neutral-600' },
+/** The tag of a slot's evaluation (Figma 31888:52320): not opened yet, being written, or final. */
+const SLOT_STATE: Record<SlotState, { label: string; variant: 'gray' | 'primary' | 'green' }> = {
+  final: { label: 'بررسی شده', variant: 'green' },
+  draft: { label: 'درحال بررسی', variant: 'primary' },
+  pending: { label: 'مشاهده نشده', variant: 'gray' },
 }
 
 export interface ReviewAssignmentPanelProps {
@@ -128,19 +132,37 @@ export function ReviewAssignmentPanel({
 
   return (
     <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4" aria-labelledby={`${id}-reviewers`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Typography id={`${id}-reviewers`} as="h2" variant="16/bold" sm="20/bold" color="neutral-800">لیست داوران و فرم‌های داوری</Typography>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Typography id={`${id}-reviewers`} as="h2" variant="20/extrabold" color="neutral-800">لیست داوران و فرم‌های داوری</Typography>
+          {current ? (
+            <div className="flex items-center gap-2">
+              <Badge variant={current.completion.ready ? 'green' : 'gray'} size="md">
+                <Typography as="span" variant="14/regular" className="text-inherit">
+                  {fa(current.completion.finalized)}/{fa(current.completion.required)}
+                </Typography>
+              </Badge>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button type="button" variant="text-gray" size="icon-xs" aria-label="راهنمای فهرست داوران">
+                      <InformationBulkIcon aria-hidden="true" className="size-5 text-neutral-400" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    در صورت عدم تکمیل داوری از سمت یکی از داوران، داور را حذف کنید و یک داور جایگزین اضافه کنید
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          ) : null}
+        </div>
         {current ? (
-          <Typography
-            as="span"
-            variant="14/semibold"
-            className={`rounded-full px-3 py-1 ${current.completion.ready ? 'bg-success-50 text-success-700' : 'bg-neutral-100 text-neutral-700'}`}
-          >
-            ارزیابی نهایی: {fa(current.completion.finalized)} از {fa(current.completion.required)}
+          <Typography variant="14/regular" color="neutral-500">
+            برای اتمام داوری نیاز به {fa(current.completion.required)} داوری تمام شده است
           </Typography>
         ) : null}
       </div>
-
 
       {round === 'failed' ? (
         <Typography role="alert" variant="14/regular" color="error">دریافت اطلاعات داوری انجام نشد. صفحه را دوباره بارگذاری کنید.</Typography>
@@ -177,13 +199,12 @@ export function ReviewAssignmentPanel({
             <Typography role="alert" variant="14/regular" color="error">وضعیت ارزیابی‌ها دریافت نشد؛ جایگزینی تا بارگذاری دوباره صفحه غیرفعال است.</Typography>
           ) : null}
           {current.slots ? (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col divide-y divide-neutral-200">
               {employerSlot ? (
                 <SlotRow
-                  label="کارفرما (ثابت)"
+                  employer
                   name={nameOf(employerSlot.userId, 'کارفرمای پرونده')}
                   state={stateOf(employerSlot)}
-                  assignedAt={employerSlot.assignedAt}
                   replaceLabel={canReplaceEmployer && isCurrent ? 'جایگزینی کارفرما' : null}
                   onReplace={() => {
                     setDialog({ kind: 'replace', slot: 'employer', outgoing: employerSlot })
@@ -199,10 +220,8 @@ export function ReviewAssignmentPanel({
                 return (
                   <SlotRow
                     key={slot.assignmentId}
-                    label={`داور ${fa(index + 1)}`}
                     name={nameOf(slot.userId, `داور ${fa(index + 1)}`)}
                     state={state}
-                    assignedAt={slot.assignedAt}
                     // Only an unfinished ordinary reviewer is replaceable; the server re-checks it under lock.
                     replaceLabel={canReplaceReviewer && isCurrent && state !== null && state !== 'final' ? 'جایگزینی داور' : null}
                     onReplace={() => {
@@ -272,39 +291,37 @@ export function ReviewAssignmentPanel({
 }
 
 function SlotRow({
-  label,
+  employer = false,
   name,
   state,
-  assignedAt,
   replaceLabel,
   onReplace,
 }: {
-  label: string
+  employer?: boolean
   name: string
   state: SlotState | null
-  assignedAt: string
   replaceLabel: string | null
   onReplace: () => void
 }) {
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-neutral-50 p-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <Typography variant="12/regular" color="neutral-500">{label}</Typography>
-        <Typography variant="16/regular" color="neutral-800" className="break-words">{name}</Typography>
-        <Typography variant="12/regular" color="neutral-400">منتسب از {formatDate(assignedAt)}</Typography>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {state ? (
-          <Typography as="span" variant="12/regular" className={`rounded-full px-3 py-1 ${SLOT_STATE[state].className}`}>
-            {SLOT_STATE[state].label}
-          </Typography>
-        ) : null}
-        {replaceLabel ? (
-          <Button type="button" variant="outline-gray" size="32" onClick={onReplace} aria-label={`${replaceLabel}: ${name}`}>
-            <Typography variant="14/regular" className="text-inherit">{replaceLabel}</Typography>
-          </Button>
-        ) : null}
-      </div>
+    <li className="flex items-center gap-2 py-2">
+      <span
+        aria-hidden="true"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600"
+      >
+        <Typography as="span" variant="14/semibold" className="text-inherit">{name.trim().charAt(0) || '—'}</Typography>
+      </span>
+      <Typography as="span" variant="16/regular" color={employer ? 'neutral-400' : 'neutral-600'} className="min-w-0 truncate">
+        {name}
+      </Typography>
+      {employer ? <Badge variant="gray" size="sm">کارفرما</Badge> : null}
+      <span className="flex-1" />
+      {state ? <Badge variant={SLOT_STATE[state].variant} size="sm">{SLOT_STATE[state].label}</Badge> : null}
+      {replaceLabel ? (
+        <Button type="button" variant="text-gray" size="icon-32" onClick={onReplace} aria-label={`${replaceLabel}: ${name}`}>
+          <DashboardCloseCircle aria-hidden="true" className="size-5" />
+        </Button>
+      ) : null}
     </li>
   )
 }

@@ -18,6 +18,9 @@ import {
 } from '@/components/dashboard/admin-request-list-data'
 import { CompanyAvatar } from '@/components/dashboard/company-avatar'
 import { ListFilterButton } from '@/components/dashboard/list-filter-button'
+import { RowActions } from '@/components/dashboard/list-row-actions'
+import { ReferRequestDialog } from '@/components/dashboard/refer-request-dialog'
+import { RequestDecisionDialog, REVIEW_DECISION, TRIAGE, type Decision } from '@/components/dashboard/request-actions-panel'
 import {
   REQUEST_STATUS_FILTER_OPTIONS,
   REVIEW_STAGE_OPTIONS,
@@ -25,7 +28,7 @@ import {
   type RequestStatus,
 } from '@/components/dashboard/requests/types'
 import { workQueueLabel } from '@/components/dashboard/work-queue-overview'
-import { CompanyBuildingIcon, DashboardEditIcon } from '@/components/icons'
+import { BackSquareIcon, CompanyBuildingIcon, DashboardCloseCircle, DashboardEditIcon, SendIcon } from '@/components/icons'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 import { Typography } from '@/components/ui/typography'
 import { formatDate } from '@/utilities/dashboard-api'
@@ -48,12 +51,58 @@ const STATUS_VARIANT: Record<RequestStatus, BadgeProps['variant']> = {
   rejected: 'red',
 }
 
+/**
+ * The status tag of a row (Figma 31885:20135): a case in review reads by where the review stands, since
+ * that is what the people who run it look for; every other status keeps its own tag.
+ */
+function statusTag(item: AdminRequestRow): { label: string; variant: BadgeProps['variant'] } {
+  if (item.status === 'in_review') {
+    if (item.reviewStage === 'chief_triage') return { label: 'ارجاع نشده', variant: 'gray' }
+    // The four evaluations are in and the chief's decision is what waits.
+    if (item.reviewStage === 'triaged') {
+      return item.allowedActions?.includes('decideReview')
+        ? { label: 'بررسی شده', variant: 'green' }
+        : { label: 'درحال بررسی', variant: 'primary' }
+    }
+    if (item.reviewStage === 'advanced') return { label: 'تکمیل شده', variant: 'black' }
+  }
+  // A case sent back to the company is being corrected.
+  if (item.status === 'action_needed') return { label: 'درحال اصلاح', variant: 'yellow' }
+  return { label: STATUS_LABELS[item.status] ?? item.status, variant: STATUS_VARIANT[item.status] ?? 'gray' }
+}
+
+/** What a row's menu command does: open the referral dialog, or one of the shared decision dialogs. */
+type RowCommand = { kind: 'refer' } | { kind: 'decision'; decision: Decision }
+
+/**
+ * The row menu's three commands in the design's order (Figma 31885:20135): «ارجاع», «درخواست اصلاحیه», «رد درخواست».
+ * In triage «ارجاع» assigns the reviewers; after the review it moves the case on to the financial stage.
+ */
+function rowMenu(item: AdminRequestRow): { label: string; icon: React.ReactNode; destructive?: boolean; command: RowCommand }[] | null {
+  const icons = {
+    send: <SendIcon aria-hidden="true" className="size-5" />,
+    back: <BackSquareIcon aria-hidden="true" className="size-5" />,
+    close: <DashboardCloseCircle aria-hidden="true" className="size-5" />,
+  }
+  if (item.allowedActions?.includes('triage')) {
+    return [
+      { label: 'ارجاع', icon: icons.send, command: { kind: 'refer' } },
+      { label: 'درخواست اصلاحیه', icon: icons.back, command: { kind: 'decision', decision: TRIAGE[1]! } },
+      { label: 'رد درخواست', icon: icons.close, destructive: true, command: { kind: 'decision', decision: TRIAGE[2]! } },
+    ]
+  }
+  if (item.allowedActions?.includes('decideReview')) {
+    return [
+      { label: 'ارجاع', icon: icons.send, command: { kind: 'decision', decision: REVIEW_DECISION[0]! } },
+      { label: 'درخواست اصلاحیه', icon: icons.back, command: { kind: 'decision', decision: REVIEW_DECISION[1]! } },
+      { label: 'رد درخواست', icon: icons.close, destructive: true, command: { kind: 'decision', decision: REVIEW_DECISION[2]! } },
+    ]
+  }
+  return null
+}
+
 /** The tag of a case the Secretariat follows up (its investment memo was sent). */
 const FOLLOW_UP_LABEL = 'پیگیری سرمایه‌گذاری'
-
-/** A follow-up case waits on the Secretariat's result until it is published. */
-const pendingOf = (item: AdminRequestRow) =>
-  item.pending ?? (item.followUp && !item.followUp.published ? 'منتظر انتشار نتیجه' : null)
 
 const text = (value: string) => (
   <Typography variant="14/regular" color="secondary" className="max-sm:text-[13px]">
@@ -67,7 +116,10 @@ const companyHref = (companyId: string) => `/dashboard/companies/${encodeURIComp
  * `canViewCompany`: the company's name and the company actions lead to its dossier, which only the
  * owner and Secretariat may read; every other role sees the name as text.
  */
-function buildColumns(canViewCompany: boolean): AdminColumn<AdminRequestRow>[] {
+function buildColumns(
+  canViewCompany: boolean,
+  onCommand: (item: AdminRequestRow, command: RowCommand) => void,
+): AdminColumn<AdminRequestRow>[] {
   return [
     {
       id: 'company',
@@ -90,7 +142,7 @@ function buildColumns(canViewCompany: boolean): AdminColumn<AdminRequestRow>[] {
     },
     {
       id: 'request',
-      header: 'درخواست',
+      header: 'عنوان درخواست',
       render: (item) => (
         <Link
           href={`/dashboard/requests/${encodeURIComponent(item.id)}`}
@@ -103,39 +155,40 @@ function buildColumns(canViewCompany: boolean): AdminColumn<AdminRequestRow>[] {
     {
       id: 'status',
       header: 'وضعیت',
-      render: (item) => (
-        <span className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={STATUS_VARIANT[item.status] ?? 'gray'} size="sm">
-            {STATUS_LABELS[item.status] ?? item.status}
-          </Badge>
-          {item.followUp ? (
-            <Badge variant="brand-solid" size="sm">
-              {FOLLOW_UP_LABEL}
+      render: (item) => {
+        const tag = statusTag(item)
+        return (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <Badge variant={tag.variant} size="sm">
+              {tag.label}
             </Badge>
-          ) : null}
-        </span>
-      ),
+            {item.followUp ? (
+              <Badge variant="brand-solid" size="sm">
+                {FOLLOW_UP_LABEL}
+              </Badge>
+            ) : null}
+          </span>
+        )
+      },
     },
-    {
-      id: 'stage',
-      header: 'مرحله',
-      render: (item) => (
-        <span className="flex flex-col gap-1">
-          {text(item.stage)}
-          {pendingOf(item) ? (
-            <Typography variant="12/regular" color="brand-600">
-              {pendingOf(item)}
-            </Typography>
-          ) : null}
-        </span>
-      ),
-    },
+    { id: 'due', header: 'تاریخ سررسید', render: (item) => text(formatDate(item.dueDate) || '—') },
     { id: 'date', header: 'تاریخ ثبت', render: (item) => text(formatDate(item.createdAt) || '—') },
     {
       id: 'actions',
-      header: 'عملیات',
-      render: (item) => (
-        <AdminRowActions
+      render: (item) => {
+        const menu = rowMenu(item)
+        return menu ? (
+          <RowActions
+            actions={menu.map(({ label, icon, destructive, command }) => ({
+              id: label,
+              label,
+              icon,
+              destructive,
+              onSelect: () => onCommand(item, command),
+            }))}
+          />
+        ) : (
+          <AdminRowActions
           viewHref={`/dashboard/requests/${encodeURIComponent(item.id)}`}
           viewLabel="مشاهده درخواست"
           actions={
@@ -161,7 +214,8 @@ function buildColumns(canViewCompany: boolean): AdminColumn<AdminRequestRow>[] {
               : []
           }
         />
-      ),
+        )
+      },
     },
   ]
 }
@@ -272,10 +326,15 @@ export function AdminRequestList({
     }
   }, [urlSearch])
 
-  const columns = useMemo(() => buildColumns(canViewCompany), [canViewCompany])
+  const [command, setCommand] = useState<{ item: AdminRequestRow; command: RowCommand } | null>(null)
+  const columns = useMemo(
+    () => buildColumns(canViewCompany, (item, next) => setCommand({ item, command: next })),
+    [canViewCompany],
+  )
   const queueLabel = filters.queue ? workQueueLabel(filters.queue) : undefined
 
   return (
+    <>
     <AdminListView
       title="درخواست ها"
       notice={
@@ -351,5 +410,17 @@ export function AdminRequestList({
         setRetries((count) => count + 1)
       }}
     />
+    {command?.command.kind === 'refer' ? (
+      <ReferRequestDialog id={command.item.id} revision={command.item.revision} onClose={() => setCommand(null)} />
+    ) : command?.command.kind === 'decision' ? (
+      <RequestDecisionDialog
+        id={command.item.id}
+        revision={command.item.revision}
+        decision={command.command.decision}
+        available={Boolean(command.item.allowedActions?.includes(command.command.decision.gate))}
+        onClose={() => setCommand(null)}
+      />
+    ) : null}
+    </>
   )
 }

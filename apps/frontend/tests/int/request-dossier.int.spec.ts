@@ -194,7 +194,7 @@ describe('RequestDossier per role', () => {
         ],
       },
     })
-    expect(screen.getByText(/ارزیابی نهایی: ۱ از ۴/)).toBeTruthy()
+    expect(screen.getByText('۱/۴')).toBeTruthy()
     expect(screen.getByText(/ارزیابی کارفرما/)).toBeTruthy()
     expect(screen.queryByText(/ارزیابی داور/)).toBeNull()
   })

@@ -3,29 +3,22 @@
 import { SearchField } from '@/components/dashboard/search-field'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  AlertCircle,
-  ChevronDown,
-  Download,
-  FileText,
-  Folder,
-  Layers,
-  RotateCcw,
-  X,
-} from 'lucide-react'
+import { Download, FileText, RotateCcw } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   CalendarBulkIcon,
+  DashboardCloseCircle,
   EmptyInboxIllustration,
   LocationBulkIcon,
   TickSquareIcon,
 } from '@/components/icons'
-import { ParticipationEligibilityPanel } from '@/components/dashboard/participation-eligibility-panel'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TreeRow } from '@/components/dashboard/event-tree-row'
+import { DashboardSelect } from '@/components/dashboard/dashboard-select'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Typography } from '@/components/ui/typography'
 import {
   DashboardApiError,
@@ -38,9 +31,6 @@ import {
   type EventSubtopicDto,
   type RfpVersionDto,
 } from '@/utilities/dashboard-api'
-import type { Eligibility } from '@/utilities/participation-eligibility'
-import { DashboardSelect } from '@/components/dashboard/dashboard-select'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { ListFilterButton } from '@/components/dashboard/list-filter-button'
 import { ListToolbar } from '@/components/dashboard/list-toolbar'
 import { rowActivationProps } from '@/components/dashboard/list-table'
@@ -67,7 +57,6 @@ export interface EventsViewProps {
   isOwner?: boolean
   initialSelectedEventId?: string
   /** Subtopics the representative chose before leaving to complete the profile. */
-  initialSubtopicIds?: string[]
 }
 
 /**
@@ -80,7 +69,7 @@ export const EVENT_TAG_VARIANT = {
   ended: 'gray',
 } as const satisfies Record<EventItem['badgeType'], 'secondary' | 'primary' | 'gray'>
 
-function EventStatusTag({ type, children }: { type: EventItem['badgeType']; children: ReactNode }) {
+export function EventStatusTag({ type, children }: { type: EventItem['badgeType']; children: ReactNode }) {
   return (
     <Badge variant={EVENT_TAG_VARIANT[type]} size="md" data-event-status={type}>
       {children}
@@ -104,7 +93,7 @@ function EventMetaRow({ icon, children }: { icon: ReactNode; children: ReactNode
 }
 
 /** Date and place of an event card: a 16px gap between the two lines (Figma 56:13489 / 56:13527). */
-function EventMeta({ dates, location }: { dates: string; location: string }) {
+export function EventMeta({ dates, location }: { dates: string; location: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <EventMetaRow icon={<CalendarBulkIcon className="size-[28px] shrink-0 text-neutral-400" />}>{dates}</EventMetaRow>
@@ -181,92 +170,77 @@ function EventsEmptyState({ noMatch = false }: { noMatch?: boolean }) {
   )
 }
 
-// Quick selection modal matching Figma Frame 120 (node 31994:87443)
-function QuickSelectModal({
-  isOpen,
+/**
+ * The popup behind «ثبت نام»: the applicant picks the title and the subtitle to apply for, and confirming
+ * continues to the application page for that subtitle.
+ */
+function RegisterDialog({
   onClose,
   categories,
   subtopics,
-  onSelectSubtopic,
+  onConfirm,
 }: {
-  isOpen: boolean
   onClose: () => void
   categories: EventCategoryDto[]
   subtopics: EventSubtopicDto[]
-  onSelectSubtopic: (subtopicId: string) => void
+  onConfirm: (subtopicId: string) => void
 }) {
-  const [selectedCatId, setSelectedCatId] = useState<string>(categories[0]?.id ?? '')
+  const [selectedCatId, setSelectedCatId] = useState('')
+  const [selectedSubId, setSelectedSubId] = useState('')
   const availableSubtopics = useMemo(
     () => subtopics.filter((sub) => sub.categoryId === selectedCatId),
     [subtopics, selectedCatId],
   )
-  const [selectedSubId, setSelectedSubId] = useState<string>(availableSubtopics[0]?.id ?? '')
 
-  useEffect(() => {
-    if (categories.length > 0 && !selectedCatId) {
-      setSelectedCatId(categories[0]!.id)
-    }
-  }, [categories, selectedCatId])
-
-  useEffect(() => {
-    setSelectedSubId(availableSubtopics[0]?.id ?? '')
-  }, [availableSubtopics])
-
-  if (!isOpen) return null
-
-  const handleConfirm = () => {
-    if (selectedSubId) {
-      onSelectSubtopic(selectedSubId)
-    }
-    onClose()
+  const chooseCategory = (categoryId: string) => {
+    setSelectedCatId(categoryId)
+    setSelectedSubId('')
   }
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-          <div>
-            <DialogTitle id="quick-select-title" className="text-[18px] leading-[28px]">
-              انتخاب عنوان
-            </DialogTitle>
-            <p className="mt-1 font-sans text-[13px] leading-[20px] font-normal text-neutral-500">
-              برای مشاهده فرم عنوان و زیر عنوان مورد نظر خود را انتخاب کنید.
-            </p>
+      <DialogContent showCloseButton={false} className="max-w-[400px] gap-5 rounded-[16px] p-4 sm:p-4">
+        {/* Header (Figma 31994:87443): the title at the start, the close button at the end */}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <DialogTitle>انتخاب عنوان</DialogTitle>
+            <Button variant="text-gray" size="icon-40" type="button" onClick={onClose}>
+              <DashboardCloseCircle aria-hidden="true" />
+              <span className="sr-only">بستن پنجره</span>
+            </Button>
           </div>
-          <Button variant="text-gray" size="icon-36"
-            type="button"
-            onClick={onClose}
-            aria-label="بستن پنجره"
-          >
-            <X className="size-5" />
-          </Button>
+          <DialogDescription>
+            برای مشاهده فرم عنوان و زیر عنوان مورد نظر خود را انتخاب کنید.
+          </DialogDescription>
         </div>
 
-        {/* Dropdowns */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="modal-cat-select" className="font-sans text-[14px] leading-[24px] font-semibold text-neutral-700">
-              عنوان
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="register-cat-select">
+              <Typography as="span" variant="16/semibold" color="neutral-700">
+                عنوان
+              </Typography>
             </label>
             <DashboardSelect
-              id="modal-cat-select"
+              id="register-cat-select"
               label="عنوان"
-              placeholder="عنوان را جستجو یا انتخاب کنید"
+              placeholder="عنوان مد نظر خود را انتخاب کنید"
               options={categories.map((c) => ({ value: c.id, label: c.title }))}
               value={selectedCatId}
-              onChange={setSelectedCatId}
+              onChange={chooseCategory}
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="modal-sub-select" className="font-sans text-[14px] leading-[24px] font-semibold text-neutral-700">
-              زیر عنوان
+          <div className="flex flex-col gap-2">
+            <label htmlFor="register-sub-select">
+              <Typography as="span" variant="16/semibold" color="neutral-700">
+                زیر عنوان
+              </Typography>
             </label>
             <DashboardSelect
-              id="modal-sub-select"
+              id="register-sub-select"
               label="زیر عنوان"
-              placeholder={availableSubtopics.length === 0 ? 'زیرعنوانی یافت نشد' : 'زیرعنوان را جستجو یا انتخاب کنید'}
+              placeholder="زیر عنوان مد نظر خود را انتخاب کنید"
               disabled={availableSubtopics.length === 0}
               options={availableSubtopics.map((s) => ({ value: s.id, label: s.title }))}
               value={selectedSubId}
@@ -275,20 +249,13 @@ function QuickSelectModal({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="mt-2 flex items-center justify-end gap-3 pt-2">
-          <Button variant="outline-gray" size="40"
-            type="button"
-            onClick={onClose}
-          >
-            لغو
-          </Button>
-          <Button size="40"
-            type="button"
-            onClick={handleConfirm}
-            disabled={!selectedSubId}
-          >
+        {/* Confirm first in the DOM: it sits at the start (right) and cancel follows on its left */}
+        <div className="flex items-center gap-2">
+          <Button size="40" type="button" className="flex-1" onClick={() => onConfirm(selectedSubId)} disabled={!selectedSubId}>
             تایید
+          </Button>
+          <Button variant="outline-primary" size="40" type="button" className="flex-1" onClick={onClose}>
+            لغو
           </Button>
         </div>
       </DialogContent>
@@ -296,7 +263,6 @@ function QuickSelectModal({
   )
 }
 
-/** A 404 here means the event is not open to this account, not that the list is empty. */
 function describeHierarchyFailure(cause: unknown): string {
   if (cause instanceof TypeError) return 'ارتباط با سرور برقرار نشد. اتصال را بررسی کنید و دوباره تلاش کنید.'
   if (cause instanceof DashboardApiError) {
@@ -316,16 +282,11 @@ function describeRfpFailure(cause: unknown): string {
   return 'دریافت فایل RFP انجام نشد. دوباره تلاش کنید.'
 }
 
-function toPersianDigits(val: number | string): string {
-  return String(val).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)] ?? d)
-}
-
 export function EventsView({
   initialEventsList = [],
   state = 'default',
   isOwner = false,
   initialSelectedEventId,
-  initialSubtopicIds,
 }: EventsViewProps) {
   const router = useRouter()
   const [events] = useState<EventItem[]>(initialEventsList)
@@ -334,9 +295,6 @@ export function EventsView({
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name'>('newest')
 
   // The event page's own search and filter over its subtopics (the shared toolbar and filter template).
-  const [subtopicSearch, setSubtopicSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [selectionFilter, setSelectionFilter] = useState<'' | 'selected' | 'unselected'>('')
 
   // Find initial selected event if provided
   const foundInitial = useMemo(() => {
@@ -352,6 +310,7 @@ export function EventsView({
   }, [events, initialSelectedEventId])
 
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(foundInitial)
+  const [registerOpen, setRegisterOpen] = useState(false)
 
   // Subtopics & categories state for selected event
   const [categories, setCategories] = useState<EventCategoryDto[]>([])
@@ -363,24 +322,12 @@ export function EventsView({
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
 
   // Selected subtopics for multi-application proposal submission
-  const [selectedSubtopicIds, setSelectedSubtopicIds] = useState<Set<string>>(new Set())
 
   // RFP state: key = subtopicId, value = { loading, error, version }
   const [rfpState, setRfpState] = useState<
     Record<string, { loading: boolean; error: string | null; version: RfpVersionDto | null; isOpen: boolean }>
   >({})
 
-  // Quick Select modal
-  const [quickModalOpen, setQuickModalOpen] = useState(false)
-
-  // Company verification read from the server; registration stays off until it is approved.
-  const [eligibility, setEligibility] = useState<Eligibility | null>(null)
-  // Subtopics to restore once, for the event the representative returned to.
-  const pendingSubtopicIds = useRef<{ eventId: string; ids: string[] } | null>(
-    initialSelectedEventId && initialSubtopicIds?.length
-      ? { eventId: initialSelectedEventId, ids: initialSubtopicIds }
-      : null,
-  )
 
   // Fetch categories & subtopics whenever selectedEvent changes
   const effectiveEventId = selectedEvent?.rawId || selectedEvent?.id.replace(/^events-/, '') || ''
@@ -406,13 +353,6 @@ export function EventsView({
       if (!isCurrent()) return
       setCategories(catsRes.items ?? [])
       setSubtopics(subsRes.items ?? [])
-      const restore = pendingSubtopicIds.current
-      if (restore && restore.eventId === eventId) {
-        pendingSubtopicIds.current = null
-        const known = new Set((subsRes.items ?? []).map((sub) => sub.id))
-        // Only restore subtopics that still exist for this event.
-        setSelectedSubtopicIds(new Set(restore.ids.filter((id) => known.has(id))))
-      }
       // Expand all categories by default so user immediately sees hierarchy
       const initialExpanded: Record<string, boolean> = {}
       for (const cat of catsRes.items ?? []) {
@@ -429,25 +369,12 @@ export function EventsView({
   useEffect(() => {
     if (selectedEvent) {
       void loadEventHierarchy()
-      setSelectedSubtopicIds(new Set())
       setRfpState({})
     }
   }, [effectiveEventId])
 
   const toggleCategory = (catId: string) => {
     setExpandedCategories((prev) => ({ ...prev, [catId]: !prev[catId] }))
-  }
-
-  const toggleSubtopicSelect = (subtopicId: string) => {
-    setSelectedSubtopicIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(subtopicId)) {
-        next.delete(subtopicId)
-      } else {
-        next.add(subtopicId)
-      }
-      return next
-    })
   }
 
   const toggleRfpViewer = async (subtopic: EventSubtopicDto) => {
@@ -497,13 +424,13 @@ export function EventsView({
     }
   }
 
-  const handleRegisterSelected = () => {
-    if (selectedSubtopicIds.size === 0 || !eligibility?.canParticipate) return
-    const ids = Array.from(selectedSubtopicIds).join(',')
+  // «ثبت نام» opens the title and subtitle popup; confirming continues to the application for that subtitle.
+  const handleRegister = (subtopicId: string) => {
+    setRegisterOpen(false)
     router.push(
       `/dashboard/new-request?service=events&eventId=${encodeURIComponent(
         effectiveEventId,
-      )}&subtopicId=${encodeURIComponent(ids)}`,
+      )}&subtopicId=${encodeURIComponent(subtopicId)}`,
     )
   }
 
@@ -553,14 +480,6 @@ export function EventsView({
   // is read-only). Only a card with no operational event behind it has nowhere to go and stays inert.
   const eventHasTarget = (evt: EventItem) => eventHasAction(evt) || (!isOwner && evt.badgeType === 'ended')
 
-  // Subtopics that pass the event page's search and filters; a category with none left is hidden.
-  const subtopicQuery = subtopicSearch.trim()
-  const subtopicFiltered = Boolean(subtopicQuery || categoryFilter || selectionFilter)
-  const subtopicMatches = (sub: EventSubtopicDto) =>
-    (!subtopicQuery || sub.title.includes(subtopicQuery)) &&
-    (!categoryFilter || sub.categoryId === categoryFilter) &&
-    (!selectionFilter || (selectionFilter === 'selected') === selectedSubtopicIds.has(sub.id))
-
   const isLoading = state === 'loading'
   const isEmpty = !isLoading && filteredEvents.length === 0
 
@@ -569,14 +488,12 @@ export function EventsView({
   // -------------------------------------------------------------
   if (selectedEvent) {
     const isEnded = selectedEvent.badgeType === 'ended'
-    const selectedCount = selectedSubtopicIds.size
 
     return (
       <div className="flex min-h-0 w-full flex-1 flex-col text-start" dir="rtl">
-        {/* Breadcrumbs and Top Action Header - Figma Frame 146 (node 31967:73802) */}
-        <div className="flex flex-wrap items-center justify-between gap-4 py-2">
-          {/* Breadcrumb path */}
-          <nav aria-label="مسیر راهنما" className="flex items-center gap-2 font-sans text-[14px] text-neutral-600">
+        {/* Header: register button at the end, breadcrumb at the start (Figma 31981:77643) */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <nav aria-label="مسیر راهنما" className="flex min-w-0 items-center gap-2">
             <Button
               type="button"
               variant="link-gray"
@@ -587,58 +504,38 @@ export function EventsView({
               }}
               aria-label="بازگشت به رویدادها و نمایشگاه‌ها"
             >
-              <Typography as="span" variant="14/regular" className="text-inherit">
+              <Typography as="span" variant="16/regular" color="neutral-500">
                 رویدادها و نمایشگاه‌ها
               </Typography>
             </Button>
-            <span className="text-neutral-400">/</span>
-            <span className="font-bold text-neutral-800 truncate max-w-[280px] sm:max-w-md">
+            <Typography as="span" variant="16/regular" color="neutral-500">
+              /
+            </Typography>
+            <Typography as="h1" variant="24/bold" color="neutral-700" className="min-w-0 truncate">
               {selectedEvent.title}
-            </span>
+            </Typography>
           </nav>
 
-          {/* Top Registration Action Button */}
-          <div className="flex items-center gap-3">
-            <Button size="40"
-              type="button"
-              onClick={handleRegisterSelected}
-              disabled={isEnded || selectedCount === 0 || !eligibility?.canParticipate}
-            >
-              <TickSquareIcon className="size-6 shrink-0 stroke-white" />
-              <Typography as="span" variant="16/semibold" className="text-inherit">
-                {isEnded
-                  ? 'مهلت ثبت‌نام پایان یافته'
-                  : selectedCount > 0
-                    ? `ثبت درخواست (${toPersianDigits(selectedCount)} زیرعنوان)`
-                    : 'ثبت‌نام در رویداد'}
-              </Typography>
-            </Button>
-          </div>
+          <Button
+            size="40"
+            type="button"
+            className="min-w-[120px]"
+            onClick={() => setRegisterOpen(true)}
+            disabled={isEnded || loadingDetails || subtopics.length === 0}
+          >
+            <Typography as="span" variant="16/semibold" className="text-inherit">
+              {isEnded ? 'مهلت ثبت‌نام پایان یافته' : 'ثبت نام'}
+            </Typography>
+          </Button>
         </div>
 
         {/* The route keeps the page fixed (list routes scroll their own region), so the details scroll here. */}
         <ScrollArea className="min-h-0 flex-1">
-        {/* Slot 1: Event Summary Banner Card - Figma Frame 61 / Frame 46 / Frame 60 */}
-        <section className="relative mt-4 flex w-full flex-col gap-4 rounded-[16px] border border-neutral-200 bg-background p-4 sm:p-6">
-          <div className="flex flex-col-reverse items-start justify-end gap-5 sm:flex-row">
-            {/* Left Content column */}
-            <div className="flex w-full flex-1 flex-col justify-between gap-4 py-1">
-              {/* Badge + Title */}
-              <div className="flex flex-col items-start gap-3">
-                <EventStatusTag type={selectedEvent.badgeType}>{selectedEvent.badgeText}</EventStatusTag>
-                <Typography as="h1" variant="20/bold" color="neutral-700">
-                  {selectedEvent.title}
-                </Typography>
-              </div>
-
-              {/* Dates & Location */}
-              <div className="pt-2">
-                <EventMeta dates={selectedEvent.dates} location={selectedEvent.location} />
-              </div>
-            </div>
-
-            {/* Event Thumbnail on Right - Figma Frame 60 (200px x 200px) */}
-            <div className="relative size-[160px] shrink-0 overflow-hidden rounded-[10px] bg-slate-100 sm:size-[200px]">
+        {/* Slot 1: event summary card (Figma 31981:77598) */}
+        <section className="mt-5 flex w-full flex-col gap-6 rounded-[16px] border border-neutral-200 bg-background p-4">
+          <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
+            {/* The image comes first, so it sits at the start (right) of the RTL row */}
+            <div className="relative size-[160px] shrink-0 self-center overflow-hidden rounded-[8px] bg-neutral-100 sm:size-[200px]">
               {selectedEvent.imageSrc ? (
                 <Image
                   src={selectedEvent.imageSrc}
@@ -656,122 +553,30 @@ export function EventsView({
                 </Typography>
               )}
             </div>
+
+            <div className="flex min-w-0 flex-1 flex-col gap-8">
+              <div className="flex flex-col items-start gap-4">
+                <EventStatusTag type={selectedEvent.badgeType}>{selectedEvent.badgeText}</EventStatusTag>
+                <Typography as="h2" variant="20/bold" color="neutral-700">
+                  {selectedEvent.title}
+                </Typography>
+              </div>
+              <EventMeta dates={selectedEvent.dates} location={selectedEvent.location} />
+            </div>
           </div>
 
-          {/* Event description summary */}
           {selectedEvent.description && (
-            <p className="border-t border-neutral-100 pt-4 font-sans text-[14px] leading-[26px] text-neutral-600">
+            <Typography as="p" variant="16/regular" color="neutral-500">
               {selectedEvent.description}
-            </p>
+            </Typography>
           )}
         </section>
 
-        {/* Company verification state, missing profile sections and return destination (FE06) */}
-        {!isOwner && !isEnded ? (
-          <div className="mt-4">
-            <ParticipationEligibilityPanel
-              target={{
-                kind: 'event',
-                eventId: effectiveEventId,
-                subtopicIds: Array.from(selectedSubtopicIds),
-              }}
-              onEligibilityChange={setEligibility}
-            />
-          </div>
-        ) : null}
-
-        {/* Slot 2: Categories and Subtopics Tree Card - Figma Slot / Frame 156 */}
-        <section className="relative mt-4 flex w-full flex-col gap-5 rounded-[16px] border border-neutral-200 bg-background p-4 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 pb-4">
-            <div className="flex items-center gap-2">
-              <Layers className="size-6 text-brand-500" />
-              <h2 className="font-sans text-[18px] leading-[32px] font-bold text-neutral-700">
-                عنوان ها و زیر عنوان های رویداد
-              </h2>
-            </div>
-
-            {/* Toolbar: Counter and Quick Select */}
-            <div className="flex items-center gap-3">
-              {selectedCount > 0 && (
-                <span className="inline-flex items-center rounded-full bg-brand-50 px-3 py-1 font-sans text-[13px] font-medium text-brand-700">
-                  {toPersianDigits(selectedCount)} زیرعنوان انتخاب شده
-                </span>
-              )}
-              {categories.length > 0 && (
-                <Button variant="outline-gray" size="36"
-                  type="button"
-                  onClick={() => setQuickModalOpen(true)}
-                >
-                  <span>انتخاب سریع عنوان</span>
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Multiple Applications Notice Banner */}
-          <div
-            role="note"
-            className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/80 p-3.5 text-blue-900"
-          >
-            <AlertCircle className="mt-0.5 size-5 shrink-0 text-blue-600" />
-            <div className="text-[13px] leading-[22px]">
-              <p className="font-semibold">
-                برای هر زیرعنوان انتخاب‌شده، یک پرونده و کد رهگیری جداگانه تشکیل خواهد شد.
-              </p>
-              <p className="text-blue-800">
-                شما می‌توانید چندین زیرعنوان مرتبط را همزمان انتخاب کنید؛ پس از تکمیل، ارزیابی هر پروپوزال به‌صورت کاملاً مستقل انجام می‌شود.
-              </p>
-            </div>
-          </div>
-
-          {/* Search and the shared filter template over the subtopics (design QA #276) */}
-          {!loadingDetails && !detailsError && categories.length > 0 && (
-            <ListToolbar
-              search={
-                <SearchField
-                  value={subtopicSearch}
-                  onChange={(event) => setSubtopicSearch(event.target.value)}
-                  placeholder="جستجوی زیرعنوان"
-                  aria-label="جستجوی زیرعنوان‌ها"
-                  maxLength={100}
-                />
-              }
-              filter={
-                <ListFilterButton
-                  label="فیلتر زیرعنوان‌ها"
-                  groups={[
-                    ...(categories.length > 1
-                      ? [
-                          {
-                            key: 'category',
-                            label: 'عنوان',
-                            value: categoryFilter,
-                            options: [
-                              { value: '', label: 'همه عنوان‌ها' },
-                              ...categories.map((cat) => ({ value: cat.id, label: cat.title })),
-                            ],
-                          },
-                        ]
-                      : []),
-                    {
-                      key: 'selection',
-                      label: 'وضعیت انتخاب',
-                      value: selectionFilter,
-                      options: [
-                        { value: '', label: 'همه زیرعنوان‌ها' },
-                        { value: 'selected', label: 'انتخاب‌شده' },
-                        { value: 'unselected', label: 'انتخاب‌نشده' },
-                      ],
-                    },
-                  ]}
-                  onChange={(key, value) => {
-                    if (key === 'category') setCategoryFilter(value ?? '')
-                    else setSelectionFilter((value as 'selected' | 'unselected' | undefined) ?? '')
-                  }}
-                />
-              }
-            />
-          )}
+        {/* Slot 2: titles and subtitles tree (Figma 31981:77613) */}
+        <section className="mt-5 flex w-full flex-col gap-6 rounded-[16px] border border-neutral-200 bg-background p-4">
+          <Typography as="h2" variant="20/extrabold" color="neutral-800">
+            عنوان ها و زیر عنوان های رویداد
+          </Typography>
 
           {/* Hierarchy Content */}
           {loadingDetails ? (
@@ -792,147 +597,95 @@ export function EventsView({
               هیچ عنوان یا زیرعنوانی برای این رویداد تعریف نشده است.
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              {subtopicFiltered &&
-                !categories.some((cat) => subtopics.some((sub) => sub.categoryId === cat.id && subtopicMatches(sub))) && (
-                  <div role="status" className="py-8 text-center font-sans text-[14px] text-neutral-500">
-                    زیرعنوانی با این جستجو یا فیلتر پیدا نشد.
-                  </div>
-                )}
+            <div className="flex flex-col">
               {categories.map((cat) => {
-                const catSubtopics = subtopics.filter((sub) => sub.categoryId === cat.id && subtopicMatches(sub))
-                // A category with nothing left under the search or filter is not worth showing.
-                if (subtopicFiltered && catSubtopics.length === 0) return null
-                const isExpanded = subtopicFiltered || (expandedCategories[cat.id] ?? false)
+                const catSubtopics = subtopics.filter((sub) => sub.categoryId === cat.id)
+                const isExpanded = expandedCategories[cat.id] ?? false
 
                 return (
-                  <div
-                    key={cat.id}
-                    className="overflow-hidden rounded-xl border border-neutral-200/80 bg-neutral-50/50"
-                  >
-                    {/* Category Accordion Header */}
-                    <Button
-                      type="button"
-                      variant="row"
-                      size="clear"
-                      onClick={() => toggleCategory(cat.id)}
-                      className="p-3.5"
-                      aria-expanded={isExpanded}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Folder className="size-5 text-brand-600" />
-                        <span className="font-sans text-[16px] leading-[28px] font-semibold text-neutral-800">
-                          {cat.title}
-                        </span>
-                        <span className="rounded-full bg-neutral-200/70 px-2 py-0.5 font-sans text-[12px] font-normal text-neutral-600">
-                          {catSubtopics.length} زیرعنوان
-                        </span>
-                      </div>
-                      <ChevronDown
-                        className={`size-5 text-neutral-500 transition-transform ${
-                          isExpanded ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </Button>
+                  <div key={cat.id} className="flex flex-col">
+                    <TreeRow
+                      title={cat.title}
+                      strong
+                      expanded={isExpanded}
+                      onToggle={() => toggleCategory(cat.id)}
+                    />
 
-                    {/* Subtopics List */}
                     {isExpanded && (
-                      <div className="flex flex-col divide-y divide-neutral-100 bg-background">
+                      <div className="ms-2 flex flex-col border-s border-neutral-200 ps-4">
                         {catSubtopics.length === 0 ? (
-                          <div className="p-4 text-center text-[13px] text-neutral-400">
+                          <Typography as="p" variant="16/regular" color="neutral-500" className="px-2 py-3">
                             زیرعنوانی در این دسته موجود نیست.
-                          </div>
+                          </Typography>
                         ) : (
                           catSubtopics.map((sub) => {
-                            const isChecked = selectedSubtopicIds.has(sub.id)
                             const rfp = rfpState[sub.id]
 
                             return (
-                              <div key={sub.id} className="flex flex-col gap-2.5 p-3.5 sm:p-4">
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                  {/* Right side: Checkbox + Subtopic title + Employer tag */}
-                                  <div className="flex items-start gap-3 flex-1 min-w-[260px]">
-                                    <label className="flex items-center gap-2 cursor-pointer pt-0.5">
-                                      <Checkbox
-                                        checked={isChecked}
-                                        onCheckedChange={() => toggleSubtopicSelect(sub.id)}
-                                        aria-label={`انتخاب زیرعنوان ${sub.title}`} />
-                                      <span className="sr-only">انتخاب {sub.title}</span>
-                                    </label>
+                              <div key={sub.id} className="flex flex-col">
+                                <TreeRow
+                                  title={sub.title}
+                                  expanded={Boolean(rfp?.isOpen)}
+                                  onToggle={() => toggleRfpViewer(sub)}
+                                />
 
-                                    <div className="flex flex-col gap-1">
-                                      <span className="font-sans text-[15px] leading-[26px] font-medium text-neutral-800">
-                                        {sub.title}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Left side: RFP Actions */}
-                                  <div className="flex items-center gap-2">
-                                    <Button variant="outline-gray" size="32"
-                                      type="button"
-                                      onClick={() => toggleRfpViewer(sub)}
-                                      aria-label={`دریافت فایل RFP برای ${sub.title}`}
-                                    >
-                                      <FileText className="size-4" />
-                                      <span>مشاهده و دانلود RFP</span>
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {/* Collapsible RFP Details & Files Area */}
+                                {/* RFP details and files: the «توضیحات» level of the tree */}
                                 {rfp?.isOpen && (
-                                  <div className="mt-2 rounded-lg border border-neutral-200 bg-neutral-50/70 p-3">
+                                  <div className="ms-2 flex flex-col gap-2 border-s border-neutral-200 ps-4 py-2">
                                     {rfp.loading ? (
-                                      <div className="flex items-center gap-2 text-[13px] text-neutral-500">
+                                      <div className="flex items-center gap-2 px-2">
                                         <Skeleton className="h-4 w-32 bg-neutral-200" />
-                                        <span>در حال دریافت فایل‌های RFP...</span>
+                                        <Typography as="span" variant="14/regular" color="neutral-500">
+                                          در حال دریافت فایل‌های RFP...
+                                        </Typography>
                                       </div>
                                     ) : rfp.error ? (
-                                      <div className="text-[13px] text-error-500">{rfp.error}</div>
+                                      <Typography as="p" variant="14/regular" color="error" className="px-2">
+                                        {rfp.error}
+                                      </Typography>
                                     ) : !rfp.version || rfp.version.files.length === 0 ? (
-                                      <div className="text-[13px] text-neutral-500">
+                                      <Typography as="p" variant="16/regular" color="neutral-500" className="px-2">
                                         فایل RFP بارگذاری نشده است
-                                      </div>
+                                      </Typography>
                                     ) : (
-                                      <div className="flex flex-col gap-2">
+                                      <>
                                         {rfp.version.reason && (
-                                          <p className="text-[12px] text-neutral-500">
-                                            توضیحات نسخه: {rfp.version.reason}
-                                          </p>
+                                          <Typography as="p" variant="16/regular" color="neutral-500" className="px-2">
+                                            {rfp.version.reason}
+                                          </Typography>
                                         )}
-                                        <div className="flex flex-col gap-1.5">
-                                          {rfp.version.files.map((file) => (
-                                            <div
-                                              key={file.id}
-                                              className="flex items-center justify-between rounded-md border border-neutral-200 bg-background p-2 text-[13px]"
-                                            >
-                                              <div className="flex items-center gap-2 truncate">
-                                                <FileText className="size-4 shrink-0 text-brand-600" />
-                                                <span className="truncate font-medium text-neutral-800">
-                                                  {file.filename}
-                                                </span>
-                                                <span className="text-[11px] text-neutral-400">
-                                                  ({formatFileSize(file.sizeBytes)})
-                                                </span>
-                                              </div>
-                                              <a
-                                                href={getRfpDownloadUrl(
-                                                  effectiveEventId,
-                                                  sub.id,
-                                                  rfp.version!.id,
-                                                  file.id,
-                                                )}
-                                                download={file.filename}
-                                                className="flex items-center gap-1 rounded px-2.5 py-1 text-[12px] font-semibold text-brand-600 hover:bg-brand-50"
-                                              >
-                                                <Download className="size-3.5" />
-                                                <span>دانلود</span>
-                                              </a>
+                                        {rfp.version.files.map((file) => (
+                                          <div
+                                            key={file.id}
+                                            className="flex items-center justify-between gap-3 rounded-[8px] border border-neutral-200 bg-background p-2"
+                                          >
+                                            <div className="flex min-w-0 items-center gap-2">
+                                              <FileText className="size-4 shrink-0 text-neutral-500" />
+                                              <Typography as="span" variant="14/regular" color="neutral-700" className="truncate">
+                                                {file.filename}
+                                              </Typography>
+                                              <Typography as="span" variant="14/regular" color="neutral-500">
+                                                ({formatFileSize(file.sizeBytes)})
+                                              </Typography>
                                             </div>
-                                          ))}
-                                        </div>
-                                      </div>
+                                            <a
+                                              href={getRfpDownloadUrl(
+                                                effectiveEventId,
+                                                sub.id,
+                                                rfp.version!.id,
+                                                file.id,
+                                              )}
+                                              download={file.filename}
+                                              className="flex shrink-0 items-center gap-1 rounded px-2.5 py-1 text-brand-600 hover:bg-brand-50"
+                                            >
+                                              <Download className="size-3.5" />
+                                              <Typography as="span" variant="14/regular" className="text-inherit">
+                                                دانلود
+                                              </Typography>
+                                            </a>
+                                          </div>
+                                        ))}
+                                      </>
                                     )}
                                   </div>
                                 )}
@@ -950,20 +703,14 @@ export function EventsView({
         </section>
         </ScrollArea>
 
-        {/* Quick Select Modal Dialog */}
-        <QuickSelectModal
-          isOpen={quickModalOpen}
-          onClose={() => setQuickModalOpen(false)}
-          categories={categories}
-          subtopics={subtopics}
-          onSelectSubtopic={(subId) => {
-            setSelectedSubtopicIds((prev) => new Set([...prev, subId]))
-            const targetSub = subtopics.find((s) => s.id === subId)
-            if (targetSub) {
-              setExpandedCategories((prev) => ({ ...prev, [targetSub.categoryId]: true }))
-            }
-          }}
-        />
+        {registerOpen && (
+          <RegisterDialog
+            onClose={() => setRegisterOpen(false)}
+            categories={categories}
+            subtopics={subtopics}
+            onConfirm={handleRegister}
+          />
+        )}
       </div>
     )
   }

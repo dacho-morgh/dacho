@@ -22,7 +22,7 @@ import {
   runSelfSignup,
   type SelfSignupStore,
 } from '@cms-core/auth/self-signup'
-import { changeOwnPassword, updateOwnAccount } from '@cms-core/endpoints/selfAccount'
+import { MIN_PASSWORD_LENGTH, changeOwnPassword, updateOwnAccount } from '@cms-core/endpoints/selfAccount'
 import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import {
   APIError,
@@ -257,6 +257,12 @@ export const Users: CollectionConfig = {
             data[key] = body[key]
           }
         }
+        // The owner resetting a password follows the same minimum as a person changing their own.
+        if (typeof data.password === 'string' && data.password.length < MIN_PASSWORD_LENGTH)
+          return Response.json(
+            { error: 'weak_password', errors: [{ field: 'password', code: 'too_short' }] },
+            { status: 400 },
+          )
         for (const key of ['degree', 'activityField'] as const) {
           if (!(key in body)) continue
           if (body[key] !== null && typeof body[key] !== 'string')
@@ -339,6 +345,12 @@ export const Users: CollectionConfig = {
             depth: 0,
             req,
           })
+          // A reset password must end every session the person already has open.
+          if (data.password !== undefined) {
+            const sessionTable = await db.execute(sql`SELECT to_regclass('public.users_sessions') AS sessions`)
+            if (sessionTable.rows[0]?.sessions)
+              await db.execute(sql`DELETE FROM public.users_sessions WHERE _parent_id = ${Number(id)}`)
+          }
           // Payload uses wall time; preserve CAS even within one millisecond or after clock skew.
           const advanced = await db.execute(sql`
             UPDATE public.users

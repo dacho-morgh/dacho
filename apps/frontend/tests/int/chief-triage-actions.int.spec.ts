@@ -314,7 +314,7 @@ describe('chief intake snapshots', () => {
 })
 
 describe('chief intake queue', () => {
-  it('shows each case stage and the step waiting on this person', async () => {
+  it('tags each case by where its review stands and offers the triage commands in the row menu', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
@@ -330,8 +330,15 @@ describe('chief intake queue', () => {
     type Props = NonNullable<Parameters<typeof AdminRequestList>[0]>
     const List = AdminRequestList as (props: Props) => ReturnType<typeof AdminRequestList>
     render(createElement(List, { filters: { queue: 'chief_triage' } }))
-    expect(await screen.findByText('منتظر بررسی اولیه شما')).toBeTruthy()
-    expect(screen.getAllByText('بررسی اولیه').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getAllByText('منتظر بررسی اولیه شما')).toHaveLength(1)
+    // A case still in triage reads «ارجاع نشده»; a rejected one keeps its own tag (Figma 31885:20135).
+    expect(await screen.findByText('ارجاع نشده')).toBeTruthy()
+    expect(screen.getByText('رد شده')).toBeTruthy()
+    // Only the case this person may triage has the menu, with the three commands of the design.
+    const menus = screen.getAllByRole('button', { name: 'عملیات' })
+    expect(menus).toHaveLength(1)
+    fireEvent.click(menus[0]!)
+    expect(await screen.findByRole('button', { name: 'ارجاع' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'درخواست اصلاحیه' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'رد درخواست' })).toBeTruthy()
   })
 })

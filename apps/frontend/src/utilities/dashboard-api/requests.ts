@@ -30,6 +30,7 @@ export function listRequests(params?: {
 export interface RequestEventInfo {
   id: string
   title: string
+  description?: string | null
   category: { id: string; title: string } | null
   subtopic: { id: string; title: string } | null
   image: { url: string; alt: string | null } | null

@@ -475,6 +475,46 @@ describe('employee form', () => {
     render(createElement(EmployeeForm, { mode: 'view', id: '1' }))
     await screen.findByRole('heading', { name: 'مهندس آرش حسینی' })
     expect(screen.queryByRole('link', { name: 'ویرایش' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'تغییر رمز عبور' })).toBeNull()
     expect(screen.queryByLabelText('فایل رزومه')).toBeNull()
+  })
+
+  it('lets the owner set a new password from the employee page', async () => {
+    const request = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        return json({ doc: { ...staff[0], updatedAt: '2026-11-02T10:00:00.000Z' } })
+      }
+      return json({ ...staff[0], phone: '09120000123', personnelAddresses: [] })
+    })
+    vi.stubGlobal('fetch', request)
+    render(createElement(EmployeeForm, { mode: 'view', id: '1', canManage: true }))
+    await screen.findByRole('heading', { name: 'مهندس آرش حسینی' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'تغییر رمز عبور' }))
+    const dialog = await screen.findByRole('dialog')
+    const password = within(dialog).getByLabelText('رمز عبور جدید')
+    const repeat = within(dialog).getByLabelText('تکرار رمز عبور جدید')
+
+    // Too short, then mismatched: nothing is sent.
+    fireEvent.change(password, { target: { value: 'short' } })
+    fireEvent.change(repeat, { target: { value: 'short' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ذخیره رمز عبور' }))
+    expect(await within(dialog).findByRole('alert')).toBeTruthy()
+    fireEvent.change(password, { target: { value: 'long-enough-1' } })
+    fireEvent.change(repeat, { target: { value: 'different-2' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ذخیره رمز عبور' }))
+    expect(within(dialog).getByRole('alert').textContent).toContain('یکسان نیست')
+    expect(request.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(0)
+
+    fireEvent.change(repeat, { target: { value: 'long-enough-1' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ذخیره رمز عبور' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    const writes = request.mock.calls.filter(([, init]) => init?.method === 'PATCH')
+    expect(writes).toHaveLength(1)
+    expect(writes[0]![0]).toBe('/api/users/personnel/1')
+    expect(JSON.parse(writes[0]![1]!.body as string)).toEqual({
+      expectedUpdatedAt: staff[0]!.updatedAt,
+      password: 'long-enough-1',
+    })
   })
 })

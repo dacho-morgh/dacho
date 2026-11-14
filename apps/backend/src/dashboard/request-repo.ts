@@ -66,9 +66,14 @@ export interface ApplicationTeamMember {
   relation?: string
 }
 
-/** The trimmed team, or null unless it is a nonempty list of named members. */
+/**
+ * The trimmed team. Naming key team members is optional: no value or an empty list is an empty team. Anything
+ * that is present must still be a well-formed list of named members, otherwise this returns null.
+ */
 export function parseApplicationTeam(value: unknown): ApplicationTeamMember[] | null {
-  if (!Array.isArray(value) || value.length === 0) return null
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value)) return null
+  if (value.length === 0) return []
   const team: ApplicationTeamMember[] = []
   for (const member of value) {
     if (!member || typeof member !== 'object') return null
