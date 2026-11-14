@@ -34,6 +34,8 @@ export function canOpenDashboardDestination(role: OperationalRole, rawValue: str
   if (path === '/dashboard/profile/staff' || path.startsWith('/dashboard/profile/staff/')) {
     return role !== 'representative'
   }
+  // A chief reviewer opens one company's page from a case of theirs (the server limits which), never the list.
+  if (role === 'chief-reviewer' && /^\/dashboard\/companies\/[^/]+$/.test(path)) return true
   if (path === '/dashboard/companies' || path.startsWith('/dashboard/companies/')) {
     return managementRoles.includes(role)
   }

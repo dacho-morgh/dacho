@@ -1,5 +1,6 @@
 import Image from 'next/image'
 
+import { ReadonlyField } from '@/components/dashboard/company-detail/company-detail-parts'
 import { DownloadRow } from '@/components/dashboard/download-row'
 import { EventMeta, EventStatusTag, type EventItem } from '@/components/dashboard/events-view'
 import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
@@ -44,6 +45,7 @@ export function EventApplicationCards({
   rfpFiles,
   notes,
   submittedProposals,
+  variant = 'cards',
 }: {
   requestId: string
   event: RequestEventInfo
@@ -52,8 +54,46 @@ export function EventApplicationCards({
   notes: string
   /** The proposal files pinned when the application was sent; empty for a draft. */
   submittedProposals: Array<{ id: string; filename: string }>
+  /** `chief`: the single «اطلاعات و فرم رویداد» card of the chief's page (Figma 31885:6801), not the applicant's cards. */
+  variant?: 'cards' | 'chief'
 }) {
   const status = event.status ? STATUS[event.status] : null
+  if (variant === 'chief') {
+    return (
+      <section aria-labelledby="request-event-info-heading" className={card}>
+        <Typography as="h2" id="request-event-info-heading" variant="20/extrabold" color="neutral-800">
+          اطلاعات و فرم رویداد
+        </Typography>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <ReadonlyField label="رویداد" value={event.title} />
+          <ReadonlyField label="تاریخ برگزاری" value={formatEventDateRange(event.startDate, event.endDate)} />
+          <ReadonlyField label="عنوان" value={event.category?.title ?? ''} />
+          <ReadonlyField label="زیر عنوان" value={event.subtopic?.title ?? ''} />
+          {status ? <ReadonlyField label="وضعیت رویداد" value={status.text} /> : null}
+          <ReadonlyField label="محل برگزاری" value={event.location ?? ''} />
+          {rfpFiles.map((file, position) => (
+            <DownloadRow
+              key={file.id}
+              label={rfpFiles.length > 1 ? `فایل RFP ${position + 1}` : 'فایل RFP'}
+              href={getRequestRfpFileUrl(requestId, file.id)}
+              filename={file.filename}
+            />
+          ))}
+          {submittedProposals.map((file, position) => (
+            <div key={file.id} className="flex min-w-0 items-center justify-between gap-3">
+              <Typography as="span" variant="16/semibold" color="neutral-700">
+                {submittedProposals.length > 1 ? `پروپوزال ارسالی ${position + 1}` : 'پروپوزال ارسالی'}
+              </Typography>
+              <PrivateDocumentDownload documentId={file.id} filename={file.filename} emphasis="primary" />
+            </div>
+          ))}
+          <div className="md:col-span-2">
+            <ReadonlyField label="توضیحات" value={notes} />
+          </div>
+        </div>
+      </section>
+    )
+  }
   return (
     <>
       <section aria-label="رویداد" className={card}>

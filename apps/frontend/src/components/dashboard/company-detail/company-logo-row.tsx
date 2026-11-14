@@ -15,6 +15,7 @@ export function CompanyLogoRow({
   logo,
   onUpload,
   onRemove,
+  readOnly = false,
   children,
 }: {
   companyName?: string
@@ -22,6 +23,8 @@ export function CompanyLogoRow({
   /** Shows the picture at once and stores it; the promise settles when the server has answered. */
   onUpload: (file: File) => Promise<void>
   onRemove: () => Promise<void>
+  /** A reader who may not change the company (a chief reviewer) gets the picture alone, without the buttons. */
+  readOnly?: boolean
   /** What closes the row, e.g. the verification status. */
   children?: ReactNode
 }) {
@@ -65,7 +68,7 @@ export function CompanyLogoRow({
         </span>
       )}
       {/* Small screens: the two compact buttons stack beside the logo, as tall as it is; from sm they sit in a row. */}
-      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      {readOnly ? null : <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         {/* The picker is driven by the button below, so the native control stays visually hidden. */}
         <div className="sr-only">
           <FileInput
@@ -106,7 +109,7 @@ export function CompanyLogoRow({
             حذف عکس پروفایل
           </Typography>
         </Button>
-      </div>
+      </div>}
       {children}
     </div>
   )

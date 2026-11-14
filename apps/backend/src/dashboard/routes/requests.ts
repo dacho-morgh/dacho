@@ -561,7 +561,8 @@ export function registerRequestRoutes(router: Router, ctx: DashboardContext): vo
         requestId: req.params.id,
         actorId: actor.id,
         action,
-        reason: action === 'accept' ? null : trimmedReason,
+        // An accepting chief may leave a note; it is recorded in the case history like the other decisions' reasons.
+        reason: trimmedReason || null,
         expectedRevision: revision,
       })
       if (result === 'not_found') { res.status(404).json({ error: 'not_found' }); return }

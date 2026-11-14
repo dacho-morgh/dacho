@@ -9,6 +9,7 @@ import { RequestAssignmentPanel } from '@/components/dashboard/request-assignmen
 import { RequestCompanyCard } from '@/components/dashboard/request-detail/request-company-card'
 import { RequestDetailShell } from '@/components/dashboard/request-detail/request-detail-shell'
 import { RequestEventCard, RequestStatusCard, RequestWorkflowStepper } from '@/components/dashboard/request-detail/request-event-card'
+import { RequestHeaderActions } from '@/components/dashboard/request-detail/request-header-actions'
 import { RequestCardRow, RequestHistoryCard } from '@/components/dashboard/request-detail/request-history-card'
 import { ReviewAssignmentPanel } from '@/components/dashboard/review-assignment-panel'
 import { SecretariatFollowUpPanel } from '@/components/dashboard/secretariat-follow-up-panel'
@@ -177,7 +178,7 @@ export function RequestDossier({
 
   const oversight = role === 'system-owner' || role === 'central-secretariat'
   const companyName = plainText(owner?.name)
-  const profileHref = oversight && request.ownerId ? `/dashboard/companies/${encodeURIComponent(request.ownerId)}` : null
+  const profileHref = (oversight || role === 'chief-reviewer') && request.ownerId ? `/dashboard/companies/${encodeURIComponent(request.ownerId)}` : null
   const showsCompanyCard = !isCompany && Boolean(companyName || profileHref)
   // The company and the admin pages open with the application card and its stepper; the others keep the stepper in a fold below.
   const showsEventCard = isCompany || oversight
@@ -186,26 +187,44 @@ export function RequestDossier({
   const statusLabel = isCompany ? companyRequestStageLabel(request) : (STATUS_LABELS[request.status] ?? request.status)
   const statusVariant = isCompany ? COMPANY_STAGE_VARIANTS[companyRequestStage(request)] : (STATUS_VARIANTS[request.status] ?? 'gray')
   const snapshotCompany = profile && profile !== 'failed' ? profile.verification?.snapshot.company : null
-  const companyFacts = [plainText(snapshotCompany?.type), plainText(snapshotCompany?.province), plainText(snapshotCompany?.city)]
+  // «فعال | سهامی عام | ۵ سال»: the company's status, type and age from the case's company card; the pinned profile fills in
+  // the type and place for a reader whose card lacks them.
+  const companyCard = detail.company
+  const companyFacts = companyCard
+    ? [
+        plainText(companyCard.status) || (companyCard.active === true ? 'فعال' : companyCard.active === false ? 'غیرفعال' : ''),
+        plainText(companyCard.type),
+        typeof companyCard.ageYears === 'number' ? `${companyCard.ageYears.toLocaleString('fa-IR')} سال` : '',
+      ]
+    : [plainText(snapshotCompany?.type), plainText(snapshotCompany?.province), plainText(snapshotCompany?.city)]
   const submitted = formatDate(request.submissionDate)
   const eventFacts = [
     { icon: 'document' as const, text: `کد پیگیری: ${request.trackingCode}` },
     ...(submitted ? [{ icon: 'calendar' as const, text: `تاریخ ثبت: ${submitted}` }] : []),
   ]
 
+  // The chief's desk (Figma 31885:6783): the commands sit in the page header, the company and the round lead, and the
+  // event application follows the company information instead of opening the page.
+  const chiefDesk = role === 'chief-reviewer' && Boolean(eventCards)
+  const chiefCommands = chiefDesk && (actions.includes('triage') || actions.includes('decideReview'))
+
   return (
-    <RequestDetailShell title={pageTitle} actions={headerActions}>
-      {eventCards}
+    <RequestDetailShell
+      title={pageTitle}
+      actions={chiefCommands ? <RequestHeaderActions id={id} actions={actions} revision={request.revision} /> : headerActions}
+    >
+      {chiefDesk ? null : eventCards}
 
       {showsCompanyCard ? (
         <RequestCompanyCard
           name={companyName || 'شرکت متقاضی'}
           facts={companyFacts}
           profileHref={profileHref}
+          logoUrl={companyCard?.logo?.url ?? null}
         />
       ) : null}
 
-      {showsEventCard && eventCards ? (
+      {chiefDesk ? null : showsEventCard && eventCards ? (
         <RequestStatusCard workflow={workflow} currentStep={request.currentStep} />
       ) : showsEventCard ? (
         <RequestEventCard
@@ -219,7 +238,7 @@ export function RequestDossier({
         />
       ) : null}
 
-      <RequestActionsPanel id={id} actions={actions} revision={request.revision} />
+      {chiefCommands ? null : <RequestActionsPanel id={id} actions={actions} revision={request.revision} />}
       {unbuiltNotes.length ? (
         <ul className="flex flex-col gap-1 rounded-2xl bg-neutral-50 p-4">
           {unbuiltNotes.map((note) => (
@@ -253,7 +272,7 @@ export function RequestDossier({
           employerId={roundEmployerId}
         />
       </RequestCardRow>
-      {round !== null || evaluations !== null ? (
+      {(round !== null || evaluations !== null) && !(chiefDesk && !(round && round !== 'failed' && round.round)) ? (
         <ChiefReviewSummary
           round={round}
           evaluations={evaluations}
@@ -280,7 +299,9 @@ export function RequestDossier({
         </DetailCard>
       )}
 
-      {profile !== null ? <ProfileSnapshot profile={profile} /> : null}
+      {profile !== null ? <ProfileSnapshot profile={profile} strong={chiefDesk} /> : null}
+
+      {chiefDesk ? eventCards : null}
 
       {eventCards ? null : (
         <DetailCard title="اطلاعات و فرم رویداد">
@@ -364,7 +385,7 @@ export function RequestDossier({
         </DetailCard>
       )}
 
-      {showsEventCard ? null : (
+      {showsEventCard || chiefDesk ? null : (
         <CollapsibleCard title="روند بررسی" defaultOpen={false}>
           <RequestWorkflowStepper workflow={workflow} currentStep={request.currentStep} />
         </CollapsibleCard>
@@ -389,18 +410,18 @@ const PROFILE_FIELDS: [section: 'company' | 'dossier', key: string, label: strin
  * The profile as it was when the company submitted, not the live profile: only the
  * fields every reviewing role may see, whatever the snapshot holds for this reader.
  */
-function ProfileSnapshot({ profile }: { profile: DossierPart<RequestVerificationDto> }) {
+function ProfileSnapshot({ profile, strong = false }: { profile: DossierPart<RequestVerificationDto>; strong?: boolean }) {
   return (
-    <DetailCard title="اطلاعات شرکت">
+    <DetailCard title="اطلاعات شرکت" strong={strong}>
       {profile === 'failed' ? (
         <Typography role="alert" variant="14/regular" color="error">
           دریافت پروفایل ثبت‌شده شرکت انجام نشد. صفحه را دوباره بارگذاری کنید.
         </Typography>
       ) : profile?.verification ? (
         <>
-          <Typography variant="14/regular" color="neutral-500">
+          {strong ? null : <Typography variant="14/regular" color="neutral-500">
             اطلاعات در زمان ثبت · نسخه {profile.verification.revision.toLocaleString('fa-IR')} پروفایل تأییدشده · ثبت در {formatDate(profile.verification.createdAt)}
-          </Typography>
+          </Typography>}
           <div className="grid gap-4 sm:grid-cols-2">
             {PROFILE_FIELDS.map(([section, key, label]) => (
               <ReadonlyField key={`${section}.${key}`} label={label} value={answerText(profile.verification?.snapshot[section]?.[key])} />

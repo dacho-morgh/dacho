@@ -12,11 +12,14 @@ export function DetailCard({
   action,
   children,
   className,
+  strong = false,
 }: {
   title: string
   action?: ReactNode
   children: ReactNode
   className?: string
+  /** The 20/ExtraBold title of the case page's «Slot» cards (Figma 31885:6794). */
+  strong?: boolean
 }) {
   return (
     <section
@@ -24,9 +27,15 @@ export function DetailCard({
       className={cn('flex flex-col gap-5 rounded-2xl border border-neutral-200 bg-background p-4', className)}
     >
       <div className="flex min-h-8 items-center justify-between gap-4">
-        <Typography as="h2" variant="16/bold" sm="20/bold" color="secondary">
-          {title}
-        </Typography>
+        {strong ? (
+          <Typography as="h2" variant="20/extrabold" color="neutral-800">
+            {title}
+          </Typography>
+        ) : (
+          <Typography as="h2" variant="16/bold" sm="20/bold" color="secondary">
+            {title}
+          </Typography>
+        )}
         {action}
       </div>
       {children}

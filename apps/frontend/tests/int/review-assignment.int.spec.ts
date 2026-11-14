@@ -206,20 +206,20 @@ describe('round slots and progress', () => {
         { id: 'e2', userId: 'r2', variant: 'ordinary', state: 'draft', finalizedAt: null },
       ]),
     })
-    expect(screen.getByText('ارزیابی نهایی: ۱ از ۴')).toBeTruthy()
+    expect(screen.getByText('۱/۴')).toBeTruthy()
     expect(screen.getByText(/نسخه پرونده ۴ · نسخه پروپوزال ۳/)).toBeTruthy()
     const rows = screen.getAllByRole('listitem')
-    expect(rows[0].textContent).toMatch(/کارفرما \(ثابت\).*کارفرما یکم.*در انتظار ارزیابی/)
-    expect(rows[1].textContent).toMatch(/داور الف.*ارزیابی نهایی شد/)
-    expect(rows[2].textContent).toMatch(/داور ب.*در حال ارزیابی/)
-    expect(rows[3].textContent).toMatch(/داور ج.*در انتظار ارزیابی/)
+    expect(rows[0].textContent).toMatch(/کارفرما یکم.*کارفرما.*مشاهده نشده/)
+    expect(rows[1].textContent).toMatch(/داور الف.*بررسی شده/)
+    expect(rows[2].textContent).toMatch(/داور ب.*درحال بررسی/)
+    expect(rows[3].textContent).toMatch(/داور ج.*مشاهده نشده/)
     // Without a replace command nobody gets a control.
     expect(screen.queryByRole('button', { name: /جایگزینی/ })).toBeNull()
   })
 
   it.each([0, 2, 3, 4])('shows %i/4 from the server count', (finalized) => {
     panel({ round: { round: round({ completion: { required: 4, finalized, ready: finalized === 4, completedAt: null } }) } })
-    expect(screen.getByText(`ارزیابی نهایی: ${finalized.toLocaleString('fa-IR')} از ۴`)).toBeTruthy()
+    expect(screen.getByText(`${finalized.toLocaleString('fa-IR')}/۴`)).toBeTruthy()
   })
 
   it('offers replacement only for unfinished ordinary reviewers to the chief', () => {

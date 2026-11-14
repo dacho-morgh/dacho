@@ -225,6 +225,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
     const rfp = await readPart<{ version: RfpVersionDto }>(`${path}/rfp`)
     eventCards = (
       <EventApplicationCards
+        variant={role === 'chief-reviewer' ? 'chief' : 'cards'}
         requestId={id}
         event={event}
         rfpFiles={rfp && rfp !== 'failed' ? (rfp.version.files ?? []) : []}

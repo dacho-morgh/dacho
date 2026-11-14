@@ -23,7 +23,7 @@ export function RequestDetailShell({
   children: ReactNode
 }) {
   return (
-    <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pt-6 md:pt-10" dir="rtl">
+    <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto p-4 pt-6 md:pt-10" dir="rtl">
       <div className="flex flex-wrap items-center justify-between gap-3 pe-12 md:pe-0">
         <nav aria-label="مسیر صفحه" className="flex min-h-10 min-w-0 flex-wrap items-center gap-2">
           <Link href="/dashboard/requests">

@@ -183,6 +183,7 @@ export function CompanyDetailView({
   id,
   tab = 'profile',
   canManageAccount = false,
+  readOnly = false,
   initial,
 }: {
   id: string
@@ -191,6 +192,8 @@ export function CompanyDetailView({
   initial?: CompanyDetailResponse
   /** Only the System Owner may change or remove the representative's account. */
   canManageAccount?: boolean
+  /** A chief reviewer reads the company: no edit, add or delete control is drawn. */
+  readOnly?: boolean
 }) {
   const [dialog, setDialog] = useState<CompanyDialog | null>(null)
   const [data, setData] = useState<CompanyDetailResponse | null>(initial ?? null)
@@ -635,7 +638,7 @@ export function CompanyDetailView({
     >
       {tab === 'profile' && (
         <>
-          <CompanyLogoRow companyName={companyName} logo={data.logo} onUpload={uploadLogo} onRemove={removeLogo}>
+          <CompanyLogoRow companyName={companyName} logo={data.logo} onUpload={uploadLogo} onRemove={removeLogo} readOnly={readOnly}>
             <div className="order-last flex w-full items-center gap-2 sm:order-none sm:ms-auto sm:w-auto">
               <Badge variant={badgeInfo.variant} size="md">
                 {badgeInfo.label}
@@ -652,7 +655,7 @@ export function CompanyDetailView({
           <DetailCard
             title="اطلاعات پایه"
             action={
-              <Button
+              readOnly ? undefined : <Button
                 type="button"
                 variant="gray"
                 size="32"
@@ -677,7 +680,7 @@ export function CompanyDetailView({
           <DetailCard
             title="آدرس ها"
             action={
-              <Button
+              readOnly ? undefined : <Button
                 type="button"
                 variant="gray"
                 size="32"
@@ -701,7 +704,7 @@ export function CompanyDetailView({
                     <Typography as="h3" variant="14/semibold" sm="16/bold" color="secondary" className="min-w-0 flex-1 break-words">
                       {address.title}
                     </Typography>
-                    <div className="flex items-center gap-2">
+                    {readOnly ? null : <div className="flex items-center gap-2">
                       <Button
                         type="button"
                         variant="text-gray"
@@ -724,7 +727,7 @@ export function CompanyDetailView({
                       >
                         <DashboardTrashIcon />
                       </Button>
-                    </div>
+                    </div>}
                   </div>
                   <Typography variant="14/semibold" sm="16/semibold" color="neutral-400">
                     {address.address}

@@ -35,7 +35,7 @@ const errorMessage = (cause: unknown) =>
   describeMutationFailure(cause, 'اقدام انجام نشد. دوباره تلاش کنید.')
 
 /** One command the server may list for this person, with what it does and what it asks for. */
-interface Decision {
+export interface Decision {
   /** The `allowedActions` entry that offers this command. */
   gate: RequestAction
   key: string
@@ -54,7 +54,7 @@ interface Decision {
   done: string
 }
 
-const TRIAGE: Decision[] = [
+export const TRIAGE: Decision[] = [
   {
     gate: 'triage',
     key: 'triage-accept',
@@ -92,7 +92,7 @@ const TRIAGE: Decision[] = [
   },
 ]
 
-const REVIEW_DECISION: Decision[] = [
+export const REVIEW_DECISION: Decision[] = [
   {
     gate: 'decideReview',
     key: 'decision-advance',
@@ -159,7 +159,6 @@ export function RequestActionsPanel({
   actions: RequestAction[]
   revision?: number
 }) {
-  const router = useRouter()
   const [open, setOpen] = useState<Decision | null>(null)
 
   const groups = [
@@ -201,36 +200,65 @@ export function RequestActionsPanel({
         </div>
       ))}
       {open ? (
-        <DecisionForm
-          key={open.key}
+        <RequestDecisionDialog
+          id={id}
+          revision={revision}
           decision={open}
           // A refreshed case may no longer offer the command; the dialog then explains instead of sending.
           available={actions.includes(open.gate)}
           onClose={() => setOpen(null)}
-          onSend={async (reason) => {
-            try {
-              await open.send(id, reason, revision)
-              setOpen(null)
-              toast.success(`${open.done} پرونده و صف به‌روز شد.`, {
-                action: (
-                  <Button asChild variant="text-primary" size="32">
-                    <Link href="/dashboard/requests">
-                      <Typography variant="14/regular" className="text-inherit">بازگشت به صف درخواست‌ها</Typography>
-                    </Link>
-                  </Button>
-                ),
-              })
-              return null
-            } catch (cause) {
-              toast.error('ثبت تصمیم انجام نشد.')
-              return errorMessage(cause)
-            } finally {
-              router.refresh()
-            }
-          }}
         />
       ) : null}
     </section>
+  )
+}
+
+/**
+ * One command's dialog with its send: the dashboard decisions of the case page and of a list row share it.
+ * After any answer the case and the queue are read again.
+ */
+export function RequestDecisionDialog({
+  id,
+  revision,
+  decision,
+  available,
+  onClose,
+}: {
+  id: string
+  revision?: number
+  decision: Decision
+  available: boolean
+  onClose: () => void
+}) {
+  const router = useRouter()
+  return (
+    <DecisionForm
+      key={decision.key}
+      decision={decision}
+      available={available}
+      onClose={onClose}
+      onSend={async (reason) => {
+        try {
+          await decision.send(id, reason, revision)
+          onClose()
+          toast.success(`${decision.done} پرونده و صف به‌روز شد.`, {
+            action: (
+              <Button asChild variant="text-primary" size="32">
+                <Link href="/dashboard/requests">
+                  <Typography variant="14/regular" className="text-inherit">بازگشت به صف درخواست‌ها</Typography>
+                </Link>
+              </Button>
+            ),
+          })
+          return null
+        } catch (cause) {
+          toast.error('ثبت تصمیم انجام نشد.')
+          return errorMessage(cause)
+        } finally {
+          router.refresh()
+        }
+      }}
+    />
   )
 }
 

@@ -27,6 +27,8 @@ export function reopenRequest(id: string, reason: string, expectedRevision?: num
 export interface ReviewCandidatesDto {
   items: { id: string; name: string | null }[]
   employerId: string | null
+  /** The fixed employer's display name, when the server could resolve it. */
+  employerName?: string | null
 }
 
 export function getReviewCandidates(id: string): Promise<ReviewCandidatesDto> {
