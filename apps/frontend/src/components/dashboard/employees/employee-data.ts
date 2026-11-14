@@ -100,6 +100,20 @@ export async function setEmployeeActive(employee: Employee, isActive: boolean): 
   return { ...employee, ...result.doc }
 }
 
+/**
+ * The owner sets a new password for a staff member. The server needs the version stamp the page last read,
+ * enforces the minimum length and ends the person's open sessions.
+ */
+export async function setEmployeePassword(employee: Employee, password: string): Promise<Employee> {
+  const result = await adminRequest(`/api/users/personnel/${encodeURIComponent(employee.id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedUpdatedAt: employee.updatedAt, password }),
+  })
+  if (!result.doc?.updatedAt) throw new AdminError(500, {})
+  return { ...employee, ...result.doc }
+}
+
 /** Company representatives are applicants, not staff. */
 export const toStaff = (items: Employee[]): Employee[] =>
   items.filter((item) => item.operationalRole !== 'representative')

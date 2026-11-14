@@ -31,6 +31,7 @@ import {
   type Employee,
   type PersonnelFileRef,
 } from './employee-data'
+import { ChangePasswordDialog } from './change-password-dialog'
 import { toast } from 'sonner'
 
 /** docs/system/document-policy.json — Word/PDF, 10 MB (decimal) per file. */
@@ -231,7 +232,7 @@ export function EmployeeForm({
           />
         </>
       ) : mode === 'view' ? (
-        <EmployeeDetails employee={employee!} canManage={canManage} title={title} />
+        <EmployeeDetails employee={employee!} canManage={canManage} title={title} onChanged={setEmployee} />
       ) : (
         <EmployeeEditor
           key={employee?.updatedAt ?? 'new'}
@@ -291,11 +292,14 @@ function EmployeeDetails({
   employee,
   canManage,
   title,
+  onChanged,
 }: {
   employee: Employee
   canManage: boolean
   title: string
+  onChanged: (employee: Employee) => void
 }) {
+  const [changingPassword, setChangingPassword] = useState(false)
   const value = (id: string, label: string, text?: string | null, className?: string) => (
     <FormField id={id} label={label} className={className}>
       <Input id={id} readOnly value={text || '—'} className={CONTROL_TEXT} />
@@ -309,17 +313,32 @@ function EmployeeDetails({
         title={title}
         action={
           canManage && (
-            <Button asChild size="48">
-              <Link href={`/dashboard/employees/${encodeURIComponent(employee.id)}/edit`}>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button size="48" type="button" variant="outline-primary" onClick={() => setChangingPassword(true)}>
                 <Typography as="span" variant="14/regular" sm="20/regular" className="text-inherit">
-                  ویرایش
+                  تغییر رمز عبور
                 </Typography>
-                <DashboardEditIcon className="size-[26px]" />
-              </Link>
-            </Button>
+              </Button>
+              <Button asChild size="48">
+                <Link href={`/dashboard/employees/${encodeURIComponent(employee.id)}/edit`}>
+                  <Typography as="span" variant="14/regular" sm="20/regular" className="text-inherit">
+                    ویرایش
+                  </Typography>
+                  <DashboardEditIcon className="size-[26px]" />
+                </Link>
+              </Button>
+            </div>
           )
         }
       />
+      {canManage ? (
+        <ChangePasswordDialog
+          employee={employee}
+          open={changingPassword}
+          onOpenChange={setChangingPassword}
+          onChanged={onChanged}
+        />
+      ) : null}
       <div className="flex flex-col gap-5">
         <Section title="اطلاعات حساب">
           {value('phone', 'شماره تلفن همراه', employee.phone)}
@@ -455,7 +474,10 @@ function EmployeeEditor({
   const fileInput = useRef<HTMLInputElement>(null)
   // A field rule, not an object refine: zod skips object refines while any field is invalid.
   const schema = employee
-    ? employeeSchema
+    ? employeeSchema.extend({
+        // Left empty keeps the password; a new one follows the server's minimum.
+        password: z.union([z.literal(''), z.string().min(8, 'رمز عبور حداقل ۸ نویسه است.')]),
+      })
     : employeeSchema.extend({ password: z.string().min(3, 'رمز عبور حداقل ۳ نویسه است.') })
   const {
     register,
