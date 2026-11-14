@@ -22,6 +22,8 @@ export type PrivateDocumentDownloadProps = PrivateDocumentDownloadSource & {
   filename: string
   label?: string
   disabled?: boolean
+  /** `primary` is the filled 40px button of a file row (Figma 32315:43019); the default is the compact outline one. */
+  emphasis?: 'default' | 'primary'
 }
 
 /**
@@ -30,7 +32,7 @@ export type PrivateDocumentDownloadProps = PrivateDocumentDownloadSource & {
  * denied, expired or revoked request shows Persian feedback and never falls
  * back to a public media URL or exposes a storage path.
  */
-export function PrivateDocumentDownload({ filename, label = 'دانلود', disabled = false, ...source }: PrivateDocumentDownloadProps) {
+export function PrivateDocumentDownload({ filename, label = 'دانلود', disabled = false, emphasis = 'default', ...source }: PrivateDocumentDownloadProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sessionExpired, setSessionExpired] = useState(false)
@@ -69,14 +71,14 @@ export function PrivateDocumentDownload({ filename, label = 'دانلود', disa
     <div className="flex min-w-0 flex-col items-end gap-1">
       <Button
         type="button"
-        variant="outline-primary"
-        size="32"
+        variant={emphasis === 'primary' ? 'primary' : 'outline-primary'}
+        size={emphasis === 'primary' ? '40' : '32'}
         disabled={disabled || busy}
         aria-busy={busy}
         aria-label={`${label} ${filename}`}
         onClick={() => void download()}
       >
-        <Typography as="span" variant="12/semibold" className="text-inherit">
+        <Typography as="span" variant={emphasis === 'primary' ? '16/semibold' : '12/semibold'} className="text-inherit">
           {busy ? 'در حال دریافت…' : label}
         </Typography>
       </Button>

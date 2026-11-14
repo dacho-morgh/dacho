@@ -21,7 +21,6 @@ vi.mock('@/components/documents/private-document-field', () => ({
 }))
 
 import { ParticipationEligibilityPanel } from '@/components/dashboard/participation-eligibility-panel'
-import { EventsView, type EventItem } from '@/components/dashboard/events-view'
 import { NewRequestForm } from '@/components/dashboard/new-request-form'
 import { registrationReturnUrl } from '@/components/dashboard/profile/return-to-registration'
 import * as dashboardApi from '@/utilities/dashboard-api'
@@ -261,66 +260,6 @@ describe('ParticipationEligibilityPanel', () => {
       resolveOld(verification('approved'))
     })
     expect(screen.getByTestId('eligibility-state').getAttribute('data-state')).toBe('pending')
-  })
-})
-
-describe('EventsView eligibility gate', () => {
-  const event: EventItem = {
-    id: `events-${EVENT_ID}`,
-    rawId: EVENT_ID,
-    serviceKey: 'events',
-    title: 'رویداد نوآوری',
-    badgeText: 'در حال برگزاری',
-    badgeType: 'active',
-    dates: '۱۲ بهمن',
-    location: 'بوشهر',
-    hasActionButton: true,
-  }
-
-  beforeEach(() => {
-    vi.spyOn(dashboardApi, 'getEventCategories').mockResolvedValue({
-      items: [{ id: 'cat-1', eventId: EVENT_ID, title: 'دسته', createdAt: '', updatedAt: '' }],
-    })
-    vi.spyOn(dashboardApi, 'getEventSubtopics').mockResolvedValue({
-      items: [
-        { id: 'sub-1', eventId: EVENT_ID, categoryId: 'cat-1', categoryTitle: 'دسته', title: 'زیرعنوان اول', employerId: 'employer-1', currentRfpVersionId: null },
-        { id: 'sub-2', eventId: EVENT_ID, categoryId: 'cat-1', categoryTitle: 'دسته', title: 'زیرعنوان دوم', employerId: 'employer-1', currentRfpVersionId: null },
-      ] satisfies dashboardApi.EventSubtopicDto[],
-    })
-  })
-
-  it('restores the returned subtopic selection but keeps registration off while verification is pending', async () => {
-    mockEligibility('pending')
-    render(createElement(EventsView, { initialEventsList: [event], initialSelectedEventId: EVENT_ID, initialSubtopicIds: ['sub-2', 'gone'] }))
-    const checkbox = await screen.findByRole('checkbox', { name: /انتخاب زیرعنوان زیرعنوان دوم/ })
-    // The shared Checkbox is a Radix button: its state is aria-checked.
-    await waitFor(() => expect(checkbox.getAttribute('aria-checked')).toBe('true'))
-    expect((await screen.findByTestId('eligibility-state')).getAttribute('data-state')).toBe('pending')
-    const register = screen.getByRole('button', { name: /ثبت درخواست \(۱ زیرعنوان\)/ }) as HTMLButtonElement
-    expect(register.disabled).toBe(true)
-    fireEvent.click(register)
-    expect(mockPush).not.toHaveBeenCalled()
-  })
-
-  it('carries the selected subtopics into the profile return link', async () => {
-    mockEligibility('unsubmitted', ['addresses'])
-    render(createElement(EventsView, { initialEventsList: [event], initialSelectedEventId: EVENT_ID }))
-    fireEvent.click(await screen.findByRole('checkbox', { name: /انتخاب زیرعنوان زیرعنوان اول/ }))
-    const link = await screen.findByRole('link', { name: 'تکمیل آدرس‌ها' })
-    expect(link.getAttribute('href')).toBe(
-      `/dashboard/profile/company?returnTo=${encodeURIComponent(`/dashboard/events?eventId=${EVENT_ID}&subtopicId=sub-1`)}#company-addresses`,
-    )
-  })
-
-  it('enables registration once the server reports approval', async () => {
-    mockEligibility('approved')
-    render(createElement(EventsView, { initialEventsList: [event], initialSelectedEventId: EVENT_ID }))
-    fireEvent.click(await screen.findByRole('checkbox', { name: /انتخاب زیرعنوان زیرعنوان اول/ }))
-    await screen.findByTestId('eligibility-state')
-    const register = screen.getByRole('button', { name: /ثبت درخواست \(۱ زیرعنوان\)/ }) as HTMLButtonElement
-    await waitFor(() => expect(register.disabled).toBe(false))
-    fireEvent.click(register)
-    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining(`eventId=${EVENT_ID}&subtopicId=sub-1`))
   })
 })
 

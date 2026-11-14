@@ -23,6 +23,22 @@ export default async function NewRequestPage({ searchParams }: { searchParams: P
   }))
   const participation = participationTargetFor(key, query)
   const returnTo = participation ? newRequestPath(query) : undefined
+  // An event application draws its own header and cards (Figma 31983:86016).
+  if (participation?.kind === 'event') {
+    return (
+      <main className="flex w-full min-w-0 flex-col px-4 pt-10 pb-4" dir="rtl">
+        <NewRequestForm
+          serviceId={String(service.id)}
+          serviceKey={service.key ?? undefined}
+          title={service.title}
+          fields={fields}
+          initialAnswers={initialAnswers}
+          participation={participation}
+          returnTo={returnTo}
+        />
+      </main>
+    )
+  }
   return (
     <main className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-6 p-4 sm:p-10" dir="rtl">
       {participation ? (
@@ -32,7 +48,7 @@ export default async function NewRequestPage({ searchParams }: { searchParams: P
           </Link>
           <Typography as="span" variant="14/regular" color="neutral-400">/</Typography>
           <Typography as="span" variant="14/semibold" color="neutral-700">
-            {participation.kind === 'event' ? 'ثبت نام در رویداد' : 'ثبت نام در نمایشگاه'}
+            ثبت نام در نمایشگاه
           </Typography>
         </nav>
       ) : null}

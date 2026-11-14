@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { PrivateDocumentDownload } from '@/components/documents/private-document-download'
-import { DashboardCloseCircle } from '@/components/icons'
+import { DashboardCloseCircle, DocumentTextIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { RequiredMark } from '@/components/ui/field'
 import { Typography } from '@/components/ui/typography'
@@ -50,6 +50,11 @@ export interface PrivateDocumentFieldProps {
   /** For a role that only reads: no upload control or upload guidance at all. */
   readOnly?: boolean
   /**
+   * `dropzone`: only the drop area of the proposal upload (Figma 31996:87660), with no card, heading or hints;
+   * the files already uploaded and the progress still show below it.
+   */
+  variant?: 'card' | 'dropzone'
+  /**
    * Attachment mode (e.g. a letter being composed): existing parent files are
    * not listed; only files uploaded through this control in this session are
    * shown, and they can be detached locally without deleting server bytes.
@@ -79,6 +84,7 @@ export function PrivateDocumentField({
   canUpload = true,
   canDelete = false,
   readOnly = false,
+  variant = 'card',
   sessionOnly = false,
   onPendingChange,
   onReadyChange,
@@ -266,9 +272,54 @@ export function PrivateDocumentField({
     }
   }
 
+  const dropzone = variant === 'dropzone'
+  const chooseDropped = (event: React.DragEvent) => {
+    event.preventDefault()
+    if (uploadAllowed && !pending) void chooseFiles(event.dataTransfer.files)
+  }
+
   return (
-    <section className="flex flex-col gap-3 rounded-xl border border-neutral-100 bg-background p-4" dir="rtl">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <section
+      className={dropzone ? 'flex flex-col gap-3' : 'flex flex-col gap-3 rounded-xl border border-neutral-100 bg-background p-4'}
+      dir="rtl"
+    >
+      {dropzone && !readOnly ? (
+        <label
+          htmlFor={inputId}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={chooseDropped}
+          className={
+            'flex h-[280px] w-full flex-col items-center justify-center gap-3 self-center rounded-[8px] border border-neutral-100 bg-background px-4 text-center transition-colors has-[:focus-visible]:border-brand-500 ' +
+            (uploadAllowed && !pending ? 'cursor-pointer hover:border-brand-500' : 'cursor-not-allowed opacity-60')
+          }
+        >
+          <input
+            ref={inputRef}
+            id={inputId}
+            type="file"
+            className="sr-only"
+            accept={documentAccept(category)}
+            multiple
+            disabled={!uploadAllowed || pending}
+            onChange={(event) => {
+              void chooseFiles(event.target.files)
+              event.target.value = ''
+            }}
+          />
+          <DocumentTextIcon aria-hidden="true" className="size-6 text-neutral-700" />
+          <Typography as="span" variant="16/regular" color="neutral-700">
+            فایل خود را اینجا رها کنید یا برای انتخاب کلیک کنید
+          </Typography>
+          <Typography as="span" variant="12/regular" color="neutral-400">
+            حداکثر حجم مجاز ۱۰ مگابایت است
+          </Typography>
+          <Typography as="span" variant="12/regular" color="neutral-400">
+            در فرمت‌های pdf, doc, docx
+          </Typography>
+        </label>
+      ) : null}
+
+      {dropzone ? null : <div className="flex flex-wrap items-center justify-between gap-2">
         <Typography as="h3" variant="16/semibold" color="neutral-700">
           {label ?? documentCategoryLabel(category)}
           {required ? <RequiredMark className="ms-1" /> : null}
@@ -278,14 +329,14 @@ export function PrivateDocumentField({
             {documentFormatsMessage(category)} · {DOCUMENT_SIZE_MESSAGE}
           </Typography>
         )}
-      </div>
+      </div>}
 
       {description ? (
         <Typography variant="12/regular" color="neutral-500">
           {description}
         </Typography>
       ) : null}
-      {readOnly ? null : (
+      {readOnly || dropzone ? null : (
         <Typography variant="12/light" color="neutral-400">
           امکان بارگذاری چند فایل در همین فیلد وجود دارد؛ هر فایل جداگانه اعتبارسنجی می‌شود.
         </Typography>
@@ -424,7 +475,7 @@ export function PrivateDocumentField({
         </ul>
       ) : null}
 
-      {readOnly ? null : <div className="flex flex-wrap items-center gap-2">
+      {readOnly || dropzone ? null : <div className="flex flex-wrap items-center gap-2">
         <input
           ref={inputRef}
           id={inputId}

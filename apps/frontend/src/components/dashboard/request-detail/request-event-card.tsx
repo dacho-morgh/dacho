@@ -17,6 +17,8 @@ export interface RequestWorkflowStep {
   title: string
   roleName?: string
   order: number
+  /** The backend's own reading of an event application's stage; when present it decides the stepper. */
+  state?: 'done' | 'current' | 'upcoming' | 'rejected'
 }
 
 type BadgeVariant = 'gray' | 'primary' | 'success' | 'warning' | 'error'
@@ -123,6 +125,48 @@ export function RequestEventCard({
 }
 
 /**
+ * «وضعیت درخواست» alone: the collapsible stepper card, for pages whose event, title and files are drawn
+ * by their own cards (the event application page) so the head of the application card would repeat them.
+ */
+export function RequestStatusCard({
+  workflow,
+  currentStep,
+}: {
+  workflow: RequestWorkflowStep[]
+  currentStep: string | null | undefined
+}) {
+  const [open, setOpen] = useState(true)
+  const bodyId = useId()
+  return (
+    <section
+      aria-label="وضعیت درخواست"
+      data-testid="request-status-card"
+      className="flex min-w-0 flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <Typography as="h2" variant="16/bold" sm="20/bold" color="neutral-800">
+          وضعیت درخواست
+        </Typography>
+        <Button
+          type="button"
+          variant="text-gray"
+          size="icon-32"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          aria-label={open ? 'بستن وضعیت درخواست' : 'باز کردن وضعیت درخواست'}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <ChevronUpIcon className={cn('size-6', !open && 'rotate-180')} aria-hidden="true" />
+        </Button>
+      </div>
+      <div id={bodyId} hidden={!open}>
+        <RequestWorkflowStepper workflow={workflow} currentStep={currentStep} />
+      </div>
+    </section>
+  )
+}
+
+/**
  * The service's workflow as the design's vertical stepper: a green tick for the steps
  * behind the case, the numbered brand dot for the current one, grey dots after it.
  */
@@ -144,7 +188,17 @@ export function RequestWorkflowStepper({
   return (
     <ol className="flex flex-col">
       {workflow.map((step, index) => {
-        const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'next'
+        // The backend reports each stage's state for an event application; otherwise it is read from the current step.
+        const reported = step.state
+        const state: 'done' | 'current' | 'next' | 'rejected' = reported
+          ? reported === 'upcoming'
+            ? 'next'
+            : reported
+          : index < currentIndex
+            ? 'done'
+            : index === currentIndex
+              ? 'current'
+              : 'next'
         const last = index === workflow.length - 1
         return (
           <li
@@ -161,7 +215,11 @@ export function RequestWorkflowStepper({
                   aria-hidden="true"
                   className={cn(
                     'flex size-6 shrink-0 items-center justify-center rounded-full',
-                    state === 'current' ? 'bg-brand-500 text-white' : 'bg-neutral-100 text-neutral-500',
+                    state === 'current'
+                      ? 'bg-brand-500 text-white'
+                      : state === 'rejected'
+                        ? 'bg-error-500 text-white'
+                        : 'bg-neutral-100 text-neutral-500',
                   )}
                 >
                   <Typography as="span" variant="12/semibold" className="text-inherit">
@@ -174,7 +232,7 @@ export function RequestWorkflowStepper({
                   aria-hidden="true"
                   className={cn(
                     'min-h-8 w-px flex-1',
-                    state === 'done' ? 'bg-success-500' : state === 'current' ? 'bg-brand-500' : 'bg-neutral-200',
+                    state === 'done' ? 'bg-success-500' : state === 'current' ? 'bg-brand-500' : state === 'rejected' ? 'bg-error-500' : 'bg-neutral-200',
                   )}
                 />
               )}

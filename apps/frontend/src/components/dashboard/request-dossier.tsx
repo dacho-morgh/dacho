@@ -8,7 +8,7 @@ import { RequestActionsPanel } from '@/components/dashboard/request-actions-pane
 import { RequestAssignmentPanel } from '@/components/dashboard/request-assignment-panel'
 import { RequestCompanyCard } from '@/components/dashboard/request-detail/request-company-card'
 import { RequestDetailShell } from '@/components/dashboard/request-detail/request-detail-shell'
-import { RequestEventCard, RequestWorkflowStepper } from '@/components/dashboard/request-detail/request-event-card'
+import { RequestEventCard, RequestStatusCard, RequestWorkflowStepper } from '@/components/dashboard/request-detail/request-event-card'
 import { RequestCardRow, RequestHistoryCard } from '@/components/dashboard/request-detail/request-history-card'
 import { ReviewAssignmentPanel } from '@/components/dashboard/review-assignment-panel'
 import { SecretariatFollowUpPanel } from '@/components/dashboard/secretariat-follow-up-panel'
@@ -122,6 +122,10 @@ export interface RequestDossierProps {
   roundEmployerId?: string | null
   /** Company-only sections, rendered above the request details. */
   companySections?: React.ReactNode
+  /** The event application's cards (Figma 32314:41509): drawn first, and they own the proposal files. */
+  eventCards?: React.ReactNode
+  /** The page's main action, drawn opposite the title at the top (the company's letter to the Secretariat). */
+  headerActions?: React.ReactNode
   /** The company sections include the FE13 correction form, which owns the proposal upload while correcting. */
   correctionHandled?: boolean
 }
@@ -142,6 +146,8 @@ export function RequestDossier({
   people = {},
   roundEmployerId = null,
   companySections,
+  eventCards = null,
+  headerActions = null,
   correctionHandled = false,
 }: RequestDossierProps) {
   const { request, owner, timeline, workflow } = detail
@@ -188,7 +194,9 @@ export function RequestDossier({
   ]
 
   return (
-    <RequestDetailShell title={pageTitle}>
+    <RequestDetailShell title={pageTitle} actions={headerActions}>
+      {eventCards}
+
       {showsCompanyCard ? (
         <RequestCompanyCard
           name={companyName || 'شرکت متقاضی'}
@@ -197,7 +205,9 @@ export function RequestDossier({
         />
       ) : null}
 
-      {showsEventCard ? (
+      {showsEventCard && eventCards ? (
+        <RequestStatusCard workflow={workflow} currentStep={request.currentStep} />
+      ) : showsEventCard ? (
         <RequestEventCard
           title={request.title}
           titleAsHeading={!isCompany}
@@ -256,96 +266,103 @@ export function RequestDossier({
       {followUp && !financialStageOpen ? followUp : null}
       {actions.includes('assign') ? <RequestAssignmentPanel id={id} /> : null}
 
-      <DetailCard title="خلاصه پرونده">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {showsEventCard ? null : <InfoField label="کد پیگیری" value={<bdi className="font-mono">{request.trackingCode}</bdi>} />}
-          <InfoField label="وضعیت" value={statusLabel} />
-          {isCompany ? null : <InfoField label="مرحله" value={stageLabel(request.reviewStage, request.currentStep)} />}
-          <InfoField label="نسخه پرونده" value={request.revision ? request.revision.toLocaleString('fa-IR') : '—'} />
-          <InfoField label="اقدام بعدی شما" value={nextAction ?? 'اقدامی برای شما تعریف نشده است'} />
-          {showsEventCard ? null : <InfoField label="تاریخ ثبت" value={submitted || 'ثبت نشده'} />}
-          <InfoField label="آخرین به‌روزرسانی" value={formatDate(request.updatedAt)} />
-        </div>
-      </DetailCard>
+      {eventCards ? null : (
+        <DetailCard title="خلاصه پرونده">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {showsEventCard ? null : <InfoField label="کد پیگیری" value={<bdi className="font-mono">{request.trackingCode}</bdi>} />}
+            <InfoField label="وضعیت" value={statusLabel} />
+            {isCompany ? null : <InfoField label="مرحله" value={stageLabel(request.reviewStage, request.currentStep)} />}
+            <InfoField label="نسخه پرونده" value={request.revision ? request.revision.toLocaleString('fa-IR') : '—'} />
+            <InfoField label="اقدام بعدی شما" value={nextAction ?? 'اقدامی برای شما تعریف نشده است'} />
+            {showsEventCard ? null : <InfoField label="تاریخ ثبت" value={submitted || 'ثبت نشده'} />}
+            <InfoField label="آخرین به‌روزرسانی" value={formatDate(request.updatedAt)} />
+          </div>
+        </DetailCard>
+      )}
 
       {profile !== null ? <ProfileSnapshot profile={profile} /> : null}
 
-      <DetailCard title="اطلاعات و فرم رویداد">
-        {proposal === 'failed' ? (
-          <Typography role="alert" variant="14/regular" color="error">
-            دریافت نسخه پروپوزال انجام نشد. صفحه را دوباره بارگذاری کنید.
-          </Typography>
-        ) : proposalDetail ? (
-          <div className="flex flex-col gap-1">
-            <Typography variant="14/regular" color="neutral-500">
-              نسخه پروپوزال: {proposalDetail.revision.toLocaleString('fa-IR')}
+      {eventCards ? null : (
+        <DetailCard title="اطلاعات و فرم رویداد">
+          {proposal === 'failed' ? (
+            <Typography role="alert" variant="14/regular" color="error">
+              دریافت نسخه پروپوزال انجام نشد. صفحه را دوباره بارگذاری کنید.
             </Typography>
-            {!isCompany ? (
+          ) : proposalDetail ? (
+            <div className="flex flex-col gap-1">
               <Typography variant="14/regular" color="neutral-500">
-                نسخه ثبت‌شده در {formatDate(proposalDetail.createdAt)}
-                {proposalDetail.proposalDocuments.length
-                  ? ` · فایل پروپوزال: ${proposalDetail.proposalDocuments.map((file) => file.filename).join('، ')}`
-                  : ''}
+                نسخه پروپوزال: {proposalDetail.revision.toLocaleString('fa-IR')}
               </Typography>
-            ) : null}
-          </div>
-        ) : null}
-        <div className="grid gap-4 sm:grid-cols-2">
-          {Object.entries(request.answers ?? {})
-            .filter(([key]) => key !== 'applicationTeam')
-            .map(([key, value]) => (
-              <ReadonlyField key={key} label={key} value={answerText(value)} />
-            ))}
-        </div>
-        {proposalDetail?.applicationTeam?.length ? (
-          <div className="flex flex-col gap-3">
-            <Typography as="h3" variant="16/semibold" color="neutral-800">تیم متقاضی</Typography>
-            <ul className="flex flex-col gap-2">
-              {proposalDetail.applicationTeam.map((member, index) => (
-                <li key={`${index}-${member.name}`} className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
-                  <Typography variant="14/regular" color="neutral-800">
-                    {member.name} · {member.role}{member.relation ? ` · ${member.relation}` : ''}
-                  </Typography>
-                </li>
+              {!isCompany ? (
+                <Typography variant="14/regular" color="neutral-500">
+                  نسخه ثبت‌شده در {formatDate(proposalDetail.createdAt)}
+                  {proposalDetail.proposalDocuments.length
+                    ? ` · فایل پروپوزال: ${proposalDetail.proposalDocuments.map((file) => file.filename).join('، ')}`
+                    : ''}
+                </Typography>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {Object.entries(request.answers ?? {})
+              .filter(([key]) => key !== 'applicationTeam' && !(eventCards && key === 'proposalNotes'))
+              .map(([key, value]) => (
+                <ReadonlyField key={key} label={key} value={answerText(value)} />
               ))}
-            </ul>
           </div>
-        ) : null}
-      </DetailCard>
+          {proposalDetail?.applicationTeam?.length ? (
+            <div className="flex flex-col gap-3">
+              <Typography as="h3" variant="16/semibold" color="neutral-800">تیم متقاضی</Typography>
+              <ul className="flex flex-col gap-2">
+                {proposalDetail.applicationTeam.map((member, index) => (
+                  <li key={`${index}-${member.name}`} className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
+                    <Typography variant="14/regular" color="neutral-800">
+                      {member.name} · {member.role}{member.relation ? ` · ${member.relation}` : ''}
+                    </Typography>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </DetailCard>
+      )}
 
-      <DetailCard title="مدارک درخواست">
-        {seesFinancial ? (
-          <Typography variant="14/regular" color="neutral-500">
-            مدارک مالی فقط برای شرکت، دبیرخانه، صاحب سیستم و مسئول سرمایه‌گذاریِ منتسب قابل مشاهده است.
-          </Typography>
-        ) : null}
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {correcting ? null : (
-            <PrivateDocumentField
-              category="proposal"
-              label={documentCategoryLabel('proposal')}
-              requestId={id}
-              readOnly={!canUpload}
-              canUpload={canUpload && proposalWritable}
-              canDelete={canDelete && proposalWritable}
-            />
-          )}
-          {/* The company uploads in the package form and the investment person reads the frozen package (S6). */}
-          {seesFinancial && !isCompany && role !== 'investment-reviewer'
-            ? FINANCIAL_CATEGORIES.map((category) => (
-                <PrivateDocumentField
-                  key={category}
-                  category={category}
-                  label={documentCategoryLabel(category)}
-                  requestId={id}
-                  readOnly={!canUpload}
-                  canUpload={canUpload && (!isCompany || financialStageOpen)}
-                  canDelete={canDelete}
-                />
-              ))
-            : null}
-        </div>
-      </DetailCard>
+      {/* On an event application the proposal lives in the cards above; only the financial files remain here. */}
+      {eventCards && !(seesFinancial && !isCompany && role !== 'investment-reviewer') ? null : (
+        <DetailCard title="مدارک درخواست">
+          {seesFinancial ? (
+            <Typography variant="14/regular" color="neutral-500">
+              مدارک مالی فقط برای شرکت، دبیرخانه، صاحب سیستم و مسئول سرمایه‌گذاریِ منتسب قابل مشاهده است.
+            </Typography>
+          ) : null}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {correcting || eventCards ? null : (
+              <PrivateDocumentField
+                category="proposal"
+                label={documentCategoryLabel('proposal')}
+                requestId={id}
+                readOnly={!canUpload}
+                canUpload={canUpload && proposalWritable}
+                canDelete={canDelete && proposalWritable}
+              />
+            )}
+            {/* The company uploads in the package form and the investment person reads the frozen package (S6). */}
+            {seesFinancial && !isCompany && role !== 'investment-reviewer'
+              ? FINANCIAL_CATEGORIES.map((category) => (
+                  <PrivateDocumentField
+                    key={category}
+                    category={category}
+                    label={documentCategoryLabel(category)}
+                    requestId={id}
+                    readOnly={!canUpload}
+                    canUpload={canUpload && (!isCompany || financialStageOpen)}
+                    canDelete={canDelete}
+                  />
+                ))
+              : null}
+          </div>
+        </DetailCard>
+      )}
 
       {showsEventCard ? null : (
         <CollapsibleCard title="روند بررسی" defaultOpen={false}>

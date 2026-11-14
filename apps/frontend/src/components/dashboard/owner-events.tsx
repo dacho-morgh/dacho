@@ -8,8 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Typography } from '@/components/ui/typography'
 import {
   formatFileSize,
+  getProposalTemplate,
+  getProposalTemplateDownloadUrl,
   getRfpDownloadUrl,
   type EventCategoryDto,
+  type ProposalTemplateDto,
   type EventSubtopicDto,
   type RfpVersionDto,
 } from '@/utilities/dashboard-api'
@@ -662,6 +665,144 @@ function RfpManager({
   )
 }
 
+/**
+ * The event's sample proposal form: the file every applicant downloads next to the RFP. It starts as the bundled
+ * default; the owner may replace it for this event and go back to the default at any time.
+ */
+function ProposalTemplateSection({ eventId }: { eventId: string }) {
+  const [template, setTemplate] = useState<ProposalTemplateDto | null>(null)
+  const [loadFailure, setLoadFailure] = useState<unknown>(null)
+  const [busy, setBusy] = useState(false)
+  const [inputKey, setInputKey] = useState(0)
+  const [formError, setFormError] = useState<string | null>(null)
+  const base = `/api/dashboard/admin/events/${encodeURIComponent(eventId)}/proposal-template`
+
+  const load = async () => {
+    setLoadFailure(null)
+    try {
+      setTemplate((await getProposalTemplate(eventId)).template)
+    } catch (cause) {
+      setLoadFailure(cause)
+    }
+  }
+  useEffect(() => {
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId])
+
+  const replace = async (file: File | undefined) => {
+    if (!file) return
+    setFormError(null)
+    const invalid = validateSelectedFile(file)
+    if (invalid) {
+      setFormError(`${file.name}: ${rfpUploadMessages[invalid]}`)
+      setInputKey((value) => value + 1)
+      return
+    }
+    setBusy(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const result = await adminRequest(base, { method: 'PUT', body: formData })
+      setTemplate(result.template)
+      toast.success('نمونه فرم پروپوزال تغییر کرد.')
+    } catch (cause) {
+      toast.error('تغییر نمونه فرم پروپوزال انجام نشد.')
+      const code = cause instanceof AdminError ? String(cause.data?.error) : ''
+      setFormError(rfpUploadMessages[code] ?? 'تغییر نمونه فرم پروپوزال انجام نشد. دوباره تلاش کنید.')
+    } finally {
+      setBusy(false)
+      setInputKey((value) => value + 1)
+    }
+  }
+
+  const reset = async () => {
+    setFormError(null)
+    setBusy(true)
+    try {
+      const result = await adminRequest(base, { method: 'DELETE' })
+      setTemplate(result.template)
+      toast.success('نمونه فرم پروپوزال به حالت پیش‌فرض برگشت.')
+    } catch {
+      toast.error('بازگرداندن نمونه پیش‌فرض انجام نشد.')
+      setFormError('بازگرداندن نمونه پیش‌فرض انجام نشد. دوباره تلاش کنید.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section
+      aria-labelledby="event-proposal-template-heading"
+      className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-background p-4"
+    >
+      <header className="flex min-w-0 flex-col gap-1">
+        <Typography as="h2" id="event-proposal-template-heading" variant="20/bold" color="neutral-600">
+          نمونه فرم پروپوزال
+        </Typography>
+        <Typography variant="14/regular" color="muted">
+          این فایل کنار فایل RFP هر زیرعنوان برای متقاضیان نمایش داده می‌شود. اگر فایل دیگری بارگذاری نکنید، نمونه پیش‌فرض استفاده می‌شود.
+        </Typography>
+      </header>
+
+      {loadFailure !== null ? (
+        <RequestError error={loadFailure} returnTo="/dashboard/events" retry={() => void load()} />
+      ) : template === null ? (
+        <Skeleton className="h-10 w-full" />
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-100 p-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <DocumentTextIcon aria-hidden="true" className="size-6 shrink-0 text-neutral-500" />
+            <div className="flex min-w-0 flex-col">
+              <Typography variant="14/semibold" color="neutral-700" className="truncate">
+                <bdi dir="auto">{template.filename}</bdi>
+              </Typography>
+              <Typography variant="12/regular" color="neutral-500">
+                {formatFileSize(template.sizeBytes)}
+              </Typography>
+            </div>
+            <Badge variant={template.isDefault ? 'gray' : 'primary'}>{template.isDefault ? 'پیش‌فرض' : 'تغییر یافته'}</Badge>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild size="40" variant="outline-gray">
+              <a href={getProposalTemplateDownloadUrl(eventId)} download={template.filename}>
+                <Typography variant="14/regular" className="text-inherit">دانلود</Typography>
+              </a>
+            </Button>
+            {!template.isDefault ? (
+              <Button size="40" type="button" variant="text-gray" disabled={busy} onClick={() => void reset()}>
+                <Typography variant="14/regular" className="text-inherit">بازگشت به نمونه پیش‌فرض</Typography>
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-col gap-2">
+        <Typography asChild variant="16/semibold">
+          <label htmlFor="proposal-template-file">جایگزینی نمونه فرم پروپوزال</label>
+        </Typography>
+        <FileInput
+          key={inputKey}
+          id="proposal-template-file"
+          aria-label="جایگزینی نمونه فرم پروپوزال"
+          accept={DOCUMENT_ACCEPT}
+          disabled={busy || template === null}
+          onChange={(event) => void replace(event.target.files?.[0])}
+        />
+        <Typography variant="12/regular" color="muted">
+          فرمت‌های مجاز: PDF, DOC, DOCX — حداکثر ۱۰ مگابایت
+        </Typography>
+        {formError ? (
+          <Typography role="alert" variant="14/regular" color="error">
+            {formError}
+          </Typography>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
 function EventSubtopicsManager({
   event,
   people,
@@ -746,6 +887,8 @@ function EventSubtopicsManager({
           }
         />
       )}
+
+      <ProposalTemplateSection eventId={event.id} />
 
       {/* Same card as the event form's sections above it (FormSection). */}
       <section
